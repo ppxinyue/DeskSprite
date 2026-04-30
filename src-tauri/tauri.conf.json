@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DeskSprite",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.desksprite.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,8 @@
   "app": {
     "windows": [
       {
-        "title": "desksprite-init",
+        "label": "main",
+        "title": "DeskSprite",
         "width": 800,
         "height": 600,
         "resizable": true,
@@ -20,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src https://api.openai.com https://api.anthropic.com https://api.groq.com"
     }
   },
   "bundle": {

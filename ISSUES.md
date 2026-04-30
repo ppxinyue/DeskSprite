@@ -43,3 +43,14 @@
 - 解决方案：手动 `pnpm add class-variance-authority`。
 - 经验总结：使用 `pnpm dlx shadcn add` 后需检查是否有遗漏的依赖。
 - 是否需更新技术文档：否
+
+## ISSUE-005
+- 发现时间：2026-05-01
+- 发现者：Agent 1
+- 相关任务：A5. 配置 tauri.conf.json 权限
+- 严重程度：已解决
+- 问题现象：`core:window:allow-skip-taskbar` 和 `core:window:allow-set-transparent` 权限不存在，cargo build 报错。`trayIcon` 配置字段导致 `set_tray_icon` 方法找不到。
+- 原因分析：Tauri 2.0 的权限名与文档不完全一致，透明窗口是窗口属性而非权限控制，托盘图标应通过代码创建而非配置文件。
+- 解决方案：移除不存在的权限，删除 `trayIcon` 配置（托盘在任务 C 通过代码实现），仅保留验证通过的权限列表。
+- 经验总结：添加权限前应先确认实际可用权限名，可从 cargo build 错误输出的列表中查找。
+- 是否需更新技术文档：否
