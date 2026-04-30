@@ -3,24 +3,24 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0
-- 完成任务：0 / 11 (A-K)
+- 完成任务：1 / 11 (A-K)
 - 当前 Agent 分工：[Agent 1: 任务A 项目初始化]
 
 ## 任务进度
 
 ### A. 项目初始化
-- 状态：🔄 进行中
+- 状态：✅ 完成
 - 负责人：Agent 1
 - 开始时间：2026-04-30
-- 完成时间：
+- 完成时间：2026-05-01
 - 子任务：
   - [x] A1: 创建 Tauri 2.0 + React TS 项目
   - [x] A2: 安装前端依赖
   - [x] A3: 配置 Tailwind + shadcn/ui
   - [x] A4: 添加 Rust 依赖
   - [x] A5: 配置 tauri.conf.json 权限
-  - [ ] A6: 配置动态 CSP 安全策略
-- 备注：A1-A5 已完成并验证（pnpm build + cargo build 通过）。
+  - [x] A6: 配置动态 CSP 安全策略
+- 备注：A1-A6 全部完成（pnpm build + cargo build 通过）。任务 A 完成！
 
 ### B. 数据库 + Keychain
 - 状态：⏳ 待开始
