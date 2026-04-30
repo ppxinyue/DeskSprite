@@ -1,8 +1,8 @@
 [package]
-name = "app"
+name = "desksprite"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "DeskSprite - AI Desktop Pet"
+authors = ["pp"]
 license = ""
 repository = ""
 edition = "2021"
@@ -23,3 +23,19 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.10.3" }
 tauri-plugin-log = "2"
+
+# DeskSprite P0 dependencies
+keyring = "3"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+chrono = { version = "0.4", features = ["serde"] }
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-store = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+xcap = "0.5"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+screenshots = "0.8"

@@ -17,10 +17,10 @@
   - [x] A1: 创建 Tauri 2.0 + React TS 项目
   - [x] A2: 安装前端依赖
   - [x] A3: 配置 Tailwind + shadcn/ui
-  - [ ] A4: 添加 Rust 依赖
+  - [x] A4: 添加 Rust 依赖
   - [ ] A5: 配置 tauri.conf.json 权限
   - [ ] A6: 配置动态 CSP 安全策略
-- 备注：A1-A3 已完成并验证（pnpm build 通过）。
+- 备注：A1-A4 已完成并验证（pnpm build + cargo build 通过）。
 
 ### B. 数据库 + Keychain
 - 状态：⏳ 待开始
