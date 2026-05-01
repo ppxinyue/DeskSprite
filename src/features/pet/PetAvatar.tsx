@@ -73,7 +73,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: PetAvatarProps) {
               key={`${petState}-${imageSrc}`}
               src={imageSrc}
               alt="DeskSprite Pet"
-              className="w-16 h-16 pointer-events-none"
+              className="w-24 h-24 pointer-events-none drop-shadow-lg"
               animate={animate}
               initial={{ opacity: 0 }}
               exit={{ opacity: 0 }}

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AppLayout } from "@/components/layouts/AppLayout";
 import { PetAvatar } from "@/features/pet/PetAvatar";
 import { ChatDialog } from "@/features/chat/ChatDialog";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
@@ -18,6 +17,11 @@ function App() {
     const label = getCurrentWindow().label;
     setWindowLabel(label);
     loadSettings();
+
+    // Add background class for settings window
+    if (label === "settings") {
+      document.body.classList.add("has-background");
+    }
   }, []);
 
   useEffect(() => {
@@ -45,30 +49,28 @@ function App() {
     );
   }
 
-  // Pet window
+  // Pet window - transparent, pet floats on desktop
   return (
     <TooltipProvider>
-      <AppLayout>
-        <div className="relative flex flex-col h-full w-full">
-          {/* Pet avatar positioned freely */}
-          <div className="absolute top-4 left-4 z-10">
-            <PetAvatar
-              opacity={settings.petOpacity}
-              scale={settings.petScale}
-            />
-          </div>
-
-          {/* Chat dialog shown when dialogOpen */}
-          {dialogOpen && (
-            <div
-              className="absolute bottom-4 left-4 z-20"
-              style={{ width: `${settings.dialogWidth}px`, maxWidth: "100%" }}
-            >
-              <ChatDialog />
-            </div>
-          )}
+      <div className="relative h-screen w-screen overflow-hidden">
+        {/* Pet avatar */}
+        <div className="absolute bottom-16 left-8 z-10">
+          <PetAvatar
+            opacity={settings.petOpacity}
+            scale={settings.petScale}
+          />
         </div>
-      </AppLayout>
+
+        {/* Chat dialog */}
+        {dialogOpen && (
+          <div
+            className="absolute bottom-4 left-4 z-20"
+            style={{ width: `${settings.dialogWidth}px`, maxWidth: "calc(100% - 32px)" }}
+          >
+            <ChatDialog />
+          </div>
+        )}
+      </div>
     </TooltipProvider>
   );
 }
