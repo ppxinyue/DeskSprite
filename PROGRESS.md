@@ -3,8 +3,8 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0
-- 完成任务：6 / 11 (A-K)
-- 当前 Agent 分工：[Agent 1: 任务G AI Service]
+- 完成任务：7 / 11 (A-K)
+- 当前 Agent 分工：[Agent 1: 任务H 悬浮对话框]
 
 ## 任务进度
 
@@ -91,7 +91,17 @@
 - 备注：验证通过（pnpm build）。framer-motion 的 Variants 类型需用 TargetAndTransition 替代。
 
 ### G. AI Service 层
-- 状态：⏳ 待开始
+- 状态：✅ 完成
+- 负责人：Agent 1
+- 开始时间：2026-05-01
+- 完成时间：2026-05-01
+- 子任务：
+  - [x] G1: 创建 types.ts（Message/ApiConfig/StreamChunk/AiError/ChatResponse）
+  - [x] G2: 创建 systemPrompt.ts（默认 Prompt + {pet_name} 替换 + 从 DB 读取活跃 Prompt）
+  - [x] G3: 实现 aiService.ts（streamChat + vision + 多 Provider 请求适配）
+  - [x] G4: 实现 SSE 解析（parseSSELine）
+  - [x] G5: 实现错误处理（network/auth/rate_limit/server/unknown 分级）
+- 备注：验证通过（pnpm build）。支持 OpenAI/Anthropic/Groq/Custom 四种 Provider 格式适配。
 
 ### H. 悬浮对话框 + 对话持久化 + 语音
 - 状态：⏳ 待开始
