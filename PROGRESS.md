@@ -3,8 +3,8 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0
-- 完成任务：3 / 11 (A-K)
-- 当前 Agent 分工：[Agent 1: 任务D UI基础组件库]
+- 完成任务：4 / 11 (A-K)
+- 当前 Agent 分工：[Agent 1: 检查点2 — B/C/D 完成同步检查]
 
 ## 任务进度
 
@@ -51,7 +51,16 @@
 - 备注：验证通过（cargo build）。需要启用 tauri features: tray-icon + macos-private-api，以及 tauri.conf.json 中 macOSPrivateApi: true。
 
 ### D. UI 基础组件库
-- 状态：⏳ 待开始
+- 状态：✅ 完成
+- 负责人：Agent 1
+- 开始时间：2026-05-01
+- 完成时间：2026-05-01
+- 子任务：
+  - [x] D1: 验证 shadcn/ui 12 个基础组件（button/input/textarea/slider/switch/dropdown-menu/context-menu/tooltip/dialog/sheet/scroll-area/separator）
+  - [x] D2: 确认 components/ui/ 目录 TypeScript 类型正确（pnpm build 通过）
+  - [x] D3: 确认 Tailwind 主题变量已配置（pet-dialog-bg/pet-bubble-user/pet-bubble-ai，亮暗双主题）
+  - [x] D4: 创建 AppLayout.tsx（宠物窗透明布局）和 SettingsLayout.tsx（设置窗侧栏布局）
+- 备注：验证通过（pnpm build）。组件库和主题系统已就绪。
 
 ### E. 设置中心 + 跨窗口同步
 - 状态：⏳ 待开始
