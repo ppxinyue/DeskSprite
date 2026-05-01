@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 static CUSTOM_ORIGINS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 

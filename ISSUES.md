@@ -54,3 +54,25 @@
 - 解决方案：移除不存在的权限，删除 `trayIcon` 配置（托盘在任务 C 通过代码实现），仅保留验证通过的权限列表。
 - 经验总结：添加权限前应先确认实际可用权限名，可从 cargo build 错误输出的列表中查找。
 - 是否需更新技术文档：否
+
+## ISSUE-006
+- 发现时间：2026-05-01
+- 发现者：Agent 1
+- 相关任务：B1. 数据库初始化
+- 严重程度：已解决
+- 问题现象：cargo build 报 `no method named get_webview_window` 错误，csp.rs 中 AppHandle 缺少 Manager trait import。
+- 原因分析：tauri::Manager trait 需要显式引入才能使用 get_webview_window 方法。
+- 解决方案：在 csp.rs 中添加 `use tauri::Manager;`。
+- 经验总结：Tauri 2.0 的 AppHandle 扩展方法需要引入对应 trait。
+- 是否需更新技术文档：否
+
+## ISSUE-007
+- 发现时间：2026-05-01
+- 发现者：Agent 1
+- 相关任务：B5. 前端 db.ts
+- 严重程度：已解决
+- 问题现象：前端 pnpm build 报 `Cannot find module '@tauri-apps/plugin-sql'`。
+- 原因分析：前端缺少 @tauri-apps/plugin-sql 依赖包，Rust 端已配置但前端包未安装。
+- 解决方案：`pnpm add @tauri-apps/plugin-sql`。
+- 经验总结：Tauri 插件需要同时安装 Rust 端和前端端的包。
+- 是否需更新技术文档：否
