@@ -60,6 +60,7 @@ pub fn run() {
             commands::keychain::save_api_key,
             commands::keychain::get_api_key,
             commands::keychain::delete_api_key,
+            commands::screenshot::capture_screen_region,
             commands::window::show_pet_window,
             commands::window::hide_pet_window,
             commands::window::show_settings_cmd,

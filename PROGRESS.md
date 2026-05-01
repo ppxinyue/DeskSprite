@@ -3,8 +3,8 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0
-- 完成任务：8 / 11 (A-K)
-- 当前 Agent 分工：[Agent 1: 任务I 截图选区]
+- 完成任务：9 / 11 (A-K)
+- 当前 Agent 分工：[Agent 1: 任务J 智能附着引擎]
 
 ## 任务进度
 
@@ -118,7 +118,15 @@
 - 备注：验证通过（pnpm build）。
 
 ### I. 截图选区 + VLM 调用
-- 状态：⏳ 待开始
+- 状态：✅ 完成
+- 负责人：Agent 1
+- 开始时间：2026-05-01
+- 完成时间：2026-05-01
+- 子任务：
+  - [x] I1: 实现 Rust 截图命令（capture_screen_region，macOS xcap + Windows screenshots）
+  - [x] I2: 创建前端截图选区 UI（ScreenshotOverlay.tsx，拖拽选区 + 尺寸显示 + 截取按钮）
+  - [x] I3: VLM vision 调用已在 aiService.ts 实现（多 Provider 适配）
+- 备注：验证通过（cargo build + pnpm build）。添加了 base64 和 image crate 依赖。
 
 ### J. 智能附着引擎
 - 状态：⏳ 待开始
