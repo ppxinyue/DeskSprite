@@ -3,8 +3,8 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0
-- 完成任务：5 / 11 (A-K)
-- 当前 Agent 分工：[Agent 1: 任务F 灵宠动画]
+- 完成任务：6 / 11 (A-K)
+- 当前 Agent 分工：[Agent 1: 任务G AI Service]
 
 ## 任务进度
 
@@ -77,7 +77,18 @@
 - 备注：验证通过（cargo build + pnpm build）。
 
 ### F. 灵宠动画 + 拖动 + 右键
-- 状态：⏳ 待开始
+- 状态：✅ 完成
+- 负责人：Agent 1
+- 开始时间：2026-05-01
+- 完成时间：2026-05-01
+- 子任务：
+  - [x] F1: 准备默认猫十五占位图片（front/side/sleep SVG）
+  - [x] F2: 创建 animations.ts（9 种状态→图片+动画映射）
+  - [x] F3: 创建 petStore.ts（Zustand，petState/position/visible/dialogOpen）
+  - [x] F4: 创建 PetAvatar.tsx（motion.img + framer-motion 拖动 + 右键 ContextMenu）
+  - [x] F5: 缩放和透明度通过 props 控制
+  - [x] F6: 形象上传占位（设置页 UI 已预留，Rust 命令待后续任务实现）
+- 备注：验证通过（pnpm build）。framer-motion 的 Variants 类型需用 TargetAndTransition 替代。
 
 ### G. AI Service 层
 - 状态：⏳ 待开始
