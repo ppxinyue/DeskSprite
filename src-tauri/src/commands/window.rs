@@ -1,9 +1,17 @@
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, AppHandle, Runtime};
 
 pub fn create_pet_window<R: Runtime>(app: &AppHandle<R>) {
+    let (w, h) = if let Ok(Some(monitor)) = app.primary_monitor() {
+        let size = monitor.size();
+        (size.width as f64, size.height as f64)
+    } else {
+        (1920.0, 1080.0)
+    };
+
     let _ = WebviewWindowBuilder::new(app, "pet", WebviewUrl::App("index.html".into()))
         .title("DeskSprite Pet")
-        .inner_size(400.0, 600.0)
+        .inner_size(w, h)
+        .position(0.0, 0.0)
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
