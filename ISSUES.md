@@ -76,3 +76,14 @@
 - 解决方案：`pnpm add @tauri-apps/plugin-sql`。
 - 经验总结：Tauri 插件需要同时安装 Rust 端和前端端的包。
 - 是否需更新技术文档：否
+
+## ISSUE-008
+- 发现时间：2026-05-01
+- 发现者：Agent 1
+- 相关任务：C. 窗口管理 + 系统托盘
+- 严重程度：已解决
+- 问题现象：cargo build 报多类错误：tray mod not found、transparent 方法不存在、global-shortcut API 类型不匹配。
+- 原因分析：1) tray-icon 需要在 Cargo.toml 中启用 feature；2) transparent 窗口需要 macos-private-api feature（Cargo.toml + tauri.conf.json 同步配置）；3) global-shortcut v2 的 handler 回调参数是 ShortcutEvent 而非 ShortcutState。
+- 解决方案：Cargo.toml 添加 features `["tray-icon", "macos-private-api"]`，tauri.conf.json 添加 `"macOSPrivateApi": true`，修正 handler 签名使用 `event.state == ShortcutState::Pressed`。
+- 经验总结：Tauri 2.0 的特殊窗口属性（透明、托盘）需要 feature flags，且 Cargo.toml 和 tauri.conf.json 必须同步配置。
+- 是否需更新技术文档：否

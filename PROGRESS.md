@@ -3,8 +3,8 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0
-- 完成任务：2 / 11 (A-K)
-- 当前 Agent 分工：[Agent 1: 任务B 数据库+Keychain]
+- 完成任务：3 / 11 (A-K)
+- 当前 Agent 分工：[Agent 1: 任务D UI基础组件库]
 
 ## 任务进度
 
@@ -37,7 +37,18 @@
 - 备注：验证通过（cargo build + pnpm build）。csp.rs 缺少 `use tauri::Manager` 导致编译报错已修复。前端缺少 @tauri-apps/plugin-sql 已安装。
 
 ### C. 窗口管理 + 系统托盘
-- 状态：⏳ 待开始
+- 状态：✅ 完成
+- 负责人：Agent 1
+- 开始时间：2026-05-01
+- 完成时间：2026-05-01
+- 子任务：
+  - [x] C1: 实现 tray.rs 系统托盘（Show/Hide/Settings/Quit + 左键点击切换）
+  - [x] C2: 创建宠物窗（transparent + always_on_top + skip_taskbar + decorations:false）
+  - [x] C3: 创建设置窗（标准窗口，800x600，resizable）
+  - [x] C4: 窗口间通信命令（show_pet_window/hide_pet_window/show_settings_cmd/close_settings_window）
+  - [x] C5: 应用生命周期（关闭不退出，仅托盘 Quit 退出）
+  - [x] C6: 注册全局快捷键 Cmd+Shift+P（show pet + emit shortcut:chat-focus）
+- 备注：验证通过（cargo build）。需要启用 tauri features: tray-icon + macos-private-api，以及 tauri.conf.json 中 macOSPrivateApi: true。
 
 ### D. UI 基础组件库
 - 状态：⏳ 待开始
