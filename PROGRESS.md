@@ -3,8 +3,8 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0
-- 完成任务：4 / 11 (A-K)
-- 当前 Agent 分工：[Agent 1: 检查点2 — B/C/D 完成同步检查]
+- 完成任务：5 / 11 (A-K)
+- 当前 Agent 分工：[Agent 1: 任务F 灵宠动画]
 
 ## 任务进度
 
@@ -63,7 +63,18 @@
 - 备注：验证通过（pnpm build）。组件库和主题系统已就绪。
 
 ### E. 设置中心 + 跨窗口同步
-- 状态：⏳ 待开始
+- 状态：✅ 完成
+- 负责人：Agent 1
+- 开始时间：2026-05-01
+- 完成时间：2026-05-01
+- 子任务：
+  - [x] E1: 实现 settingsStore.ts + apiConfigStore.ts（Zustand，对接 SQLite）
+  - [x] E2: 构建完整设置页 UI（SettingsPanel.tsx，8 个设置分区）
+  - [x] E3: 实现 API 配置管理（添加/删除/设为默认/测试连接）
+  - [x] E4: 实现 System Prompt 编辑区域（保存/重置默认）
+  - [x] E5: 实现连接测试 Rust 命令（test_ai_connection 占位）
+  - [x] E6: 实现跨窗口同步（settings:updated / api-config:changed Tauri 事件）
+- 备注：验证通过（cargo build + pnpm build）。
 
 ### F. 灵宠动画 + 拖动 + 右键
 - 状态：⏳ 待开始
