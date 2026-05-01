@@ -53,18 +53,23 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   loaded: false,
 
   loadSettings: async () => {
-    const rows = await getAllSettings();
-    const map = new Map(rows.map((r) => [r.key, r.value]));
-    const loaded = { ...DEFAULT_SETTINGS };
-    for (const [key, value] of map) {
-      if (key in loaded) {
-        const parsed = tryParse(value);
-        if (parsed !== undefined) {
-          (loaded as Record<string, unknown>)[key] = parsed;
+    try {
+      const rows = await getAllSettings();
+      const map = new Map(rows.map((r) => [r.key, r.value]));
+      const loaded = { ...DEFAULT_SETTINGS };
+      for (const [key, value] of map) {
+        if (key in loaded) {
+          const parsed = tryParse(value);
+          if (parsed !== undefined) {
+            (loaded as Record<string, unknown>)[key] = parsed;
+          }
         }
       }
+      set({ settings: loaded, loaded: true });
+    } catch (e) {
+      console.warn('Failed to load settings from DB, using defaults:', e);
+      set({ settings: DEFAULT_SETTINGS, loaded: true });
     }
-    set({ settings: loaded, loaded: true });
   },
 
   updateSetting: async (key, value) => {

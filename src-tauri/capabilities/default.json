@@ -23,9 +23,19 @@
     "core:event:allow-listen",
     "core:tray:default",
     "sql:default",
+    "sql:allow-execute",
+    "sql:allow-select",
     "store:default",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-save",
     "global-shortcut:default",
     "dialog:default",
-    "fs:default"
+    "dialog:allow-open",
+    "fs:default",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-exists",
+    "fs:allow-mkdir"
   ]
 }

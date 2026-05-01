@@ -43,7 +43,8 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
   loaded: false,
 
   loadConfigs: async () => {
-    const rows = await getApiConfigs();
+    try {
+      const rows = await getApiConfigs();
     set({
       configs: rows.map((r) => ({
         id: r.id,
@@ -58,6 +59,10 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
       })),
       loaded: true,
     });
+    } catch (e) {
+      console.warn('Failed to load API configs:', e);
+      set({ configs: [], loaded: true });
+    }
   },
 
   addConfig: async (provider, baseUrl, model, apiKey) => {

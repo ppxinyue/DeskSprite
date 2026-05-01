@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -7,8 +6,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { usePetStore } from './petStore';
-import { getImageSrc, getAnimationConfig } from './animations';
-import { startAttachEngine, stopAttachEngine, pauseAttach } from './attachEngine';
+import { getImageSrc } from './animations';
 import { invoke } from '@tauri-apps/api/core';
 
 interface PetAvatarProps {
@@ -19,38 +17,31 @@ interface PetAvatarProps {
 export function PetAvatar({ opacity = 1, scale = 1 }: PetAvatarProps) {
   const { petState, setPetState, toggleDialog } = usePetStore();
   const imageSrc = getImageSrc(petState);
-  const { animate } = getAnimationConfig(petState);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    startAttachEngine();
-    return () => stopAttachEngine();
+    // Simple idle animation toggle
+    const timer = setInterval(() => {
+      const current = usePetStore.getState().petState;
+      if (current === 'idle') setPetState('happy');
+      else if (current === 'happy') setPetState('idle');
+    }, 8000);
+    return () => clearInterval(timer);
   }, []);
-
-  const handleDragStart = () => {
-    pauseAttach();
-    setPetState('dragging');
-  };
-  const handleDragEnd = () => setPetState('idle');
-
-  const handleClick = () => {
-    pauseAttach();
-    toggleDialog();
-  };
 
   const handleContextMenuAction = async (action: string) => {
     switch (action) {
       case 'chat':
-        pauseAttach();
         toggleDialog();
         break;
       case 'settings':
-        await invoke('show_settings_cmd');
+        try { await invoke('show_settings_cmd'); } catch (e) { console.error(e); }
         break;
       case 'hide':
-        await invoke('hide_pet_window');
+        try { await invoke('hide_pet_window'); } catch (e) { console.error(e); }
         break;
       case 'quit':
-        await invoke('plugin:window|close');
+        try { await invoke('plugin:window|close'); } catch (e) { console.error(e); }
         break;
     }
   };
@@ -58,29 +49,39 @@ export function PetAvatar({ opacity = 1, scale = 1 }: PetAvatarProps) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <motion.div
-          className="cursor-grab active:cursor-grabbing select-none"
-          style={{ opacity, transform: `scale(${scale})` }}
-          drag
-          dragMomentum={false}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onClick={handleClick}
-          onHoverStart={() => pauseAttach()}
+        <div
+          className="cursor-pointer select-none"
+          style={{
+            opacity,
+            transform: `scale(${scale})`,
+            transformOrigin: 'center',
+          }}
+          onClick={toggleDialog}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
         >
-          <AnimatePresence mode="wait">
-            <motion.img
-              key={`${petState}-${imageSrc}`}
-              src={imageSrc}
-              alt="DeskSprite Pet"
-              className="w-24 h-24 pointer-events-none drop-shadow-lg"
-              animate={animate}
-              initial={{ opacity: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            />
-          </AnimatePresence>
-        </motion.div>
+          <img
+            src={imageSrc}
+            alt="DeskSprite Pet"
+            className="w-24 h-24 drop-shadow-lg"
+            style={{
+              transition: 'transform 0.3s ease',
+              transform: hovered ? 'scale(1.1)' : 'scale(1)',
+              animation: 'petBounce 4s ease-in-out infinite',
+            }}
+            onError={(e) => {
+              // Fallback: render a colored circle if image fails
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+          {/* Fallback visible if image fails */}
+          <div
+            className="w-24 h-24 rounded-full flex items-center justify-center text-3xl"
+            style={{ background: 'linear-gradient(135deg, #F5A623, #E8951D)', display: 'none' }}
+          >
+            🐱
+          </div>
+        </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem onClick={() => handleContextMenuAction('chat')}>

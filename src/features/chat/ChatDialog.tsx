@@ -56,20 +56,24 @@ export function ChatDialog() {
   }, [messages, streamingContent]);
 
   async function loadRecentConversation() {
-    const convos = await getConversations();
-    if (convos.length > 0) {
-      const latest = convos[0];
-      setCurrentConversationId(latest.id);
-      const msgs = await getMessages(latest.id);
-      setMessages(
-        msgs.map((m) => ({
-          id: `msg-${m.id}`,
-          role: m.role as 'user' | 'assistant' | 'system',
+    try {
+      const convos = await getConversations();
+      if (convos.length > 0) {
+        const latest = convos[0];
+        setCurrentConversationId(latest.id);
+        const msgs = await getMessages(latest.id);
+        setMessages(
+          msgs.map((m) => ({
+            id: `msg-${m.id}`,
+            role: m.role as 'user' | 'assistant' | 'system',
           content: m.content,
           timestamp: new Date(m.timestamp).getTime(),
           imageUrl: m.image_path ?? undefined,
         }))
       );
+    }
+    } catch (e) {
+      console.warn('Failed to load recent conversation:', e);
     }
   }
 

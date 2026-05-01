@@ -53,13 +53,18 @@ function App() {
   return (
     <TooltipProvider>
       <div className="relative h-screen w-screen overflow-hidden">
-        {/* Pet avatar */}
+        {/* Pet avatar - positioned in lower-left */}
         <div className="absolute bottom-16 left-8 z-10">
           <PetAvatar
             opacity={settings.petOpacity}
             scale={settings.petScale}
           />
         </div>
+
+        {/* Debug: show emoji fallback if pet image fails */}
+        <noscript>
+          <div className="absolute bottom-16 left-8 text-6xl">🐱</div>
+        </noscript>
 
         {/* Chat dialog */}
         {dialogOpen && (
