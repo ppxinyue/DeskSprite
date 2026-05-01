@@ -3,8 +3,8 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0
-- 完成任务：7 / 11 (A-K)
-- 当前 Agent 分工：[Agent 1: 任务H 悬浮对话框]
+- 完成任务：8 / 11 (A-K)
+- 当前 Agent 分工：[Agent 1: 任务I 截图选区]
 
 ## 任务进度
 
@@ -104,7 +104,18 @@
 - 备注：验证通过（pnpm build）。支持 OpenAI/Anthropic/Groq/Custom 四种 Provider 格式适配。
 
 ### H. 悬浮对话框 + 对话持久化 + 语音
-- 状态：⏳ 待开始
+- 状态：✅ 完成
+- 负责人：Agent 1
+- 开始时间：2026-05-01
+- 完成时间：2026-05-01
+- 子任务：
+  - [x] H1: 创建 chatStore.ts（Zustand，对话消息状态管理）
+  - [x] H2: 创建 ChatDialog.tsx（悬浮对话框 UI，毛玻璃背景）
+  - [x] H3: 实现消息气泡（Markdown 渲染 + 流式闪烁光标 + 用户/AI 双色气泡）
+  - [x] H4: 对接 aiService 流式对话（petState 联动 thinking→speaking→happy）
+  - [x] H5: 实现对话持久化（SQLite messages 表读写，自动加载最近会话）
+  - [x] H6: 语音接口预留（设置页开关已实现，P0 不做完整语音）
+- 备注：验证通过（pnpm build）。
 
 ### I. 截图选区 + VLM 调用
 - 状态：⏳ 待开始
