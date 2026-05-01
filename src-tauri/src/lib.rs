@@ -54,6 +54,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::ai::test_ai_connection,
+            commands::desktop::get_desktop_bounds,
             commands::csp::add_csp_origin,
             commands::csp::get_csp_origins,
             commands::csp::remove_csp_origin,

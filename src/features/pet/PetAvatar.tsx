@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ContextMenu,
@@ -7,6 +8,7 @@ import {
 } from '@/components/ui/context-menu';
 import { usePetStore } from './petStore';
 import { getImageSrc, getAnimationConfig } from './animations';
+import { startAttachEngine, stopAttachEngine, pauseAttach } from './attachEngine';
 import { invoke } from '@tauri-apps/api/core';
 
 interface PetAvatarProps {
@@ -19,12 +21,26 @@ export function PetAvatar({ opacity = 1, scale = 1 }: PetAvatarProps) {
   const imageSrc = getImageSrc(petState);
   const { animate } = getAnimationConfig(petState);
 
-  const handleDragStart = () => setPetState('dragging');
+  useEffect(() => {
+    startAttachEngine();
+    return () => stopAttachEngine();
+  }, []);
+
+  const handleDragStart = () => {
+    pauseAttach();
+    setPetState('dragging');
+  };
   const handleDragEnd = () => setPetState('idle');
+
+  const handleClick = () => {
+    pauseAttach();
+    toggleDialog();
+  };
 
   const handleContextMenuAction = async (action: string) => {
     switch (action) {
       case 'chat':
+        pauseAttach();
         toggleDialog();
         break;
       case 'settings':
@@ -34,7 +50,6 @@ export function PetAvatar({ opacity = 1, scale = 1 }: PetAvatarProps) {
         await invoke('hide_pet_window');
         break;
       case 'quit':
-        // Use tauri process exit
         await invoke('plugin:window|close');
         break;
     }
@@ -50,7 +65,8 @@ export function PetAvatar({ opacity = 1, scale = 1 }: PetAvatarProps) {
           dragMomentum={false}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onClick={toggleDialog}
+          onClick={handleClick}
+          onHoverStart={() => pauseAttach()}
         >
           <AnimatePresence mode="wait">
             <motion.img

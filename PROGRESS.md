@@ -3,8 +3,8 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0
-- 完成任务：9 / 11 (A-K)
-- 当前 Agent 分工：[Agent 1: 任务J 智能附着引擎]
+- 完成任务：10 / 11 (A-K)
+- 当前 Agent 分工：[Agent 1: 任务K 集成测试]
 
 ## 任务进度
 
@@ -129,7 +129,16 @@
 - 备注：验证通过（cargo build + pnpm build）。添加了 base64 和 image crate 依赖。
 
 ### J. 智能附着引擎
-- 状态：⏳ 待开始
+- 状态：✅ 完成
+- 负责人：Agent 1
+- 开始时间：2026-05-01
+- 完成时间：2026-05-01
+- 子任务：
+  - [x] J1: 创建 attachEngine.ts（三种附着模式调度 + 2s 轮询 + 交互打断 5s 恢复）
+  - [x] J2: 实现 Rust get_desktop_bounds 命令（macOS xcap + defaults 读取 Dock 状态）
+  - [x] J3: 在 PetAvatar.tsx 集成（useEffect 挂载引擎，hover/drag/click 触发 pauseAttach）
+  - [x] J4: 附着行为逻辑完成（dock_sleep/window_edge/fullscreen_float 三种模式切换）
+- 备注：验证通过（cargo build + pnpm build）。
 
 ### K. 集成测试 + 打包
 - 状态：⏳ 待开始
