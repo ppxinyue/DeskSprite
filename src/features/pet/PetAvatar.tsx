@@ -20,7 +20,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: PetAvatarProps) {
   const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
-    // Simple idle animation toggle
+    // Simple idle <-> happy cycle
     const timer = setInterval(() => {
       const current = usePetStore.getState().petState;
       if (current === 'idle') setPetState('happy');
@@ -46,41 +46,39 @@ export function PetAvatar({ opacity = 1, scale = 1 }: PetAvatarProps) {
     }
   };
 
+  // Display size: the actual image is ~2000x2500, we show at ~120x150
+  const displayWidth = 120 * scale;
+  const displayHeight = 150 * scale;
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
           className="cursor-pointer select-none"
-          style={{
-            opacity,
-            transform: `scale(${scale})`,
-            transformOrigin: 'center',
-          }}
+          style={{ opacity }}
           onClick={toggleDialog}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
           <img
             src={imageSrc}
-            alt="DeskSprite Pet"
-            className="w-24 h-24 drop-shadow-lg"
+            alt="猫十五"
+            draggable={false}
+            className="drop-shadow-lg"
             style={{
-              transition: 'transform 0.3s ease',
-              transform: hovered ? 'scale(1.1)' : 'scale(1)',
-              animation: 'petBounce 4s ease-in-out infinite',
-            }}
-            onError={(e) => {
-              // Fallback: render a colored circle if image fails
-              (e.target as HTMLImageElement).style.display = 'none';
+              width: displayWidth,
+              height: displayHeight,
+              objectFit: 'contain',
+              transition: 'transform 0.3s ease, filter 0.3s ease',
+              transform: hovered ? 'scale(1.08)' : 'scale(1)',
+              animation: petState === 'idle' ? 'petBounce 4s ease-in-out infinite' :
+                         petState === 'happy' ? 'petJump 0.5s ease' :
+                         petState === 'thinking' ? 'petWobble 1.5s ease-in-out infinite' :
+                         petState === 'sleeping' ? 'petBreathe 6s ease-in-out infinite' :
+                         undefined,
+              filter: petState === 'dragging' ? 'drop-shadow(0 8px 16px rgba(0,0,0,0.4))' : undefined,
             }}
           />
-          {/* Fallback visible if image fails */}
-          <div
-            className="w-24 h-24 rounded-full flex items-center justify-center text-3xl"
-            style={{ background: 'linear-gradient(135deg, #F5A623, #E8951D)', display: 'none' }}
-          >
-            🐱
-          </div>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>

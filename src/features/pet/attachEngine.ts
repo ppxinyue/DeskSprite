@@ -1,7 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { usePetStore } from './petStore';
 import { useSettingsStore } from '@/features/settings/settingsStore';
-import type { PetState } from './animations';
 
 interface DesktopBounds {
   x: number;
@@ -13,18 +12,12 @@ interface DesktopBounds {
   fullscreen_active: boolean;
 }
 
-export type AttachMode = 'dock_sleep' | 'window_edge' | 'fullscreen_float' | 'none';
+export type AttachMode = 'dock_sleep' | 'fullscreen_hide' | 'desktop_float' | 'none';
 
 const POLL_INTERVAL = 2000;
 const RESUME_DELAY = 5000;
-const WALK_INTERVAL_MIN = 8000;
-const WALK_INTERVAL_MAX = 15000;
-const FLOAT_INTERVAL_MIN = 5000;
-const FLOAT_INTERVAL_MAX = 10000;
 
 let pollTimer: ReturnType<typeof setInterval> | null = null;
-let walkTimer: ReturnType<typeof setTimeout> | null = null;
-let floatTimer: ReturnType<typeof setTimeout> | null = null;
 let resumeTimer: ReturnType<typeof setTimeout> | null = null;
 let currentMode: AttachMode = 'none';
 let isPaused = false;
@@ -37,12 +30,8 @@ export function startAttachEngine() {
 
 export function stopAttachEngine() {
   if (pollTimer) clearInterval(pollTimer);
-  if (walkTimer) clearTimeout(walkTimer);
-  if (floatTimer) clearTimeout(floatTimer);
   if (resumeTimer) clearTimeout(resumeTimer);
   pollTimer = null;
-  walkTimer = null;
-  floatTimer = null;
   resumeTimer = null;
   currentMode = 'none';
   isPaused = false;
@@ -50,8 +39,6 @@ export function stopAttachEngine() {
 
 export function pauseAttach() {
   isPaused = true;
-  if (walkTimer) clearTimeout(walkTimer);
-  if (floatTimer) clearTimeout(floatTimer);
   scheduleResume();
 }
 
@@ -59,62 +46,66 @@ function scheduleResume() {
   if (resumeTimer) clearTimeout(resumeTimer);
   resumeTimer = setTimeout(() => {
     isPaused = false;
-    applyMode(currentMode);
+    poll();
   }, RESUME_DELAY);
 }
 
 async function poll() {
   const { settings } = useSettingsStore.getState();
-  if (!settings.smartAttach) return;
+  if (!settings.smartAttach || isPaused) return;
 
   try {
     const bounds = await invoke<DesktopBounds>('get_desktop_bounds');
-    if (isPaused) return;
 
     let newMode: AttachMode;
     if (bounds.fullscreen_active) {
-      newMode = 'fullscreen_float';
-    } else if (bounds.dock_visible && bounds.dock_rect) {
+      newMode = 'fullscreen_hide';
+    } else if (bounds.dock_visible) {
       newMode = 'dock_sleep';
     } else {
-      newMode = 'window_edge';
+      newMode = 'desktop_float';
     }
 
     if (newMode !== currentMode) {
       currentMode = newMode;
-      applyMode(currentMode);
+      applyMode(currentMode, bounds);
     }
   } catch {
-    // Silently ignore polling errors
+    // Silently ignore
   }
 }
 
-function applyMode(mode: AttachMode) {
+function applyMode(mode: AttachMode, bounds: DesktopBounds) {
   const store = usePetStore.getState();
-  const { settings } = useSettingsStore.getState();
-
-  if (walkTimer) clearTimeout(walkTimer);
-  if (floatTimer) clearTimeout(floatTimer);
-
-  const activity = settings.attachActivity;
-  const walkChance = activity === 'high' ? 0.8 : activity === 'medium' ? 0.5 : 0.2;
 
   switch (mode) {
     case 'dock_sleep': {
+      // Position pet just above the dock
       store.setPetState('sleeping');
-      // Position near dock
+      if (bounds.dock_rect) {
+        store.setPosition({
+          x: bounds.dock_rect.x + bounds.dock_rect.width / 2 - 60,
+          y: bounds.dock_rect.y - 160,
+        });
+      }
       break;
     }
-    case 'window_edge': {
-      store.setPetState('idle');
-      // Schedule random walking
-      scheduleWalk(walkChance);
+    case 'fullscreen_hide': {
+      // Hide at top-right corner, peek on hover
+      store.setPetState('peering');
+      store.setPosition({
+        x: bounds.width - 130,
+        y: -80, // mostly hidden, only ears visible
+      });
       break;
     }
-    case 'fullscreen_float': {
+    case 'desktop_float': {
+      // Float somewhere visible
       store.setPetState('idle');
-      // Schedule random floating
-      scheduleFloat();
+      store.setPosition({
+        x: bounds.width - 200,
+        y: bounds.height - 250,
+      });
       break;
     }
     case 'none': {
@@ -122,38 +113,4 @@ function applyMode(mode: AttachMode) {
       break;
     }
   }
-}
-
-function scheduleWalk(chance: number) {
-  const delay = randomBetween(WALK_INTERVAL_MIN, WALK_INTERVAL_MAX);
-  walkTimer = setTimeout(() => {
-    if (isPaused || currentMode !== 'window_edge') return;
-    if (Math.random() < chance) {
-      const store = usePetStore.getState();
-      store.setPetState('walking');
-      setTimeout(() => {
-        if (!isPaused && currentMode === 'window_edge') {
-          store.setPetState('idle');
-          scheduleWalk(chance);
-        }
-      }, 2000 + Math.random() * 3000);
-    } else {
-      scheduleWalk(chance);
-    }
-  }, delay);
-}
-
-function scheduleFloat() {
-  const delay = randomBetween(FLOAT_INTERVAL_MIN, FLOAT_INTERVAL_MAX);
-  floatTimer = setTimeout(() => {
-    if (isPaused || currentMode !== 'fullscreen_float') return;
-    const states: PetState[] = ['idle', 'thinking', 'sleeping'];
-    const state = states[Math.floor(Math.random() * states.length)];
-    usePetStore.getState().setPetState(state);
-    scheduleFloat();
-  }, delay);
-}
-
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
 }
