@@ -4,30 +4,38 @@ import {
   ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { usePetStore } from './petStore';
-import { isBuiltinAsset, needsFrameAnimation } from './animations';
-import { resetIdleTimer, triggerYawn, triggerHappy, stopPetStateEngine } from './petStateEngine';
+import {
+  getNextFrameIndex,
+  getPetFrameSources,
+  getRandomFrameSwitchDelay,
+  isBuiltinAsset,
+} from './animations';
+import { stopPetStateEngine } from './petStateEngine';
 
 function toSrc(path: string): string {
-  return isBuiltinAsset(path) ? path : `/${path}`;
+  return isBuiltinAsset(path) ? path : convertFileSrc(path);
 }
 
 export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?: number }) {
   const { petState, setPetState, mediaConfig, toggleDialog, position } = usePetStore();
   const config = mediaConfig[petState];
+  const frameSources = getPetFrameSources(config);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [imgError, setImgError] = useState(false);
   const isDragging = useRef(false);
+  const suppressNextClick = useRef(false);
   const dragOrigin = useRef<{ mx: number; my: number; px: number; py: number } | null>(null);
+  const petRootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { resetIdleTimer(); return () => stopPetStateEngine(); }, []);
-
-  useEffect(() => { setCurrentFrame(0); setImgError(false); }, [petState]);
+  useEffect(() => () => stopPetStateEngine(), []);
 
   useEffect(() => {
-    if (!needsFrameAnimation(config)) return;
-    const t = setInterval(() => setCurrentFrame((f) => (f + 1) % config.userFrames.length), config.frameInterval);
-    return () => clearInterval(t);
-  }, [config]);
+    if (config.userAnimatedPath || frameSources.length <= 1) return;
+    const t = setTimeout(() => {
+      setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));
+    }, getRandomFrameSwitchDelay());
+    return () => clearTimeout(t);
+  }, [config.userAnimatedPath, frameSources.length, currentFrame]);
 
   const enableHit = () => invoke('set_cursor_passthrough', { passthrough: false }).catch(() => {});
   const disableHit = () => invoke('set_cursor_passthrough', { passthrough: true }).catch(() => {});
@@ -35,7 +43,9 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
+    enableHit();
     isDragging.current = false;
+    suppressNextClick.current = false;
     dragOrigin.current = { mx: e.clientX, my: e.clientY, px: position.x, py: position.y };
 
     const onMove = (ev: MouseEvent) => {
@@ -44,23 +54,26 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
       const dy = ev.clientY - dragOrigin.current.my;
       if (!isDragging.current && Math.sqrt(dx * dx + dy * dy) > 4) {
         isDragging.current = true;
-        setPetState('running');
+        suppressNextClick.current = true;
       }
       if (isDragging.current) {
         usePetStore.getState().setPosition({ x: dragOrigin.current.px + dx, y: dragOrigin.current.py + dy });
       }
     };
 
-    const onUp = () => {
+    const onUp = (ev: MouseEvent) => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       if (isDragging.current) {
         setPetState('idle');
-        resetIdleTimer();
       }
+      const rect = petRootRef.current?.getBoundingClientRect();
+      const pointerStillOnPet = rect
+        ? ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom
+        : false;
       isDragging.current = false;
       dragOrigin.current = null;
-      setTimeout(disableHit, 100);
+      if (!pointerStillOnPet) disableHit();
     };
 
     window.addEventListener('mousemove', onMove);
@@ -68,19 +81,11 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   };
 
   const handleClick = () => {
-    if (isDragging.current) return;
-    resetIdleTimer();
-    const cur = usePetStore.getState().petState;
-    if (cur === 'sleeping') {
-      setPetState('idle');
-    } else if (cur !== 'thinking') {
-      if (Math.random() < 0.5) {
-        const pick = (['happy', 'yawn', 'idle'] as const)[Math.floor(Math.random() * 3)];
-        if (pick === 'happy') triggerHappy();
-        else if (pick === 'yawn') triggerYawn();
-        else setPetState('idle');
-      }
+    if (isDragging.current || suppressNextClick.current) {
+      suppressNextClick.current = false;
+      return;
     }
+    setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));
     toggleDialog();
   };
 
@@ -108,10 +113,8 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   if (config.userAnimatedPath) {
     src = isBuiltinAsset(config.userAnimatedPath) ? config.userAnimatedPath : convertFileSrc(config.userAnimatedPath);
     kind = config.userAnimatedType === 'video' ? 'video' : 'img';
-  } else if (config.userFrames.length > 0) {
-    src = toSrc(config.userFrames[currentFrame] ?? config.userFrames[0]);
   } else {
-    src = config.defaultAsset;
+    src = toSrc(frameSources[currentFrame % frameSources.length] ?? frameSources[0]);
   }
 
   const interactiveProps = {
@@ -135,6 +138,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
+            ref={petRootRef}
             className="cursor-pointer select-none flex items-center justify-center"
             style={{ width: w, height: h, fontSize: Math.round(80 * scale), opacity, background: 'transparent' }}
             {...interactiveProps}
@@ -148,7 +152,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="cursor-pointer select-none" style={{ background: 'transparent', display: 'inline-block' }} {...interactiveProps}>
+        <div ref={petRootRef} className="cursor-pointer select-none" style={{ background: 'transparent', display: 'inline-block' }} {...interactiveProps}>
           {kind === 'video' ? (
             <video key={src} src={src} autoPlay loop muted playsInline draggable={false} width={w} height={h}
               className="drop-shadow-lg" style={{ objectFit: 'contain', opacity, display: 'block', background: 'transparent' }}

@@ -2,10 +2,10 @@
 
 ## 总体状态
 - 开始时间：2026-04-30
-- 当前阶段：P0（集成调试 + UI 优化）
+- 当前阶段：P0（集成调试 + 拖拽稳定性修复）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + 四项修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：bf39be8 fix: 四项修复 — 穿透稳定/灰色背景/hover输入框/设置重组
+- 最新提交：fix: stabilize pet drag and simplify states
 
 ## 任务进度
 
@@ -66,15 +66,17 @@
 - 状态：✅ 完成
 - 开始时间：2026-05-06，完成时间：2026-05-06
 - 子任务：
-  - [x] F1: 重构 animations.ts（6种状态 + defaultAsset/userFrames/userAnimatedPath）
+  - [x] F1: 重构 animations.ts（3种状态 idle/thinking/sleeping + defaultAssets/userFrames/userAnimatedPath）
   - [x] F2: 重构 petStore.ts（PetMediaConfig）
-  - [x] F3: 新建 petStateEngine.ts（idle→yawn→sleeping，happy 3秒回 idle）
-  - [x] F4: 重写 PetAvatar.tsx（逐帧播放 + 拖拽 + 单击随机 + 右键菜单）
+  - [x] F3: 移除 yawn/happy/running 自动状态链，AI 完成后回 idle
+  - [x] F4: 重写 PetAvatar.tsx（随机 PNG 切换 + 拖拽 + 单击切图 + 右键菜单）
   - [x] F5: App.tsx 启动恢复媒体配置
-  - [x] F6: ChatDialog 使用 triggerHappy()
-  - [x] F7: ImageSection 6状态×3路上传 + 帧率Slider
+  - [x] F6: ChatDialog / HoverInputBar 使用 thinking → idle 状态流
+  - [x] F7: ImageSection 3状态 PNG 序列上传
   - [x] F8: 添加 tauri-plugin-process 依赖
-- 资产路径：`assets/{state}/{state}.png`（idle/yawn/happy/sleeping/running/thinking）
+  - [x] F9: 拖拽结束后保留命中直到鼠标真正离开灵宠，修复第二次拖动穿透
+  - [x] F10: 支持状态文件夹内多张 PNG 随机 1-5 分钟切换，点击灵宠主动切换一次
+- 资产路径：`assets/{state}/*.png`（idle/thinking/sleeping）
 
 ### G. AI Service 层
 - 状态：✅ 完成
@@ -165,3 +167,10 @@
 ### R8. 版本同步（2026-05-06）
 - @tauri-apps/api 从 v2.10.1 升级到 v2.11.0，匹配 tauri crate v2.11.0
 - 文件：package.json, pnpm-lock.yaml
+
+### R9. 第二次拖拽鼠标穿透 + 三状态 PNG 随机切换（2026-05-06）
+- 问题：第一次拖拽后 `PetAvatar` 在 mouseup 100ms 后强制恢复窗口穿透，鼠标仍停留在灵宠上时下一次 mousedown 会直接穿透到桌面。
+- 修复：拖拽结束时检查指针是否仍在灵宠区域内；若仍在区域内保持命中，等 mouseleave 再恢复穿透。
+- 状态调整：删除 running、yawn、happy，只保留 idle、thinking、sleeping；AI 回复完成直接回 idle。
+- 图片调整：默认 idle/sleeping 可配置多张 PNG，用户上传多张 PNG 后随机间隔 1-5 分钟切换；点击灵宠会主动切换一次当前状态 PNG。
+- 文件：animations.ts, PetAvatar.tsx, petStateEngine.ts, ChatDialog.tsx, HoverInputBar.tsx, SettingsPanel.tsx

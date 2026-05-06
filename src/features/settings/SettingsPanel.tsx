@@ -180,7 +180,7 @@ function AppearanceSection({
 
       <Separator className="my-6" />
       <SectionTitle>形象自定义</SectionTitle>
-      <SectionDesc>为每种状态上传自定义图片或动画，上传立即生效。</SectionDesc>
+      <SectionDesc>为每种状态上传一组 PNG，系统会随机间隔 1-5 分钟切换，上传立即生效。</SectionDesc>
       <ImageSection />
 
       <div className="mt-8 flex justify-end">
@@ -208,32 +208,6 @@ function ImageSection() {
     await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
   };
 
-  const handleUploadGif = async (state: PetState) => {
-    const result = await open({ multiple: false, filters: [{ name: 'GIF动图', extensions: ['gif'] }] });
-    if (typeof result !== 'string') return;
-    const newConfig: PetStateMediaConfig = {
-      ...mediaConfig[state], userAnimatedPath: result, userAnimatedType: 'gif',
-    };
-    setStateMediaConfig(state, newConfig);
-    await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
-  };
-
-  const handleUploadVideo = async (state: PetState) => {
-    const result = await open({ multiple: false, filters: [{ name: '短视频（建议5秒内）', extensions: ['mp4', 'webm'] }] });
-    if (typeof result !== 'string') return;
-    const newConfig: PetStateMediaConfig = {
-      ...mediaConfig[state], userAnimatedPath: result, userAnimatedType: 'video',
-    };
-    setStateMediaConfig(state, newConfig);
-    await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
-  };
-
-  const handleUpdateFrameInterval = async (state: PetState, ms: number) => {
-    const newConfig = { ...mediaConfig[state], frameInterval: ms };
-    setStateMediaConfig(state, newConfig);
-    await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
-  };
-
   const handleClear = async (state: PetState) => {
     setStateMediaConfig(state, DEFAULT_MEDIA_CONFIG[state]);
     await setSetting(`petMedia_${state}`, JSON.stringify(DEFAULT_MEDIA_CONFIG[state]));
@@ -252,33 +226,30 @@ function ImageSection() {
         const cfg = mediaConfig[state];
         const meta = STATE_META[state];
 
-        let previewSrc: string | null = null;
-        if (cfg.userAnimatedPath && cfg.userAnimatedType !== 'video') {
-          previewSrc = convertFileSrc(cfg.userAnimatedPath);
-        } else if (cfg.userFrames.length > 0) {
-          previewSrc = convertFileSrc(cfg.userFrames[0]);
-        } else {
-          previewSrc = cfg.defaultAsset;
-        }
+        const previewSrc = cfg.userAnimatedPath
+          ? convertFileSrc(cfg.userAnimatedPath)
+          : cfg.userFrames.length > 0
+            ? convertFileSrc(cfg.userFrames[0])
+            : cfg.defaultAssets[0];
 
         let configDesc = '内置默认';
         if (cfg.userAnimatedPath) {
           const name = cfg.userAnimatedPath.split('/').pop() ?? '';
-          configDesc = cfg.userAnimatedType === 'video' ? `视频：${name}` : `GIF：${name}`;
+          configDesc = `文件：${name}`;
         } else if (cfg.userFrames.length > 0) {
-          configDesc = `${cfg.userFrames.length}帧 · ${cfg.frameInterval}ms`;
+          configDesc = `${cfg.userFrames.length}张 · 随机1-5分钟切换`;
+        } else if (cfg.defaultAssets.length > 1) {
+          configDesc = `${cfg.defaultAssets.length}张内置 · 随机1-5分钟切换`;
         }
 
         return (
           <div key={state} className="border border-border rounded-lg p-3">
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 rounded border border-border overflow-hidden flex items-center justify-center bg-muted flex-shrink-0">
-                {cfg.userAnimatedType === 'video' ? (
-                  <span className="text-lg">🎬</span>
-                ) : previewSrc ? (
+                {previewSrc ? (
                   <img src={previewSrc} alt={meta.label} className="w-full h-full object-contain" />
                 ) : (
-                  <span className="text-lg">🐾</span>
+                  <span className="text-lg">PNG</span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
@@ -288,20 +259,10 @@ function ImageSection() {
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleUploadPng(state)}>PNG</Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleUploadGif(state)}>GIF</Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleUploadVideo(state)}>视频</Button>
                   {(cfg.userFrames.length > 0 || cfg.userAnimatedPath) && (
                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleClear(state)}>清除</Button>
                   )}
                 </div>
-                {cfg.userFrames.length > 1 && !cfg.userAnimatedPath && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs text-muted-foreground">帧率</span>
-                    <Slider value={[cfg.frameInterval]} onValueChange={([v]) => handleUpdateFrameInterval(state, v)}
-                      min={50} max={500} step={50} className="w-24" />
-                    <span className="text-xs text-muted-foreground">{cfg.frameInterval}ms</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>

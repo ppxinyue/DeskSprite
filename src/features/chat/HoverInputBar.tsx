@@ -76,8 +76,7 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
         appendStreamingContent(token);
       }
 
-      setPetState('happy');
-      setTimeout(() => usePetStore.getState().setPetState('idle'), 3000);
+      setPetState('idle');
       addMessage(createMessage('assistant', fullContent));
       if (convoId) await insertMessage(convoId, 'assistant', fullContent);
     } catch (e) {
