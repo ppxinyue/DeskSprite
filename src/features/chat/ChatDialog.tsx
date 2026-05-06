@@ -379,17 +379,24 @@ function StandaloneChatWorkspace() {
   }
 
   async function loadConversationIntoPanel(conversationId: number) {
-    const panelId = activePanelId;
-    const historyItem = historyItems.find((item) => item.id === conversationId);
-    const modelId = modelIdToPanelValue(historyItem?.modelId ?? null);
     try {
+      const convos = await getConversations();
+      const conversation = convos.find((item) => item.id === conversationId);
+      const historyItem = historyItems.find((item) => item.id === conversationId);
+      const modelSource = conversation?.model_id ?? historyItem?.modelId ?? null;
+      const modelId = modelIdToPanelValue(modelSource);
       const msgs = await getMessages(conversationId);
-      updatePanel(panelId, {
+      const targetPanel = panels.find((panel) => panel.id === activePanelId) ?? panels[0] ?? createPanel();
+      const panelId = targetPanel.id;
+      const loadedPanel = {
         conversationId,
-        title: historyItem?.title || `对话 ${conversationId}`,
+        title: conversation?.title || historyItem?.title || `对话 ${conversationId}`,
         modelId,
         modelLocked: true,
-        modelLabel: getModelLabel(historyItem?.modelId ?? null, configs),
+        modelLabel: getModelLabel(modelSource, configs),
+        input: '',
+        selectedImage: null,
+        isStreaming: false,
         messages: msgs.map((m) => ({
           id: `msg-${m.id}`,
           role: m.role as 'user' | 'assistant' | 'system',
@@ -397,7 +404,15 @@ function StandaloneChatWorkspace() {
           timestamp: new Date(m.timestamp).getTime(),
           imageUrl: m.image_path && /[/\\]/.test(m.image_path) ? convertFileSrc(m.image_path) : undefined,
         })),
+      };
+      setPanels((items) => {
+        if (items.some((panel) => panel.id === panelId)) {
+          return items.map((panel) => panel.id === panelId ? { ...panel, ...loadedPanel } : panel);
+        }
+        return [{ ...targetPanel, ...loadedPanel }];
       });
+      setActivePanelId(panelId);
+      setLayout('single');
     } catch (e) {
       console.warn('Failed to load conversation:', e);
     }

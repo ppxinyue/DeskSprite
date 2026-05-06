@@ -383,3 +383,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：最大宽度约束和固定宽度是两种不同语义，聊天气泡应优先按内容收缩。
 - 是否需更新技术文档：是。
+
+## ISSUE-034
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：H. 大对话窗口 / A. AI 默认人格
+- 严重程度：严重
+- 问题现象：大聊天窗口历史对话点击后无法稳定打开；默认 system prompt 需要补充独立灵宠、不讨好用户的行为边界。
+- 原因分析：历史加载只更新当前 active panel，若 active panel 状态异常或处于多面板布局，用户会看不到加载结果；加载历史时也未显式清理输入、图片和 streaming 状态。Prompt 只覆盖简洁人格，没有约束主动讨好式话术。
+- 解决方案：点击历史时重新读取 `conversations` 和 messages，加载到有效面板并切回 single layout，同时清空输入/图片/streaming；新增上一版 expert prompt 兼容常量，并将默认 prompt 更新到带独立性规则的版本。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/features/ai/systemPrompt.ts`, `src-tauri/migrations/0001_initial.sql`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：历史打开是导航行为，应确保目标内容立即成为可见主视图，而不是只隐式更新某个可能不可见的面板。
+- 是否需更新技术文档：是。
