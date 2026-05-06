@@ -323,3 +323,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/index.css`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：对话产品的“专业感”有时来自更少的视觉容器；主题系统应先满足语义稳定，再扩展风格数量。
 - 是否需更新技术文档：是。
+
+## ISSUE-029
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：A. AI 默认人格 / C. 窗口管理 / E. 设置中心
+- 严重程度：改进
+- 问题现象：默认 system prompt 不再符合“极度简洁”的灵宠定位；其他窗口全屏时灵宠可能不在对应 Space 置顶显示；设置窗口初始尺寸和左侧目录占比需要收敛。
+- 原因分析：默认 prompt 存在前端常量和数据库迁移两份来源，且老用户数据库中可能已保存旧默认；宠物窗只设置 `always_on_top`，macOS 全屏 Space 还需要 `visible_on_all_workspaces`；设置窗口沿用 80% 尺寸和 224px 侧栏。
+- 解决方案：抽出 `DEFAULT_SYSTEM_PROMPT` 与 `normalizeSystemPrompt`，运行态把旧默认映射到新默认；新迁移写入新 prompt；宠物窗创建和 show 时设置 `visible_on_all_workspaces(true)`；设置窗口改为 70% 居中，侧栏收窄到 192px。
+- 涉及文件：`src/features/ai/systemPrompt.ts`, `src/features/settings/SettingsPanel.tsx`, `src-tauri/migrations/0001_initial.sql`, `src-tauri/src/commands/window.rs`, `src/components/layouts/SettingsLayout.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：跨 Space 悬浮窗需要显式声明全工作区可见；默认 prompt 升级要兼顾新安装和已安装用户，不能只改迁移。
+- 是否需更新技术文档：是。

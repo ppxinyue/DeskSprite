@@ -249,3 +249,9 @@
 - 小窗：移除输入框与对话历史之间的横线，只保留输入框圆角容器。
 - 大窗：模型选择回到每个对话面板左上角，使用 macOS 灰色按钮式 select；顶部不显示标题，仅保留布局切换和新增面板按钮；图片/语音图标间距收紧，语音录制状态改为灰阶脉冲。
 - 文件：ChatDialog.tsx, index.css, App.tsx, SettingsPanel.tsx, settingsStore.ts
+
+### R20. 默认 Prompt、全屏 Space 置顶与设置窗尺寸（2026-05-06）
+- Prompt：默认 system prompt 改为极简灵宠人格；前端运行态会把旧内置默认 prompt 自动映射到新默认，避免老用户数据库中仍保留旧文案。
+- 窗口：宠物窗创建和重新显示时同时设置 `always_on_top` 与 `visible_on_all_workspaces`，提升其他应用进入全屏 Space 后灵宠仍置顶可见的稳定性。
+- 设置：设置窗口打开/复用时按主屏工作区 70% 居中；左侧目录从 224px 收窄到 192px，降低侧栏占比。
+- 文件：systemPrompt.ts, SettingsPanel.tsx, 0001_initial.sql, window.rs, SettingsLayout.tsx

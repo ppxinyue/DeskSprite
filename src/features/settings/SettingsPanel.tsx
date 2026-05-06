@@ -10,6 +10,7 @@ import { useSettingsStore } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
+import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { getConversations, getMessages, getSystemPrompt, updateSystemPrompt, setSetting } from '@/lib/db';
 import { maskKey } from '@/lib/keychain';
 import type { PetState, PetStateMediaConfig } from '@/features/pet/animations';
@@ -18,8 +19,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import type { ReactNode } from 'react';
-
-const DEFAULT_PROMPT = `你是{pet_name}，一只温柔、机智、偶尔调皮的橘猫，住在用户的桌面上。你热爱陪伴主人工作，会用轻松幽默的语气聊天。你擅长编程、写作、分析问题，也会提醒主人注意休息和喝水。你的回答应该简洁有用，偶尔展现猫咪的可爱本性。`;
 
 type SettingsSection = 'appearance' | 'ai' | 'history' | 'shortcuts' | 'privacy';
 
@@ -35,13 +34,13 @@ export function SettingsPanel() {
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
   const { settings, loaded, loadSettings, updateSetting, updateSettings } = useSettingsStore();
   const { configs, loadConfigs, addConfig, removeConfig, setDefault } = useApiConfigStore();
-  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_PROMPT);
+  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [newConfig, setNewConfig] = useState({ provider: 'openai', baseUrl: '', model: '', apiKey: '' });
 
   useEffect(() => {
     loadSettings();
     loadConfigs();
-    getSystemPrompt().then(setSystemPrompt);
+    getSystemPrompt().then((prompt) => setSystemPrompt(normalizeSystemPrompt(prompt)));
   }, []);
 
   if (!loaded) return <div className="p-6">加载中...</div>;
@@ -366,7 +365,7 @@ function AISection({
       <Textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={6} className="font-mono text-sm" />
       <div className="flex gap-2 mt-3">
         <Button onClick={() => updateSystemPrompt(systemPrompt)}>保存</Button>
-        <Button variant="outline" onClick={() => setSystemPrompt(DEFAULT_PROMPT)}>重置为默认</Button>
+        <Button variant="outline" onClick={() => setSystemPrompt(DEFAULT_SYSTEM_PROMPT)}>重置为默认</Button>
       </div>
 
       <Separator className="my-6" />
