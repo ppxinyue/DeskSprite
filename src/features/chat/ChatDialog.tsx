@@ -590,6 +590,7 @@ function getModelLabel(
   configs: ReturnType<typeof useApiConfigStore.getState>['configs'],
 ) {
   if (modelId === -1) return `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`;
+  if (modelId === null && configs.length === 0) return `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`;
   if (typeof modelId === 'number' && modelId > 0) {
     const config = configs.find((item) => item.id === modelId);
     return config ? `${config.provider} · ${config.model}` : `模型 #${modelId}`;
@@ -798,15 +799,24 @@ function ModelControl({
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const options = [
-    { id: 'default', title: '默认模型', description: '使用设置中的默认配置' },
-    { id: 'builtin', title: `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`, description: '内置默认模型' },
-    ...configs.map((config) => ({
-      id: String(config.id),
-      title: `${config.provider} · ${config.model}`,
-      description: config.baseUrl,
-    })),
-  ];
+  const defaultConfig = configs.find((config) => config.isDefault);
+  const options = configs.length === 0
+    ? [{ id: 'default', title: `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`, description: '内置默认模型' }]
+    : [
+        {
+          id: 'default',
+          title: defaultConfig
+            ? `默认 · ${defaultConfig.provider} · ${defaultConfig.model}`
+            : `默认 · CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`,
+          description: defaultConfig?.baseUrl ?? '内置默认模型',
+        },
+        { id: 'builtin', title: `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`, description: '内置默认模型' },
+        ...configs.map((config) => ({
+          id: String(config.id),
+          title: `${config.provider} · ${config.model}`,
+          description: config.baseUrl,
+        })),
+      ];
   const current = options.find((item) => item.id === modelId) ?? options[0];
 
   useEffect(() => {
@@ -847,8 +857,7 @@ function ModelControl({
         title={current.title}
       >
         <span className="min-w-0">
-          <span className="block truncate text-[13px] text-[var(--text-primary)]">{current.title}</span>
-          <span className="block truncate text-[11px] text-[var(--text-secondary)]">{current.description}</span>
+          <span className="block truncate text-[13px] leading-[1.5] text-[var(--text-primary)]">{current.title}</span>
         </span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>

@@ -123,7 +123,7 @@ pub fn show_chat_window(app: AppHandle) -> Result<(), String> {
     }
 
     WebviewWindowBuilder::new(&app, "chat", WebviewUrl::App("index.html".into()))
-        .title("DeskSprite Chat")
+        .title("")
         .inner_size(w, h)
         .position(x, y)
         .decorations(true)

@@ -347,3 +347,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/index.css`, `src/lib/db.ts`, `src/features/ai/systemPrompt.ts`, `src-tauri/src/commands/window.rs`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/migrations/0001_initial.sql`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：macOS 全屏 Space 不是普通置顶问题，需要同时处理 Space membership 与窗口 level；历史会话应把模型视为会话元数据而非可编辑输入。
 - 是否需更新技术文档：是。
+
+## ISSUE-031
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：H. 大对话窗口 UI
+- 严重程度：改进
+- 问题现象：大聊天窗口顶端仍显示 “DeskSprite Chat”；模型选择触发器显示了描述小字，入口不够干净；无用户 API 配置时菜单里“默认模型”和 CloseAI 重复。
+- 原因分析：Tauri chat 窗口仍设置了原生 title；自定义模型触发器复用了菜单行项的标题/描述双行结构；模型选项没有根据用户配置数量做去重。
+- 解决方案：chat 窗口 title 改为空；触发器只保留模型名称和 chevron；当用户没有自定义 API 配置时，菜单只渲染一个 CloseAI 默认项。
+- 涉及文件：`src-tauri/src/commands/window.rs`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：主入口和下拉菜单的信息密度应该分层，入口保持短，详细信息放在展开态。
+- 是否需更新技术文档：是。
