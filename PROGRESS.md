@@ -233,3 +233,11 @@
 - 主题：新增浅色 A / 浅色 B / 深色 A / 深色 B 四套聊天色彩变量，设置页主题选择同步扩展。
 - 细节：消息 fade-in 150ms，hover 轻微变亮，Markdown 代码块使用等宽字体，消息复制按钮 hover 显示；前端显示层过滤密集 emoji 和行首括号动作描述。
 - 文件：ChatDialog.tsx, index.css, App.tsx, SettingsPanel.tsx, settingsStore.ts
+
+### R18. 大对话窗口 ChatGPT-like 布局重构（2026-05-06）
+- 问题：大对话窗口灰块和边框过多，视觉层级像后台工具；模型、布局、新建和多面板控件分散；历史列表卡片感偏重。
+- 修复：大窗重构为 240px 侧边栏 + 48px 顶部 Header + 消息区 + 底部输入区；侧边栏使用纯文本历史列表和 hover 高亮，顶部固定“新建对话”。
+- Header：左侧为当前激活面板的模型选择，右侧为 icon-only 布局切换和新增面板按钮；多面板仍保留每个面板独立 `modelId`，点击面板后 Header 控制该面板模型。
+- 对话区：删除外层大灰容器，消息区使用 `max-width: 720px` 居中，面板之间只保留 1px 分隔线；输入区同样 720px 居中，图片上传/语音输入在左，发送按钮在右。
+- 主题：新增 `--bg-primary`、`--bg-secondary`、`--text-primary`、`--border-color`、`--accent-color` CSS variables，并映射到现有四套聊天主题。
+- 文件：ChatDialog.tsx, index.css

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { Columns3, Copy, Grid2X2, ImagePlus, Mic, PanelRight, Plus, Rows3, X } from 'lucide-react';
+import { Columns3, Copy, Grid2X2, Mic, PanelRight, Paperclip, Plus, Rows3, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useChatStore, createMessage } from './chatStore';
@@ -475,44 +475,56 @@ function StandaloneChatWorkspace() {
   const visiblePanels = layout === 'single'
     ? [panels.find((panel) => panel.id === activePanelId) ?? panels[0]]
     : panels;
+  const activePanel = panels.find((panel) => panel.id === activePanelId) ?? panels[0];
 
   return (
-    <div className="grid h-full grid-cols-[260px_minmax(0,1fr)] bg-background text-foreground">
-      <aside className="flex min-h-0 flex-col border-r border-border bg-muted/35">
-        <div className="flex items-center justify-between border-b border-border px-3 py-3">
-          <span className="text-sm font-semibold">历史对话</span>
-          <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => {
+    <div className="grid h-full grid-cols-[240px_minmax(0,1fr)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
+      <aside className="flex min-h-0 flex-col border-r border-[var(--border-color)] bg-[var(--bg-secondary)]">
+        <div className="shrink-0 p-3">
+          <button className="flex h-9 w-full items-center gap-2 rounded-[8px] px-3 text-left text-[14px] leading-[1.5] transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" onClick={() => {
             const next = createPanel();
             setPanels([next]);
             setActivePanelId(next.id);
             setLayout('single');
-          }}>新建</Button>
+          }}>
+            <Plus className="h-4 w-4" />
+            新建对话
+          </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
           {historyItems.map((item) => (
-            <button key={item.id} className="block w-full rounded-md px-2 py-2 text-left text-sm hover:bg-accent" onClick={() => loadConversationIntoPanel(item.id)}>
-              <div className="truncate">{item.title || `对话 ${item.id}`}</div>
-              <div className="mt-0.5 text-[11px] text-muted-foreground">{item.updatedAt}</div>
+            <button key={item.id} className="block w-full rounded-[8px] px-3 py-2 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" onClick={() => loadConversationIntoPanel(item.id)}>
+              <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
+              <div className="mt-0.5 truncate text-[12px] leading-[1.5] text-[var(--text-secondary)]">{item.updatedAt}</div>
             </button>
           ))}
         </div>
       </aside>
-      <main className="flex min-h-0 flex-col">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h1 className="text-sm font-semibold">DeskSprite Chat</h1>
+      <main className="flex min-h-0 flex-col bg-[var(--bg-primary)]">
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--border-color)] px-4">
+          <select
+            className="h-8 max-w-[280px] rounded-[8px] border-0 bg-transparent px-2 text-[14px] leading-[1.5] outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] focus:bg-[var(--bg-secondary)]"
+            value={activePanel?.modelId ?? 'default'}
+            onChange={(e) => activePanel && updatePanel(activePanel.id, { modelId: e.target.value })}
+          >
+            <option value="default">默认模型</option>
+            <option value="builtin">CloseAI · {BUILTIN_CLOSEAI_CONFIG.model}</option>
+            {configs.map((c) => (
+              <option key={c.id} value={String(c.id)}>{c.provider} · {c.model}</option>
+            ))}
+          </select>
           <div className="flex items-center gap-1">
             <LayoutButton title="单窗口" active={layout === 'single'} onClick={() => setLayout('single')}><PanelRight className="h-4 w-4" /></LayoutButton>
             <LayoutButton title="横向并排" active={layout === 'columns'} onClick={() => setLayout('columns')}><Columns3 className="h-4 w-4" /></LayoutButton>
             <LayoutButton title="纵向并排" active={layout === 'rows'} onClick={() => setLayout('rows')}><Rows3 className="h-4 w-4" /></LayoutButton>
             <LayoutButton title="四宫格" active={layout === 'grid'} onClick={() => setLayout('grid')}><Grid2X2 className="h-4 w-4" /></LayoutButton>
-            <Button variant="outline" size="sm" className="ml-2 h-8 gap-1 px-2" onClick={addPanel} disabled={panels.length >= 4}>
+            <Button variant="ghost" size="sm" className="ml-1 h-8 w-8 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" title="新建面板" onClick={addPanel} disabled={panels.length >= 4}>
               <Plus className="h-4 w-4" />
-              添加
             </Button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 p-3">
-          <div className="grid h-full gap-3" style={layoutGridStyle(layout, visiblePanels.length)}>
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="grid h-full gap-px bg-[var(--border-color)]" style={layoutGridStyle(layout, visiblePanels.length)}>
             {visiblePanels.map((panel) => (
               <StandaloneChatPanel
                 key={panel.id}
@@ -527,7 +539,6 @@ function StandaloneChatWorkspace() {
                   if (image) updatePanel(panel.id, { selectedImage: image });
                 }}
                 onInputChange={(value) => updatePanel(panel.id, { input: value })}
-                onModelChange={(modelId) => updatePanel(panel.id, { modelId })}
                 onSubmit={() => sendFromPanel(panel.id)}
                 onVoiceInput={() => startSpeechInput(
                   (text) => updatePanel(panel.id, (current) => ({ ...current, input: `${current.input}${current.input ? ' ' : ''}${text}` })),
@@ -619,9 +630,9 @@ function startSpeechInput(onText: (text: string) => void, setListening: (listeni
 function LayoutButton({ title, active, onClick, children }: { title: string; active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <Button
-      variant={active ? 'secondary' : 'ghost'}
+      variant="ghost"
       size="sm"
-      className="h-8 w-8 p-0"
+      className={`h-8 w-8 p-0 transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${active ? 'bg-[color-mix(in_srgb,var(--text-primary)_10%,transparent)]' : ''}`}
       title={title}
       onClick={onClick}
     >
@@ -639,7 +650,6 @@ function StandaloneChatPanel({
   onClose,
   onImagePick,
   onInputChange,
-  onModelChange,
   onSubmit,
   onVoiceInput,
 }: {
@@ -651,7 +661,6 @@ function StandaloneChatPanel({
   onClose: () => void;
   onImagePick: () => void;
   onInputChange: (value: string) => void;
-  onModelChange: (value: string) => void;
   onSubmit: () => void;
   onVoiceInput: () => void;
 }) {
@@ -678,52 +687,56 @@ function StandaloneChatPanel({
 
   return (
     <section
-      className={`flex min-h-0 flex-col overflow-hidden rounded-lg border bg-background shadow-sm ${active ? 'border-primary/50' : 'border-border'}`}
+      className={`flex min-h-0 flex-col overflow-hidden bg-[var(--bg-primary)] ${active ? 'outline outline-1 outline-[var(--accent-color)]' : ''}`}
       onMouseDown={onActivate}
     >
-      <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <select
-          className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-          value={panel.modelId}
-          onChange={(e) => onModelChange(e.target.value)}
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3">
+        <div
+          className="min-w-0 flex-1 truncate rounded-[6px] px-2 py-1 text-left text-[12px] leading-[1.5] text-[var(--text-secondary)] transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]"
+          title="点击面板后可在顶部切换模型"
         >
-          <option value="default">默认模型</option>
-          <option value="builtin">CloseAI · {BUILTIN_CLOSEAI_CONFIG.model}</option>
-          {configs.map((c) => (
-            <option key={c.id} value={String(c.id)}>{c.provider} · {c.model}</option>
-          ))}
-        </select>
+          {modelLabel(panel.modelId, configs)}
+        </div>
         {canClose && (
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={onClose} title="关闭">
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" onClick={onClose} title="关闭">
             <X className="h-4 w-4" />
           </Button>
         )}
       </div>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4">
-        <div className="mx-auto max-w-3xl py-5 space-y-3">
+        <div className="mx-auto max-w-[720px] space-y-3 py-5">
           {panel.messages.length === 0 ? (
-            <div className="pt-12 text-center text-sm text-muted-foreground">开始一次新的对话</div>
+            <div className="pt-12 text-center text-[14px] leading-[1.5] text-[var(--text-secondary)]">开始一次新的对话</div>
           ) : panel.messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
           ))}
         </div>
       </div>
-      <div className="border-t border-border p-3">
-        <Composer
-          input={panel.input}
-          isStreaming={panel.isStreaming}
-          isListening={panel.isListening}
-          onImagePick={onImagePick}
-          onInputChange={onInputChange}
-          onKeyDown={handleKeyDown}
-          onSubmit={onSubmit}
-          onVoiceInput={onVoiceInput}
-          selectedImage={panel.selectedImage}
-          textareaRef={textareaRef}
-        />
+      <div className="shrink-0 px-4 pb-4">
+        <div className="mx-auto max-w-[720px]">
+          <Composer
+            input={panel.input}
+            isStreaming={panel.isStreaming}
+            isListening={panel.isListening}
+            onImagePick={onImagePick}
+            onInputChange={onInputChange}
+            onKeyDown={handleKeyDown}
+            onSubmit={onSubmit}
+            onVoiceInput={onVoiceInput}
+            selectedImage={panel.selectedImage}
+            textareaRef={textareaRef}
+          />
+        </div>
       </div>
     </section>
   );
+}
+
+function modelLabel(modelId: string, configs: ReturnType<typeof useApiConfigStore.getState>['configs']) {
+  if (modelId === 'default') return '默认模型';
+  if (modelId === 'builtin') return `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`;
+  const config = configs.find((item) => String(item.id) === modelId);
+  return config ? `${config.provider} · ${config.model}` : '默认模型';
 }
 
 function Composer({
@@ -768,10 +781,10 @@ function Composer({
       >
         {!compact && (
           <>
-            <Button variant="ghost" size="sm" type="button" className="ml-1 h-9 w-9 p-0 text-[var(--color-chat-muted)] hover:bg-[var(--color-chat-assistant)] hover:text-[var(--color-chat-text)]" title="图片输入" onClick={onImagePick}>
-              <ImagePlus className="h-4 w-4" />
+            <Button variant="ghost" size="sm" type="button" className="ml-1 h-9 w-9 p-0 text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]" title="上传图片" onClick={onImagePick}>
+              <Paperclip className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" type="button" className={`h-9 w-9 p-0 hover:bg-[var(--color-chat-assistant)] ${isListening ? 'text-[var(--color-chat-accent)]' : 'text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)]'}`} title="语音输入" onClick={onVoiceInput}>
+            <Button variant="ghost" size="sm" type="button" className={`h-9 w-9 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${isListening ? 'animate-pulse text-red-500' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
               <Mic className="h-4 w-4" />
             </Button>
           </>
@@ -803,7 +816,7 @@ function MessageBubble({ message, isStreaming = false }: { message: ChatMessage;
       <div
         className={`relative max-w-[80%] rounded-[12px] px-[14px] py-[10px] text-[14px] leading-[1.5] transition-colors ${
           isUser
-            ? 'bg-[var(--color-chat-user)] text-[var(--color-chat-text)] hover:brightness-[0.98] dark:hover:brightness-110'
+            ? 'bg-[var(--color-chat-user)] text-[var(--color-chat-user-text)] hover:brightness-[0.98] dark:hover:brightness-110'
             : 'bg-[var(--color-chat-assistant)] text-[var(--color-chat-text)] hover:brightness-[0.985] dark:hover:brightness-110'
         }`}
       >

@@ -299,3 +299,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/index.css`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：聊天界面应使用独立设计 token，避免桌面宠物的装饰性视觉变量渗透到高可读文本界面。
 - 是否需更新技术文档：是。
+
+## ISSUE-027
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：H. 大对话窗口 UI
+- 严重程度：改进
+- 问题现象：大对话窗口灰色块过多，面板边框过重，层级不清晰，整体更像后台工具而不是专业对话产品。
+- 原因分析：大窗沿用了“多面板卡片”思路，侧边栏、Header、面板和输入区各自有边框/背景，导致嵌套层级过多；模型选择放在面板内部，布局和新建按钮放在主 Header，控件语义不统一。
+- 解决方案：改成 ChatGPT-like 结构：240px 纯文本侧边栏、48px Header、主消息区、底部输入区；Header 左侧统一控制当前激活面板模型，右侧保留 icon-only 多布局切换和新增面板；面板不再是卡片，只用 1px 分隔线保留多布局边界。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：多面板能力和专业聊天界面可以共存，但主结构必须先是“对话产品”，再用低噪声分隔线表达面板布局，不能让每个功能都变成一张卡片。
+- 是否需更新技术文档：是。
