@@ -249,7 +249,7 @@ export function ChatDialog({
           ) : historyItems.map((item) => (
             <button
               key={item.id}
-              className="block w-full rounded-[8px] px-3 py-2 text-left transition-colors hover:bg-[var(--color-chat-assistant)]"
+              className="block w-full rounded-[8px] px-3 py-2 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-chat-text)_8%,transparent)]"
               onClick={() => loadConversation(item.id)}
             >
               <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
@@ -265,7 +265,7 @@ export function ChatDialog({
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
           style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 60) }}
         >
-          <div className="space-y-3 py-4">
+          <div className="space-y-2 py-3">
             {messages.map((msg) => (
               <MessageBubble key={msg.id} message={msg} />
             ))}
@@ -475,7 +475,6 @@ function StandaloneChatWorkspace() {
   const visiblePanels = layout === 'single'
     ? [panels.find((panel) => panel.id === activePanelId) ?? panels[0]]
     : panels;
-  const activePanel = panels.find((panel) => panel.id === activePanelId) ?? panels[0];
 
   return (
     <div className="grid h-full grid-cols-[240px_minmax(0,1fr)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -501,18 +500,7 @@ function StandaloneChatWorkspace() {
         </div>
       </aside>
       <main className="flex min-h-0 flex-col bg-[var(--bg-primary)]">
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--border-color)] px-4">
-          <select
-            className="h-8 max-w-[280px] rounded-[8px] border-0 bg-transparent px-2 text-[14px] leading-[1.5] outline-none transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] focus:bg-[var(--bg-secondary)]"
-            value={activePanel?.modelId ?? 'default'}
-            onChange={(e) => activePanel && updatePanel(activePanel.id, { modelId: e.target.value })}
-          >
-            <option value="default">默认模型</option>
-            <option value="builtin">CloseAI · {BUILTIN_CLOSEAI_CONFIG.model}</option>
-            {configs.map((c) => (
-              <option key={c.id} value={String(c.id)}>{c.provider} · {c.model}</option>
-            ))}
-          </select>
+        <div className="flex h-12 shrink-0 items-center justify-end border-b border-[var(--border-color)] px-4">
           <div className="flex items-center gap-1">
             <LayoutButton title="单窗口" active={layout === 'single'} onClick={() => setLayout('single')}><PanelRight className="h-4 w-4" /></LayoutButton>
             <LayoutButton title="横向并排" active={layout === 'columns'} onClick={() => setLayout('columns')}><Columns3 className="h-4 w-4" /></LayoutButton>
@@ -539,6 +527,7 @@ function StandaloneChatWorkspace() {
                   if (image) updatePanel(panel.id, { selectedImage: image });
                 }}
                 onInputChange={(value) => updatePanel(panel.id, { input: value })}
+                onModelChange={(modelId) => updatePanel(panel.id, { modelId })}
                 onSubmit={() => sendFromPanel(panel.id)}
                 onVoiceInput={() => startSpeechInput(
                   (text) => updatePanel(panel.id, (current) => ({ ...current, input: `${current.input}${current.input ? ' ' : ''}${text}` })),
@@ -650,6 +639,7 @@ function StandaloneChatPanel({
   onClose,
   onImagePick,
   onInputChange,
+  onModelChange,
   onSubmit,
   onVoiceInput,
 }: {
@@ -661,6 +651,7 @@ function StandaloneChatPanel({
   onClose: () => void;
   onImagePick: () => void;
   onInputChange: (value: string) => void;
+  onModelChange: (value: string) => void;
   onSubmit: () => void;
   onVoiceInput: () => void;
 }) {
@@ -687,16 +678,21 @@ function StandaloneChatPanel({
 
   return (
     <section
-      className={`flex min-h-0 flex-col overflow-hidden bg-[var(--bg-primary)] ${active ? 'outline outline-1 outline-[var(--accent-color)]' : ''}`}
+      className={`flex min-h-0 flex-col overflow-hidden bg-[var(--bg-primary)] ${active ? 'outline outline-1 outline-[var(--border-color)]' : ''}`}
       onMouseDown={onActivate}
     >
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-[var(--border-color)] px-3">
-        <div
-          className="min-w-0 flex-1 truncate rounded-[6px] px-2 py-1 text-left text-[12px] leading-[1.5] text-[var(--text-secondary)] transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]"
-          title="点击面板后可在顶部切换模型"
+      <div className="flex h-9 shrink-0 items-center gap-2 px-3">
+        <select
+          className="h-7 min-w-0 max-w-[240px] flex-1 truncate rounded-[7px] border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-secondary)_85%,var(--bg-primary))] px-2 text-[12px] leading-[1.5] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-secondary)]"
+          value={panel.modelId}
+          onChange={(e) => onModelChange(e.target.value)}
         >
-          {modelLabel(panel.modelId, configs)}
-        </div>
+          <option value="default">默认模型</option>
+          <option value="builtin">CloseAI · {BUILTIN_CLOSEAI_CONFIG.model}</option>
+          {configs.map((c) => (
+            <option key={c.id} value={String(c.id)}>{c.provider} · {c.model}</option>
+          ))}
+        </select>
         {canClose && (
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" onClick={onClose} title="关闭">
             <X className="h-4 w-4" />
@@ -704,7 +700,7 @@ function StandaloneChatPanel({
         )}
       </div>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4">
-        <div className="mx-auto max-w-[720px] space-y-3 py-5">
+        <div className="mx-auto max-w-[720px] space-y-2 py-4">
           {panel.messages.length === 0 ? (
             <div className="pt-12 text-center text-[14px] leading-[1.5] text-[var(--text-secondary)]">开始一次新的对话</div>
           ) : panel.messages.map((msg) => (
@@ -730,13 +726,6 @@ function StandaloneChatPanel({
       </div>
     </section>
   );
-}
-
-function modelLabel(modelId: string, configs: ReturnType<typeof useApiConfigStore.getState>['configs']) {
-  if (modelId === 'default') return '默认模型';
-  if (modelId === 'builtin') return `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`;
-  const config = configs.find((item) => String(item.id) === modelId);
-  return config ? `${config.provider} · ${config.model}` : '默认模型';
 }
 
 function Composer({
@@ -765,7 +754,7 @@ function Composer({
   compact?: boolean;
 }) {
   return (
-    <div className={compact ? "border-t border-[var(--color-chat-border)] p-4 pt-3" : ""}>
+    <div className={compact ? "p-3 pt-2" : ""}>
       {selectedImage && (
         <div className="mb-2 flex items-center gap-2 rounded-[8px] border border-[var(--color-chat-border)] px-2 py-1.5 text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
           <img src={selectedImage.dataUrl} alt="" className="h-8 w-8 rounded-[6px] object-cover" />
@@ -773,7 +762,7 @@ function Composer({
         </div>
       )}
       <form
-        className={`flex w-full items-end gap-1.5 rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-input-bg)] p-0 shadow-none transition-[border-color,box-shadow] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_18%,transparent)]`}
+        className="flex w-full items-end gap-1 rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-input-bg)] p-0 shadow-none transition-[border-color,box-shadow] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_18%,transparent)]"
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit();
@@ -781,10 +770,10 @@ function Composer({
       >
         {!compact && (
           <>
-            <Button variant="ghost" size="sm" type="button" className="ml-1 h-9 w-9 p-0 text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]" title="上传图片" onClick={onImagePick}>
+            <Button variant="ghost" size="sm" type="button" className="ml-1 h-9 w-8 p-0 text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]" title="上传图片" onClick={onImagePick}>
               <Paperclip className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" type="button" className={`h-9 w-9 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${isListening ? 'animate-pulse text-red-500' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
+            <Button variant="ghost" size="sm" type="button" className={`h-9 w-8 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${isListening ? 'animate-pulse text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
               <Mic className="h-4 w-4" />
             </Button>
           </>
@@ -814,11 +803,7 @@ function MessageBubble({ message, isStreaming = false }: { message: ChatMessage;
   return (
     <div className={`group flex animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`relative max-w-[80%] rounded-[12px] px-[14px] py-[10px] text-[14px] leading-[1.5] transition-colors ${
-          isUser
-            ? 'bg-[var(--color-chat-user)] text-[var(--color-chat-user-text)] hover:brightness-[0.98] dark:hover:brightness-110'
-            : 'bg-[var(--color-chat-assistant)] text-[var(--color-chat-text)] hover:brightness-[0.985] dark:hover:brightness-110'
-        }`}
+        className={`relative max-w-[80%] text-[14px] leading-[1.5] text-[var(--color-chat-text)] transition-colors ${isUser ? 'text-right' : 'text-left'}`}
       >
         {(message.imageDataUrl || message.imageUrl) && (
           <img src={message.imageDataUrl || message.imageUrl} alt="" className="mb-2 max-h-48 rounded-[8px] object-contain" />

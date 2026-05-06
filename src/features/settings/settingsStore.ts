@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { setSetting, getAllSettings } from '@/lib/db';
 import { emit } from '@tauri-apps/api/event';
 
-export type Theme = 'light' | 'light-soft' | 'dark' | 'dark-slate' | 'system';
+export type Theme = 'light' | 'dark' | 'system';
 
 export interface AppSettings {
   theme: Theme;
@@ -61,7 +61,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         if (key in loaded) {
           const parsed = tryParse(value);
           if (parsed !== undefined) {
-            (loaded as Record<string, unknown>)[key] = parsed;
+            (loaded as Record<string, unknown>)[key] =
+              key === 'theme' && !['system', 'light', 'dark'].includes(String(parsed))
+                ? 'system'
+                : parsed;
           }
         }
       }

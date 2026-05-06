@@ -143,10 +143,8 @@ function AppearanceSection({
           onChange={(e) => update('theme', e.target.value as import('./settingsStore').Theme)}
         >
           <option value="system">跟随系统</option>
-          <option value="light">浅色 A</option>
-          <option value="light-soft">浅色 B</option>
-          <option value="dark">深色 A</option>
-          <option value="dark-slate">深色 B</option>
+          <option value="light">浅色</option>
+          <option value="dark">深色</option>
         </select>
       </SettingRow>
       <SettingRow label="灵宠透明度">

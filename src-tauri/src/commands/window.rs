@@ -66,7 +66,7 @@ pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String
     }
 
     WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html".into()))
-        .title("DeskSprite Settings")
+        .title("")
         .inner_size(w, h)
         .position(x, y)
         .decorations(true)

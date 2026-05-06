@@ -34,11 +34,10 @@
   --text-primary: #111111;
   --text-secondary: #6b7280;
   --border-color: #e5e5e5;
-  --accent-color: #10a37f;
+  --accent-color: #8e8e93;
   --color-chat-bg: var(--bg-primary);
-  --color-chat-user: #10a37f;
-  --color-chat-user-text: #ffffff;
-  --color-chat-assistant: #f7f7f8;
+  --color-chat-user-text: var(--text-primary);
+  --color-chat-assistant: transparent;
   --color-chat-text: var(--text-primary);
   --color-chat-muted: var(--text-secondary);
   --color-chat-border: var(--border-color);
@@ -47,24 +46,6 @@
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, Consolas, monospace;
-}
-
-.theme-light-soft {
-  --bg-primary: #fbfbfa;
-  --bg-secondary: #f1f1ef;
-  --text-primary: #151515;
-  --text-secondary: #6f6f69;
-  --border-color: #deded8;
-  --accent-color: #0f8f72;
-  --color-chat-bg: var(--bg-primary);
-  --color-chat-user: #0f8f72;
-  --color-chat-user-text: #ffffff;
-  --color-chat-assistant: #f1f1ef;
-  --color-chat-text: var(--text-primary);
-  --color-chat-muted: var(--text-secondary);
-  --color-chat-border: var(--border-color);
-  --color-chat-input-bg: #ffffff;
-  --color-chat-accent: var(--accent-color);
 }
 
 .dark {
@@ -97,33 +78,14 @@
   --text-primary: #ececf1;
   --text-secondary: #c5c5d2;
   --border-color: #565869;
-  --accent-color: #10a37f;
+  --accent-color: #8e8e93;
   --color-chat-bg: var(--bg-primary);
-  --color-chat-user: #3b82f6;
-  --color-chat-user-text: #ffffff;
-  --color-chat-assistant: #444654;
+  --color-chat-user-text: var(--text-primary);
+  --color-chat-assistant: transparent;
   --color-chat-text: var(--text-primary);
   --color-chat-muted: var(--text-secondary);
   --color-chat-border: var(--border-color);
   --color-chat-input-bg: #40414f;
-  --color-chat-accent: var(--accent-color);
-}
-
-.theme-dark-slate {
-  --bg-primary: #202123;
-  --bg-secondary: #17181a;
-  --text-primary: #f3f4f6;
-  --text-secondary: #b8bbc2;
-  --border-color: #3f4147;
-  --accent-color: #19c37d;
-  --color-chat-bg: var(--bg-primary);
-  --color-chat-user: #2563eb;
-  --color-chat-user-text: #ffffff;
-  --color-chat-assistant: #2f3033;
-  --color-chat-text: var(--text-primary);
-  --color-chat-muted: var(--text-secondary);
-  --color-chat-border: var(--border-color);
-  --color-chat-input-bg: #2b2c30;
   --color-chat-accent: var(--accent-color);
 }
 

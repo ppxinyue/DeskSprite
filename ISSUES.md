@@ -311,3 +311,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：多面板能力和专业聊天界面可以共存，但主结构必须先是“对话产品”，再用低噪声分隔线表达面板布局，不能让每个功能都变成一张卡片。
 - 是否需更新技术文档：是。
+
+## ISSUE-028
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：H. 对话窗口主题与消息排版
+- 严重程度：改进
+- 问题现象：新增的四套主题和聊天 accent 使用了绿色/蓝色；消息仍用气泡包裹；大窗模型选择不在每个主对话窗口左上角；小窗输入框上方有分隔线。
+- 原因分析：上一轮为 ChatGPT-like 视觉引入了独立彩色 token 和气泡式 message block，但用户现在要求更克制的黑白灰文本流；大窗 Header 统一模型选择虽然减少了控件，但不符合多面板下每个窗口独立选择的视觉预期。
+- 解决方案：主题回退到 system/light/dark，并将聊天 token 改为黑白灰；消息组件移除背景、圆角和 padding，只保留左右对齐纯文本；大窗每个 `StandaloneChatPanel` 顶部恢复一个灰色 select；小窗 composer 去掉上边框。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/index.css`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：对话产品的“专业感”有时来自更少的视觉容器；主题系统应先满足语义稳定，再扩展风格数量。
+- 是否需更新技术文档：是。
