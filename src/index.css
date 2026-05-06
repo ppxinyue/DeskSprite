@@ -65,6 +65,11 @@
   *::after {
     @apply border-border;
   }
+
+  #root {
+    background: transparent;
+  }
+
   body {
     @apply text-foreground;
     background: transparent;
@@ -78,8 +83,8 @@
 }
 
 @keyframes petBounce {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
 }
 
 @keyframes petJump {

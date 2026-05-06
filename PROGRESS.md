@@ -95,6 +95,12 @@
   - 问题一：全屏宠物窗拦截所有鼠标事件，桌面卡死 → 添加 `set_ignore_cursor_events(true)` + `set_cursor_passthrough` 命令动态切换穿透
   - 问题二：设置窗口无法点击 → body.has-background 添加 pointer-events:auto
   - 问题三：资产文件重命名 → animations.ts 路径更新为 assets/{state}/{state}.png
+  - 修复记录（2026-05-06 第二轮）：
+  - 穿透稳定性：拖拽结束延迟100ms恢复穿透，防止丢失鼠标
+  - 灰色背景：#root 透明，petBounce 改用 translateY，容器显式 background:transparent
+  - Hover 输入框：新建 HoverInputBar.tsx，悬停灵宠自动浮出半透明输入框
+  - 设置重组：8 section → 4 section（外观/AI对话/快捷键/隐私），外观滑块需确认才生效
+  - SettingsLayout：视觉优化（侧边栏标题、间距、字体层级）
 
 ### G. AI Service 层
 - 状态：✅ 完成

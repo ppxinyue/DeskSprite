@@ -16,25 +16,22 @@ import { DEFAULT_MEDIA_CONFIG, ALL_PET_STATES, STATE_META } from '@/features/pet
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import type { ReactNode } from 'react';
 
 const DEFAULT_PROMPT = `你是{pet_name}，一只温柔、机智、偶尔调皮的橘猫，住在用户的桌面上。你热爱陪伴主人工作，会用轻松幽默的语气聊天。你擅长编程、写作、分析问题，也会提醒主人注意休息和喝水。你的回答应该简洁有用，偶尔展现猫咪的可爱本性。`;
 
-type SettingsSection = 'appearance' | 'pet' | 'behavior' | 'image' | 'ai' | 'voice' | 'shortcuts' | 'privacy';
+type SettingsSection = 'appearance' | 'ai' | 'shortcuts' | 'privacy';
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
-  { id: 'appearance', label: '外观与悬浮球' },
-  { id: 'pet', label: '宠物身份' },
-  { id: 'behavior', label: '灵宠行为' },
-  { id: 'image', label: '形象自定义' },
-  { id: 'ai', label: 'AI 与对话' },
-  { id: 'voice', label: '语音' },
+  { id: 'appearance', label: '外观' },
+  { id: 'ai', label: 'AI 对话' },
   { id: 'shortcuts', label: '快捷键' },
   { id: 'privacy', label: '隐私与数据' },
 ];
 
 export function SettingsPanel() {
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
-  const { settings, loaded, loadSettings, updateSetting } = useSettingsStore();
+  const { settings, loaded, loadSettings, updateSetting, updateSettings } = useSettingsStore();
   const { configs, loadConfigs, addConfig, removeConfig, setDefault } = useApiConfigStore();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_PROMPT);
   const [newConfig, setNewConfig] = useState({ provider: 'openai', baseUrl: '', model: '', apiKey: '' });
@@ -48,35 +45,28 @@ export function SettingsPanel() {
   if (!loaded) return <div className="p-6">加载中...</div>;
 
   const sidebar = (
-    <div className="flex flex-col gap-1">
+    <>
       {SECTIONS.map((s) => (
         <button
           key={s.id}
-          className={`text-left px-3 py-2 rounded-md text-sm transition-colors ${
+          className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             activeSection === s.id
-              ? 'bg-accent text-accent-foreground font-medium'
-              : 'hover:bg-accent/50'
+              ? 'bg-accent text-accent-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
           }`}
           onClick={() => setActiveSection(s.id)}
         >
           {s.label}
         </button>
       ))}
-    </div>
+    </>
   );
 
   return (
     <SettingsLayout sidebar={sidebar}>
       {activeSection === 'appearance' && (
-        <AppearanceSection settings={settings} updateSetting={updateSetting} />
+        <AppearanceSection settings={settings} updateSettings={updateSettings} />
       )}
-      {activeSection === 'pet' && (
-        <PetIdentitySection settings={settings} updateSetting={updateSetting} />
-      )}
-      {activeSection === 'behavior' && (
-        <BehaviorSection settings={settings} updateSetting={updateSetting} />
-      )}
-      {activeSection === 'image' && <ImageSection />}
       {activeSection === 'ai' && (
         <AISection
           settings={settings}
@@ -91,9 +81,6 @@ export function SettingsPanel() {
           setDefault={setDefault}
         />
       )}
-      {activeSection === 'voice' && (
-        <VoiceSection settings={settings} updateSetting={updateSetting} />
-      )}
       {activeSection === 'shortcuts' && (
         <ShortcutsSection settings={settings} updateSetting={updateSetting} />
       )}
@@ -102,34 +89,61 @@ export function SettingsPanel() {
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-lg font-semibold mb-4">{children}</h2>;
+function SectionTitle({ children }: { children: ReactNode }) {
+  return <h2 className="text-base font-semibold text-foreground mb-1">{children}</h2>;
 }
 
-function SettingRow({ label, children }: { label: string; children: React.ReactNode }) {
+function SectionDesc({ children }: { children: ReactNode }) {
+  return <p className="text-sm text-muted-foreground mb-5">{children}</p>;
+}
+
+function SettingRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-3">
-      <span className="text-sm">{label}</span>
-      <div className="flex items-center gap-2">{children}</div>
+    <div className="flex items-center justify-between py-3 border-b border-border/40 last:border-0">
+      <div>
+        <span className="text-sm text-foreground">{label}</span>
+        {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+      </div>
+      <div className="flex items-center gap-2 ml-4 shrink-0">{children}</div>
     </div>
   );
 }
 
 function AppearanceSection({
   settings,
-  updateSetting,
+  updateSettings,
 }: {
   settings: import('./settingsStore').AppSettings;
-  updateSetting: import('./settingsStore').SettingsState['updateSetting'];
+  updateSettings: import('./settingsStore').SettingsState['updateSettings'];
 }) {
+  const [draft, setDraft] = useState({
+    petOpacity: settings.petOpacity,
+    petScale: settings.petScale,
+    dialogWidth: settings.dialogWidth,
+    theme: settings.theme,
+  });
+  const [dirty, setDirty] = useState(false);
+
+  const update = <K extends keyof typeof draft>(k: K, v: typeof draft[K]) => {
+    setDraft((d) => ({ ...d, [k]: v }));
+    setDirty(true);
+  };
+
+  const handleConfirm = async () => {
+    await updateSettings(draft);
+    setDirty(false);
+  };
+
   return (
     <>
-      <SectionTitle>外观与悬浮球</SectionTitle>
+      <SectionTitle>外观设置</SectionTitle>
+      <SectionDesc>调整灵宠的显示效果，确认后生效。</SectionDesc>
+
       <SettingRow label="主题">
         <select
           className="bg-input border border-border rounded px-2 py-1 text-sm"
-          value={settings.theme}
-          onChange={(e) => updateSetting('theme', e.target.value as 'light' | 'dark' | 'system')}
+          value={draft.theme}
+          onChange={(e) => update('theme', e.target.value as 'light' | 'dark' | 'system')}
         >
           <option value="system">跟随系统</option>
           <option value="light">浅色</option>
@@ -137,96 +151,41 @@ function AppearanceSection({
         </select>
       </SettingRow>
       <SettingRow label="灵宠透明度">
-        <span className="text-xs text-muted-foreground w-8">{settings.petOpacity.toFixed(1)}</span>
+        <span className="text-xs text-muted-foreground w-8">{draft.petOpacity.toFixed(1)}</span>
         <Slider
-          value={[settings.petOpacity]}
-          onValueChange={([v]) => updateSetting('petOpacity', v)}
-          min={0.6}
-          max={1}
-          step={0.05}
-          className="w-32"
+          value={[draft.petOpacity]}
+          onValueChange={([v]) => update('petOpacity', v)}
+          min={0.6} max={1} step={0.05} className="w-32"
         />
       </SettingRow>
       <SettingRow label="灵宠大小">
-        <span className="text-xs text-muted-foreground w-8">{settings.petScale.toFixed(1)}</span>
+        <span className="text-xs text-muted-foreground w-8">{draft.petScale.toFixed(1)}</span>
         <Slider
-          value={[settings.petScale]}
-          onValueChange={([v]) => updateSetting('petScale', v)}
-          min={0.5}
-          max={2}
-          step={0.1}
-          className="w-32"
+          value={[draft.petScale]}
+          onValueChange={([v]) => update('petScale', v)}
+          min={0.5} max={2} step={0.1} className="w-32"
         />
       </SettingRow>
       <SettingRow label="对话框宽度">
         <select
           className="bg-input border border-border rounded px-2 py-1 text-sm"
-          value={settings.dialogWidth}
-          onChange={(e) => updateSetting('dialogWidth', Number(e.target.value))}
+          value={draft.dialogWidth}
+          onChange={(e) => update('dialogWidth', Number(e.target.value))}
         >
           <option value={320}>320px</option>
           <option value={360}>360px</option>
           <option value={420}>420px</option>
         </select>
       </SettingRow>
-    </>
-  );
-}
 
-function PetIdentitySection({
-  settings,
-  updateSetting,
-}: {
-  settings: import('./settingsStore').AppSettings;
-  updateSetting: import('./settingsStore').SettingsState['updateSetting'];
-}) {
-  return (
-    <>
-      <SectionTitle>宠物身份</SectionTitle>
-      <SettingRow label="宠物名字">
-        <Input
-          value={settings.petName}
-          onChange={(e) => updateSetting('petName', e.target.value)}
-          className="w-48"
-        />
-      </SettingRow>
-    </>
-  );
-}
+      <Separator className="my-6" />
+      <SectionTitle>形象自定义</SectionTitle>
+      <SectionDesc>为每种状态上传自定义图片或动画，上传立即生效。</SectionDesc>
+      <ImageSection />
 
-function BehaviorSection({
-  settings,
-  updateSetting,
-}: {
-  settings: import('./settingsStore').AppSettings;
-  updateSetting: import('./settingsStore').SettingsState['updateSetting'];
-}) {
-  return (
-    <>
-      <SectionTitle>灵宠行为</SectionTitle>
-      <SettingRow label="智能附着">
-        <Switch
-          checked={settings.smartAttach}
-          onCheckedChange={(v) => updateSetting('smartAttach', v)}
-        />
-      </SettingRow>
-      <SettingRow label="附着活跃度">
-        <select
-          className="bg-input border border-border rounded px-2 py-1 text-sm"
-          value={settings.attachActivity}
-          onChange={(e) => updateSetting('attachActivity', e.target.value as 'low' | 'medium' | 'high')}
-        >
-          <option value="low">低</option>
-          <option value="medium">中</option>
-          <option value="high">高</option>
-        </select>
-      </SettingRow>
-      <SettingRow label="置顶">
-        <Switch
-          checked={settings.alwaysOnTop}
-          onCheckedChange={(v) => updateSetting('alwaysOnTop', v)}
-        />
-      </SettingRow>
+      <div className="mt-8 flex justify-end">
+        <Button onClick={handleConfirm} disabled={!dirty}>确认更改</Button>
+      </div>
     </>
   );
 }
@@ -243,40 +202,27 @@ function ImageSection() {
     if (!result || result.length === 0) return;
     const frames = (Array.isArray(result) ? result : [result]).sort();
     const newConfig: PetStateMediaConfig = {
-      ...mediaConfig[state],
-      userFrames: frames,
-      userAnimatedPath: null,
-      userAnimatedType: null,
+      ...mediaConfig[state], userFrames: frames, userAnimatedPath: null, userAnimatedType: null,
     };
     setStateMediaConfig(state, newConfig);
     await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
   };
 
   const handleUploadGif = async (state: PetState) => {
-    const result = await open({
-      multiple: false,
-      filters: [{ name: 'GIF动图', extensions: ['gif'] }],
-    });
+    const result = await open({ multiple: false, filters: [{ name: 'GIF动图', extensions: ['gif'] }] });
     if (typeof result !== 'string') return;
     const newConfig: PetStateMediaConfig = {
-      ...mediaConfig[state],
-      userAnimatedPath: result,
-      userAnimatedType: 'gif',
+      ...mediaConfig[state], userAnimatedPath: result, userAnimatedType: 'gif',
     };
     setStateMediaConfig(state, newConfig);
     await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
   };
 
   const handleUploadVideo = async (state: PetState) => {
-    const result = await open({
-      multiple: false,
-      filters: [{ name: '短视频（建议5秒内）', extensions: ['mp4', 'webm'] }],
-    });
+    const result = await open({ multiple: false, filters: [{ name: '短视频（建议5秒内）', extensions: ['mp4', 'webm'] }] });
     if (typeof result !== 'string') return;
     const newConfig: PetStateMediaConfig = {
-      ...mediaConfig[state],
-      userAnimatedPath: result,
-      userAnimatedType: 'video',
+      ...mediaConfig[state], userAnimatedPath: result, userAnimatedType: 'video',
     };
     setStateMediaConfig(state, newConfig);
     await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
@@ -301,113 +247,74 @@ function ImageSection() {
   };
 
   return (
-    <>
-      <SectionTitle>形象自定义</SectionTitle>
-      <p className="text-sm text-muted-foreground mb-6">
-        为每种状态上传自定义图片或动画。未上传时使用内置默认图。
-      </p>
+    <div className="space-y-4">
+      {ALL_PET_STATES.map((state) => {
+        const cfg = mediaConfig[state];
+        const meta = STATE_META[state];
 
-      <div className="space-y-6">
-        {ALL_PET_STATES.map((state) => {
-          const cfg = mediaConfig[state];
-          const meta = STATE_META[state];
+        let previewSrc: string | null = null;
+        if (cfg.userAnimatedPath && cfg.userAnimatedType !== 'video') {
+          previewSrc = convertFileSrc(cfg.userAnimatedPath);
+        } else if (cfg.userFrames.length > 0) {
+          previewSrc = convertFileSrc(cfg.userFrames[0]);
+        } else {
+          previewSrc = cfg.defaultAsset;
+        }
 
-          let previewSrc: string | null = null;
-          if (cfg.userAnimatedPath && cfg.userAnimatedType !== 'video') {
-            previewSrc = convertFileSrc(cfg.userAnimatedPath);
-          } else if (cfg.userFrames.length > 0) {
-            previewSrc = convertFileSrc(cfg.userFrames[0]);
-          } else {
-            previewSrc = cfg.defaultAsset;
-          }
+        let configDesc = '内置默认';
+        if (cfg.userAnimatedPath) {
+          const name = cfg.userAnimatedPath.split('/').pop() ?? '';
+          configDesc = cfg.userAnimatedType === 'video' ? `视频：${name}` : `GIF：${name}`;
+        } else if (cfg.userFrames.length > 0) {
+          configDesc = `${cfg.userFrames.length}帧 · ${cfg.frameInterval}ms`;
+        }
 
-          let configDesc = '使用内置默认图';
-          if (cfg.userAnimatedPath) {
-            const name = cfg.userAnimatedPath.split('/').pop() ?? '';
-            configDesc = cfg.userAnimatedType === 'video'
-              ? `视频：${name}`
-              : `GIF：${name}`;
-          } else if (cfg.userFrames.length > 0) {
-            configDesc = `${cfg.userFrames.length} 帧 PNG · ${cfg.frameInterval}ms/帧`;
-          }
-
-          return (
-            <div key={state} className="border border-border rounded-lg p-4">
-              <div className="flex items-start gap-4">
-                <div className="w-16 h-16 rounded border border-border overflow-hidden flex items-center justify-center bg-muted flex-shrink-0">
-                  {cfg.userAnimatedType === 'video' ? (
-                    <span className="text-2xl">🎬</span>
-                  ) : previewSrc ? (
-                    <img src={previewSrc} alt={meta.label} className="w-full h-full object-contain" />
-                  ) : (
-                    <span className="text-2xl">🐾</span>
+        return (
+          <div key={state} className="border border-border rounded-lg p-3">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 rounded border border-border overflow-hidden flex items-center justify-center bg-muted flex-shrink-0">
+                {cfg.userAnimatedType === 'video' ? (
+                  <span className="text-lg">🎬</span>
+                ) : previewSrc ? (
+                  <img src={previewSrc} alt={meta.label} className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-lg">🐾</span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="font-medium text-sm">{meta.label}</span>
+                  <span className="text-xs text-muted-foreground">{configDesc}</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleUploadPng(state)}>PNG</Button>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleUploadGif(state)}>GIF</Button>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleUploadVideo(state)}>视频</Button>
+                  {(cfg.userFrames.length > 0 || cfg.userAnimatedPath) && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleClear(state)}>清除</Button>
                   )}
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm">{meta.label}</span>
-                    <span className="text-xs text-muted-foreground">{meta.desc}</span>
+                {cfg.userFrames.length > 1 && !cfg.userAnimatedPath && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-muted-foreground">帧率</span>
+                    <Slider value={[cfg.frameInterval]} onValueChange={([v]) => handleUpdateFrameInterval(state, v)}
+                      min={50} max={500} step={50} className="w-24" />
+                    <span className="text-xs text-muted-foreground">{cfg.frameInterval}ms</span>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-3">{configDesc}</p>
-
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    <Button variant="outline" size="sm" onClick={() => handleUploadPng(state)}>
-                      上传PNG序列
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleUploadGif(state)}>
-                      上传GIF
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleUploadVideo(state)}>
-                      上传视频
-                    </Button>
-                    {(cfg.userFrames.length > 0 || cfg.userAnimatedPath) && (
-                      <Button variant="ghost" size="sm" onClick={() => handleClear(state)}>
-                        清除
-                      </Button>
-                    )}
-                  </div>
-
-                  {cfg.userFrames.length > 1 && !cfg.userAnimatedPath && (
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-xs text-muted-foreground">帧率</span>
-                      <Slider
-                        value={[cfg.frameInterval]}
-                        onValueChange={([v]) => handleUpdateFrameInterval(state, v)}
-                        min={50}
-                        max={500}
-                        step={50}
-                        className="w-32"
-                      />
-                      <span className="text-xs text-muted-foreground w-16">{cfg.frameInterval}ms/帧</span>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
             </div>
-          );
-        })}
-      </div>
-
-      <Separator className="my-6" />
-      <Button variant="outline" size="sm" onClick={handleResetAll}>
-        恢复全部默认
-      </Button>
-    </>
+          </div>
+        );
+      })}
+      <Button variant="outline" size="sm" onClick={handleResetAll}>恢复全部默认</Button>
+    </div>
   );
 }
 
 function AISection({
-  settings,
-  updateSetting,
-  systemPrompt,
-  setSystemPrompt,
-  configs,
-  newConfig,
-  setNewConfig,
-  addConfig,
-  removeConfig,
-  setDefault,
+  settings, updateSetting, systemPrompt, setSystemPrompt,
+  configs, newConfig, setNewConfig, addConfig, removeConfig, setDefault,
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
@@ -431,30 +338,23 @@ function AISection({
   const handleTest = async (configId: number) => {
     setTestResult((prev) => ({ ...prev, [configId]: '测试中...' }));
     try {
-      const result = await invoke<{ success: boolean; message: string; latency_ms: number }>(
-        'test_ai_connection',
-        { configId }
-      );
-      setTestResult((prev) => ({
-        ...prev,
-        [configId]: result.success
-          ? `成功 (${result.latency_ms}ms)`
-          : `失败: ${result.message}`,
-      }));
+      const result = await invoke<{ success: boolean; message: string; latency_ms: number }>('test_ai_connection', { configId });
+      setTestResult((prev) => ({ ...prev, [configId]: result.success ? `成功 (${result.latency_ms}ms)` : `失败: ${result.message}` }));
     } catch (e) {
       setTestResult((prev) => ({ ...prev, [configId]: `错误: ${e}` }));
     }
   };
 
-  const handleSavePrompt = async () => {
-    await updateSystemPrompt(systemPrompt);
-  };
-
   return (
     <>
+      <SectionTitle>宠物身份</SectionTitle>
+      <SettingRow label="宠物名字">
+        <Input value={settings.petName} onChange={(e) => updateSetting('petName', e.target.value)} className="w-48" />
+      </SettingRow>
+
+      <Separator className="my-6" />
       <SectionTitle>AI 配置</SectionTitle>
 
-      {/* Existing configs */}
       {configs.map((c) => (
         <div key={c.id} className="border border-border rounded-lg p-3 mb-3">
           <div className="flex items-center justify-between mb-2">
@@ -468,144 +368,73 @@ function AISection({
               {c.isDefault ? (
                 <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">默认</span>
               ) : (
-                <Button variant="ghost" size="sm" onClick={() => setDefault(c.id)}>
-                  设为默认
-                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setDefault(c.id)}>设为默认</Button>
               )}
-              <Button variant="ghost" size="sm" onClick={() => handleTest(c.id)}>
-                测试
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => removeConfig(c.id, c.keyringRef)}>
-                删除
-              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleTest(c.id)}>测试</Button>
+              <Button variant="ghost" size="sm" onClick={() => removeConfig(c.id, c.keyringRef)}>删除</Button>
             </div>
           </div>
           <div className="text-xs text-muted-foreground">{c.baseUrl}</div>
-          {testResult[c.id] && (
-            <div className="text-xs mt-1">{testResult[c.id]}</div>
-          )}
+          {testResult[c.id] && <div className="text-xs mt-1">{testResult[c.id]}</div>}
         </div>
       ))}
 
       <Separator className="my-4" />
-
-      {/* Add new config */}
       <h3 className="text-sm font-medium mb-3">添加 API 配置</h3>
       <div className="space-y-3">
-        <select
-          className="w-full bg-input border border-border rounded px-3 py-2 text-sm"
-          value={newConfig.provider}
-          onChange={(e) => setNewConfig({ ...newConfig, provider: e.target.value })}
-        >
+        <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm"
+          value={newConfig.provider} onChange={(e) => setNewConfig({ ...newConfig, provider: e.target.value })}>
           <option value="openai">OpenAI</option>
           <option value="anthropic">Anthropic</option>
           <option value="groq">Groq</option>
           <option value="custom">自定义</option>
         </select>
-        <Input
-          placeholder="Base URL (e.g. https://api.openai.com/v1)"
-          value={newConfig.baseUrl}
-          onChange={(e) => setNewConfig({ ...newConfig, baseUrl: e.target.value })}
-        />
-        <Input
-          placeholder="Model (e.g. gpt-4o-mini)"
-          value={newConfig.model}
-          onChange={(e) => setNewConfig({ ...newConfig, model: e.target.value })}
-        />
-        <Input
-          type="password"
-          placeholder="API Key"
-          value={newConfig.apiKey}
-          onChange={(e) => setNewConfig({ ...newConfig, apiKey: e.target.value })}
-        />
-        <Button onClick={handleAdd} disabled={!newConfig.baseUrl || !newConfig.model || !newConfig.apiKey}>
-          添加
-        </Button>
+        <Input placeholder="Base URL" value={newConfig.baseUrl} onChange={(e) => setNewConfig({ ...newConfig, baseUrl: e.target.value })} />
+        <Input placeholder="Model" value={newConfig.model} onChange={(e) => setNewConfig({ ...newConfig, model: e.target.value })} />
+        <Input type="password" placeholder="API Key" value={newConfig.apiKey} onChange={(e) => setNewConfig({ ...newConfig, apiKey: e.target.value })} />
+        <Button onClick={handleAdd} disabled={!newConfig.baseUrl || !newConfig.model || !newConfig.apiKey}>添加</Button>
       </div>
 
       <Separator className="my-6" />
-
-      {/* System Prompt */}
       <SectionTitle>System Prompt</SectionTitle>
-      <Textarea
-        value={systemPrompt}
-        onChange={(e) => setSystemPrompt(e.target.value)}
-        rows={6}
-        className="font-mono text-sm"
-      />
+      <Textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={6} className="font-mono text-sm" />
       <div className="flex gap-2 mt-3">
-        <Button onClick={handleSavePrompt}>保存</Button>
-        <Button variant="outline" onClick={() => setSystemPrompt(DEFAULT_PROMPT)}>
-          重置为默认
-        </Button>
+        <Button onClick={() => updateSystemPrompt(systemPrompt)}>保存</Button>
+        <Button variant="outline" onClick={() => setSystemPrompt(DEFAULT_PROMPT)}>重置为默认</Button>
       </div>
 
       <Separator className="my-6" />
-
-      {/* Model settings */}
-      <SettingRow label="温度 (Temperature)">
+      <SectionTitle>模型参数</SectionTitle>
+      <SettingRow label="温度">
         <span className="text-xs text-muted-foreground w-8">{settings.temperature.toFixed(1)}</span>
-        <Slider
-          value={[settings.temperature]}
-          onValueChange={([v]) => updateSetting('temperature', v)}
-          min={0}
-          max={2}
-          step={0.1}
-          className="w-32"
-        />
+        <Slider value={[settings.temperature]} onValueChange={([v]) => updateSetting('temperature', v)} min={0} max={2} step={0.1} className="w-32" />
       </SettingRow>
-      <SettingRow label="最大输出 Token">
-        <Input
-          type="number"
-          value={settings.maxTokens}
-          onChange={(e) => updateSetting('maxTokens', Number(e.target.value))}
-          className="w-24"
-        />
+      <SettingRow label="最大 Token">
+        <Input type="number" value={settings.maxTokens} onChange={(e) => updateSetting('maxTokens', Number(e.target.value))} className="w-24" />
       </SettingRow>
       <SettingRow label="流式输出">
-        <Switch
-          checked={settings.streamOutput}
-          onCheckedChange={(v) => updateSetting('streamOutput', v)}
-        />
+        <Switch checked={settings.streamOutput} onCheckedChange={(v) => updateSetting('streamOutput', v)} />
       </SettingRow>
-    </>
-  );
-}
 
-function VoiceSection({
-  settings,
-  updateSetting,
-}: {
-  settings: import('./settingsStore').AppSettings;
-  updateSetting: import('./settingsStore').SettingsState['updateSetting'];
-}) {
-  return (
-    <>
+      <Separator className="my-6" />
       <SectionTitle>语音</SectionTitle>
       <SettingRow label="语音输入语言">
-        <select
-          className="bg-input border border-border rounded px-2 py-1 text-sm"
-          value={settings.voiceInputLang}
-          onChange={(e) => updateSetting('voiceInputLang', e.target.value)}
-        >
+        <select className="bg-input border border-border rounded px-2 py-1 text-sm"
+          value={settings.voiceInputLang} onChange={(e) => updateSetting('voiceInputLang', e.target.value)}>
           <option value="system">跟随系统</option>
           <option value="zh-CN">简体中文</option>
           <option value="en-US">英文</option>
         </select>
       </SettingRow>
       <SettingRow label="语音输出">
-        <Switch
-          checked={settings.voiceOutput}
-          onCheckedChange={(v) => updateSetting('voiceOutput', v)}
-        />
+        <Switch checked={settings.voiceOutput} onCheckedChange={(v) => updateSetting('voiceOutput', v)} />
       </SettingRow>
     </>
   );
 }
 
 function ShortcutsSection({
-  settings,
-  updateSetting,
+  settings, updateSetting,
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
@@ -614,20 +443,10 @@ function ShortcutsSection({
     <>
       <SectionTitle>快捷键</SectionTitle>
       <SettingRow label="全局唤起">
-        <Input
-          value={settings.globalShortcut}
-          onChange={(e) => updateSetting('globalShortcut', e.target.value)}
-          className="w-48"
-          readOnly
-        />
+        <Input value={settings.globalShortcut} onChange={(e) => updateSetting('globalShortcut', e.target.value)} className="w-48" readOnly />
       </SettingRow>
       <SettingRow label="截图快捷键">
-        <Input
-          value={settings.screenshotShortcut}
-          onChange={(e) => updateSetting('screenshotShortcut', e.target.value)}
-          className="w-48"
-          readOnly
-        />
+        <Input value={settings.screenshotShortcut} onChange={(e) => updateSetting('screenshotShortcut', e.target.value)} className="w-48" readOnly />
       </SettingRow>
     </>
   );
@@ -638,17 +457,11 @@ function PrivacySection() {
     <>
       <SectionTitle>隐私与数据</SectionTitle>
       <div className="space-y-3">
-        <Button variant="destructive" size="sm" disabled>
-          清除所有对话历史
-        </Button>
+        <Button variant="destructive" size="sm" disabled>清除所有对话历史</Button>
         <br />
-        <Button variant="destructive" size="sm" disabled>
-          删除所有 API 配置
-        </Button>
+        <Button variant="destructive" size="sm" disabled>删除所有 API 配置</Button>
         <br />
-        <Button variant="outline" size="sm" disabled>
-          导出对话资料 (JSON)
-        </Button>
+        <Button variant="outline" size="sm" disabled>导出对话资料 (JSON)</Button>
       </div>
     </>
   );
