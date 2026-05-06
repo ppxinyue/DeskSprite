@@ -11,38 +11,31 @@ export function resetIdleTimer() {
   if (idleTimer) clearTimeout(idleTimer);
   idleTimer = setTimeout(() => {
     const { petState } = usePetStore.getState();
-    if (petState === 'idle') {
-      triggerYawn();
-    }
+    if (petState === 'idle') triggerYawn();
   }, YAWN_IDLE_TIMEOUT);
 }
 
 export function triggerYawn() {
   const { setPetState, mediaConfig } = usePetStore.getState();
   setPetState('yawn');
-
   const config = mediaConfig['yawn'];
-  let yawnDuration: number;
-  if (config.animatedPath) {
-    yawnDuration = YAWN_DISPLAY_DURATION;
-  } else {
-    yawnDuration = config.frames.length > 1
-      ? config.frames.length * config.frameInterval
+  const dur = config.userAnimatedPath
+    ? YAWN_DISPLAY_DURATION
+    : config.userFrames.length > 1
+      ? config.userFrames.length * config.frameInterval
       : YAWN_DISPLAY_DURATION;
-  }
-
   if (stateTimer) clearTimeout(stateTimer);
   stateTimer = setTimeout(() => {
     usePetStore.getState().setPetState('sleeping');
-  }, yawnDuration);
+  }, dur);
 }
 
 export function triggerHappy() {
-  const { setPetState } = usePetStore.getState();
-  setPetState('happy');
+  usePetStore.getState().setPetState('happy');
   if (stateTimer) clearTimeout(stateTimer);
   stateTimer = setTimeout(() => {
     usePetStore.getState().setPetState('idle');
+    resetIdleTimer();
   }, HAPPY_DURATION);
 }
 

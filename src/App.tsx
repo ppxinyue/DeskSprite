@@ -8,10 +8,8 @@ import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore } from "@/features/settings/settingsStore";
 import { getSetting } from "@/lib/db";
-import type { PetState } from "@/features/pet/animations";
+import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG } from "@/features/pet/animations";
 import "./index.css";
-
-const PET_STATES: PetState[] = ['idle', 'yawn', 'happy', 'sleeping', 'running', 'thinking'];
 
 function App() {
   const [windowLabel, setWindowLabel] = useState<string>("pet");
@@ -22,16 +20,17 @@ function App() {
     setWindowLabel(label);
 
     loadSettings().then(async () => {
-      for (const state of PET_STATES) {
+      for (const state of ALL_PET_STATES) {
         try {
           const raw = await getSetting(`petMedia_${state}`);
           if (raw) {
-            const config = JSON.parse(raw);
-            usePetStore.getState().setStateMediaConfig(state, config);
+            const parsed = JSON.parse(raw);
+            usePetStore.getState().setStateMediaConfig(state, {
+              ...DEFAULT_MEDIA_CONFIG[state],
+              ...parsed,
+            });
           }
-        } catch {
-          // ignore, use default
-        }
+        } catch { /* use default */ }
       }
     });
 

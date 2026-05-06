@@ -73,6 +73,7 @@
 
   body.has-background {
     @apply bg-background;
+    pointer-events: auto;
   }
 }
 

@@ -91,6 +91,10 @@
   - [x] F7: 重写 ImageSection（6状态 × PNG/GIF/视频三路上传 + 帧率Slider）
   - [x] F8: 添加 tauri-plugin-process 依赖（exit 命令）
 - 备注：验证通过（pnpm build + cargo build）。6种状态：idle/yawn/happy/sleeping/running/thinking。
+- 修复记录（2026-05-06）：
+  - 问题一：全屏宠物窗拦截所有鼠标事件，桌面卡死 → 添加 `set_ignore_cursor_events(true)` + `set_cursor_passthrough` 命令动态切换穿透
+  - 问题二：设置窗口无法点击 → body.has-background 添加 pointer-events:auto
+  - 问题三：资产文件重命名 → animations.ts 路径更新为 assets/{state}/{state}.png
 
 ### G. AI Service 层
 - 状态：✅ 完成

@@ -120,3 +120,25 @@
 - 解决方案：前端 `pnpm add @tauri-apps/plugin-process`，Rust 端 Cargo.toml 添加 `tauri-plugin-process = "2"`，lib.rs 注册 `.plugin(tauri_plugin_process::init())`。
 - 经验总结：使用 Tauri 插件 API 前应确认双端依赖都已安装。
 - 是否需更新技术文档：否
+
+## ISSUE-012
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：F. 灵宠动画系统
+- 严重程度：严重（功能完全不可用）
+- 问题现象：灵宠窗口全屏后桌面所有其他窗口卡死，无法点击任何东西。
+- 原因分析：Tauri 全屏透明窗口在操作系统级别拦截所有鼠标事件，CSS `pointer-events-none` 只影响 WebView 内部的 DOM 事件分发，不影响操作系统层面的窗口事件传递。
+- 解决方案：1) 创建宠物窗口后调用 `set_ignore_cursor_events(true)` 让窗口默认穿透鼠标事件；2) 新增 `set_cursor_passthrough` Rust 命令；3) 前端 PetAvatar 在 onMouseEnter 时调用 `set_cursor_passthrough(false)` 接收事件，onMouseLeave 时调用 `set_cursor_passthrough(true)` 恢复穿透。
+- 经验总结：透明窗口穿透需要操作系统级别的 API，CSS pointer-events 不够。
+- 是否需更新技术文档：否
+
+## ISSUE-013
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：K. 设置页面
+- 严重程度：严重
+- 问题现象：设置界面完全无法使用，按钮无法点击。
+- 原因分析：设置窗口 body 背景透明，WebView 将透明区域的点击事件穿透到下层，导致 React 事件层无法接收。
+- 解决方案：在 index.css 的 `body.has-background` 中添加 `pointer-events: auto` 确保设置窗口内容可点击。
+- 经验总结：Tauri WebView 中透明窗口和普通窗口的事件处理机制不同，需要显式启用 pointer-events。
+- 是否需更新技术文档：否

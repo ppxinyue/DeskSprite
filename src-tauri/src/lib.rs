@@ -68,6 +68,7 @@ pub fn run() {
             commands::window::show_settings_cmd,
             commands::window::close_settings_window,
             commands::window::exit_app,
+            commands::window::set_cursor_passthrough,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

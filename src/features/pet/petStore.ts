@@ -11,8 +11,8 @@ interface PetStore {
 
   setPetState: (state: PetState) => void;
   setPosition: (pos: { x: number; y: number }) => void;
-  setVisible: (visible: boolean) => void;
-  setDialogOpen: (open: boolean) => void;
+  setVisible: (v: boolean) => void;
+  setDialogOpen: (v: boolean) => void;
   toggleDialog: () => void;
   setStateMediaConfig: (state: PetState, config: PetStateMediaConfig) => void;
   resetMediaConfig: () => void;
