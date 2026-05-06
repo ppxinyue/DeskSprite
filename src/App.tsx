@@ -94,7 +94,7 @@ function PetWindow() {
     <TooltipProvider>
       <div className="fixed inset-0 overflow-hidden" style={{ background: 'transparent' }}>
         <div
-          className="absolute flex flex-col items-center"
+          className="absolute flex flex-col items-start"
           style={{
             left: 20,
             top: 20,

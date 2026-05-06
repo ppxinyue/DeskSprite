@@ -20,6 +20,8 @@ import remarkGfm from 'remark-gfm';
 
 export function ChatDialog({ maxHeight }: { maxHeight: number }) {
   const [input, setInput] = useState('');
+  const [mode, setMode] = useState<'chat' | 'history'>('chat');
+  const [historyItems, setHistoryItems] = useState<Array<{ id: number; title: string | null; updatedAt: string }>>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -33,6 +35,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
     setStreaming,
     setStreamingContent,
     appendStreamingContent,
+    updateLastAssistant,
     setCurrentConversationId,
     clearMessages,
   } = useChatStore();
@@ -44,7 +47,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
   useEffect(() => {
     loadConfigs();
     loadSettings();
-    loadRecentConversation();
+    handleNewConversation();
   }, []);
 
   useEffect(() => {
@@ -57,26 +60,29 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
     resizeInput();
   }, [input]);
 
-  async function loadRecentConversation() {
+  async function loadConversation(conversationId: number) {
     try {
-      const convos = await getConversations();
-      if (convos.length > 0) {
-        const latest = convos[0];
-        setCurrentConversationId(latest.id);
-        const msgs = await getMessages(latest.id);
-        setMessages(
-          msgs.map((m) => ({
-            id: `msg-${m.id}`,
-            role: m.role as 'user' | 'assistant' | 'system',
+      const msgs = await getMessages(conversationId);
+      setCurrentConversationId(conversationId);
+      setMessages(
+        msgs.map((m) => ({
+          id: `msg-${m.id}`,
+          role: m.role as 'user' | 'assistant' | 'system',
           content: m.content,
           timestamp: new Date(m.timestamp).getTime(),
           imageUrl: m.image_path ?? undefined,
         }))
       );
-    }
+      setMode('chat');
     } catch (e) {
-      console.warn('Failed to load recent conversation:', e);
+      console.warn('Failed to load conversation:', e);
     }
+  }
+
+  async function loadHistory() {
+    const convos = await getConversations();
+    setHistoryItems(convos.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updated_at })));
+    setMode('history');
   }
 
   async function handleSend() {
@@ -93,6 +99,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
 
     const userMsg = createMessage('user', text);
     addMessage(userMsg);
+    addMessage(createMessage('assistant', '...'));
     setInput('');
 
     let convoId = currentConversationId;
@@ -122,6 +129,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
       let fullContent = '';
       for await (const token of streamChat(chatMessages, apiConfig)) {
         fullContent += token;
+        updateLastAssistant(fullContent || '...');
         appendStreamingContent(token);
         if (fullContent.length === token.length) {
           setPetState('thinking');
@@ -129,8 +137,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
       }
 
       setPetState('idle');
-      const assistantMsg = createMessage('assistant', fullContent);
-      addMessage(assistantMsg);
+      updateLastAssistant(fullContent);
 
       if (convoId) {
         await insertMessage(convoId, 'assistant', fullContent);
@@ -140,7 +147,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
-      addMessage(createMessage('assistant', `出错了：${errMsg}`));
+      updateLastAssistant(`出错了：${errMsg}`);
       setPetState('idle');
     } finally {
       setStreaming(false);
@@ -158,6 +165,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
   function handleNewConversation() {
     clearMessages();
     setCurrentConversationId(null);
+    setMode('chat');
   }
 
   function resizeInput() {
@@ -167,43 +175,55 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
     el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
   }
 
-  const hasVisibleMessages = messages.length > 0 || !!streamingContent;
-
   return (
     <div
       className="flex flex-col w-full overflow-hidden rounded-xl border border-border/50 bg-[var(--color-pet-dialog-bg)] shadow-lg backdrop-blur-sm"
       style={{ maxHeight }}
     >
-      {hasVisibleMessages && (
-        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30">
           <span className="text-xs font-medium text-foreground/70">{settings.petName}</span>
-          <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={handleNewConversation}>
-            新对话
-          </Button>
+          <div className="flex gap-1">
+            <Button variant={mode === 'chat' ? 'secondary' : 'ghost'} size="sm" className="h-6 text-xs px-2" onClick={handleNewConversation}>
+              新对话
+            </Button>
+            <Button variant={mode === 'history' ? 'secondary' : 'ghost'} size="sm" className="h-6 text-xs px-2" onClick={() => loadHistory().catch(() => {})}>
+              历史对话
+            </Button>
+          </div>
+        </div>
+
+      {mode === 'history' && (
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2" style={{ maxHeight: Math.max(120, maxHeight - 42) }}>
+          {historyItems.length === 0 ? (
+            <div className="px-2 py-6 text-center text-xs text-muted-foreground">暂无历史对话</div>
+          ) : historyItems.map((item) => (
+            <button
+              key={item.id}
+              className="block w-full rounded-md px-2 py-2 text-left hover:bg-accent"
+              onClick={() => loadConversation(item.id)}
+            >
+              <div className="truncate text-xs font-medium">{item.title || `对话 ${item.id}`}</div>
+              <div className="mt-0.5 text-[11px] text-muted-foreground">{item.updatedAt}</div>
+            </button>
+          ))}
         </div>
       )}
 
-      {hasVisibleMessages && (
+      {mode === 'chat' && messages.length > 0 && (
         <div
           ref={scrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
-          style={{ maxHeight: Math.max(80, maxHeight - 92) }}
+          style={{ maxHeight: Math.max(80, maxHeight - 98) }}
         >
           <div className="py-2 space-y-2">
             {messages.map((msg) => (
               <MessageBubble key={msg.id} message={msg} />
             ))}
-            {isStreaming && streamingContent && (
-              <MessageBubble
-                message={{ id: 'streaming', role: 'assistant', content: streamingContent, timestamp: 0 }}
-                isStreaming
-              />
-            )}
           </div>
         </div>
       )}
 
-      <div className={hasVisibleMessages ? "p-2 border-t border-border/30" : "p-2"}>
+      {mode === 'chat' && <div className={messages.length > 0 ? "p-2 border-t border-border/30" : "p-2"}>
         <form
           className="flex items-end gap-2"
           onSubmit={(e) => {
@@ -225,7 +245,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
             发送
           </Button>
         </form>
-      </div>
+      </div>}
     </div>
   );
 }

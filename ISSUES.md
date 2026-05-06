@@ -238,3 +238,16 @@
 - 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/index.css`, `src-tauri/src/commands/window.rs`, `src/features/pet/PetAvatar.tsx`
 - 经验总结：小型桌面窗口内的浮层不能依赖负向 transform 居中，任何超出窗口矩形的内容都会被 OS/WebView 裁切；聊天类内容必须有一个明确高度的滚动容器。
 - 是否需更新技术文档：是。
+
+## ISSUE-022
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：F. 灵宠交互 / H. 悬浮对话框
+- 严重程度：严重
+- 问题现象：拖拽后仍可能触发宠物形象切换；hover 弹出对话框时灵宠位置跳动；发出对话后没有即时回复占位；右键菜单在小型透明窗口中闪烁或卡住。
+- 原因分析：Tauri 原生 `startDragging()` 的鼠标事件收尾不稳定，React click 仍可能在拖拽后触发；容器宽度从宠物宽度切到对话框宽度时使用居中布局导致灵宠重排；Radix ContextMenu 在透明小窗口与窗口尺寸变化组合下容易出现焦点/portal 抖动。
+- 解决方案：拖拽改为前端手动计算位移并调用 `setPosition(PhysicalPosition)`，超过阈值才标记为拖拽，非拖拽单击才切图；hover 容器改为左上固定布局；发送后立即插入 `...` 助手消息并在流式 token 到达时更新；右键菜单改为自绘半透明小菜单，失焦/外部点击/滚轮自动关闭。
+- 同步调整：对话框顶部加入“新对话 / 历史对话”，每次 hover 默认新对话；浅色主题 AI 回复气泡使用半透明深灰，深色主题使用黑色。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：桌面小窗里的右键菜单和拖拽不宜依赖复杂 portal/focus 行为；交互状态应由窗口自身明确管理。
+- 是否需更新技术文档：是。

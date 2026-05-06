@@ -27,7 +27,7 @@
   /* DeskSprite custom tokens */
   --color-pet-dialog-bg: rgba(255, 255, 255, 0.72);
   --color-pet-bubble-user: #f0f0f0;
-  --color-pet-bubble-ai: #1e1e1e;
+  --color-pet-bubble-ai: rgba(78, 78, 78, 0.72);
   --color-pet-bubble-ai-text: #fafafa;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -57,8 +57,8 @@
 
   --color-pet-dialog-bg: rgba(23, 23, 23, 0.72);
   --color-pet-bubble-user: #262626;
-  --color-pet-bubble-ai: #e5e5e5;
-  --color-pet-bubble-ai-text: #171717;
+  --color-pet-bubble-ai: #0a0a0a;
+  --color-pet-bubble-ai-text: #fafafa;
 }
 
 @layer base {

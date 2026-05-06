@@ -5,7 +5,7 @@
 - 当前阶段：P0（集成调试 + 拖拽稳定性修复）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + 四项修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：fix: stabilize hover chat layout and history detail
+- 最新提交：fix: separate pet drag click and chat modes
 
 ## 任务进度
 
@@ -195,3 +195,11 @@
 - 历史：设置页新增历史对话详情视图，可点击会话查看完整本地消息。
 - 交互：宠物窗启用 accept_first_mouse，减少未聚焦窗口首次 hover/点击被系统吃掉的问题。
 - 文件：App.tsx, ChatDialog.tsx, SettingsPanel.tsx, settingsStore.ts, index.css, window.rs, PetAvatar.tsx
+
+### R13. 拖拽/点击分离、hover 不跳动与对话模式（2026-05-06）
+- 问题：拖拽后仍可能触发切换形象；hover 展开对话框时灵宠随容器宽度变化而跳动；发送后没有即时回复占位；右键菜单在小窗中闪烁。
+- 修复：拖拽改为手动移动窗口并记录移动阈值，只有非拖拽单击才切换 PNG；hover 容器改为左上固定布局，灵宠位置不随对话框宽度变化。
+- 对话：顶部新增“新对话 / 历史对话”，每次 hover 默认新对话；发送后立即插入 `...` 助手占位并流式更新。
+- 右键：替换 Radix ContextMenu 为自绘轻量菜单，跟随主题半透明，点击其他区域/滚动/失焦自动关闭。
+- 主题：浅色主题 AI 回复气泡改为半透明深灰，深色主题使用黑色。
+- 文件：PetAvatar.tsx, App.tsx, ChatDialog.tsx, index.css
