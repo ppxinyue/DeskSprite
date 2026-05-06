@@ -307,7 +307,6 @@ export function PetAvatar({
           width: w,
           height: h,
           background: 'transparent',
-          backgroundColor: 'rgba(255, 255, 255, 0.001)',
           display: 'inline-block',
           overflow: 'hidden',
           isolation: 'isolate',

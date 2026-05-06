@@ -431,3 +431,15 @@
 - 涉及文件：`src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：用户可配置动画应把“启用状态”和“参数”都放进持久化设置；同步需求应复用已有事件边界，而不是新增独立动画定时器。
 - 是否需更新技术文档：是。
+
+## ISSUE-038
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：F. 灵宠渲染 / C. 窗口管理
+- 严重程度：严重
+- 问题现象：灵宠形象背后出现明显白色矩形背景，看起来像有两个可见图层。
+- 原因分析：`PetAvatar` 外层交互容器为了增强命中区域，设置了 `rgba(255,255,255,0.001)`；在 macOS 透明 WebView 合成和缩放后，这个极低 alpha 仍可能被肉眼看到。
+- 解决方案：移除白色 alpha 背景，保留透明外层 DOM 容器承接点击、拖拽、右键事件；真正的灵宠形象继续由 canvas/video 绘制。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：透明窗口中的“几乎透明”颜色仍可能被系统合成放大为可见色块；命中层应避免依赖可绘制背景色。
+- 是否需更新技术文档：是。

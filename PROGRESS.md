@@ -302,3 +302,8 @@
 - 同步：`PetAvatar` 在自动 1-5 分钟切图和非拖拽点击切图时，会同时从已开启动作中随机选择一个动作；只开启一个动作时保持该动作，全部关闭时灵宠静止。
 - 动画：CSS keyframes 改为读取运行时 CSS 变量，跳动幅度使用 px，摇摆幅度使用 deg，呼吸幅度使用百分比缩放；默认启用轻微 `petJump` 以延续原来的上下浮动观感。
 - 文件：settingsStore.ts, SettingsPanel.tsx, App.tsx, PetAvatar.tsx, index.css
+
+### R29. 移除灵宠可见白色命中背景（2026-05-06）
+- 问题：灵宠外层交互容器使用 `rgba(255,255,255,0.001)` 作为命中层，在透明 WebView 合成后会显出明显白色矩形。
+- 修复：移除白色 alpha 背景，外层容器只保留透明 DOM 命中区域；灵宠视觉仍由 canvas/video 单独渲染。
+- 文件：PetAvatar.tsx
