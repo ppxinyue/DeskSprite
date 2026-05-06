@@ -152,6 +152,7 @@ function PetWindow() {
                 <ChatDialog
                   initialConversationId={chatConversationId}
                   initialMode={chatMode}
+                  dialogOpacity={settings.petOpacity}
                   maxHeight={maxDialogHeight}
                   onClose={closeChat}
                 />

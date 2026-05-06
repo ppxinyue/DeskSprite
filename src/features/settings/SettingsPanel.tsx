@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -111,6 +112,15 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
   );
 }
 
+function AppearanceRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[120px_280px] items-center py-3 border-b border-border/40 last:border-0">
+      <span className="text-sm text-foreground">{label}</span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
 function AppearanceSection({
   settings,
   updateSettings,
@@ -133,43 +143,43 @@ function AppearanceSection({
   return (
     <>
       <SectionTitle>外观设置</SectionTitle>
-      <SectionDesc>调整灵宠的显示效果，修改会实时生效。</SectionDesc>
 
-      <SettingRow label="主题">
-        <select
-          className="bg-input border border-border rounded px-2 py-1 text-sm"
+      <AppearanceRow label="主题">
+        <ThemeSelect
           value={draft.theme}
-          onChange={(e) => update('theme', e.target.value as import('./settingsStore').Theme)}
-        >
-          <option value="system">跟随系统</option>
-          <option value="light">浅色</option>
-          <option value="dark">深色</option>
-        </select>
-      </SettingRow>
-      <SettingRow label="灵宠透明度">
-        <span className="text-xs text-muted-foreground w-8">{draft.petOpacity.toFixed(1)}</span>
-        <Slider
-          value={[draft.petOpacity]}
-          onValueChange={([v]) => update('petOpacity', v)}
-          min={0.6} max={1} step={0.05} className="w-32"
+          onChange={(theme) => update('theme', theme)}
         />
-      </SettingRow>
-      <SettingRow label="灵宠大小">
-        <span className="text-xs text-muted-foreground w-8">{draft.petScale.toFixed(1)}</span>
-        <Slider
-          value={[draft.petScale]}
-          onValueChange={([v]) => update('petScale', v)}
-          min={0.5} max={2} step={0.1} className="w-32"
-        />
-      </SettingRow>
-      <SettingRow label="对话框宽度">
-        <span className="text-xs text-muted-foreground w-12">{draft.dialogWidth}px</span>
-        <Slider
-          value={[draft.dialogWidth]}
-          onValueChange={([v]) => update('dialogWidth', v)}
-          min={280} max={720} step={10} className="w-40"
-        />
-      </SettingRow>
+      </AppearanceRow>
+      <AppearanceRow label="灵宠透明度">
+        <div className="flex items-center gap-3">
+          <span className="w-12 text-right text-xs text-muted-foreground">{draft.petOpacity.toFixed(1)}</span>
+          <Slider
+            value={[draft.petOpacity]}
+            onValueChange={([v]) => update('petOpacity', v)}
+            min={0.6} max={1} step={0.05} className="w-48"
+          />
+        </div>
+      </AppearanceRow>
+      <AppearanceRow label="灵宠大小">
+        <div className="flex items-center gap-3">
+          <span className="w-12 text-right text-xs text-muted-foreground">{draft.petScale.toFixed(1)}</span>
+          <Slider
+            value={[draft.petScale]}
+            onValueChange={([v]) => update('petScale', v)}
+            min={0.5} max={2} step={0.1} className="w-48"
+          />
+        </div>
+      </AppearanceRow>
+      <AppearanceRow label="对话框宽度">
+        <div className="flex items-center gap-3">
+          <span className="w-12 text-right text-xs text-muted-foreground">{draft.dialogWidth}px</span>
+          <Slider
+            value={[draft.dialogWidth]}
+            onValueChange={([v]) => update('dialogWidth', v)}
+            min={200} max={600} step={10} className="w-48"
+          />
+        </div>
+      </AppearanceRow>
 
       <Separator className="my-6" />
       <SectionTitle>形象自定义</SectionTitle>
@@ -177,6 +187,88 @@ function AppearanceSection({
       <ImageSection />
 
     </>
+  );
+}
+
+const THEME_OPTIONS: { id: import('./settingsStore').Theme; title: string; description: string }[] = [
+  { id: 'system', title: '跟随系统', description: '跟随 macOS 外观设置' },
+  { id: 'light', title: '浅色', description: '始终使用浅色主题' },
+  { id: 'dark', title: '深色', description: '始终使用深色主题' },
+];
+
+function ThemeSelect({
+  value,
+  onChange,
+}: {
+  value: import('./settingsStore').Theme;
+  onChange: (theme: import('./settingsStore').Theme) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const current = THEME_OPTIONS.find((option) => option.id === value) ?? THEME_OPTIONS[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={menuRef} className="relative w-[220px]">
+      <button
+        type="button"
+        className="flex h-10 w-full items-center justify-between gap-2 rounded-[10px] bg-[color-mix(in_srgb,var(--color-muted)_82%,var(--color-background))] px-3 text-left text-[13px] text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/20"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="truncate">{current.title}</span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-11 z-50 w-[260px] overflow-hidden rounded-[14px] bg-background py-1.5 shadow-[0_10px_34px_rgba(0,0,0,0.16)] ring-1 ring-border/75 dark:shadow-[0_14px_38px_rgba(0,0,0,0.42)]"
+          role="listbox"
+        >
+          <div className="px-3 pb-1.5 pt-1 text-[11px] leading-[1.5] text-muted-foreground">选择主题</div>
+          {THEME_OPTIONS.map((option) => {
+            const selected = option.id === value;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className={`flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left transition-colors hover:bg-muted ${
+                  selected ? 'bg-muted/80' : ''
+                }`}
+                onClick={() => {
+                  onChange(option.id);
+                  setOpen(false);
+                }}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] leading-[1.35] text-foreground">{option.title}</span>
+                  <span className="block truncate text-[11px] leading-[1.35] text-muted-foreground">{option.description}</span>
+                </span>
+                {selected && <Check className="h-4 w-4 shrink-0 text-foreground" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

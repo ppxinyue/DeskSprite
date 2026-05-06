@@ -26,7 +26,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   petOpacity: 1.0,
   petScale: 1.0,
-  dialogWidth: 350,
+  dialogWidth: 300,
   petName: '猫十五',
   smartAttach: true,
   attachActivity: 'medium',
@@ -64,6 +64,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
             (loaded as Record<string, unknown>)[key] =
               key === 'theme' && !['system', 'light', 'dark'].includes(String(parsed))
                 ? 'system'
+                : key === 'dialogWidth' && typeof parsed === 'number'
+                  ? Math.min(600, Math.max(200, parsed))
                 : parsed;
           }
         }

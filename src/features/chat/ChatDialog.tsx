@@ -42,11 +42,13 @@ interface SpeechRecognitionLike {
 }
 
 export function ChatDialog({
+  dialogOpacity = 1,
   initialConversationId,
   initialMode,
   maxHeight,
   standalone = false,
 }: {
+  dialogOpacity?: number;
   initialConversationId?: number | null;
   initialMode: 'new' | 'history';
   maxHeight: number;
@@ -247,7 +249,11 @@ export function ChatDialog({
   return (
     <div
       className="chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] font-sans text-[14px] text-[var(--color-chat-text)] shadow-none"
-      style={{ maxHeight: standalone ? undefined : maxHeight, height: standalone ? '100%' : undefined }}
+      style={{
+        maxHeight: standalone ? undefined : maxHeight,
+        height: standalone ? '100%' : undefined,
+        opacity: standalone ? 1 : dialogOpacity,
+      }}
     >
       {mode === 'history' && (
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" style={{ maxHeight: standalone ? undefined : Math.max(120, maxHeight - 42) }}>

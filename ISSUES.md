@@ -395,3 +395,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/features/ai/systemPrompt.ts`, `src-tauri/migrations/0001_initial.sql`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：历史打开是导航行为，应确保目标内容立即成为可见主视图，而不是只隐式更新某个可能不可见的面板。
 - 是否需更新技术文档：是。
+
+## ISSUE-035
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：E. 设置中心 / C. 窗口管理 / B. 应用图标
+- 严重程度：改进
+- 问题现象：外观设置说明文字多余；主题选择仍是原生 select；对话框宽度范围和默认值不符合预期，且滑块起止点不齐；设置窗口默认宽度偏宽；透明度只影响灵宠不影响小对话框；Dock 图标未使用 idle 形象。
+- 原因分析：外观设置仍沿用早期通用 SettingRow 布局，控件宽度各自定义；`dialogWidth` 默认值和 slider 范围未同步最新交互规格；小对话框未接收 `petOpacity`；Tauri bundle 图标仍是旧图标资源。
+- 解决方案：重写外观设置行布局为固定 label/control 栅格；主题选择改为 popover；dialogWidth 默认 300 并 clamp 到 200-600；设置窗口改为 62% 宽、70% 高；小窗 `ChatDialog` 接收 `dialogOpacity`；用 idle.png 等比置入透明方形画布并重新生成全部 bundle icons。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src-tauri/src/commands/window.rs`, `src-tauri/icons/*`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：设置页的滑块应共享同一度量系统；应用图标需要同时更新 png/ico/icns，macOS Dock 主要依赖 icns。
+- 是否需更新技术文档：是。

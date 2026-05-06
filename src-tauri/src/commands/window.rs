@@ -6,11 +6,19 @@ use tauri::{
 use objc2_app_kit::{NSPopUpMenuWindowLevel, NSWindow, NSWindowCollectionBehavior};
 
 fn centered_percent<R: Runtime>(app: &AppHandle<R>, percent: f64) -> (f64, f64, f64, f64) {
+    centered_size_percent(app, percent, percent)
+}
+
+fn centered_size_percent<R: Runtime>(
+    app: &AppHandle<R>,
+    width_percent: f64,
+    height_percent: f64,
+) -> (f64, f64, f64, f64) {
     if let Ok(Some(monitor)) = app.primary_monitor() {
         let scale = monitor.scale_factor();
         let work = monitor.work_area();
-        let w = work.size.width as f64 / scale * percent;
-        let h = work.size.height as f64 / scale * percent;
+        let w = work.size.width as f64 / scale * width_percent;
+        let h = work.size.height as f64 / scale * height_percent;
         let x = work.position.x as f64 / scale + (work.size.width as f64 / scale - w) / 2.0;
         let y = work.position.y as f64 / scale + (work.size.height as f64 / scale - h) / 2.0;
         (x, y, w, h)
@@ -89,7 +97,7 @@ pub fn set_cursor_passthrough(app: AppHandle, passthrough: bool) -> Result<(), S
 }
 
 pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    let (x, y, w, h) = centered_percent(app, 0.7);
+    let (x, y, w, h) = centered_size_percent(app, 0.62, 0.7);
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.set_size(LogicalSize::new(w, h));
         let _ = window.set_position(LogicalPosition::new(x, y));

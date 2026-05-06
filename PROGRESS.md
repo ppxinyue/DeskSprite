@@ -284,3 +284,11 @@
 - 大窗历史：点击历史对话时重新读取会话元信息和消息，确保加载到有效面板，并强制切回单窗口显示该会话；同时清空输入、图片和 streaming 状态。
 - Prompt：默认 system prompt 增加“独立灵宠，不讨好用户，不主动说陪伴/待命/有事直说/我来帮你”规则；前一版默认 prompt 会自动映射到新版。
 - 文件：ChatDialog.tsx, systemPrompt.ts, 0001_initial.sql
+
+### R26. 设置外观精简、透明度联动与 idle Dock 图标（2026-05-06）
+- 设置外观：删除“调整灵宠的显示效果，修改会实时生效。”描述文字；主题选择改为与大窗模型选择一致的触发器 + popover 风格。
+- 滑块：对话框宽度默认值改为 300，范围改为 200-600；透明度、大小、对话框宽度三个滑块的数值列、起点和终点统一对齐。
+- 窗口：设置窗口默认宽度从 70% 收窄到 62%，高度仍为 70%。
+- 透明度：`petOpacity` 同时作用到灵宠和小对话窗口，大聊天窗口不受影响。
+- 图标：使用 `public/assets/idle/idle.png` 重新生成 Tauri bundle 图标，包括 macOS Dock 使用的 `icon.icns`。
+- 文件：SettingsPanel.tsx, settingsStore.ts, App.tsx, ChatDialog.tsx, window.rs, src-tauri/icons/*
