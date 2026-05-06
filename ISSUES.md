@@ -98,3 +98,25 @@
 - 解决方案：1) 在 capabilities 中添加 `sql:allow-execute`、`sql:allow-select` 等显式权限；2) 所有 DB 调用加 try-catch，失败时使用默认值；3) body 默认透明，settings 窗口通过 has-background 类添加背景；4) 简化 PetAvatar 为纯 CSS 动画 + img 标签，移除 framer-motion 依赖。
 - 经验总结：Tauri 2.0 的 `xxx:default` 权限可能不包含所有需要的子权限，需要显式添加。所有前端对 Tauri 的 invoke 调用必须加错误处理。
 - 是否需更新技术文档：否
+
+## ISSUE-010
+- 发现时间：2026-05-06
+- 发现者：Agent 1
+- 相关任务：F. 灵宠动画系统重构
+- 严重程度：已解决
+- 问题现象：灵宠动画系统需要从旧的5种状态（idle/happy/thinking/sleeping/dragging）重构为6种状态（idle/yawn/happy/sleeping/running/thinking），并支持多帧PNG/GIF/视频三种媒体类型。
+- 原因分析：旧系统只支持单张图片切换，不支持逐帧动画和GIF/视频。状态触发缺乏自动化（无idle→yawn→sleeping自动链）。
+- 解决方案：1) animations.ts 重构为 PetStateMediaConfig（frames + animatedPath + animatedType）；2) 新建 petStateEngine.ts 实现自动状态触发（5分钟idle→yawn→sleeping，happy 3秒后回idle）；3) PetAvatar.tsx 完整重写支持逐帧播放、拖拽、单击随机切换；4) SettingsPanel ImageSection 支持三路上传 + 帧率Slider。
+- 经验总结：动画系统应从设计初期就考虑多帧和视频支持，避免后续大重构。
+- 是否需更新技术文档：否
+
+## ISSUE-011
+- 发现时间：2026-05-06
+- 发现者：Agent 1
+- 相关任务：F8. 添加 plugin-process 依赖
+- 严重程度：已解决
+- 问题现象：PetAvatar.tsx 使用 `exit` from `@tauri-apps/plugin-process` 但前端和 Rust 端均未安装此插件。
+- 原因分析：右键菜单"退出"功能需要 plugin-process 提供的 exit API。
+- 解决方案：前端 `pnpm add @tauri-apps/plugin-process`，Rust 端 Cargo.toml 添加 `tauri-plugin-process = "2"`，lib.rs 注册 `.plugin(tauri_plugin_process::init())`。
+- 经验总结：使用 Tauri 插件 API 前应确认双端依赖都已安装。
+- 是否需更新技术文档：否

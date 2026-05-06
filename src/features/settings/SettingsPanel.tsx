@@ -11,8 +11,11 @@ import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfig
 import { usePetStore } from '@/features/pet/petStore';
 import { getSystemPrompt, updateSystemPrompt, setSetting } from '@/lib/db';
 import { maskKey } from '@/lib/keychain';
-import type { PetState } from '@/features/pet/animations';
+import type { PetState, PetStateMediaConfig } from '@/features/pet/animations';
+import { DEFAULT_MEDIA_CONFIG, isBuiltinAsset } from '@/features/pet/animations';
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 const DEFAULT_PROMPT = `你是{pet_name}，一只温柔、机智、偶尔调皮的橘猫，住在用户的桌面上。你热爱陪伴主人工作，会用轻松幽默的语气聊天。你擅长编程、写作、分析问题，也会提醒主人注意休息和喝水。你的回答应该简洁有用，偶尔展现猫咪的可爱本性。`;
 
@@ -228,82 +231,183 @@ function BehaviorSection({
   );
 }
 
-function ImageSection() {
-  const { petImages, setPetImage, clearPetImages } = usePetStore();
-  const [previewSrc, setPreviewSrc] = useState<Record<string, string>>({});
+const STATE_META: Record<PetState, { label: string; desc: string }> = {
+  idle:     { label: '待机',   desc: '默认状态，无操作时显示' },
+  yawn:     { label: '哈欠',   desc: '5分钟无交互后自动触发，结束后进入睡眠' },
+  happy:    { label: '高兴',   desc: 'AI回复完成后触发，持续3秒' },
+  sleeping: { label: '睡眠',   desc: '哈欠结束后进入，点击灵宠唤醒' },
+  running:  { label: '奔跑',   desc: '拖拽灵宠时播放' },
+  thinking: { label: '思考中', desc: '等待AI回复期间显示' },
+};
 
-  const handleUpload = async (state: PetState) => {
+function toPreviewSrc(path: string): string {
+  if (isBuiltinAsset(path)) return path;
+  return convertFileSrc(path);
+}
+
+function ImageSection() {
+  const { mediaConfig, setStateMediaConfig, resetMediaConfig } = usePetStore();
+
+  const handleUploadPng = async (state: PetState) => {
     try {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      const path = await open({
-        filters: [{ name: 'Image', extensions: ['png', 'gif'] }],
-        multiple: false,
+      const result = await open({
+        multiple: true,
+        filters: [{ name: 'PNG图片', extensions: ['png'] }],
       });
-      if (typeof path === 'string' && path) {
-        const { convertFileSrc } = await import('@tauri-apps/api/core');
-        const src = convertFileSrc(path);
-        setPetImage(state, src);
-        setPreviewSrc((prev) => ({ ...prev, [state]: src }));
-        await setSetting(`petImage_${state}`, JSON.stringify(src));
-      }
+      if (!result || result.length === 0) return;
+      const paths = (Array.isArray(result) ? result : [result]).sort();
+      const current = mediaConfig[state];
+      const newConfig: PetStateMediaConfig = {
+        frames: paths,
+        frameInterval: current.frameInterval,
+        animatedPath: null,
+        animatedType: null,
+      };
+      setStateMediaConfig(state, newConfig);
+      await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
     } catch (e) {
-      console.error('Image upload failed:', e);
+      console.error('PNG upload failed:', e);
+    }
+  };
+
+  const handleUploadGif = async (state: PetState) => {
+    try {
+      const result = await open({
+        multiple: false,
+        filters: [{ name: 'GIF动图', extensions: ['gif'] }],
+      });
+      if (typeof result !== 'string') return;
+      const current = mediaConfig[state];
+      const newConfig: PetStateMediaConfig = {
+        frames: current.frames,
+        frameInterval: current.frameInterval,
+        animatedPath: result,
+        animatedType: 'gif',
+      };
+      setStateMediaConfig(state, newConfig);
+      await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
+    } catch (e) {
+      console.error('GIF upload failed:', e);
+    }
+  };
+
+  const handleUploadVideo = async (state: PetState) => {
+    try {
+      const result = await open({
+        multiple: false,
+        filters: [{ name: '短视频（建议5秒内）', extensions: ['mp4', 'webm'] }],
+      });
+      if (typeof result !== 'string') return;
+      const current = mediaConfig[state];
+      const newConfig: PetStateMediaConfig = {
+        frames: current.frames,
+        frameInterval: current.frameInterval,
+        animatedPath: result,
+        animatedType: 'video',
+      };
+      setStateMediaConfig(state, newConfig);
+      await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
+    } catch (e) {
+      console.error('Video upload failed:', e);
     }
   };
 
   const handleClear = async (state: PetState) => {
-    setPetImage(state, null);
-    setPreviewSrc((prev) => {
-      const next = { ...prev };
-      delete next[state];
-      return next;
-    });
-    try { await setSetting(`petImage_${state}`, JSON.stringify(null)); } catch {}
+    setStateMediaConfig(state, DEFAULT_MEDIA_CONFIG[state]);
+    try { await setSetting(`petMedia_${state}`, JSON.stringify(DEFAULT_MEDIA_CONFIG[state])); } catch {}
   };
 
   const handleClearAll = async () => {
-    clearPetImages();
-    setPreviewSrc({});
-    const states: PetState[] = ['idle', 'happy', 'thinking', 'sleeping', 'dragging'];
+    resetMediaConfig();
+    const states: PetState[] = ['idle', 'yawn', 'happy', 'sleeping', 'running', 'thinking'];
     for (const s of states) {
-      try { await setSetting(`petImage_${s}`, JSON.stringify(null)); } catch {}
+      try { await setSetting(`petMedia_${s}`, JSON.stringify(DEFAULT_MEDIA_CONFIG[s])); } catch {}
     }
   };
 
-  const stateLabels: Record<PetState, string> = {
-    idle: '待机 (idle)',
-    happy: '高兴 (happy)',
-    thinking: '思考 (thinking)',
-    sleeping: '睡眠 (sleeping)',
-    dragging: '拖拽 (dragging)',
+  const handleFrameInterval = async (state: PetState, ms: number) => {
+    const current = mediaConfig[state];
+    const newConfig = { ...current, frameInterval: ms };
+    setStateMediaConfig(state, newConfig);
+    await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
   };
+
+  const allStates: PetState[] = ['idle', 'yawn', 'happy', 'sleeping', 'running', 'thinking'];
 
   return (
     <>
       <SectionTitle>形象自定义</SectionTitle>
       <p className="text-sm text-muted-foreground mb-4">
-        为每个状态上传 PNG 或 GIF 图片。未上传的状态使用 idle 图片或默认猫十五。
+        为每个状态上传 PNG（支持多帧逐帧播放）、GIF 或短视频。
       </p>
       <div className="space-y-4">
-        {(['idle', 'happy', 'thinking', 'sleeping', 'dragging'] as PetState[]).map((state) => {
-          const currentSrc = previewSrc[state] || petImages[state];
+        {allStates.map((state) => {
+          const config = mediaConfig[state];
+          const hasCustom = config !== DEFAULT_MEDIA_CONFIG[state];
+          const isMultiFrame = config.frames.length > 1 && !config.animatedPath;
+          const previewSrc = config.animatedPath
+            ? toPreviewSrc(config.animatedPath)
+            : config.frames.length > 0
+              ? toPreviewSrc(config.frames[0])
+              : null;
+
           return (
-            <div key={state} className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-3">
-                {currentSrc && (
-                  <img src={currentSrc} alt={state} className="w-10 h-12 object-contain rounded border border-border" />
-                )}
-                <span className="text-sm">{stateLabels[state]}</span>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => handleUpload(state)}>
-                  选择文件
-                </Button>
-                {currentSrc && (
-                  <Button variant="ghost" size="sm" onClick={() => handleClear(state)}>
-                    清除
-                  </Button>
-                )}
+            <div key={state} className="border border-border rounded-lg p-3">
+              <div className="flex items-start gap-3">
+                {/* Preview */}
+                <div className="w-16 h-16 flex items-center justify-center shrink-0">
+                  {config.animatedType === 'video' ? (
+                    <span className="text-2xl">🎬</span>
+                  ) : previewSrc ? (
+                    <img
+                      src={previewSrc}
+                      alt={state}
+                      className="w-16 h-16 object-contain rounded border border-border"
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">无</span>
+                  )}
+                </div>
+                {/* Info + controls */}
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm">{STATE_META[state].label}</div>
+                  <div className="text-xs text-muted-foreground mb-2">{STATE_META[state].desc}</div>
+                  {hasCustom && (
+                    <div className="text-xs text-muted-foreground mb-2">
+                      {config.animatedType === 'gif' ? 'GIF' : config.animatedType === 'video' ? '视频' : `${config.frames.length} 帧`}
+                    </div>
+                  )}
+                  <div className="flex gap-2 flex-wrap">
+                    <Button variant="outline" size="sm" onClick={() => handleUploadPng(state)}>
+                      PNG
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleUploadGif(state)}>
+                      GIF
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleUploadVideo(state)}>
+                      视频
+                    </Button>
+                    {hasCustom && (
+                      <Button variant="ghost" size="sm" onClick={() => handleClear(state)}>
+                        清除
+                      </Button>
+                    )}
+                  </div>
+                  {isMultiFrame && (
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-xs text-muted-foreground shrink-0">帧率</span>
+                      <Slider
+                        value={[config.frameInterval]}
+                        onValueChange={([v]) => handleFrameInterval(state, v)}
+                        min={50}
+                        max={500}
+                        step={50}
+                        className="w-32"
+                      />
+                      <span className="text-xs text-muted-foreground w-12">{config.frameInterval}ms</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           );

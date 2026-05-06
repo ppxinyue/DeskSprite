@@ -1,34 +1,21 @@
 import { create } from 'zustand';
-import type { PetState } from './animations';
-
-interface PetPosition {
-  x: number;
-  y: number;
-}
-
-export interface PetImageConfig {
-  idle: string | null;
-  happy: string | null;
-  thinking: string | null;
-  sleeping: string | null;
-  dragging: string | null;
-}
+import type { PetState, PetMediaConfig, PetStateMediaConfig } from './animations';
+import { DEFAULT_MEDIA_CONFIG } from './animations';
 
 interface PetStore {
   petState: PetState;
-  position: PetPosition;
+  position: { x: number; y: number };
   visible: boolean;
   dialogOpen: boolean;
-  petImages: PetImageConfig;
+  mediaConfig: PetMediaConfig;
 
   setPetState: (state: PetState) => void;
-  setPosition: (pos: PetPosition) => void;
+  setPosition: (pos: { x: number; y: number }) => void;
   setVisible: (visible: boolean) => void;
   setDialogOpen: (open: boolean) => void;
   toggleDialog: () => void;
-  setPetImage: (state: PetState, path: string | null) => void;
-  setPetImages: (images: PetImageConfig) => void;
-  clearPetImages: () => void;
+  setStateMediaConfig: (state: PetState, config: PetStateMediaConfig) => void;
+  resetMediaConfig: () => void;
 }
 
 export const usePetStore = create<PetStore>((set) => ({
@@ -36,35 +23,14 @@ export const usePetStore = create<PetStore>((set) => ({
   position: { x: 100, y: 100 },
   visible: true,
   dialogOpen: false,
-  petImages: {
-    idle: null,
-    happy: null,
-    thinking: null,
-    sleeping: null,
-    dragging: null,
-  },
+  mediaConfig: DEFAULT_MEDIA_CONFIG,
 
   setPetState: (petState) => set({ petState }),
   setPosition: (position) => set({ position }),
   setVisible: (visible) => set({ visible }),
   setDialogOpen: (dialogOpen) => set({ dialogOpen }),
   toggleDialog: () => set((s) => ({ dialogOpen: !s.dialogOpen })),
-
-  setPetImage: (state, path) =>
-    set((s) => ({
-      petImages: { ...s.petImages, [state]: path },
-    })),
-
-  setPetImages: (images) => set({ petImages: images }),
-
-  clearPetImages: () =>
-    set({
-      petImages: {
-        idle: null,
-        happy: null,
-        thinking: null,
-        sleeping: null,
-        dragging: null,
-      },
-    }),
+  setStateMediaConfig: (state, config) =>
+    set((s) => ({ mediaConfig: { ...s.mediaConfig, [state]: config } })),
+  resetMediaConfig: () => set({ mediaConfig: DEFAULT_MEDIA_CONFIG }),
 }));

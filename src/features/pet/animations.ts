@@ -1,32 +1,33 @@
 export type PetState =
   | 'idle'
+  | 'yawn'
   | 'happy'
-  | 'thinking'
   | 'sleeping'
-  | 'dragging';
+  | 'running'
+  | 'thinking';
 
-const DEFAULT_IMAGES: Record<PetState, string> = {
-  idle: 'assets/pet-images/cat15-front.png',
-  happy: 'assets/pet-images/cat15-front.png',
-  thinking: 'assets/pet-images/cat15-front.png',
-  sleeping: 'assets/pet-images/cat15-sleeping.png',
-  dragging: 'assets/pet-images/cat15-front.png',
-};
-
-const DEFAULT_IDLE_IMAGE = 'assets/pet-images/cat15-front.png';
-
-export function getDefaultImage(state: PetState): string {
-  return DEFAULT_IMAGES[state] ?? DEFAULT_IDLE_IMAGE;
+export interface PetStateMediaConfig {
+  frames: string[];
+  frameInterval: number;
+  animatedPath: string | null;
+  animatedType: 'gif' | 'video' | null;
 }
 
-export function getImageSrc(
-  state: PetState,
-  customImages: Record<PetState, string | null>,
-): string {
-  // 1. User custom image for this state
-  if (customImages[state]) return customImages[state]!;
-  // 2. User custom idle image as fallback
-  if (customImages.idle) return customImages.idle;
-  // 3. Built-in default
-  return getDefaultImage(state);
+export type PetMediaConfig = Record<PetState, PetStateMediaConfig>;
+
+export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
+  idle:     { frames: ['assets/pet-images/cat15-front.png'],    frameInterval: 150, animatedPath: null, animatedType: null },
+  yawn:     { frames: ['assets/pet-images/cat15-wondering.png'], frameInterval: 150, animatedPath: null, animatedType: null },
+  happy:    { frames: ['assets/pet-images/cat15-front.png'],    frameInterval: 150, animatedPath: null, animatedType: null },
+  sleeping: { frames: ['assets/pet-images/cat15-sleeping.png'], frameInterval: 150, animatedPath: null, animatedType: null },
+  running:  { frames: ['assets/pet-images/cat15-side.png'],     frameInterval: 150, animatedPath: null, animatedType: null },
+  thinking: { frames: ['assets/pet-images/cat15-wondering.png'], frameInterval: 150, animatedPath: null, animatedType: null },
+};
+
+export function needsFrameAnimation(config: PetStateMediaConfig): boolean {
+  return config.animatedPath === null && config.frames.length > 1;
+}
+
+export function isBuiltinAsset(path: string): boolean {
+  return path.startsWith('assets/');
 }

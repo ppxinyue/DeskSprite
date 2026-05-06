@@ -2,9 +2,9 @@
 
 ## 总体状态
 - 开始时间：2026-04-30
-- 当前阶段：P0
-- 完成任务：11 / 11 (A-K)
-- 当前 Agent 分工：[Agent 1: P0 完成]
+- 当前阶段：P0（灵宠动画系统实现）
+- 完成任务：11 / 11 (A-K) + 动画系统重构
+- 当前 Agent 分工：[Agent 1: 灵宠动画系统]
 
 ## 任务进度
 
@@ -76,19 +76,21 @@
   - [x] E6: 实现跨窗口同步（settings:updated / api-config:changed Tauri 事件）
 - 备注：验证通过（cargo build + pnpm build）。
 
-### F. 灵宠动画 + 拖动 + 右键
+### F. 灵宠动画系统（重构版）
 - 状态：✅ 完成
 - 负责人：Agent 1
-- 开始时间：2026-05-01
-- 完成时间：2026-05-01
+- 开始时间：2026-05-06
+- 完成时间：2026-05-06
 - 子任务：
-  - [x] F1: 准备默认猫十五占位图片（front/side/sleep SVG）
-  - [x] F2: 创建 animations.ts（9 种状态→图片+动画映射）
-  - [x] F3: 创建 petStore.ts（Zustand，petState/position/visible/dialogOpen）
-  - [x] F4: 创建 PetAvatar.tsx（motion.img + framer-motion 拖动 + 右键 ContextMenu）
-  - [x] F5: 缩放和透明度通过 props 控制
-  - [x] F6: 形象上传占位（设置页 UI 已预留，Rust 命令待后续任务实现）
-- 备注：验证通过（pnpm build）。framer-motion 的 Variants 类型需用 TargetAndTransition 替代。
+  - [x] F1: 重构 animations.ts（6种状态 + 多帧/GIF/视频媒体配置）
+  - [x] F2: 重构 petStore.ts（PetMediaConfig 替代旧 PetImageConfig）
+  - [x] F3: 新建 petStateEngine.ts（idle→yawn→sleeping 自动触发，happy 3秒回 idle）
+  - [x] F4: 重写 PetAvatar.tsx（逐帧播放 + 拖拽running + 单击随机切换 + 右键菜单）
+  - [x] F5: 修改 App.tsx（移除 attachEngine，启动恢复媒体配置）
+  - [x] F6: 同步 ChatDialog.tsx（使用 triggerHappy() 替代手动状态切换）
+  - [x] F7: 重写 ImageSection（6状态 × PNG/GIF/视频三路上传 + 帧率Slider）
+  - [x] F8: 添加 tauri-plugin-process 依赖（exit 命令）
+- 备注：验证通过（pnpm build + cargo build）。6种状态：idle/yawn/happy/sleeping/running/thinking。
 
 ### G. AI Service 层
 - 状态：✅ 完成
@@ -112,7 +114,7 @@
   - [x] H1: 创建 chatStore.ts（Zustand，对话消息状态管理）
   - [x] H2: 创建 ChatDialog.tsx（悬浮对话框 UI，毛玻璃背景）
   - [x] H3: 实现消息气泡（Markdown 渲染 + 流式闪烁光标 + 用户/AI 双色气泡）
-  - [x] H4: 对接 aiService 流式对话（petState 联动 thinking→speaking→happy）
+  - [x] H4: 对接 aiService 流式对话（petState 联动 thinking→happy）
   - [x] H5: 实现对话持久化（SQLite messages 表读写，自动加载最近会话）
   - [x] H6: 语音接口预留（设置页开关已实现，P0 不做完整语音）
 - 备注：验证通过（pnpm build）。
@@ -129,16 +131,11 @@
 - 备注：验证通过（cargo build + pnpm build）。添加了 base64 和 image crate 依赖。
 
 ### J. 智能附着引擎
-- 状态：✅ 完成
+- 状态：✅ 完成（代码保留，本次未接入）
 - 负责人：Agent 1
 - 开始时间：2026-05-01
 - 完成时间：2026-05-01
-- 子任务：
-  - [x] J1: 创建 attachEngine.ts（三种附着模式调度 + 2s 轮询 + 交互打断 5s 恢复）
-  - [x] J2: 实现 Rust get_desktop_bounds 命令（macOS xcap + defaults 读取 Dock 状态）
-  - [x] J3: 在 PetAvatar.tsx 集成（useEffect 挂载引擎，hover/drag/click 触发 pauseAttach）
-  - [x] J4: 附着行为逻辑完成（dock_sleep/window_edge/fullscreen_float 三种模式切换）
-- 备注：验证通过（cargo build + pnpm build）。
+- 备注：attachEngine.ts 代码保留但 App.tsx 中未调用，等待后续需要时再接入。
 
 ### K. 集成测试 + 打包
 - 状态：🔄 进行中
@@ -149,4 +146,4 @@
   - [x] K2: 主题切换联动（dark/light/system）
   - [x] K3: pnpm build + cargo build 全部通过
   - [ ] K4: 首次运行测试（需人工验证）
-- 备注：前后端集成完成，全量编译通过。K4 需用户运行 `pnpm tauri dev` 进行实际验证。
+- 备注：灵宠动画系统已重构完成，前后端编译通过。K4 需用户运行 `pnpm tauri dev` 验证。

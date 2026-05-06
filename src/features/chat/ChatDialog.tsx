@@ -17,6 +17,7 @@ import {
 } from '@/lib/db';
 import type { ApiConfig } from '@/features/ai/types';
 import type { ChatMessage } from './chatStore';
+import { triggerHappy } from '@/features/pet/petStateEngine';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -143,7 +144,7 @@ export function ChatDialog() {
         }
       }
 
-      setPetState('happy');
+      triggerHappy();
       const assistantMsg = createMessage('assistant', fullContent);
       addMessage(assistantMsg);
 
