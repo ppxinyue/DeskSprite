@@ -22,6 +22,8 @@ const MOTION_BASE_DURATION: Record<PetMotionName, number> = {
   petWobble: 1.6,
   petBreathe: 3.6,
 };
+const PET_DRAW_PADDING = 2;
+const SOURCE_EDGE_INSET_RATIO = 0.004;
 
 function pickNextMotion(motions: PetMotionSettings, current: PetMotionName | null): PetMotionName | null {
   const enabled = MOTION_NAMES.filter((name) => motions[name]?.enabled);
@@ -200,9 +202,9 @@ export function PetAvatar({
     const clearCanvas = () => {
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.globalCompositeOperation = 'copy';
-      ctx.fillStyle = 'rgba(0,0,0,0)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
     };
 
@@ -216,10 +218,29 @@ export function PetAvatar({
       ctx.save();
       ctx.scale(dpr, dpr);
       ctx.globalAlpha = opacity;
-      const ratio = Math.min(w / image.naturalWidth, h / image.naturalHeight);
-      const drawWidth = image.naturalWidth * ratio;
-      const drawHeight = image.naturalHeight * ratio;
-      ctx.drawImage(image, (w - drawWidth) / 2, (h - drawHeight) / 2, drawWidth, drawHeight);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      const sourceInset = Math.max(1, Math.round(Math.min(image.naturalWidth, image.naturalHeight) * SOURCE_EDGE_INSET_RATIO));
+      const sourceWidth = Math.max(1, image.naturalWidth - sourceInset * 2);
+      const sourceHeight = Math.max(1, image.naturalHeight - sourceInset * 2);
+      const maxDrawWidth = Math.max(1, w - PET_DRAW_PADDING * 2);
+      const maxDrawHeight = Math.max(1, h - PET_DRAW_PADDING * 2);
+      const ratio = Math.min(maxDrawWidth / sourceWidth, maxDrawHeight / sourceHeight);
+      const drawWidth = sourceWidth * ratio;
+      const drawHeight = sourceHeight * ratio;
+
+      ctx.drawImage(
+        image,
+        sourceInset,
+        sourceInset,
+        sourceWidth,
+        sourceHeight,
+        (w - drawWidth) / 2,
+        (h - drawHeight) / 2,
+        drawWidth,
+        drawHeight,
+      );
       ctx.restore();
     };
     image.onerror = () => {
@@ -308,18 +329,17 @@ export function PetAvatar({
           height: h,
           background: 'transparent',
           display: 'inline-block',
-          overflow: 'hidden',
-          isolation: 'isolate',
-          contain: 'layout paint size',
+          lineHeight: 0,
         }}
         {...interactiveProps}
       >
         {kind === 'video' ? (
           <video key={src} src={src} autoPlay loop muted playsInline draggable={false} width={w} height={h}
-            style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', background: 'transparent', backfaceVisibility: 'hidden', ...motionStyle }}
+            style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', pointerEvents: 'none', ...motionStyle }}
             onError={() => setImgError(true)} />
         ) : (
           <canvas
+            key={src}
             ref={canvasRef}
             aria-label="灵宠"
             className="block"
@@ -327,7 +347,7 @@ export function PetAvatar({
               width: w,
               height: h,
               background: 'transparent',
-              backfaceVisibility: 'hidden',
+              pointerEvents: 'none',
               ...motionStyle,
             }}
           />

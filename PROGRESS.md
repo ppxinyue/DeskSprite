@@ -307,3 +307,9 @@
 - 问题：灵宠外层交互容器使用 `rgba(255,255,255,0.001)` 作为命中层，在透明 WebView 合成后会显出明显白色矩形。
 - 修复：移除白色 alpha 背景，外层容器只保留透明 DOM 命中区域；灵宠视觉仍由 canvas/video 单独渲染。
 - 文件：PetAvatar.tsx
+
+### R30. 清理灵宠透明合成框线与首帧残留（2026-05-06）
+- 问题：灵宠背后仍有半透明框线；动作时框线不跟随宠物移动，切换形象后还可能保留首张 PNG 的边缘轮廓。
+- 排查：内置 PNG 的 alpha 会触及图片边缘；同时 `PetAvatar` 外层的 `overflow/isolation/contain` 会让透明窗口生成稳定裁剪/合成层，canvas 复用也可能让 WebView 保留旧纹理边界。
+- 修复：移除外层裁剪/隔离/contain 合成层；canvas 按 `src` key 强制重建；绘制前彻底 `clearRect`；绘制时给宠物留 2px 透明内边距，并裁掉源 PNG 最外侧约 0.4% 的边缘像素，避免资产边缘被缩放成可见框线；Tauri 宠物窗显式关闭系统阴影。
+- 文件：PetAvatar.tsx, window.rs

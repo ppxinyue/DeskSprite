@@ -72,6 +72,7 @@ pub fn create_pet_window<R: Runtime>(app: &AppHandle<R>) {
         .position(x, y)
         .decorations(false)
         .transparent(true)
+        .shadow(false)
         .accept_first_mouse(true)
         .always_on_top(true)
         .visible_on_all_workspaces(true)

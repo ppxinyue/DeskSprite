@@ -443,3 +443,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：透明窗口中的“几乎透明”颜色仍可能被系统合成放大为可见色块；命中层应避免依赖可绘制背景色。
 - 是否需更新技术文档：是。
+
+## ISSUE-039
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：F. 灵宠渲染
+- 严重程度：严重
+- 问题现象：去掉白色 alpha 命中层后，灵宠背后仍有半透明框线；动作时该框线不随宠物移动，形象切换后还会残留第一张形象的轮廓。
+- 原因分析：内置 PNG 的非透明 alpha 会触达源图边缘，缩放后容易形成边缘线；`PetAvatar` 外层的 `overflow: hidden`、`isolation`、`contain: paint` 会在透明 WebView 中制造静态裁剪/合成层；复用同一个 canvas 也增加旧纹理边界被保留的概率；透明无边框窗口的系统阴影也可能形成固定矩形框。
+- 解决方案：移除外层裁剪/隔离/contain 属性；canvas 随 `src` 变化强制 remount；清屏改为 reset transform + `clearRect`；绘制时使用 2px 透明内边距，并从源图四边裁掉约 0.4% 的边缘像素，避免源 PNG 边缘参与最终缩放；创建宠物窗时显式 `.shadow(false)`。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src-tauri/src/commands/window.rs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：透明桌面宠物不能让裁剪层、源图边缘和复用 canvas 三者叠加；干净透明渲染要同时控制 DOM 合成层和位图绘制边界。
+- 是否需更新技术文档：是。
