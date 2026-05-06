@@ -974,7 +974,7 @@ function MessageBubble({ message, isStreaming = false, fullWidth = false }: { me
     <div className={`group flex animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
         className={`relative rounded-[10px] border border-[var(--color-chat-bubble-border)] px-3 py-2 text-[14px] leading-[1.5] text-[var(--color-chat-text)] shadow-none transition-colors ${
-          fullWidth ? 'w-full max-w-full' : 'max-w-[84%]'
+          fullWidth ? 'max-w-full' : 'max-w-[84%]'
         } ${
           isUser
             ? 'bg-[var(--color-chat-user-bubble)] text-right'
