@@ -3,12 +3,22 @@ import { setSetting, getAllSettings } from '@/lib/db';
 import { emit } from '@tauri-apps/api/event';
 
 export type Theme = 'light' | 'dark' | 'system';
+export type PetMotionName = 'petJump' | 'petWobble' | 'petBreathe';
+
+export interface PetMotionSetting {
+  enabled: boolean;
+  amplitude: number;
+  speed: number;
+}
+
+export type PetMotionSettings = Record<PetMotionName, PetMotionSetting>;
 
 export interface AppSettings {
   theme: Theme;
   petOpacity: number;
   petScale: number;
   dialogWidth: number;
+  petMotions: PetMotionSettings;
   petName: string;
   smartAttach: boolean;
   attachActivity: 'low' | 'medium' | 'high';
@@ -27,6 +37,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   petOpacity: 1.0,
   petScale: 1.0,
   dialogWidth: 300,
+  petMotions: {
+    petJump: { enabled: true, amplitude: 4, speed: 1 },
+    petWobble: { enabled: false, amplitude: 3, speed: 1 },
+    petBreathe: { enabled: false, amplitude: 2, speed: 1 },
+  },
   petName: '猫十五',
   smartAttach: true,
   attachActivity: 'medium',
@@ -66,6 +81,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
                 ? 'system'
                 : key === 'dialogWidth' && typeof parsed === 'number'
                   ? Math.min(600, Math.max(200, parsed))
+                : key === 'petMotions'
+                  ? normalizePetMotions(parsed)
                 : parsed;
           }
         }
@@ -103,4 +120,37 @@ function tryParse(value: string): unknown {
   } catch {
     return value;
   }
+}
+
+function normalizePetMotions(value: unknown): PetMotionSettings {
+  const defaults = DEFAULT_SETTINGS.petMotions;
+  if (!value || typeof value !== 'object') return defaults;
+  const source = value as Partial<Record<PetMotionName, Partial<PetMotionSetting>>>;
+
+  return {
+    petJump: normalizePetMotion(source.petJump, defaults.petJump, 2, 24, 0.5, 3),
+    petWobble: normalizePetMotion(source.petWobble, defaults.petWobble, 1, 12, 0.5, 3),
+    petBreathe: normalizePetMotion(source.petBreathe, defaults.petBreathe, 1, 8, 0.5, 3),
+  };
+}
+
+function normalizePetMotion(
+  value: Partial<PetMotionSetting> | undefined,
+  fallback: PetMotionSetting,
+  minAmplitude: number,
+  maxAmplitude: number,
+  minSpeed: number,
+  maxSpeed: number,
+): PetMotionSetting {
+  return {
+    enabled: typeof value?.enabled === 'boolean' ? value.enabled : fallback.enabled,
+    amplitude: clampNumber(value?.amplitude, fallback.amplitude, minAmplitude, maxAmplitude),
+    speed: clampNumber(value?.speed, fallback.speed, minSpeed, maxSpeed),
+  };
+}
+
+function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? Math.min(max, Math.max(min, value))
+    : fallback;
 }

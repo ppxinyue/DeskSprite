@@ -7,7 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { SettingsLayout } from '@/components/layouts/SettingsLayout';
-import { useSettingsStore } from '@/features/settings/settingsStore';
+import { useSettingsStore, type PetMotionName, type PetMotionSettings } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
@@ -114,7 +114,7 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
 
 function AppearanceRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[120px_280px] items-center py-3 border-b border-border/40 last:border-0">
+    <div className="grid grid-cols-[120px_minmax(280px,420px)] items-center py-3 border-b border-border/40 last:border-0">
       <span className="text-sm text-foreground">{label}</span>
       <div className="min-w-0">{children}</div>
     </div>
@@ -133,6 +133,7 @@ function AppearanceSection({
     petScale: settings.petScale,
     dialogWidth: settings.dialogWidth,
     theme: settings.theme,
+    petMotions: settings.petMotions,
   });
 
   const update = <K extends keyof typeof draft>(k: K, v: typeof draft[K]) => {
@@ -180,6 +181,12 @@ function AppearanceSection({
           />
         </div>
       </AppearanceRow>
+      <AppearanceRow label="灵宠动作">
+        <PetMotionControls
+          value={draft.petMotions}
+          onChange={(petMotions) => update('petMotions', petMotions)}
+        />
+      </AppearanceRow>
 
       <Separator className="my-6" />
       <SectionTitle>形象自定义</SectionTitle>
@@ -188,6 +195,136 @@ function AppearanceSection({
 
     </>
   );
+}
+
+const PET_MOTION_OPTIONS: Array<{
+  id: PetMotionName;
+  title: string;
+  desc: string;
+  amplitudeLabel: string;
+  amplitudeMin: number;
+  amplitudeMax: number;
+  amplitudeStep: number;
+  amplitudeUnit: string;
+  speedMin: number;
+  speedMax: number;
+  speedStep: number;
+}> = [
+  {
+    id: 'petJump',
+    title: '跳动',
+    desc: '上下轻跳',
+    amplitudeLabel: '幅度',
+    amplitudeMin: 2,
+    amplitudeMax: 24,
+    amplitudeStep: 1,
+    amplitudeUnit: 'px',
+    speedMin: 0.5,
+    speedMax: 3,
+    speedStep: 0.1,
+  },
+  {
+    id: 'petWobble',
+    title: '摇摆',
+    desc: '左右轻晃',
+    amplitudeLabel: '角度',
+    amplitudeMin: 1,
+    amplitudeMax: 12,
+    amplitudeStep: 1,
+    amplitudeUnit: 'deg',
+    speedMin: 0.5,
+    speedMax: 3,
+    speedStep: 0.1,
+  },
+  {
+    id: 'petBreathe',
+    title: '呼吸',
+    desc: '轻微缩放',
+    amplitudeLabel: '幅度',
+    amplitudeMin: 1,
+    amplitudeMax: 8,
+    amplitudeStep: 0.5,
+    amplitudeUnit: '%',
+    speedMin: 0.5,
+    speedMax: 3,
+    speedStep: 0.1,
+  },
+];
+
+function PetMotionControls({
+  value,
+  onChange,
+}: {
+  value: PetMotionSettings;
+  onChange: (value: PetMotionSettings) => void;
+}) {
+  const updateMotion = (id: PetMotionName, partial: Partial<PetMotionSettings[PetMotionName]>) => {
+    onChange({
+      ...value,
+      [id]: {
+        ...value[id],
+        ...partial,
+      },
+    });
+  };
+
+  return (
+    <div className="w-[360px] space-y-3">
+      {PET_MOTION_OPTIONS.map((option) => {
+        const motion = value[option.id];
+        return (
+          <div key={option.id} className="rounded-[10px] border border-border/60 bg-background px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[13px] leading-[1.35] text-foreground">{option.title}</div>
+                <div className="text-[11px] leading-[1.35] text-muted-foreground">{option.desc}</div>
+              </div>
+              <Switch
+                checked={motion.enabled}
+                onCheckedChange={(enabled) => updateMotion(option.id, { enabled })}
+                aria-label={`${option.title}动作`}
+              />
+            </div>
+            <div className={`mt-2.5 space-y-2 ${motion.enabled ? '' : 'opacity-45'}`}>
+              <div className="grid grid-cols-[44px_1fr_48px] items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">{option.amplitudeLabel}</span>
+                <Slider
+                  value={[motion.amplitude]}
+                  onValueChange={([amplitude]) => updateMotion(option.id, { amplitude })}
+                  min={option.amplitudeMin}
+                  max={option.amplitudeMax}
+                  step={option.amplitudeStep}
+                  disabled={!motion.enabled}
+                />
+                <span className="text-right text-[11px] text-muted-foreground">
+                  {formatMotionValue(motion.amplitude, option.amplitudeUnit)}
+                </span>
+              </div>
+              <div className="grid grid-cols-[44px_1fr_48px] items-center gap-2">
+                <span className="text-[11px] text-muted-foreground">速度</span>
+                <Slider
+                  value={[motion.speed]}
+                  onValueChange={([speed]) => updateMotion(option.id, { speed })}
+                  min={option.speedMin}
+                  max={option.speedMax}
+                  step={option.speedStep}
+                  disabled={!motion.enabled}
+                />
+                <span className="text-right text-[11px] text-muted-foreground">{motion.speed.toFixed(1)}x</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <p className="text-[11px] leading-[1.5] text-muted-foreground">
+        开启多个动作时，灵宠会在每次形象切换时随机选择其中一个动作。
+      </p>
+    </div>
+  );
+}
+
+function formatMotionValue(value: number, unit: string): string {
+  return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}${unit}`;
 }
 
 const THEME_OPTIONS: { id: import('./settingsStore').Theme; title: string; description: string }[] = [

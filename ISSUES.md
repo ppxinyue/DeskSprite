@@ -419,3 +419,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：外观透明度要覆盖同一交互组内所有可见元素，避免按钮和面板视觉层级不一致。
 - 是否需更新技术文档：是。
+
+## ISSUE-037
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：E. 设置中心 / F. 灵宠动画
+- 严重程度：改进
+- 问题现象：项目里已有 `petJump`、`petWobble`、`petBreathe` keyframes，但用户无法在设置中启用、调节，也无法让动作与 PNG 形象切换同步。
+- 原因分析：灵宠渲染层只固定使用 `petBounce`，动作没有进入 settings store；PNG 切换逻辑只更新 `currentFrame`，没有同步更新动作状态。
+- 解决方案：新增 `petMotions` 设置项，外观页提供三个动作的开关、幅度、速度倍率控件；`PetAvatar` 抽出切图+切动作的统一函数，自动切图和非拖拽点击都走同一同步路径；CSS keyframes 改为 CSS 变量驱动幅度。
+- 涉及文件：`src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：用户可配置动画应把“启用状态”和“参数”都放进持久化设置；同步需求应复用已有事件边界，而不是新增独立动画定时器。
+- 是否需更新技术文档：是。

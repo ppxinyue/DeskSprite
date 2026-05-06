@@ -127,7 +127,7 @@ function PetWindow() {
             background: 'transparent',
           }}
         >
-          <PetAvatar opacity={settings.petOpacity} scale={settings.petScale} />
+          <PetAvatar opacity={settings.petOpacity} scale={settings.petScale} motions={settings.petMotions} />
 
           {dialogOpen && (
             <>

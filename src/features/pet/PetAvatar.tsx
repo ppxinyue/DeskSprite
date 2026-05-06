@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { usePetStore } from './petStore';
@@ -10,12 +10,37 @@ import {
   isBuiltinAsset,
 } from './animations';
 import { stopPetStateEngine } from './petStateEngine';
+import type { PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
 
 function toSrc(path: string): string {
   return isBuiltinAsset(path) ? path : convertFileSrc(path);
 }
 
-export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?: number }) {
+const MOTION_NAMES: PetMotionName[] = ['petJump', 'petWobble', 'petBreathe'];
+const MOTION_BASE_DURATION: Record<PetMotionName, number> = {
+  petJump: 4,
+  petWobble: 1.6,
+  petBreathe: 3.6,
+};
+
+function pickNextMotion(motions: PetMotionSettings, current: PetMotionName | null): PetMotionName | null {
+  const enabled = MOTION_NAMES.filter((name) => motions[name]?.enabled);
+  if (enabled.length === 0) return null;
+  if (enabled.length === 1) return enabled[0];
+  let next = enabled[Math.floor(Math.random() * enabled.length)];
+  if (next === current) next = enabled[(enabled.indexOf(next) + 1) % enabled.length];
+  return next;
+}
+
+export function PetAvatar({
+  opacity = 1,
+  scale = 1,
+  motions,
+}: {
+  opacity?: number;
+  scale?: number;
+  motions: PetMotionSettings;
+}) {
   const { petState, mediaConfig, openChat, dialogOpen } = usePetStore();
   const config = mediaConfig[petState];
   const frameSources = getPetFrameSources(config);
@@ -24,6 +49,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const [recentConversations, setRecentConversations] = useState<Array<{ id: number; title: string | null }>>([]);
+  const [currentMotion, setCurrentMotion] = useState<PetMotionName | null>(() => pickNextMotion(motions, null));
   const didDrag = useRef(false);
   const startPoint = useRef<{ x: number; y: number } | null>(null);
   const petRootRef = useRef<HTMLDivElement>(null);
@@ -37,14 +63,27 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   useEffect(() => {
     if (dialogOpen || config.userAnimatedPath || frameSources.length <= 1) return;
     const t = setTimeout(() => {
-      setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));
+      switchFrameAndMotion();
     }, getRandomFrameSwitchDelay());
     return () => clearTimeout(t);
-  }, [config.userAnimatedPath, dialogOpen, frameSources.length, currentFrame]);
+  }, [config.userAnimatedPath, dialogOpen, frameSources.length, currentFrame, currentMotion, motions]);
 
   useEffect(() => {
     setCurrentFrame(0);
-  }, [petState, config.userAnimatedPath, frameSources.length]);
+    setCurrentMotion((motion) => pickNextMotion(motions, motion));
+  }, [petState, config.userAnimatedPath, frameSources.length, motions]);
+
+  useEffect(() => {
+    setCurrentMotion((motion) => {
+      if (motion && motions[motion]?.enabled) return motion;
+      return pickNextMotion(motions, motion);
+    });
+  }, [motions]);
+
+  const switchFrameAndMotion = () => {
+    setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));
+    setCurrentMotion((motion) => pickNextMotion(motions, motion));
+  };
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -96,7 +135,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
       didDrag.current = false;
       return;
     }
-    setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));
+    switchFrameAndMotion();
   };
 
   const handleContextMenu = async (action: string) => {
@@ -248,6 +287,17 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
     );
   }
 
+  const motionStyle = currentMotion && motions[currentMotion]
+    ? {
+        animation: `${currentMotion} ${MOTION_BASE_DURATION[currentMotion] / motions[currentMotion].speed}s ease-in-out infinite`,
+        '--pet-motion-amplitude': String(motions[currentMotion].amplitude),
+        '--pet-motion-y': `${-motions[currentMotion].amplitude}px`,
+        '--pet-motion-rotate': `${motions[currentMotion].amplitude}deg`,
+        '--pet-motion-rotate-negative': `${-motions[currentMotion].amplitude}deg`,
+        '--pet-motion-scale': String(1 + motions[currentMotion].amplitude / 100),
+      } as CSSProperties & Record<string, string>
+    : undefined;
+
   return (
     <>
       <div
@@ -267,7 +317,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
       >
         {kind === 'video' ? (
           <video key={src} src={src} autoPlay loop muted playsInline draggable={false} width={w} height={h}
-            style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', background: 'transparent', backfaceVisibility: 'hidden' }}
+            style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', background: 'transparent', backfaceVisibility: 'hidden', ...motionStyle }}
             onError={() => setImgError(true)} />
         ) : (
           <canvas
@@ -279,7 +329,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
               height: h,
               background: 'transparent',
               backfaceVisibility: 'hidden',
-              animation: 'petBounce 4s ease-in-out infinite',
+              ...motionStyle,
             }}
           />
         )}
