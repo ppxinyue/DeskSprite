@@ -5,7 +5,7 @@
 - 当前阶段：P0（集成调试 + 拖拽稳定性修复）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + 对话/拖拽迭代修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：待提交：refine chat windows and menu interactions
+- 最新提交：待提交：stabilize pet rendering and complete chat inputs
 
 ## 任务进度
 
@@ -217,3 +217,11 @@
 - 对话：大窗口改为 ChatGPT 风格基础布局，左侧历史和模型选择，右侧聊天主体，输入框固定在底部；小对话窗顶部增加模型、图片、语音、放大图形按钮。
 - 外观：设置“外观”滑块拖动即写入并通过 `settings:updated` 同步宠物窗；切图时用固定透明绘制容器隔离当前 PNG，减少旧图透明框残留。
 - 文件：window.rs, App.tsx, PetAvatar.tsx, ChatDialog.tsx, SettingsPanel.tsx
+
+### R16. 80% 窗口、Canvas 灵宠渲染与多面板对话（2026-05-06）
+- 问题：设置/大对话窗口仍可能从 80% 闪回小窗；灵宠 PNG 切换后旧形象边框残留；小窗聊天时灵宠自动切状态；大窗历史加载和多模型并排能力不完整；图片/语音按钮只是入口。
+- 修复：App 初始 window label 直接读取 Tauri 当前窗口，避免 settings/chat 首帧误跑宠物窗缩放逻辑；设置窗和 chat 窗默认 80% 工作区居中，复用窗口时也重设尺寸。
+- 渲染：PNG 灵宠改为 canvas 渲染，每次切图先清空透明画布再绘制新图，避免透明 WebView 合成层保留旧 `<img>` 边缘；小窗打开时暂停 1-5 分钟自动切图，只保留手动点击切换。
+- 对话：小窗只保留干净输入框，图片/语音/放大按钮浮在灵宠右下角；小窗发送不再改变灵宠状态；大窗支持单窗口、横向、纵向、四宫格布局，最多 4 个独立面板，每个面板独立选择模型。
+- 输入：图片输入完成为文件选择 + data URL 视觉消息；语音输入接入系统 Web Speech API，识别结果写入输入框；消息气泡可显示图片预览。
+- 文件：window.rs, App.tsx, PetAvatar.tsx, ChatDialog.tsx, aiService.ts, types.ts, chatStore.ts, settingsStore.ts

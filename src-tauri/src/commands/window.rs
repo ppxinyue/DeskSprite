@@ -1,11 +1,13 @@
-use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
+};
 
-fn centered_sixty_percent<R: Runtime>(app: &AppHandle<R>) -> (f64, f64, f64, f64) {
+fn centered_eighty_percent<R: Runtime>(app: &AppHandle<R>) -> (f64, f64, f64, f64) {
     if let Ok(Some(monitor)) = app.primary_monitor() {
         let scale = monitor.scale_factor();
         let work = monitor.work_area();
-        let w = work.size.width as f64 / scale * 0.6;
-        let h = work.size.height as f64 / scale * 0.6;
+        let w = work.size.width as f64 / scale * 0.8;
+        let h = work.size.height as f64 / scale * 0.8;
         let x = work.position.x as f64 / scale + (work.size.width as f64 / scale - w) / 2.0;
         let y = work.position.y as f64 / scale + (work.size.height as f64 / scale - h) / 2.0;
         (x, y, w, h)
@@ -54,10 +56,12 @@ pub fn set_cursor_passthrough(app: AppHandle, passthrough: bool) -> Result<(), S
 }
 
 pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    let (x, y, w, h) = centered_sixty_percent(app);
-    if let Some(w) = app.get_webview_window("settings") {
-        let _ = w.show();
-        let _ = w.set_focus();
+    let (x, y, w, h) = centered_eighty_percent(app);
+    if let Some(window) = app.get_webview_window("settings") {
+        let _ = window.set_size(LogicalSize::new(w, h));
+        let _ = window.set_position(LogicalPosition::new(x, y));
+        let _ = window.show();
+        let _ = window.set_focus();
         return Ok(());
     }
 
@@ -76,10 +80,12 @@ pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String
 
 #[tauri::command]
 pub fn show_chat_window(app: AppHandle) -> Result<(), String> {
-    let (x, y, w, h) = centered_sixty_percent(&app);
-    if let Some(w) = app.get_webview_window("chat") {
-        let _ = w.show();
-        let _ = w.set_focus();
+    let (x, y, w, h) = centered_eighty_percent(&app);
+    if let Some(window) = app.get_webview_window("chat") {
+        let _ = window.set_size(LogicalSize::new(w, h));
+        let _ = window.set_position(LogicalPosition::new(x, y));
+        let _ = window.show();
+        let _ = window.set_focus();
         return Ok(());
     }
 

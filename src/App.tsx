@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
+import { ImagePlus, Maximize2, Mic } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
 import { ChatDialog } from "@/features/chat/ChatDialog";
@@ -12,7 +15,7 @@ import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG } from "@/features/pet/animations"
 import "./index.css";
 
 function App() {
-  const [windowLabel, setWindowLabel] = useState<string>("pet");
+  const [windowLabel, setWindowLabel] = useState<string>(() => getCurrentWindow().label);
   const { settings, loadSettings } = useSettingsStore();
 
   useEffect(() => {
@@ -74,7 +77,7 @@ function App() {
     return (
       <TooltipProvider>
         <div className="h-screen w-screen bg-background text-foreground">
-          <ChatDialog initialMode="new" maxHeight={760} standalone showModelSelector />
+          <ChatDialog initialMode="new" maxHeight={760} standalone />
         </div>
       </TooltipProvider>
     );
@@ -88,8 +91,13 @@ function PetWindow() {
   const { dialogOpen, chatMode, chatConversationId, closeChat } = usePetStore();
 
   const petSize = Math.round(150 * settings.petScale);
+  const petImageWidth = Math.round(120 * settings.petScale);
+  const petImageHeight = Math.round(150 * settings.petScale);
+  const toolButtonSize = 32;
+  const toolGap = 6;
+  const toolRowWidth = toolButtonSize * 3 + toolGap * 2;
   const maxDialogHeight = settings.dialogWidth;
-  const expandedWidth = Math.max(settings.dialogWidth + 40, 220);
+  const expandedWidth = Math.max(settings.dialogWidth + 40, 20 + petImageWidth + 8 + toolRowWidth + 20);
   const expandedHeight = 20 + petSize + 12 + maxDialogHeight + 28;
   const collapsedWidth = Math.max(220, petSize + 70);
   const collapsedHeight = Math.max(220, petSize + 70);
@@ -122,21 +130,60 @@ function PetWindow() {
           <PetAvatar opacity={settings.petOpacity} scale={settings.petScale} />
 
           {dialogOpen && (
-            <div
-              className="mt-2 z-30 w-full"
-            >
-              <ChatDialog
-                initialConversationId={chatConversationId}
-                initialMode={chatMode}
-                maxHeight={maxDialogHeight}
-                onClose={closeChat}
-                showModelSelector
-              />
-            </div>
+            <>
+              <div
+                className="absolute z-40 flex items-center gap-1.5"
+                style={{
+                  left: petImageWidth + 8,
+                  top: petImageHeight - toolButtonSize,
+                }}
+              >
+                <FloatingToolButton title="图片输入" onClick={() => window.dispatchEvent(new CustomEvent("desksprite:chat-image"))}>
+                  <ImagePlus className="h-4 w-4" />
+                </FloatingToolButton>
+                <FloatingToolButton title="语音输入" onClick={() => window.dispatchEvent(new CustomEvent("desksprite:chat-voice"))}>
+                  <Mic className="h-4 w-4" />
+                </FloatingToolButton>
+                <FloatingToolButton title="放大" onClick={() => invoke("show_chat_window").catch(() => {})}>
+                  <Maximize2 className="h-4 w-4" />
+                </FloatingToolButton>
+              </div>
+              <div className="mt-2 z-30 w-full">
+                <ChatDialog
+                  initialConversationId={chatConversationId}
+                  initialMode={chatMode}
+                  maxHeight={maxDialogHeight}
+                  onClose={closeChat}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>
     </TooltipProvider>
+  );
+}
+
+function FloatingToolButton({
+  title,
+  onClick,
+  children,
+}: {
+  title: string;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      title={title}
+      onClick={onClick}
+      className="h-8 w-8 rounded-full border border-border/40 bg-popover/75 p-0 text-popover-foreground shadow-lg backdrop-blur-xl hover:bg-accent"
+    >
+      {children}
+    </Button>
   );
 }
 

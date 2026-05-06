@@ -13,6 +13,7 @@ export interface Message {
   role: 'system' | 'user' | 'assistant';
   content: string;
   imageUrl?: string;
+  imageDataUrl?: string;
 }
 
 export interface StreamChunk {

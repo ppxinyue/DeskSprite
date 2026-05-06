@@ -26,7 +26,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   petOpacity: 1.0,
   petScale: 1.0,
-  dialogWidth: 360,
+  dialogWidth: 350,
   petName: '猫十五',
   smartAttach: true,
   attachActivity: 'medium',

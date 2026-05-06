@@ -275,3 +275,15 @@
 - 涉及文件：`src-tauri/src/commands/window.rs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：小型桌面悬浮窗内的任何浮层都必须先保证 OS 窗口矩形足够容纳；跨窗口设置实时预览要走事件同步，而不是只依赖本窗口 zustand state。
 - 是否需更新技术文档：是。
+
+## ISSUE-025
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：C. 窗口管理 / F. 灵宠渲染 / H. 对话系统
+- 严重程度：严重
+- 问题现象：设置窗口和大对话窗口打开时会从大尺寸闪回小尺寸；灵宠 PNG 切换后多轮修复仍保留上一张图的透明边框；小窗对话时灵宠会自动切换形象；历史对话在大窗左侧无法稳定加载；图片和语音输入按钮不可用。
+- 原因分析：React `App` 初始 `windowLabel` 默认是 `pet`，settings/chat 窗口首帧会执行宠物窗 `setSize`；透明 WebView 中直接替换 `<img>` 可能复用旧合成层，CSS `contain/isolation` 仍不能保证清空上一张透明 PNG 的边缘像素；聊天发送时调用 `setPetState('thinking')` 会触发状态图片切换；大窗单窗口模式固定显示第一个面板，历史可能加载到当前激活但不可见的面板；图片/语音按钮没有接真实输入源。
+- 解决方案：`windowLabel` 初始值改为 `getCurrentWindow().label`；settings/chat 默认 80% 工作区居中并在复用窗口时强制重设尺寸；PNG 灵宠改为 canvas `globalCompositeOperation='copy'` 清透明画布后再绘制新图；小窗打开时暂停自动随机切图，聊天发送不再改灵宠状态；大窗单窗口显示当前激活面板；图片输入使用文件选择和 data URL 传给 VLM 请求，语音输入使用 Web Speech API 写入输入框。
+- 涉及文件：`src-tauri/src/commands/window.rs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/ai/aiService.ts`, `src/features/ai/types.ts`, `src/features/chat/chatStore.ts`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：透明桌面窗口的残影问题不能只靠 DOM/CSS 隔离解决，涉及透明 alpha 的连续图像切换应使用单一 canvas 显式清空像素缓冲区；多窗口 React 应在首帧就拿到真实窗口 label，避免错误窗口逻辑短暂执行。
+- 是否需更新技术文档：是。

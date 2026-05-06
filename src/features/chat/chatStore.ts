@@ -5,6 +5,7 @@ export interface ChatMessage extends Message {
   id: string;
   timestamp: number;
   imageUrl?: string;
+  imageDataUrl?: string;
 }
 
 interface ChatState {
@@ -59,11 +60,12 @@ export const useChatStore = create<ChatState>((set) => ({
     set({ messages: [], currentConversationId: null, streamingContent: '' }),
 }));
 
-export function createMessage(role: Message['role'], content: string): ChatMessage {
+export function createMessage(role: Message['role'], content: string, extras: Partial<Pick<ChatMessage, 'imageUrl' | 'imageDataUrl'>> = {}): ChatMessage {
   return {
     id: `msg-${Date.now()}-${++msgCounter}`,
     role,
     content,
     timestamp: Date.now(),
+    ...extras,
   };
 }

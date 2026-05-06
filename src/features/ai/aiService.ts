@@ -102,7 +102,20 @@ function buildRequestBody(
     const systemMsg = messages.find((m) => m.role === 'system');
     const chatMsgs = messages
       .filter((m) => m.role !== 'system')
-      .map((m) => ({ role: m.role, content: m.content }));
+      .map((m) => ({
+        role: m.role,
+        content: m.imageDataUrl ? [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: dataUrlMime(m.imageDataUrl),
+              data: dataUrlPayload(m.imageDataUrl),
+            },
+          },
+          { type: 'text', text: m.content || '请分析这张图片。' },
+        ] : m.content,
+      }));
     return {
       model: config.model,
       system: systemMsg?.content ?? '',
@@ -113,9 +126,25 @@ function buildRequestBody(
   }
   return {
     model: config.model,
-    messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    messages: messages.map((m) => ({
+      role: m.role,
+      content: m.imageDataUrl
+        ? [
+          { type: 'text', text: m.content || '请分析这张图片。' },
+          { type: 'image_url', image_url: { url: m.imageDataUrl } },
+        ]
+        : m.content,
+    })),
     stream,
   };
+}
+
+function dataUrlMime(dataUrl: string) {
+  return dataUrl.match(/^data:([^;]+);base64,/)?.[1] ?? 'image/png';
+}
+
+function dataUrlPayload(dataUrl: string) {
+  return dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : dataUrl;
 }
 
 function buildVisionBody(imageBase64: string, prompt: string, config: ApiConfig) {

@@ -27,6 +27,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   const didDrag = useRef(false);
   const startPoint = useRef<{ x: number; y: number } | null>(null);
   const petRootRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const w = Math.round(120 * scale);
   const h = Math.round(150 * scale);
   const collapsedSize = Math.max(220, Math.round(150 * scale) + 70);
@@ -34,12 +35,16 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   useEffect(() => () => stopPetStateEngine(), []);
 
   useEffect(() => {
-    if (config.userAnimatedPath || frameSources.length <= 1) return;
+    if (dialogOpen || config.userAnimatedPath || frameSources.length <= 1) return;
     const t = setTimeout(() => {
       setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));
     }, getRandomFrameSwitchDelay());
     return () => clearTimeout(t);
-  }, [config.userAnimatedPath, frameSources.length, currentFrame]);
+  }, [config.userAnimatedPath, dialogOpen, frameSources.length, currentFrame]);
+
+  useEffect(() => {
+    setCurrentFrame(0);
+  }, [petState, config.userAnimatedPath, frameSources.length]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -140,6 +145,55 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
     setImgError(false);
   }, [src]);
 
+  useEffect(() => {
+    if (kind !== 'img') return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(w * dpr));
+    canvas.height = Math.max(1, Math.round(h * dpr));
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const clearCanvas = () => {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'copy';
+      ctx.fillStyle = 'rgba(0,0,0,0)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    };
+
+    clearCanvas();
+    let cancelled = false;
+    const image = new Image();
+    image.decoding = 'async';
+    image.onload = () => {
+      if (cancelled) return;
+      clearCanvas();
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.globalAlpha = opacity;
+      const ratio = Math.min(w / image.naturalWidth, h / image.naturalHeight);
+      const drawWidth = image.naturalWidth * ratio;
+      const drawHeight = image.naturalHeight * ratio;
+      ctx.drawImage(image, (w - drawWidth) / 2, (h - drawHeight) / 2, drawWidth, drawHeight);
+      ctx.restore();
+    };
+    image.onerror = () => {
+      if (!cancelled) setImgError(true);
+    };
+    image.src = src;
+
+    return () => {
+      cancelled = true;
+      clearCanvas();
+    };
+  }, [h, kind, opacity, src, w]);
+
   const interactiveProps = {
     onMouseDown: handleMouseDown,
     onClick: handleClick,
@@ -203,6 +257,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
           width: w,
           height: h,
           background: 'transparent',
+          backgroundColor: 'rgba(255, 255, 255, 0.001)',
           display: 'inline-block',
           overflow: 'hidden',
           isolation: 'isolate',
@@ -212,14 +267,21 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
       >
         {kind === 'video' ? (
           <video key={src} src={src} autoPlay loop muted playsInline draggable={false} width={w} height={h}
-            className="drop-shadow-lg" style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', background: 'transparent', backfaceVisibility: 'hidden' }}
+            style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', background: 'transparent', backfaceVisibility: 'hidden' }}
             onError={() => setImgError(true)} />
         ) : (
-          <img key={src} src={src} alt="灵宠" draggable={false} width={w} height={h}
-            className="drop-shadow-lg"
-            style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', background: 'transparent',
-                     backfaceVisibility: 'hidden', animation: 'petBounce 4s ease-in-out infinite' }}
-            onError={() => setImgError(true)} />
+          <canvas
+            ref={canvasRef}
+            aria-label="灵宠"
+            className="block"
+            style={{
+              width: w,
+              height: h,
+              background: 'transparent',
+              backfaceVisibility: 'hidden',
+              animation: 'petBounce 4s ease-in-out infinite',
+            }}
+          />
         )}
       </div>
       {menu}
