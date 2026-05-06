@@ -66,6 +66,7 @@ pub fn run() {
             commands::window::hide_pet_window,
             commands::window::show_settings_cmd,
             commands::window::close_settings_window,
+            commands::window::exit_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

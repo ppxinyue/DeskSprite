@@ -139,7 +139,7 @@ export function ChatDialog() {
         fullContent += token;
         appendStreamingContent(token);
         if (fullContent.length === token.length) {
-          setPetState('speaking');
+          setPetState('thinking');
         }
       }
 

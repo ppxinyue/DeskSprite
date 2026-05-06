@@ -92,7 +92,7 @@ function applyMode(mode: AttachMode, bounds: DesktopBounds) {
     }
     case 'fullscreen_hide': {
       // Hide at top-right corner, peek on hover
-      store.setPetState('peering');
+      store.setPetState('sleeping');
       store.setPosition({
         x: bounds.width - 130,
         y: -80, // mostly hidden, only ears visible

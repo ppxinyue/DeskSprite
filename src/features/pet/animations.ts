@@ -1,30 +1,32 @@
 export type PetState =
   | 'idle'
-  | 'thinking'
-  | 'speaking'
-  | 'listening'
   | 'happy'
-  | 'walking'
-  | 'running'
+  | 'thinking'
   | 'sleeping'
-  | 'dragging'
-  | 'peering'
-  | 'wondering';
+  | 'dragging';
 
-const IMAGE_MAP: Record<PetState, string> = {
-  idle: '/assets/pet-images/cat15-front.png',
-  thinking: '/assets/pet-images/cat15-wondering.png',
-  speaking: '/assets/pet-images/cat15-front.png',
-  listening: '/assets/pet-images/cat15-front.png',
-  happy: '/assets/pet-images/cat15-front.png',
-  walking: '/assets/pet-images/cat15-side.png',
-  running: '/assets/pet-images/cat15-side.png',
-  sleeping: '/assets/pet-images/cat15-sleeping.png',
-  dragging: '/assets/pet-images/cat15-front.png',
-  peering: '/assets/pet-images/cat15-peering.png',
-  wondering: '/assets/pet-images/cat15-wondering.png',
+const DEFAULT_IMAGES: Record<PetState, string> = {
+  idle: 'assets/pet-images/cat15-front.png',
+  happy: 'assets/pet-images/cat15-front.png',
+  thinking: 'assets/pet-images/cat15-front.png',
+  sleeping: 'assets/pet-images/cat15-sleeping.png',
+  dragging: 'assets/pet-images/cat15-front.png',
 };
 
-export function getImageSrc(state: PetState): string {
-  return IMAGE_MAP[state] ?? IMAGE_MAP.idle;
+const DEFAULT_IDLE_IMAGE = 'assets/pet-images/cat15-front.png';
+
+export function getDefaultImage(state: PetState): string {
+  return DEFAULT_IMAGES[state] ?? DEFAULT_IDLE_IMAGE;
+}
+
+export function getImageSrc(
+  state: PetState,
+  customImages: Record<PetState, string | null>,
+): string {
+  // 1. User custom image for this state
+  if (customImages[state]) return customImages[state]!;
+  // 2. User custom idle image as fallback
+  if (customImages.idle) return customImages.idle;
+  // 3. Built-in default
+  return getDefaultImage(state);
 }

@@ -8,8 +8,10 @@ import { Separator } from '@/components/ui/separator';
 import { SettingsLayout } from '@/components/layouts/SettingsLayout';
 import { useSettingsStore } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
-import { getSystemPrompt, updateSystemPrompt } from '@/lib/db';
+import { usePetStore } from '@/features/pet/petStore';
+import { getSystemPrompt, updateSystemPrompt, setSetting } from '@/lib/db';
 import { maskKey } from '@/lib/keychain';
+import type { PetState } from '@/features/pet/animations';
 import { invoke } from '@tauri-apps/api/core';
 
 const DEFAULT_PROMPT = `你是{pet_name}，一只温柔、机智、偶尔调皮的橘猫，住在用户的桌面上。你热爱陪伴主人工作，会用轻松幽默的语气聊天。你擅长编程、写作、分析问题，也会提醒主人注意休息和喝水。你的回答应该简洁有用，偶尔展现猫咪的可爱本性。`;
@@ -227,23 +229,88 @@ function BehaviorSection({
 }
 
 function ImageSection() {
+  const { petImages, setPetImage, clearPetImages } = usePetStore();
+  const [previewSrc, setPreviewSrc] = useState<Record<string, string>>({});
+
+  const handleUpload = async (state: PetState) => {
+    try {
+      const { open } = await import('@tauri-apps/plugin-dialog');
+      const path = await open({
+        filters: [{ name: 'Image', extensions: ['png', 'gif'] }],
+        multiple: false,
+      });
+      if (typeof path === 'string' && path) {
+        const { convertFileSrc } = await import('@tauri-apps/api/core');
+        const src = convertFileSrc(path);
+        setPetImage(state, src);
+        setPreviewSrc((prev) => ({ ...prev, [state]: src }));
+        await setSetting(`petImage_${state}`, JSON.stringify(src));
+      }
+    } catch (e) {
+      console.error('Image upload failed:', e);
+    }
+  };
+
+  const handleClear = async (state: PetState) => {
+    setPetImage(state, null);
+    setPreviewSrc((prev) => {
+      const next = { ...prev };
+      delete next[state];
+      return next;
+    });
+    try { await setSetting(`petImage_${state}`, JSON.stringify(null)); } catch {}
+  };
+
+  const handleClearAll = async () => {
+    clearPetImages();
+    setPreviewSrc({});
+    const states: PetState[] = ['idle', 'happy', 'thinking', 'sleeping', 'dragging'];
+    for (const s of states) {
+      try { await setSetting(`petImage_${s}`, JSON.stringify(null)); } catch {}
+    }
+  };
+
+  const stateLabels: Record<PetState, string> = {
+    idle: '待机 (idle)',
+    happy: '高兴 (happy)',
+    thinking: '思考 (thinking)',
+    sleeping: '睡眠 (sleeping)',
+    dragging: '拖拽 (dragging)',
+  };
+
   return (
     <>
       <SectionTitle>形象自定义</SectionTitle>
       <p className="text-sm text-muted-foreground mb-4">
-        上传透明背景 PNG 图片替换默认灵宠形象。未上传的姿态使用默认猫十五图片。
+        为每个状态上传 PNG 或 GIF 图片。未上传的状态使用 idle 图片或默认猫十五。
       </p>
       <div className="space-y-4">
-        {(['front', 'side', 'sleep'] as const).map((pose) => (
-          <SettingRow key={pose} label={`上传 ${pose} 姿态${pose === 'front' ? '（必选）' : '（可选）'}`}>
-            <Button variant="outline" size="sm" disabled>
-              选择文件
-            </Button>
-          </SettingRow>
-        ))}
+        {(['idle', 'happy', 'thinking', 'sleeping', 'dragging'] as PetState[]).map((state) => {
+          const currentSrc = previewSrc[state] || petImages[state];
+          return (
+            <div key={state} className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-3">
+                {currentSrc && (
+                  <img src={currentSrc} alt={state} className="w-10 h-12 object-contain rounded border border-border" />
+                )}
+                <span className="text-sm">{stateLabels[state]}</span>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleUpload(state)}>
+                  选择文件
+                </Button>
+                {currentSrc && (
+                  <Button variant="ghost" size="sm" onClick={() => handleClear(state)}>
+                    清除
+                  </Button>
+                )}
+              </div>
+            </div>
+          );
+        })}
       </div>
       <Separator className="my-4" />
-      <Button variant="outline" size="sm" disabled>
+      <Button variant="outline" size="sm" onClick={handleClearAll}>
         恢复默认
       </Button>
     </>

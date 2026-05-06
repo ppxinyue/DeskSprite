@@ -7,23 +7,32 @@ import { ChatDialog } from "@/features/chat/ChatDialog";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore } from "@/features/settings/settingsStore";
+import { startAttachEngine, stopAttachEngine } from "@/features/pet/attachEngine";
+import { getSetting } from "@/lib/db";
+import type { PetState } from "@/features/pet/animations";
 import "./index.css";
 
 function App() {
   const [windowLabel, setWindowLabel] = useState<string>("pet");
   const { settings, loadSettings } = useSettingsStore();
-  const { dialogOpen, setDialogOpen } = usePetStore();
+  const { setDialogOpen, setPetImages } = usePetStore();
 
   useEffect(() => {
     const label = getCurrentWindow().label;
     setWindowLabel(label);
-    loadSettings();
+
+    // Load settings & restore pet images
+    (async () => {
+      await loadSettings();
+      await restorePetImages(setPetImages);
+    })();
 
     if (label === "settings") {
       document.body.classList.add("has-background");
     }
   }, []);
 
+  // Theme sync
   useEffect(() => {
     const root = document.documentElement;
     if (settings.theme === "dark") {
@@ -39,6 +48,7 @@ function App() {
     }
   }, [settings.theme]);
 
+  // Global shortcut listener
   useEffect(() => {
     const unlisten = listen("shortcut:chat-focus", () => {
       if (windowLabel === "pet") setDialogOpen(true);
@@ -54,12 +64,28 @@ function App() {
     );
   }
 
-  // Pet window - full screen transparent overlay
+  // Pet window
+  return <PetWindow />;
+}
+
+function PetWindow() {
+  const { settings } = useSettingsStore();
+  const { dialogOpen, position } = usePetStore();
+
+  // Start attach engine
+  useEffect(() => {
+    startAttachEngine();
+    return () => stopAttachEngine();
+  }, []);
+
   return (
     <TooltipProvider>
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {/* Pet avatar at bottom-left, clickable */}
-        <div className="absolute bottom-20 left-8 pointer-events-auto">
+        {/* Pet avatar — position from petStore */}
+        <div
+          className="absolute pointer-events-auto"
+          style={{ left: position.x, top: position.y }}
+        >
           <PetAvatar opacity={settings.petOpacity} scale={settings.petScale} />
         </div>
 
@@ -75,6 +101,29 @@ function App() {
       </div>
     </TooltipProvider>
   );
+}
+
+// Step 7: Restore pet images from DB on startup
+async function restorePetImages(
+  setPetImages: (images: Record<PetState, string | null>) => void,
+) {
+  try {
+    const states: PetState[] = ['idle', 'happy', 'thinking', 'sleeping', 'dragging'];
+    const images: Record<string, string | null> = {};
+    for (const state of states) {
+      const val = await getSetting(`petImage_${state}`);
+      if (val) {
+        try {
+          images[state] = JSON.parse(val);
+        } catch {
+          images[state] = val;
+        }
+      }
+    }
+    setPetImages(images as Record<PetState, string | null>);
+  } catch (e) {
+    console.warn('Failed to restore pet images:', e);
+  }
 }
 
 export default App;
