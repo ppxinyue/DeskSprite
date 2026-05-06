@@ -1,11 +1,9 @@
 import { useEffect, useState, useRef } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
 import { ChatDialog } from "@/features/chat/ChatDialog";
-import { HoverInputBar } from "@/features/chat/HoverInputBar";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore } from "@/features/settings/settingsStore";
@@ -67,44 +65,39 @@ function App() {
 
 function PetWindow() {
   const { settings } = useSettingsStore();
-  const { dialogOpen, setDialogOpen, position } = usePetStore();
   const [petHovered, setPetHovered] = useState(false);
   const hoverLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handlePetAreaEnter = () => {
     if (hoverLeaveTimer.current) clearTimeout(hoverLeaveTimer.current);
     setPetHovered(true);
-    invoke('set_cursor_passthrough', { passthrough: false }).catch(() => {});
+    getCurrentWindow()
+      .setSize(new LogicalSize(Math.max(settings.dialogWidth + 40, 220), 560))
+      .catch(() => {});
   };
 
   const handlePetAreaLeave = () => {
-    hoverLeaveTimer.current = setTimeout(() => setPetHovered(false), 300);
-    invoke('set_cursor_passthrough', { passthrough: true }).catch(() => {});
+    hoverLeaveTimer.current = setTimeout(() => {
+      setPetHovered(false);
+      getCurrentWindow().setSize(new LogicalSize(180, 190)).catch(() => {});
+    }, 200);
   };
 
   return (
     <TooltipProvider>
-      <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ background: 'transparent' }}>
+      <div className="fixed inset-0 overflow-hidden" style={{ background: 'transparent' }}>
         <div
-          className="absolute pointer-events-auto"
-          style={{ left: position.x, top: position.y, background: 'transparent' }}
+          className="absolute"
+          style={{ left: 20, top: 20, background: 'transparent' }}
           onMouseEnter={handlePetAreaEnter}
           onMouseLeave={handlePetAreaLeave}
         >
           <PetAvatar opacity={settings.petOpacity} scale={settings.petScale} />
 
           {petHovered && (
-            <HoverInputBar
-              petName={settings.petName}
-              dialogWidth={settings.dialogWidth}
-              onExpand={() => setDialogOpen(true)}
-            />
-          )}
-
-          {dialogOpen && (
             <div
               className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-30"
-              style={{ width: `${settings.dialogWidth}px` }}
+              style={{ width: `${settings.dialogWidth}px`, height: 340 }}
             >
               <ChatDialog />
             </div>

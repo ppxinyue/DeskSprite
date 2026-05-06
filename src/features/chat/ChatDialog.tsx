@@ -7,15 +7,14 @@ import { usePetStore } from '@/features/pet/petStore';
 import { useApiConfigStore } from '@/features/settings/apiConfigStore';
 import { useSettingsStore } from '@/features/settings/settingsStore';
 import { streamChat } from '@/features/ai/aiService';
+import { recordBuiltinUsage, resolveChatConfig } from '@/features/ai/defaultModel';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
-import { getApiKey } from '@/lib/keychain';
 import {
   getMessages,
   insertMessage,
   createConversation,
   getConversations,
 } from '@/lib/db';
-import type { ApiConfig } from '@/features/ai/types';
 import type { ChatMessage } from './chatStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -82,29 +81,12 @@ export function ChatDialog() {
     if (!text || isStreaming) return;
 
     const defaultConfig = getDefaultConfig();
-    if (!defaultConfig) {
-      addMessage(createMessage('assistant', '请先在设置中配置 API Key。'));
+    const resolved = await resolveChatConfig(defaultConfig);
+    if (!resolved.config) {
+      addMessage(createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。'));
       return;
     }
-
-    let apiKey: string;
-    try {
-      apiKey = defaultConfig.keyringRef
-        ? await getApiKey(defaultConfig.keyringRef)
-        : '';
-    } catch {
-      addMessage(createMessage('assistant', '无法读取 API Key，请重新配置。'));
-      return;
-    }
-
-    const apiConfig: ApiConfig = {
-      id: defaultConfig.id,
-      provider: defaultConfig.provider as ApiConfig['provider'],
-      baseUrl: defaultConfig.baseUrl,
-      model: defaultConfig.model,
-      apiKey,
-      isDefault: true,
-    };
+    const apiConfig = resolved.config;
 
     const userMsg = createMessage('user', text);
     addMessage(userMsg);
@@ -112,7 +94,7 @@ export function ChatDialog() {
 
     let convoId = currentConversationId;
     if (!convoId) {
-      await createConversation(text.slice(0, 50), defaultConfig.id);
+      await createConversation(text.slice(0, 50), apiConfig.id > 0 ? apiConfig.id : undefined);
       const convos = await getConversations();
       convoId = convos[0]?.id ?? null;
       setCurrentConversationId(convoId);
@@ -149,6 +131,9 @@ export function ChatDialog() {
 
       if (convoId) {
         await insertMessage(convoId, 'assistant', fullContent);
+      }
+      if (resolved.usingBuiltin) {
+        await recordBuiltinUsage(chatMessages, fullContent);
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);

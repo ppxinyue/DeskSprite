@@ -3,10 +3,9 @@ import { useApiConfigStore } from '@/features/settings/apiConfigStore';
 import { useChatStore, createMessage } from './chatStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { streamChat } from '@/features/ai/aiService';
+import { recordBuiltinUsage, resolveChatConfig } from '@/features/ai/defaultModel';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
-import { getApiKey } from '@/lib/keychain';
 import { getConversations, createConversation, insertMessage } from '@/lib/db';
-import type { ApiConfig } from '@/features/ai/types';
 
 interface HoverInputBarProps {
   petName: string;
@@ -17,7 +16,7 @@ interface HoverInputBarProps {
 export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarProps) {
   const [input, setInput] = useState('');
   const { getDefaultConfig } = useApiConfigStore();
-  const hasApiKey = !!getDefaultConfig();
+  const hasApiKey = true;
 
   const {
     messages, addMessage, setStreaming, setStreamingContent,
@@ -30,20 +29,12 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
     if (!text) return;
 
     const defaultConfig = getDefaultConfig();
-    if (!defaultConfig) return;
-
-    let apiKey: string;
-    try { apiKey = defaultConfig.keyringRef ? await getApiKey(defaultConfig.keyringRef) : ''; }
-    catch { return; }
-
-    const apiConfig: ApiConfig = {
-      id: defaultConfig.id,
-      provider: defaultConfig.provider as ApiConfig['provider'],
-      baseUrl: defaultConfig.baseUrl,
-      model: defaultConfig.model,
-      apiKey,
-      isDefault: true,
-    };
+    const resolved = await resolveChatConfig(defaultConfig);
+    if (!resolved.config) {
+      addMessage(createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。'));
+      return;
+    }
+    const apiConfig = resolved.config;
 
     addMessage(createMessage('user', text));
     setInput('');
@@ -51,7 +42,7 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
 
     let convoId = currentConversationId;
     if (!convoId) {
-      await createConversation(text.slice(0, 50), defaultConfig.id);
+      await createConversation(text.slice(0, 50), apiConfig.id > 0 ? apiConfig.id : undefined);
       const convos = await getConversations();
       convoId = convos[0]?.id ?? null;
       setCurrentConversationId(convoId);
@@ -79,6 +70,7 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
       setPetState('idle');
       addMessage(createMessage('assistant', fullContent));
       if (convoId) await insertMessage(convoId, 'assistant', fullContent);
+      if (resolved.usingBuiltin) await recordBuiltinUsage(chatMessages, fullContent);
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       addMessage(createMessage('assistant', `出错了：${errMsg}`));

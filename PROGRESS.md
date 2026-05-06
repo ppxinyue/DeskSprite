@@ -5,7 +5,7 @@
 - 当前阶段：P0（集成调试 + 拖拽稳定性修复）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + 四项修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：fix: stabilize pet drag and simplify states
+- 最新提交：fix: use compact pet window for reliable hover and drag
 
 ## 任务进度
 
@@ -174,3 +174,11 @@
 - 状态调整：删除 running、yawn、happy，只保留 idle、thinking、sleeping；AI 回复完成直接回 idle。
 - 图片调整：默认 idle/sleeping 可配置多张 PNG，用户上传多张 PNG 后随机间隔 1-5 分钟切换；点击灵宠会主动切换一次当前状态 PNG。
 - 文件：animations.ts, PetAvatar.tsx, petStateEngine.ts, ChatDialog.tsx, HoverInputBar.tsx, SettingsPanel.tsx
+
+### R10. 跨窗口返回后灵宠无法命中（2026-05-06）
+- 问题：用户点击其他窗口后再回到灵宠，鼠标仍可能穿透灵宠，无法点击或拖动。
+- 根因：全屏透明宠物窗一旦启用 OS 级 `set_ignore_cursor_events(true)`，鼠标从其他窗口回来时前端无法收到 hover 事件，也就无法重新关闭穿透。
+- 修复：宠物窗从全屏透明穿透层改为小型透明置顶窗口，窗口默认保持可命中；拖动改用 Tauri `startDragging()` 移动整个窗口。
+- 交互调整：聊天框只在鼠标 hover 灵宠区域时显示，鼠标离开后收起；右键菜单保留设置、隐藏、退出。
+- 默认模型：无用户默认模型时使用内置 CloseAI 兼容模型，本地记录 100000 token 估算额度，超额后提示配置自己的 API Key。
+- 文件：window.rs, App.tsx, PetAvatar.tsx, defaultModel.ts, ChatDialog.tsx, HoverInputBar.tsx

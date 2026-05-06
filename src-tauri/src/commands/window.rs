@@ -1,33 +1,30 @@
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, AppHandle, Runtime};
+use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 
 pub fn create_pet_window<R: Runtime>(app: &AppHandle<R>) {
-    let (w, h) = if let Ok(Some(monitor)) = app.primary_monitor() {
+    let (x, y) = if let Ok(Some(monitor)) = app.primary_monitor() {
         let size = monitor.size();
-        (size.width as f64, size.height as f64)
+        ((size.width.saturating_sub(220)) as f64, 120.0)
     } else {
-        (1920.0, 1080.0)
+        (100.0, 100.0)
     };
 
-    let window = WebviewWindowBuilder::new(app, "pet", WebviewUrl::App("index.html".into()))
+    let _ = WebviewWindowBuilder::new(app, "pet", WebviewUrl::App("index.html".into()))
         .title("DeskSprite Pet")
-        .inner_size(w, h)
-        .position(0.0, 0.0)
+        .inner_size(180.0, 190.0)
+        .position(x, y)
         .decorations(false)
         .transparent(true)
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(false)
         .build();
-
-    if let Ok(w) = window {
-        let _ = w.set_ignore_cursor_events(true);
-    }
 }
 
 #[tauri::command]
 pub fn set_cursor_passthrough(app: AppHandle, passthrough: bool) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("pet") {
-        w.set_ignore_cursor_events(passthrough).map_err(|e| e.to_string())?;
+        w.set_ignore_cursor_events(passthrough)
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -55,6 +52,7 @@ pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String
 pub fn show_pet_window(app: AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("pet") {
         let _ = w.show();
+        let _ = w.set_always_on_top(true);
         let _ = w.set_focus();
     }
     Ok(())
