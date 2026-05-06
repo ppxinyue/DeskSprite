@@ -140,11 +140,13 @@ function AppearanceSection({
         <select
           className="bg-input border border-border rounded px-2 py-1 text-sm"
           value={draft.theme}
-          onChange={(e) => update('theme', e.target.value as 'light' | 'dark' | 'system')}
+          onChange={(e) => update('theme', e.target.value as import('./settingsStore').Theme)}
         >
           <option value="system">跟随系统</option>
-          <option value="light">浅色</option>
-          <option value="dark">深色</option>
+          <option value="light">浅色 A</option>
+          <option value="light-soft">浅色 B</option>
+          <option value="dark">深色 A</option>
+          <option value="dark-slate">深色 B</option>
         </select>
       </SettingRow>
       <SettingRow label="灵宠透明度">
@@ -168,7 +170,7 @@ function AppearanceSection({
         <Slider
           value={[draft.dialogWidth]}
           onValueChange={([v]) => update('dialogWidth', v)}
-          min={280} max={520} step={10} className="w-40"
+          min={280} max={720} step={10} className="w-40"
         />
       </SettingRow>
 

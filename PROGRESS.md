@@ -5,7 +5,7 @@
 - 当前阶段：P0（集成调试 + 拖拽稳定性修复）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + 对话/拖拽迭代修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：待提交：stabilize pet rendering and complete chat inputs
+- 最新提交：待提交：redesign compact chat interface
 
 ## 任务进度
 
@@ -225,3 +225,11 @@
 - 对话：小窗只保留干净输入框，图片/语音/放大按钮浮在灵宠右下角；小窗发送不再改变灵宠状态；大窗支持单窗口、横向、纵向、四宫格布局，最多 4 个独立面板，每个面板独立选择模型。
 - 输入：图片输入完成为文件选择 + data URL 视觉消息；语音输入接入系统 Web Speech API，识别结果写入输入框；消息气泡可显示图片预览。
 - 文件：window.rs, App.tsx, PetAvatar.tsx, ChatDialog.tsx, aiService.ts, types.ts, chatStore.ts, settingsStore.ts
+
+### R17. 小对话窗 ChatGPT-like 视觉重设计（2026-05-06）
+- 问题：小对话窗仍偏“卡片 + 灰底 + 装饰气泡”，不够像专业聊天工具；主题只有单浅色/单深色；输入框和消息间距不够克制。
+- 修复：小窗容器最大宽度 720px，消息区 16px padding，消息间距 12px；用户消息右对齐、助手消息左对齐，80% 最大宽度、10px/14px padding、12px 圆角、14px 字体和 1.5 行高。
+- 输入框：改为单层 10px 圆角边框，40px 基线高度，focus 使用 accent 边框和轻微阴影；去掉半透明磨砂、额外阴影和多余边框。
+- 主题：新增浅色 A / 浅色 B / 深色 A / 深色 B 四套聊天色彩变量，设置页主题选择同步扩展。
+- 细节：消息 fade-in 150ms，hover 轻微变亮，Markdown 代码块使用等宽字体，消息复制按钮 hover 显示；前端显示层过滤密集 emoji 和行首括号动作描述。
+- 文件：ChatDialog.tsx, index.css, App.tsx, SettingsPanel.tsx, settingsStore.ts

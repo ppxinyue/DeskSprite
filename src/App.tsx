@@ -44,8 +44,14 @@ function App() {
 
   useEffect(() => {
     const root = document.documentElement;
+    root.classList.remove("theme-light-soft", "theme-dark-slate");
     if (settings.theme === "dark") root.classList.add("dark");
-    else if (settings.theme === "light") root.classList.remove("dark");
+    else if (settings.theme === "dark-slate") {
+      root.classList.add("dark", "theme-dark-slate");
+    } else if (settings.theme === "light-soft") {
+      root.classList.remove("dark");
+      root.classList.add("theme-light-soft");
+    } else if (settings.theme === "light") root.classList.remove("dark");
     else {
       const mq = window.matchMedia("(prefers-color-scheme: dark)");
       const handler = (e: MediaQueryListEvent) => root.classList.toggle("dark", e.matches);
@@ -180,7 +186,7 @@ function FloatingToolButton({
       size="sm"
       title={title}
       onClick={onClick}
-      className="h-8 w-8 rounded-full border border-border/40 bg-popover/75 p-0 text-popover-foreground shadow-lg backdrop-blur-xl hover:bg-accent"
+      className="h-8 w-8 rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] p-0 text-[var(--color-chat-muted)] shadow-none hover:bg-[var(--color-chat-assistant)] hover:text-[var(--color-chat-text)]"
     >
       {children}
     </Button>

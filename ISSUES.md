@@ -287,3 +287,15 @@
 - 涉及文件：`src-tauri/src/commands/window.rs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/ai/aiService.ts`, `src/features/ai/types.ts`, `src/features/chat/chatStore.ts`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：透明桌面窗口的残影问题不能只靠 DOM/CSS 隔离解决，涉及透明 alpha 的连续图像切换应使用单一 canvas 显式清空像素缓冲区；多窗口 React 应在首帧就拿到真实窗口 label，避免错误窗口逻辑短暂执行。
 - 是否需更新技术文档：是。
+
+## ISSUE-026
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：H. 小对话窗 UI
+- 严重程度：改进
+- 问题现象：小对话窗视觉仍像“卡片 + 灰底 + 冗长气泡”，半透明和阴影影响可读性，缺少 ChatGPT-like 的扁平层级；主题数量不满足 2 浅色 + 2 深色。
+- 原因分析：小窗一直复用全局 `pet-dialog` 和 `pet-bubble` 变量，视觉目标混在灵宠陪伴风格和专业聊天风格之间；输入框在不同模式下复用组件样式，导致边框、阴影和间距累积。
+- 解决方案：为聊天 UI 独立 `--color-chat-*` 变量，提供浅色 A/浅色 B/深色 A/深色 B；小窗容器、消息、输入框按 ChatGPT-like 尺寸重写，保留单层必要边框；移除毛玻璃和大阴影；Markdown 代码块单独样式化，复制按钮仅 hover 显示。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/index.css`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：聊天界面应使用独立设计 token，避免桌面宠物的装饰性视觉变量渗透到高可读文本界面。
+- 是否需更新技术文档：是。

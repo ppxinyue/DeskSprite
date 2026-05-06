@@ -29,9 +29,28 @@
   --color-pet-bubble-user: #f0f0f0;
   --color-pet-bubble-ai: rgba(78, 78, 78, 0.72);
   --color-pet-bubble-ai-text: #fafafa;
+  --color-chat-bg: #ffffff;
+  --color-chat-user: #dcf8c6;
+  --color-chat-assistant: #f7f7f8;
+  --color-chat-text: #111111;
+  --color-chat-muted: #6b7280;
+  --color-chat-border: #e5e5e5;
+  --color-chat-input-bg: #ffffff;
+  --color-chat-accent: #10a37f;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, Consolas, monospace;
+}
+
+.theme-light-soft {
+  --color-chat-bg: #fbfbfa;
+  --color-chat-user: #e7f8df;
+  --color-chat-assistant: #f1f1ef;
+  --color-chat-text: #151515;
+  --color-chat-muted: #6f6f69;
+  --color-chat-border: #deded8;
+  --color-chat-input-bg: #ffffff;
+  --color-chat-accent: #0f8f72;
 }
 
 .dark {
@@ -59,6 +78,25 @@
   --color-pet-bubble-user: #262626;
   --color-pet-bubble-ai: #0a0a0a;
   --color-pet-bubble-ai-text: #fafafa;
+  --color-chat-bg: #343541;
+  --color-chat-user: #3b82f6;
+  --color-chat-assistant: #444654;
+  --color-chat-text: #ececf1;
+  --color-chat-muted: #c5c5d2;
+  --color-chat-border: #565869;
+  --color-chat-input-bg: #40414f;
+  --color-chat-accent: #10a37f;
+}
+
+.theme-dark-slate {
+  --color-chat-bg: #202123;
+  --color-chat-user: #2563eb;
+  --color-chat-assistant: #2f3033;
+  --color-chat-text: #f3f4f6;
+  --color-chat-muted: #b8bbc2;
+  --color-chat-border: #3f4147;
+  --color-chat-input-bg: #2b2c30;
+  --color-chat-accent: #19c37d;
 }
 
 @layer base {
@@ -87,6 +125,41 @@
 @keyframes petBounce {
   0%, 100% { transform: translateY(0px); }
   50% { transform: translateY(-4px); }
+}
+
+@keyframes chatFadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.chat-markdown {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.chat-markdown > * + * {
+  margin-top: 0.6em;
+}
+
+.chat-markdown p,
+.chat-markdown ul,
+.chat-markdown ol,
+.chat-markdown pre,
+.chat-markdown blockquote {
+  margin-bottom: 0;
+}
+
+.chat-markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.chat-markdown pre {
+  overflow-x: auto;
+  border: 1px solid var(--color-chat-border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-chat-bg) 86%, var(--color-chat-text) 14%);
+  padding: 10px 12px;
 }
 
 @keyframes petJump {

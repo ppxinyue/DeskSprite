@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { setSetting, getAllSettings } from '@/lib/db';
 import { emit } from '@tauri-apps/api/event';
 
-export type Theme = 'light' | 'dark' | 'system';
+export type Theme = 'light' | 'light-soft' | 'dark' | 'dark-slate' | 'system';
 
 export interface AppSettings {
   theme: Theme;

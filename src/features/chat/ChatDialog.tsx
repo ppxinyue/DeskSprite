@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { Columns3, Grid2X2, ImagePlus, Mic, PanelRight, Plus, Rows3, X } from 'lucide-react';
+import { Columns3, Copy, Grid2X2, ImagePlus, Mic, PanelRight, Plus, Rows3, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useChatStore, createMessage } from './chatStore';
@@ -239,21 +239,21 @@ export function ChatDialog({
 
   return (
     <div
-      className={`flex w-full flex-col overflow-hidden border border-border/50 bg-[var(--color-pet-dialog-bg)] shadow-lg backdrop-blur-sm ${standalone ? 'h-full rounded-none border-0 bg-background shadow-none' : 'rounded-xl'}`}
+      className="chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] font-sans text-[14px] text-[var(--color-chat-text)] shadow-none"
       style={{ maxHeight: standalone ? undefined : maxHeight, height: standalone ? '100%' : undefined }}
     >
       {mode === 'history' && (
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2" style={{ maxHeight: standalone ? undefined : Math.max(120, maxHeight - 42) }}>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" style={{ maxHeight: standalone ? undefined : Math.max(120, maxHeight - 42) }}>
           {historyItems.length === 0 ? (
-            <div className="px-2 py-6 text-center text-xs text-muted-foreground">暂无历史对话</div>
+            <div className="px-2 py-6 text-center text-[12px] text-[var(--color-chat-muted)]">暂无历史对话</div>
           ) : historyItems.map((item) => (
             <button
               key={item.id}
-              className="block w-full rounded-md px-2 py-2 text-left hover:bg-accent"
+              className="block w-full rounded-[8px] px-3 py-2 text-left transition-colors hover:bg-[var(--color-chat-assistant)]"
               onClick={() => loadConversation(item.id)}
             >
-              <div className="truncate text-xs font-medium">{item.title || `对话 ${item.id}`}</div>
-              <div className="mt-0.5 text-[11px] text-muted-foreground">{item.updatedAt}</div>
+              <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
+              <div className="mt-0.5 text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">{item.updatedAt}</div>
             </button>
           ))}
         </div>
@@ -262,10 +262,10 @@ export function ChatDialog({
       {mode === 'chat' && messages.length > 0 && (
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
-          style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 58) }}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
+          style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 60) }}
         >
-          <div className="py-2 space-y-2">
+          <div className="space-y-3 py-4">
             {messages.map((msg) => (
               <MessageBubble key={msg.id} message={msg} />
             ))}
@@ -752,15 +752,15 @@ function Composer({
   compact?: boolean;
 }) {
   return (
-    <div className={compact ? "border-t border-border/30 p-2" : ""}>
+    <div className={compact ? "border-t border-[var(--color-chat-border)] p-4 pt-3" : ""}>
       {selectedImage && (
-        <div className="mb-2 flex items-center gap-2 rounded-md border border-border/50 px-2 py-1.5 text-xs text-muted-foreground">
-          <img src={selectedImage.dataUrl} alt="" className="h-8 w-8 rounded object-cover" />
+        <div className="mb-2 flex items-center gap-2 rounded-[8px] border border-[var(--color-chat-border)] px-2 py-1.5 text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
+          <img src={selectedImage.dataUrl} alt="" className="h-8 w-8 rounded-[6px] object-cover" />
           <span className="min-w-0 flex-1 truncate">{selectedImage.name}</span>
         </div>
       )}
       <form
-        className={`flex items-end gap-1.5 rounded-xl border border-border bg-background p-2 shadow-sm ${compact ? 'rounded-lg border-0 bg-transparent p-0 shadow-none' : ''}`}
+        className={`flex w-full items-end gap-1.5 rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-input-bg)] p-0 shadow-none transition-[border-color,box-shadow] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_18%,transparent)]`}
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit();
@@ -768,10 +768,10 @@ function Composer({
       >
         {!compact && (
           <>
-            <Button variant="ghost" size="sm" type="button" className="h-7 w-7 p-0" title="图片输入" onClick={onImagePick}>
+            <Button variant="ghost" size="sm" type="button" className="ml-1 h-9 w-9 p-0 text-[var(--color-chat-muted)] hover:bg-[var(--color-chat-assistant)] hover:text-[var(--color-chat-text)]" title="图片输入" onClick={onImagePick}>
               <ImagePlus className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" type="button" className={`h-7 w-7 p-0 ${isListening ? 'text-primary' : ''}`} title="语音输入" onClick={onVoiceInput}>
+            <Button variant="ghost" size="sm" type="button" className={`h-9 w-9 p-0 hover:bg-[var(--color-chat-assistant)] ${isListening ? 'text-[var(--color-chat-accent)]' : 'text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)]'}`} title="语音输入" onClick={onVoiceInput}>
               <Mic className="h-4 w-4" />
             </Button>
           </>
@@ -782,11 +782,11 @@ function Composer({
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="输入消息..."
-          className="min-h-[32px] max-h-[160px] resize-none overflow-y-auto border-0 bg-transparent text-[13px] leading-5 shadow-none focus-visible:ring-0"
+          className="min-h-[40px] max-h-[132px] flex-1 resize-none overflow-y-auto border-0 bg-transparent px-3 py-2.5 text-[14px] leading-[1.5] text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0"
           rows={1}
           disabled={isStreaming}
         />
-        <Button size="sm" type="submit" disabled={(!input.trim() && !selectedImage) || isStreaming} className="h-7 shrink-0 px-2 text-xs">
+        <Button size="sm" type="submit" disabled={(!input.trim() && !selectedImage) || isStreaming} className="m-1 h-8 shrink-0 rounded-[8px] px-3 text-[12px]">
           发送
         </Button>
       </form>
@@ -799,34 +799,50 @@ function MessageBubble({ message, isStreaming = false }: { message: ChatMessage;
   const isPending = message.role === 'assistant' && message.content === '...';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`group flex animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[82%] rounded-md px-2.5 py-1.5 text-[13px] leading-5 ${
+        className={`relative max-w-[80%] rounded-[12px] px-[14px] py-[10px] text-[14px] leading-[1.5] transition-colors ${
           isUser
-            ? 'bg-[var(--color-pet-bubble-user)] text-foreground'
-            : 'bg-[var(--color-pet-bubble-ai)] text-[var(--color-pet-bubble-ai-text)]'
+            ? 'bg-[var(--color-chat-user)] text-[var(--color-chat-text)] hover:brightness-[0.98] dark:hover:brightness-110'
+            : 'bg-[var(--color-chat-assistant)] text-[var(--color-chat-text)] hover:brightness-[0.985] dark:hover:brightness-110'
         }`}
       >
         {(message.imageDataUrl || message.imageUrl) && (
-          <img src={message.imageDataUrl || message.imageUrl} alt="" className="mb-1.5 max-h-48 rounded object-contain" />
+          <img src={message.imageDataUrl || message.imageUrl} alt="" className="mb-2 max-h-48 rounded-[8px] object-contain" />
         )}
         {isPending ? (
           <TypingDots />
         ) : isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <p className="whitespace-pre-wrap">{cleanChatText(message.content)}</p>
         ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
+          <div className="chat-markdown max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content}
+              {cleanChatText(message.content)}
             </ReactMarkdown>
           </div>
         )}
         {isStreaming && (
           <span className="inline-block w-1.5 h-4 bg-current animate-pulse ml-0.5" />
         )}
+        {!isPending && message.content && (
+          <button
+            className={`absolute top-1 hidden h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)] group-hover:flex ${isUser ? '-left-8' : '-right-8'}`}
+            title="复制"
+            onClick={() => navigator.clipboard?.writeText(cleanChatText(message.content)).catch(() => {})}
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
+}
+
+function cleanChatText(text: string) {
+  return text
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+    .replace(/^[（(][^）)]{1,24}[）)]\s*/gm, '')
+    .trim();
 }
 
 function TypingDots() {
