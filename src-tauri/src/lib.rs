@@ -66,6 +66,7 @@ pub fn run() {
             commands::window::show_pet_window,
             commands::window::hide_pet_window,
             commands::window::show_settings_cmd,
+            commands::window::show_chat_window,
             commands::window::close_settings_window,
             commands::window::exit_app,
             commands::window::set_cursor_passthrough,

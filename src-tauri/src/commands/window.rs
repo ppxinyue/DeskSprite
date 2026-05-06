@@ -1,10 +1,21 @@
 use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 
 pub fn create_pet_window<R: Runtime>(app: &AppHandle<R>) {
+    let (x, y) = if let Ok(Some(monitor)) = app.primary_monitor() {
+        let scale = monitor.scale_factor();
+        let work = monitor.work_area();
+        (
+            (work.position.x as f64 + work.size.width as f64 - 260.0 * scale) / scale,
+            (work.position.y as f64 + work.size.height as f64 - 260.0 * scale) / scale,
+        )
+    } else {
+        (100.0, 120.0)
+    };
+
     let window = WebviewWindowBuilder::new(app, "pet", WebviewUrl::App("index.html".into()))
         .title("DeskSprite Pet")
         .inner_size(220.0, 220.0)
-        .position(100.0, 120.0)
+        .position(x, y)
         .decorations(false)
         .transparent(true)
         .accept_first_mouse(true)
@@ -37,7 +48,27 @@ pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String
 
     WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html".into()))
         .title("DeskSprite Settings")
-        .inner_size(800.0, 600.0)
+        .inner_size(1040.0, 760.0)
+        .decorations(true)
+        .always_on_top(false)
+        .resizable(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn show_chat_window(app: AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("chat") {
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(&app, "chat", WebviewUrl::App("index.html".into()))
+        .title("DeskSprite Chat")
+        .inner_size(980.0, 720.0)
         .decorations(true)
         .always_on_top(false)
         .resizable(true)

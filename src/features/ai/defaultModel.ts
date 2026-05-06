@@ -56,6 +56,14 @@ export async function resolveChatConfig(defaultConfig: StoredApiConfig | undefin
   }
 }
 
+export async function resolveStoredChatConfig(defaultConfig: StoredApiConfig): Promise<{
+  config: ApiConfig | null;
+  error?: string;
+}> {
+  const resolved = await resolveChatConfig(defaultConfig);
+  return { config: resolved.config, error: resolved.error };
+}
+
 export async function recordBuiltinUsage(messages: Message[], output: string) {
   const current = await getBuiltinUsage();
   await setSetting(BUILTIN_USAGE_KEY, JSON.stringify(current + estimateTokens(messages, output)));

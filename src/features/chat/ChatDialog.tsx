@@ -4,9 +4,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useChatStore, createMessage } from './chatStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { useApiConfigStore } from '@/features/settings/apiConfigStore';
-import { useSettingsStore } from '@/features/settings/settingsStore';
 import { streamChat } from '@/features/ai/aiService';
-import { recordBuiltinUsage, resolveChatConfig } from '@/features/ai/defaultModel';
+import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
 import {
   getMessages,
@@ -18,10 +17,24 @@ import type { ChatMessage } from './chatStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-export function ChatDialog({ maxHeight }: { maxHeight: number }) {
+export function ChatDialog({
+  initialConversationId,
+  initialMode,
+  maxHeight,
+  showModelSelector = false,
+  standalone = false,
+}: {
+  initialConversationId?: number | null;
+  initialMode: 'new' | 'history';
+  maxHeight: number;
+  onClose?: () => void;
+  showModelSelector?: boolean;
+  standalone?: boolean;
+}) {
   const [input, setInput] = useState('');
-  const [mode, setMode] = useState<'chat' | 'history'>('chat');
+  const [mode, setMode] = useState<'chat' | 'history'>(initialMode === 'history' ? 'history' : 'chat');
   const [historyItems, setHistoryItems] = useState<Array<{ id: number; title: string | null; updatedAt: string }>>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>('default');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -41,13 +54,17 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
   } = useChatStore();
 
   const { setPetState } = usePetStore();
-  const { getDefaultConfig, loadConfigs } = useApiConfigStore();
-  const { settings, loadSettings } = useSettingsStore();
+  const { configs, getDefaultConfig, loadConfigs } = useApiConfigStore();
 
   useEffect(() => {
     loadConfigs();
-    loadSettings();
-    handleNewConversation();
+    if (initialConversationId) {
+      loadConversation(initialConversationId);
+    } else if (initialMode === 'history') {
+      loadHistory().catch(() => {});
+    } else {
+      handleNewConversation();
+    }
   }, []);
 
   useEffect(() => {
@@ -90,7 +107,12 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
     if (!text || isStreaming) return;
 
     const defaultConfig = getDefaultConfig();
-    const resolved = await resolveChatConfig(defaultConfig);
+    const modelConfig = configs.find((c) => String(c.id) === selectedModelId);
+    const resolved = modelConfig
+      ? { ...(await resolveStoredChatConfig(modelConfig)), usingBuiltin: false }
+      : selectedModelId === 'builtin'
+        ? { config: BUILTIN_CLOSEAI_CONFIG, usingBuiltin: true }
+        : await resolveChatConfig(defaultConfig);
     if (!resolved.config) {
       addMessage(createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。'));
       return;
@@ -177,23 +199,27 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
 
   return (
     <div
-      className="flex flex-col w-full overflow-hidden rounded-xl border border-border/50 bg-[var(--color-pet-dialog-bg)] shadow-lg backdrop-blur-sm"
-      style={{ maxHeight }}
+      className={`flex w-full flex-col overflow-hidden border border-border/50 bg-[var(--color-pet-dialog-bg)] shadow-lg backdrop-blur-sm ${standalone ? 'h-full rounded-none border-0 bg-background shadow-none' : 'rounded-xl'}`}
+      style={{ maxHeight: standalone ? undefined : maxHeight, height: standalone ? '100%' : undefined }}
     >
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30">
-          <span className="text-xs font-medium text-foreground/70">{settings.petName}</span>
-          <div className="flex gap-1">
-            <Button variant={mode === 'chat' ? 'secondary' : 'ghost'} size="sm" className="h-6 text-xs px-2" onClick={handleNewConversation}>
-              新对话
-            </Button>
-            <Button variant={mode === 'history' ? 'secondary' : 'ghost'} size="sm" className="h-6 text-xs px-2" onClick={() => loadHistory().catch(() => {})}>
-              历史对话
-            </Button>
-          </div>
+      {showModelSelector && (
+        <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3">
+          <span className="text-sm font-medium">模型</span>
+          <select
+            className="min-w-64 rounded-md border border-border bg-input px-2 py-1 text-sm"
+            value={selectedModelId}
+            onChange={(e) => setSelectedModelId(e.target.value)}
+          >
+            <option value="default">默认模型</option>
+            <option value="builtin">CloseAI · {BUILTIN_CLOSEAI_CONFIG.model}</option>
+            {configs.map((c) => (
+              <option key={c.id} value={String(c.id)}>{c.provider} · {c.model}</option>
+            ))}
+          </select>
         </div>
-
+      )}
       {mode === 'history' && (
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2" style={{ maxHeight: Math.max(120, maxHeight - 42) }}>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2" style={{ maxHeight: standalone ? undefined : Math.max(120, maxHeight - 42) }}>
           {historyItems.length === 0 ? (
             <div className="px-2 py-6 text-center text-xs text-muted-foreground">暂无历史对话</div>
           ) : historyItems.map((item) => (
@@ -213,7 +239,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
         <div
           ref={scrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
-          style={{ maxHeight: Math.max(80, maxHeight - 98) }}
+          style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 58) }}
         >
           <div className="py-2 space-y-2">
             {messages.map((msg) => (
@@ -252,6 +278,7 @@ export function ChatDialog({ maxHeight }: { maxHeight: number }) {
 
 function MessageBubble({ message, isStreaming = false }: { message: ChatMessage; isStreaming?: boolean }) {
   const isUser = message.role === 'user';
+  const isPending = message.role === 'assistant' && message.content === '...';
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -262,7 +289,9 @@ function MessageBubble({ message, isStreaming = false }: { message: ChatMessage;
             : 'bg-[var(--color-pet-bubble-ai)] text-[var(--color-pet-bubble-ai-text)]'
         }`}
       >
-        {isUser ? (
+        {isPending ? (
+          <TypingDots />
+        ) : isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
           <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -276,5 +305,15 @@ function MessageBubble({ message, isStreaming = false }: { message: ChatMessage;
         )}
       </div>
     </div>
+  );
+}
+
+function TypingDots() {
+  return (
+    <span className="inline-flex h-5 items-center gap-1">
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
+    </span>
   );
 }

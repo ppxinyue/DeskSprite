@@ -53,8 +53,8 @@ export function SettingsPanel() {
           key={s.id}
           className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
             activeSection === s.id
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+              ? 'bg-background/80 text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground hover:bg-background/45'
           }`}
           onClick={() => setActiveSection(s.id)}
         >
@@ -125,22 +125,16 @@ function AppearanceSection({
     dialogWidth: settings.dialogWidth,
     theme: settings.theme,
   });
-  const [dirty, setDirty] = useState(false);
 
   const update = <K extends keyof typeof draft>(k: K, v: typeof draft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
-    setDirty(true);
-  };
-
-  const handleConfirm = async () => {
-    await updateSettings(draft);
-    setDirty(false);
+    updateSettings({ [k]: v }).catch(() => {});
   };
 
   return (
     <>
       <SectionTitle>外观设置</SectionTitle>
-      <SectionDesc>调整灵宠的显示效果，确认后生效。</SectionDesc>
+      <SectionDesc>调整灵宠的显示效果，修改会实时生效。</SectionDesc>
 
       <SettingRow label="主题">
         <select
@@ -183,9 +177,6 @@ function AppearanceSection({
       <SectionDesc>为每种状态上传一组 PNG，系统会随机间隔 1-5 分钟切换，上传立即生效。</SectionDesc>
       <ImageSection />
 
-      <div className="mt-8 flex justify-end">
-        <Button onClick={handleConfirm} disabled={!dirty}>确认更改</Button>
-      </div>
     </>
   );
 }

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
-import { getCurrentWindow, PhysicalPosition } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { usePetStore } from './petStore';
+import { getConversations } from '@/lib/db';
 import {
   getNextFrameIndex,
   getPetFrameSources,
@@ -15,17 +16,16 @@ function toSrc(path: string): string {
 }
 
 export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?: number }) {
-  const { petState, mediaConfig } = usePetStore();
+  const { petState, mediaConfig, openChat, closeChat } = usePetStore();
   const config = mediaConfig[petState];
   const frameSources = getPetFrameSources(config);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [imgError, setImgError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  const [recentConversations, setRecentConversations] = useState<Array<{ id: number; title: string | null }>>([]);
   const didDrag = useRef(false);
-  const dragging = useRef(false);
   const startPoint = useRef<{ x: number; y: number } | null>(null);
-  const startWindowPosition = useRef<{ x: number; y: number } | null>(null);
   const petRootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => stopPetStateEngine(), []);
@@ -55,38 +55,24 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
     if (e.button !== 0) return;
     setMenuOpen(false);
     didDrag.current = false;
-    dragging.current = false;
     startPoint.current = { x: e.clientX, y: e.clientY };
-
-    getCurrentWindow().outerPosition().then((pos) => {
-      startWindowPosition.current = { x: pos.x, y: pos.y };
-    }).catch(() => {
-      startWindowPosition.current = null;
-    });
 
     const onMouseMove = (ev: MouseEvent) => {
       const start = startPoint.current;
-      const startWindow = startWindowPosition.current;
-      if (!start || !startWindow) return;
+      if (!start) return;
       const dx = ev.clientX - start.x;
       const dy = ev.clientY - start.y;
-      if (!dragging.current && Math.hypot(dx, dy) > 4) {
-        dragging.current = true;
+      if (Math.hypot(dx, dy) > 4) {
         didDrag.current = true;
-      }
-      if (dragging.current) {
-        getCurrentWindow().scaleFactor().then((factor) => {
-          getCurrentWindow()
-            .setPosition(new PhysicalPosition(startWindow.x + dx * factor, startWindow.y + dy * factor))
-            .catch(() => {});
-        }).catch(() => {});
+        startPoint.current = null;
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        getCurrentWindow().startDragging().catch(() => {});
       }
     };
 
     const onMouseUp = () => {
       startPoint.current = null;
-      startWindowPosition.current = null;
-      dragging.current = false;
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
@@ -105,6 +91,16 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   const handleContextMenu = async (action: string) => {
     setMenuOpen(false);
     switch (action) {
+      case 'new-chat':
+        openChat('new');
+        break;
+      case 'history-chat':
+        openChat('history');
+        break;
+      case 'big-chat':
+        closeChat();
+        try { await invoke('show_chat_window'); } catch (e) { console.error(e); }
+        break;
       case 'settings':
         try { await invoke('show_settings_cmd'); } catch (e) { console.error(e); }
         break;
@@ -123,6 +119,9 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
     didDrag.current = true;
     setMenuPos({ x: e.clientX, y: e.clientY });
     setMenuOpen(true);
+    getConversations()
+      .then((convos) => setRecentConversations(convos.slice(0, 3).map((c) => ({ id: c.id, title: c.title }))))
+      .catch(() => setRecentConversations([]));
   };
 
   const w = Math.round(120 * scale);
@@ -145,10 +144,27 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
 
   const menu = menuOpen && (
     <div
-      className="fixed z-50 min-w-[86px] rounded-md border border-border/60 bg-popover/80 px-1 py-1 text-popover-foreground shadow-xl backdrop-blur-xl"
+      className="fixed z-50 min-w-[96px] rounded-md border border-border/60 bg-popover/80 px-1 py-1 text-popover-foreground shadow-xl backdrop-blur-xl"
       style={{ left: menuPos.x, top: menuPos.y }}
       onMouseDown={(e) => e.stopPropagation()}
     >
+      <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">对话</div>
+      <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('new-chat')}>新对话</button>
+      <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('history-chat')}>历史对话</button>
+      {recentConversations.map((item) => (
+        <button
+          key={item.id}
+          className="block w-full max-w-40 truncate rounded px-2 py-1 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+          onClick={() => {
+            setMenuOpen(false);
+            openChat('history', item.id);
+          }}
+        >
+          {item.title || `对话 ${item.id}`}
+        </button>
+      ))}
+      <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('big-chat')}>打开大窗口</button>
+      <div className="my-1 h-px bg-border/60" />
       <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
       <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
       <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('quit')}>退出</button>

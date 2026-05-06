@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,6 +34,9 @@ function App() {
     if (label === "settings") {
       document.body.classList.add("has-background");
     }
+    if (label === "chat") {
+      document.body.classList.add("has-background");
+    }
   }, []);
 
   useEffect(() => {
@@ -51,7 +54,7 @@ function App() {
 
   useEffect(() => {
     const unlisten = listen("shortcut:chat-focus", () => {
-      if (windowLabel === "pet") usePetStore.getState().setDialogOpen(true);
+      if (windowLabel === "pet") usePetStore.getState().openChat('new');
     });
     return () => { unlisten.then(fn => fn()); };
   }, [windowLabel]);
@@ -60,13 +63,22 @@ function App() {
     return <TooltipProvider><SettingsPanel /></TooltipProvider>;
   }
 
+  if (windowLabel === "chat") {
+    return (
+      <TooltipProvider>
+        <div className="h-screen w-screen bg-background text-foreground">
+          <ChatDialog initialMode="new" maxHeight={760} standalone showModelSelector />
+        </div>
+      </TooltipProvider>
+    );
+  }
+
   return <PetWindow />;
 }
 
 function PetWindow() {
   const { settings } = useSettingsStore();
-  const [petHovered, setPetHovered] = useState(false);
-  const hoverLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { dialogOpen, chatMode, chatConversationId, closeChat } = usePetStore();
 
   const petSize = Math.round(150 * settings.petScale);
   const maxDialogHeight = settings.dialogWidth;
@@ -75,20 +87,18 @@ function PetWindow() {
   const collapsedWidth = Math.max(220, petSize + 70);
   const collapsedHeight = Math.max(220, petSize + 70);
 
-  const handlePetAreaEnter = () => {
-    if (hoverLeaveTimer.current) clearTimeout(hoverLeaveTimer.current);
-    setPetHovered(true);
+  useEffect(() => {
     getCurrentWindow()
-      .setSize(new LogicalSize(expandedWidth, expandedHeight))
+      .setSize(dialogOpen ? new LogicalSize(expandedWidth, expandedHeight) : new LogicalSize(collapsedWidth, collapsedHeight))
       .catch(() => {});
-  };
+  }, [dialogOpen, expandedWidth, expandedHeight, collapsedWidth, collapsedHeight]);
 
-  const handlePetAreaLeave = () => {
-    hoverLeaveTimer.current = setTimeout(() => {
-      setPetHovered(false);
-      getCurrentWindow().setSize(new LogicalSize(collapsedWidth, collapsedHeight)).catch(() => {});
-    }, 200);
-  };
+  useEffect(() => {
+    const unlisten = getCurrentWindow().onFocusChanged(({ payload }) => {
+      if (!payload) closeChat();
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [closeChat]);
 
   return (
     <TooltipProvider>
@@ -98,23 +108,22 @@ function PetWindow() {
           style={{
             left: 20,
             top: 20,
-            width: petHovered ? settings.dialogWidth : collapsedWidth - 40,
+            width: dialogOpen ? settings.dialogWidth : collapsedWidth - 40,
             background: 'transparent',
           }}
-          onMouseEnter={handlePetAreaEnter}
-          onPointerEnter={handlePetAreaEnter}
-          onPointerMove={() => {
-            if (!petHovered) handlePetAreaEnter();
-          }}
-          onMouseLeave={handlePetAreaLeave}
         >
           <PetAvatar opacity={settings.petOpacity} scale={settings.petScale} />
 
-          {petHovered && (
+          {dialogOpen && (
             <div
               className="mt-2 z-30 w-full"
             >
-              <ChatDialog maxHeight={maxDialogHeight} />
+              <ChatDialog
+                initialConversationId={chatConversationId}
+                initialMode={chatMode}
+                maxHeight={maxDialogHeight}
+                onClose={closeChat}
+              />
             </div>
           )}
         </div>

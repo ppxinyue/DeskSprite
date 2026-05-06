@@ -5,7 +5,7 @@
 - 当前阶段：P0（集成调试 + 拖拽稳定性修复）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + 四项修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：fix: separate pet drag click and chat modes
+- 最新提交：fix: move chat into menu and add chat window
 
 ## 任务进度
 
@@ -203,3 +203,10 @@
 - 右键：替换 Radix ContextMenu 为自绘轻量菜单，跟随主题半透明，点击其他区域/滚动/失焦自动关闭。
 - 主题：浅色主题 AI 回复气泡改为半透明深灰，深色主题使用黑色。
 - 文件：PetAvatar.tsx, App.tsx, ChatDialog.tsx, index.css
+
+### R14. 右键对话入口、大聊天窗口与外观实时设置（2026-05-06）
+- 问题：hover 弹对话条造成闪烁疲劳；手动拖拽窗口卡顿；右键新对话/历史入口不稳定；设置外观还需要确认。
+- 修复：hover 不再弹对话；右键菜单新增“新对话 / 历史对话 / 最近3条 / 打开大窗口”；拖拽回到 Tauri 原生 startDragging；外观设置滑动即实时写入。
+- 窗口：灵宠默认出现在屏幕右下角；设置窗口默认增大到 1040×760；新增独立 chat 窗口。
+- 大聊天：独立窗口支持模型选择，列出默认模型、内置 CloseAI 和用户配置模型。
+- 文件：window.rs, lib.rs, capabilities/default.json, App.tsx, PetAvatar.tsx, ChatDialog.tsx, petStore.ts, SettingsPanel.tsx, SettingsLayout.tsx, defaultModel.ts

@@ -251,3 +251,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：桌面小窗里的右键菜单和拖拽不宜依赖复杂 portal/focus 行为；交互状态应由窗口自身明确管理。
 - 是否需更新技术文档：是。
+
+## ISSUE-023
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：F. 灵宠交互 / H. 对话系统 / E. 设置中心
+- 严重程度：严重
+- 问题现象：hover 自动弹出对话条造成视觉疲劳；拖拽改为手动移动后卡顿；设置外观需要确认；右键对话入口需要支持新对话、最近历史和大窗口；设置窗口尺寸不足。
+- 原因分析：hover 作为聊天入口太敏感，透明小窗频繁 resize 会造成闪烁；手动逐帧调用窗口 setPosition 会受 IPC 与 DPI 换算影响而卡顿；外观设置 draft/confirm 模式不适合桌面宠物实时预览。
+- 解决方案：取消 hover 自动显示聊天框，改为右键菜单中的“新对话 / 历史对话 / 最近3条 / 打开大窗口”；拖拽恢复 Tauri 原生 `startDragging()` 以减少卡顿；外观设置拖动即写入；设置窗口默认增大；新增独立 chat 窗口并支持模型选择。
+- 涉及文件：`src-tauri/src/commands/window.rs`, `src-tauri/src/lib.rs`, `src-tauri/capabilities/default.json`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/pet/petStore.ts`, `src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/components/layouts/SettingsLayout.tsx`, `src/features/ai/defaultModel.ts`
+- 经验总结：桌面宠物的聊天入口应是明确命令而不是 hover；窗口拖拽优先使用平台原生能力，连续 IPC 移动只适合低频定位。
+- 是否需更新技术文档：是。
