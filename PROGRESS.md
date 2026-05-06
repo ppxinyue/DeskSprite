@@ -313,3 +313,8 @@
 - 排查：内置 PNG 的 alpha 会触及图片边缘；同时 `PetAvatar` 外层的 `overflow/isolation/contain` 会让透明窗口生成稳定裁剪/合成层，canvas 复用也可能让 WebView 保留旧纹理边界。
 - 修复：移除外层裁剪/隔离/contain 合成层；canvas 按 `src` key 强制重建；绘制前彻底 `clearRect`；绘制时给宠物留 2px 透明内边距，并裁掉源 PNG 最外侧约 0.4% 的边缘像素，避免资产边缘被缩放成可见框线；Tauri 宠物窗显式关闭系统阴影。
 - 文件：PetAvatar.tsx, window.rs
+
+### R31. 对话时暂停灵宠动画（2026-05-07）
+- 行为：小对话窗打开期间，灵宠暂停所有动作动画；自动 1-5 分钟切图继续停用，手动点击只切换形象不切换动作。
+- 视频：如果用户配置了视频类形象，对话窗打开时同步 `pause()`，关闭后恢复播放。
+- 文件：PetAvatar.tsx

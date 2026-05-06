@@ -455,3 +455,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src-tauri/src/commands/window.rs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：透明桌面宠物不能让裁剪层、源图边缘和复用 canvas 三者叠加；干净透明渲染要同时控制 DOM 合成层和位图绘制边界。
 - 是否需更新技术文档：是。
+
+## ISSUE-040
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：F. 灵宠动画 / H. 小对话窗口
+- 严重程度：改进
+- 问题现象：用户对话时，灵宠仍可能继续执行 `petJump`、`petWobble`、`petBreathe` 等动作动画。
+- 原因分析：自动 PNG 切换已在 `dialogOpen` 时停止，但 CSS motion style 仍会渲染；手动点击仍会随机切换动作；视频类形象也没有跟随对话状态暂停。
+- 解决方案：把 `dialogOpen` 作为统一的 `animationsPaused` 开关；暂停时不生成 motion style，手动切图不再切动作；视频形象在暂停时调用 `pause()`，关闭对话后恢复播放。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：对话态是用户注意力集中场景，动画暂停要覆盖 CSS 动作、自动切图、手动动作切换和媒体播放。
+- 是否需更新技术文档：是。

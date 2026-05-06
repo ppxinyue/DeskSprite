@@ -56,9 +56,11 @@ export function PetAvatar({
   const startPoint = useRef<{ x: number; y: number } | null>(null);
   const petRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const w = Math.round(120 * scale);
   const h = Math.round(150 * scale);
   const collapsedSize = Math.max(220, Math.round(150 * scale) + 70);
+  const animationsPaused = dialogOpen;
 
   useEffect(() => () => stopPetStateEngine(), []);
 
@@ -84,6 +86,7 @@ export function PetAvatar({
 
   const switchFrameAndMotion = () => {
     setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));
+    if (animationsPaused) return;
     setCurrentMotion((motion) => pickNextMotion(motions, motion));
   };
 
@@ -185,6 +188,17 @@ export function PetAvatar({
   useEffect(() => {
     setImgError(false);
   }, [src]);
+
+  useEffect(() => {
+    if (kind !== 'video') return;
+    const video = videoRef.current;
+    if (!video) return;
+    if (animationsPaused) {
+      video.pause();
+      return;
+    }
+    video.play().catch(() => {});
+  }, [animationsPaused, kind, src]);
 
   useEffect(() => {
     if (kind !== 'img') return;
@@ -308,7 +322,7 @@ export function PetAvatar({
     );
   }
 
-  const motionStyle = currentMotion && motions[currentMotion]
+  const motionStyle = !animationsPaused && currentMotion && motions[currentMotion]
     ? {
         animation: `${currentMotion} ${MOTION_BASE_DURATION[currentMotion] / motions[currentMotion].speed}s ease-in-out infinite`,
         '--pet-motion-amplitude': String(motions[currentMotion].amplitude),
@@ -334,7 +348,7 @@ export function PetAvatar({
         {...interactiveProps}
       >
         {kind === 'video' ? (
-          <video key={src} src={src} autoPlay loop muted playsInline draggable={false} width={w} height={h}
+          <video ref={videoRef} key={src} src={src} autoPlay={!animationsPaused} loop={!animationsPaused} muted playsInline draggable={false} width={w} height={h}
             style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', pointerEvents: 'none', ...motionStyle }}
             onError={() => setImgError(true)} />
         ) : (
