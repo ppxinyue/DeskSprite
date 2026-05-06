@@ -138,13 +138,13 @@ function PetWindow() {
                   top: petImageHeight - toolButtonSize,
                 }}
               >
-                <FloatingToolButton title="图片输入" onClick={() => window.dispatchEvent(new CustomEvent("desksprite:chat-image"))}>
+                <FloatingToolButton opacity={settings.petOpacity} title="图片输入" onClick={() => window.dispatchEvent(new CustomEvent("desksprite:chat-image"))}>
                   <ImagePlus className="h-4 w-4" />
                 </FloatingToolButton>
-                <FloatingToolButton title="语音输入" onClick={() => window.dispatchEvent(new CustomEvent("desksprite:chat-voice"))}>
+                <FloatingToolButton opacity={settings.petOpacity} title="语音输入" onClick={() => window.dispatchEvent(new CustomEvent("desksprite:chat-voice"))}>
                   <Mic className="h-4 w-4" />
                 </FloatingToolButton>
-                <FloatingToolButton title="放大" onClick={() => invoke("show_chat_window").catch(() => {})}>
+                <FloatingToolButton opacity={settings.petOpacity} title="放大" onClick={() => invoke("show_chat_window").catch(() => {})}>
                   <Maximize2 className="h-4 w-4" />
                 </FloatingToolButton>
               </div>
@@ -166,10 +166,12 @@ function PetWindow() {
 }
 
 function FloatingToolButton({
+  opacity = 1,
   title,
   onClick,
   children,
 }: {
+  opacity?: number;
   title: string;
   onClick?: () => void;
   children: React.ReactNode;
@@ -182,6 +184,7 @@ function FloatingToolButton({
       title={title}
       onClick={onClick}
       className="h-8 w-8 rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] p-0 text-[var(--color-chat-muted)] shadow-none hover:bg-[color-mix(in_srgb,var(--color-chat-text)_8%,transparent)] hover:text-[var(--color-chat-text)]"
+      style={{ opacity }}
     >
       {children}
     </Button>

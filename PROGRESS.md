@@ -292,3 +292,7 @@
 - 透明度：`petOpacity` 同时作用到灵宠和小对话窗口，大聊天窗口不受影响。
 - 图标：使用 `public/assets/idle/idle.png` 重新生成 Tauri bundle 图标，包括 macOS Dock 使用的 `icon.icns`。
 - 文件：SettingsPanel.tsx, settingsStore.ts, App.tsx, ChatDialog.tsx, window.rs, src-tauri/icons/*
+
+### R27. 小窗工具按钮透明度联动（2026-05-06）
+- 透明度：灵宠右下角的图片、语音、放大 3 个悬浮按钮也接入 `petOpacity`，与灵宠和小对话框同步变化。
+- 文件：App.tsx

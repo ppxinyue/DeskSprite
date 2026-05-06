@@ -407,3 +407,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src-tauri/src/commands/window.rs`, `src-tauri/icons/*`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：设置页的滑块应共享同一度量系统；应用图标需要同时更新 png/ico/icns，macOS Dock 主要依赖 icns。
 - 是否需更新技术文档：是。
+
+## ISSUE-036
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：E. 设置中心 / H. 小对话窗口
+- 严重程度：改进
+- 问题现象：透明度设置已影响灵宠和小对话框，但未影响小对话框上方的图片、语音、放大 3 个悬浮按钮。
+- 原因分析：`FloatingToolButton` 没有接收透明度参数，按钮仍按默认不透明度渲染。
+- 解决方案：给 `FloatingToolButton` 增加 `opacity` 属性，并从 `settings.petOpacity` 传入三个工具按钮。
+- 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：外观透明度要覆盖同一交互组内所有可见元素，避免按钮和面板视觉层级不一致。
+- 是否需更新技术文档：是。
