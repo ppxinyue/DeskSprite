@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useChatStore, createMessage } from './chatStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { useApiConfigStore } from '@/features/settings/apiConfigStore';
@@ -19,7 +18,7 @@ import type { ChatMessage } from './chatStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-export function ChatDialog() {
+export function ChatDialog({ maxHeight }: { maxHeight: number }) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -53,6 +52,10 @@ export function ChatDialog() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, streamingContent]);
+
+  useEffect(() => {
+    resizeInput();
+  }, [input]);
 
   async function loadRecentConversation() {
     try {
@@ -157,57 +160,71 @@ export function ChatDialog() {
     setCurrentConversationId(null);
   }
 
+  function resizeInput() {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = '32px';
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+  }
+
+  const hasVisibleMessages = messages.length > 0 || !!streamingContent;
+
   return (
-    <div className="flex flex-col h-full w-full bg-[var(--color-pet-dialog-bg)] backdrop-blur-sm rounded-xl border border-border/50 shadow-lg">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
-        <span className="text-xs font-medium text-foreground/70">
-          {settings.petName}
-        </span>
-        <div className="flex gap-1">
+    <div
+      className="flex flex-col w-full overflow-hidden rounded-xl border border-border/50 bg-[var(--color-pet-dialog-bg)] shadow-lg backdrop-blur-sm"
+      style={{ maxHeight }}
+    >
+      {hasVisibleMessages && (
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/30">
+          <span className="text-xs font-medium text-foreground/70">{settings.petName}</span>
           <Button variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={handleNewConversation}>
             新对话
           </Button>
         </div>
-      </div>
+      )}
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 px-3">
-        <div ref={scrollRef} className="py-2 space-y-3">
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
-          ))}
-          {isStreaming && streamingContent && (
-            <MessageBubble
-              message={{ id: 'streaming', role: 'assistant', content: streamingContent, timestamp: Date.now() }}
-              isStreaming
-            />
-          )}
+      {hasVisibleMessages && (
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
+          style={{ maxHeight: Math.max(80, maxHeight - 92) }}
+        >
+          <div className="py-2 space-y-2">
+            {messages.map((msg) => (
+              <MessageBubble key={msg.id} message={msg} />
+            ))}
+            {isStreaming && streamingContent && (
+              <MessageBubble
+                message={{ id: 'streaming', role: 'assistant', content: streamingContent, timestamp: 0 }}
+                isStreaming
+              />
+            )}
+          </div>
         </div>
-      </ScrollArea>
+      )}
 
-      {/* Input */}
-      <div className="p-2 border-t border-border/30">
-        <div className="flex gap-2">
+      <div className={hasVisibleMessages ? "p-2 border-t border-border/30" : "p-2"}>
+        <form
+          className="flex items-end gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend();
+          }}
+        >
           <Textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="输入消息..."
-            className="min-h-[36px] max-h-[120px] resize-none text-sm"
+            className="min-h-[32px] max-h-[140px] resize-none overflow-y-auto text-sm leading-5"
             rows={1}
             disabled={isStreaming}
           />
-          <Button
-            size="sm"
-            onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
-            className="shrink-0"
-          >
+          <Button size="sm" type="submit" disabled={!input.trim() || isStreaming} className="h-8 shrink-0">
             发送
           </Button>
-        </div>
+        </form>
       </div>
     </div>
   );
@@ -222,7 +239,7 @@ function MessageBubble({ message, isStreaming = false }: { message: ChatMessage;
         className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
           isUser
             ? 'bg-[var(--color-pet-bubble-user)] text-foreground'
-            : 'bg-[var(--color-pet-bubble-ai)] text-background'
+            : 'bg-[var(--color-pet-bubble-ai)] text-[var(--color-pet-bubble-ai-text)]'
         }`}
       >
         {isUser ? (

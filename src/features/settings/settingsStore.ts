@@ -24,7 +24,7 @@ export interface AppSettings {
 
 const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
-  petOpacity: 0.9,
+  petOpacity: 1.0,
   petScale: 1.0,
   dialogWidth: 360,
   petName: '猫十五',

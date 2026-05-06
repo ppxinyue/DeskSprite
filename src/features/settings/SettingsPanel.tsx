@@ -9,7 +9,8 @@ import { SettingsLayout } from '@/components/layouts/SettingsLayout';
 import { useSettingsStore } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
-import { getSystemPrompt, updateSystemPrompt, setSetting } from '@/lib/db';
+import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
+import { getConversations, getMessages, getSystemPrompt, updateSystemPrompt, setSetting } from '@/lib/db';
 import { maskKey } from '@/lib/keychain';
 import type { PetState, PetStateMediaConfig } from '@/features/pet/animations';
 import { DEFAULT_MEDIA_CONFIG, ALL_PET_STATES, STATE_META } from '@/features/pet/animations';
@@ -20,11 +21,12 @@ import type { ReactNode } from 'react';
 
 const DEFAULT_PROMPT = `你是{pet_name}，一只温柔、机智、偶尔调皮的橘猫，住在用户的桌面上。你热爱陪伴主人工作，会用轻松幽默的语气聊天。你擅长编程、写作、分析问题，也会提醒主人注意休息和喝水。你的回答应该简洁有用，偶尔展现猫咪的可爱本性。`;
 
-type SettingsSection = 'appearance' | 'ai' | 'shortcuts' | 'privacy';
+type SettingsSection = 'appearance' | 'ai' | 'history' | 'shortcuts' | 'privacy';
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: 'appearance', label: '外观' },
   { id: 'ai', label: 'AI 对话' },
+  { id: 'history', label: '历史对话' },
   { id: 'shortcuts', label: '快捷键' },
   { id: 'privacy', label: '隐私与数据' },
 ];
@@ -84,6 +86,7 @@ export function SettingsPanel() {
       {activeSection === 'shortcuts' && (
         <ShortcutsSection settings={settings} updateSetting={updateSetting} />
       )}
+      {activeSection === 'history' && <HistorySection />}
       {activeSection === 'privacy' && <PrivacySection />}
     </SettingsLayout>
   );
@@ -167,15 +170,12 @@ function AppearanceSection({
         />
       </SettingRow>
       <SettingRow label="对话框宽度">
-        <select
-          className="bg-input border border-border rounded px-2 py-1 text-sm"
-          value={draft.dialogWidth}
-          onChange={(e) => update('dialogWidth', Number(e.target.value))}
-        >
-          <option value={320}>320px</option>
-          <option value={360}>360px</option>
-          <option value={420}>420px</option>
-        </select>
+        <span className="text-xs text-muted-foreground w-12">{draft.dialogWidth}px</span>
+        <Slider
+          value={[draft.dialogWidth]}
+          onValueChange={([v]) => update('dialogWidth', v)}
+          min={280} max={520} step={10} className="w-40"
+        />
       </SettingRow>
 
       <Separator className="my-6" />
@@ -316,6 +316,20 @@ function AISection({
       <Separator className="my-6" />
       <SectionTitle>AI 配置</SectionTitle>
 
+      <div className="border border-border rounded-lg p-3 mb-3 bg-muted/40">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <span className="font-medium text-sm">CloseAI</span>
+            <span className="text-xs text-muted-foreground ml-2">
+              {BUILTIN_CLOSEAI_CONFIG.model} · Key: 内置隐藏
+            </span>
+          </div>
+          <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">内置默认</span>
+        </div>
+        <div className="text-xs text-muted-foreground">{BUILTIN_CLOSEAI_CONFIG.baseUrl}</div>
+        <div className="text-xs text-muted-foreground mt-1">未配置自有默认模型时自动使用，额度 100000 token。</div>
+      </div>
+
       {configs.map((c) => (
         <div key={c.id} className="border border-border rounded-lg p-3 mb-3">
           <div className="flex items-center justify-between mb-2">
@@ -409,6 +423,105 @@ function ShortcutsSection({
       <SettingRow label="截图快捷键">
         <Input value={settings.screenshotShortcut} onChange={(e) => updateSetting('screenshotShortcut', e.target.value)} className="w-48" readOnly />
       </SettingRow>
+    </>
+  );
+}
+
+function HistorySection() {
+  const [items, setItems] = useState<Array<{
+    id: number;
+    title: string | null;
+    updatedAt: string;
+    preview: string;
+  }>>([]);
+  const [selected, setSelected] = useState<{
+    id: number;
+    title: string | null;
+    updatedAt: string;
+    messages: Array<{ id: number; role: string; content: string; timestamp: string }>;
+  } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function load() {
+      const convos = await getConversations();
+      const loaded = await Promise.all(convos.map(async (c) => {
+        const msgs = await getMessages(c.id);
+        const preview = msgs.map((m) => `${m.role}: ${m.content}`).join('\n').slice(0, 240);
+        return { id: c.id, title: c.title, updatedAt: c.updated_at, preview };
+      }));
+      if (alive) setItems(loaded);
+    }
+    load().catch(() => setItems([]));
+    return () => { alive = false; };
+  }, []);
+
+  if (selected) {
+    return (
+      <>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <SectionTitle>{selected.title || `对话 ${selected.id}`}</SectionTitle>
+            <p className="text-xs text-muted-foreground">{selected.updatedAt}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setSelected(null)}>返回</Button>
+        </div>
+        <div className="space-y-3">
+          {selected.messages.map((msg) => (
+            <div key={msg.id} className="border border-border rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground">{msg.role}</span>
+                <span className="text-xs text-muted-foreground">{msg.timestamp}</span>
+              </div>
+              <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+            </div>
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  const openConversation = async (item: { id: number; title: string | null; updatedAt: string }) => {
+    const msgs = await getMessages(item.id);
+    setSelected({
+      id: item.id,
+      title: item.title,
+      updatedAt: item.updatedAt,
+      messages: msgs.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+      })),
+    });
+  };
+
+  return (
+    <>
+      <SectionTitle>历史对话</SectionTitle>
+      <SectionDesc>本地保存的对话记录。</SectionDesc>
+      <div className="space-y-3">
+        {items.length === 0 && (
+          <div className="text-sm text-muted-foreground border border-border rounded-lg p-4">
+            暂无历史对话
+          </div>
+        )}
+        {items.map((item) => (
+          <button
+            key={item.id}
+            className="block w-full text-left border border-border rounded-lg p-3 transition-colors hover:bg-accent/50"
+            onClick={() => openConversation(item)}
+          >
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <span className="text-sm font-medium truncate">{item.title || `对话 ${item.id}`}</span>
+              <span className="text-xs text-muted-foreground shrink-0">{item.updatedAt}</span>
+            </div>
+            <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-4">
+              {item.preview || '空对话'}
+            </p>
+          </button>
+        ))}
+      </div>
     </>
   );
 }

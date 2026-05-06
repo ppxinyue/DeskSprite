@@ -225,3 +225,16 @@
 - 涉及文件：`src-tauri/src/commands/window.rs`
 - 经验总结：Tauri 跨平台窗口定位要谨慎混用 monitor physical size 与 logical position；在交互稳定前优先使用保守可见坐标。
 - 是否需更新技术文档：否
+
+## ISSUE-021
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：H. 悬浮对话框 / E. 设置中心
+- 严重程度：严重
+- 问题现象：hover 对话框没有完全显示，内容超出小窗口后被裁切；消息区没有可靠滚动；主题未完整跟随设置；历史对话只能看到摘要。
+- 原因分析：对话框使用 `absolute left-1/2 -translate-x-1/2` 挂在灵宠下方，当前宠物窗宽度只比对话框略宽，居中偏移会产生负 x 坐标并被窗口裁切；消息区使用的 Radix ScrollArea 没有获得稳定高度，导致溢出不可控。
+- 解决方案：宠物窗口内部改成固定宽度文档流布局，灵宠居中，对话框在下方占满设置宽度；消息区改用原生 `overflow-y-auto` 并显式 `maxHeight = dialogWidth - input/header`；输入框按内容自动增高，整体高度不超过“宽度等长”的上限。
+- 同步调整：补充 `--color-pet-bubble-ai-text` 主题变量；设置页历史对话支持点击进入完整消息；对话框宽度设置改为滑动条；宠物窗启用 `accept_first_mouse(true)` 让未聚焦时的首次鼠标事件也能被接收。
+- 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/index.css`, `src-tauri/src/commands/window.rs`, `src/features/pet/PetAvatar.tsx`
+- 经验总结：小型桌面窗口内的浮层不能依赖负向 transform 居中，任何超出窗口矩形的内容都会被 OS/WebView 裁切；聊天类内容必须有一个明确高度的滚动容器。
+- 是否需更新技术文档：是。

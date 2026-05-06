@@ -23,7 +23,8 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   const frameSources = getPetFrameSources(config);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [imgError, setImgError] = useState(false);
-  const suppressNextClick = useRef(false);
+  const didDrag = useRef(false);
+  const startPoint = useRef<{ x: number; y: number } | null>(null);
   const petRootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => stopPetStateEngine(), []);
@@ -38,22 +39,23 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    suppressNextClick.current = false;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const onMove = (ev: MouseEvent) => {
-      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 4) {
-        suppressNextClick.current = true;
-        window.removeEventListener('mousemove', onMove);
+    didDrag.current = false;
+    startPoint.current = { x: e.clientX, y: e.clientY };
+    const onMouseUp = (ev: MouseEvent) => {
+      const start = startPoint.current;
+      if (start && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 4) {
+        didDrag.current = true;
       }
+      startPoint.current = null;
+      window.removeEventListener('mouseup', onMouseUp);
     };
-    window.addEventListener('mousemove', onMove, { once: true });
+    window.addEventListener('mouseup', onMouseUp);
     getCurrentWindow().startDragging().catch(() => {});
   };
 
   const handleClick = () => {
-    if (suppressNextClick.current) {
-      suppressNextClick.current = false;
+    if (didDrag.current) {
+      didDrag.current = false;
       return;
     }
     setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));

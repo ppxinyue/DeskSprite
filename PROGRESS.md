@@ -5,7 +5,7 @@
 - 当前阶段：P0（集成调试 + 拖拽稳定性修复）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + 四项修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：fix: keep compact pet window on screen
+- 最新提交：fix: stabilize hover chat layout and history detail
 
 ## 任务进度
 
@@ -187,3 +187,11 @@
 - 问题：灵宠完全不显示。
 - 修复：宠物窗初始位置改为固定可见坐标 `(100, 120)`，创建后显式 show + always_on_top。
 - 文件：window.rs
+
+### R12. Hover 对话框裁切、滚动与历史详情（2026-05-06）
+- 问题：对话框居中挂在灵宠下方导致左侧被小窗口裁切；消息区滚动不稳定；历史对话只能看摘要。
+- 修复：宠物窗口内布局改为宠物居中 + 对话框正常文档流占满可用宽度；消息区使用原生 overflow-y-auto，最大高度等于设置宽度；输入框自动增高。
+- 主题：补充 AI 气泡文字颜色变量，跟随亮暗主题。
+- 历史：设置页新增历史对话详情视图，可点击会话查看完整本地消息。
+- 交互：宠物窗启用 accept_first_mouse，减少未聚焦窗口首次 hover/点击被系统吃掉的问题。
+- 文件：App.tsx, ChatDialog.tsx, SettingsPanel.tsx, settingsStore.ts, index.css, window.rs, PetAvatar.tsx

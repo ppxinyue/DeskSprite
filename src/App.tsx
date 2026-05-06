@@ -68,18 +68,25 @@ function PetWindow() {
   const [petHovered, setPetHovered] = useState(false);
   const hoverLeaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const petSize = Math.round(150 * settings.petScale);
+  const maxDialogHeight = settings.dialogWidth;
+  const expandedWidth = Math.max(settings.dialogWidth + 40, 220);
+  const expandedHeight = 20 + petSize + 12 + maxDialogHeight + 28;
+  const collapsedWidth = Math.max(220, petSize + 70);
+  const collapsedHeight = Math.max(220, petSize + 70);
+
   const handlePetAreaEnter = () => {
     if (hoverLeaveTimer.current) clearTimeout(hoverLeaveTimer.current);
     setPetHovered(true);
     getCurrentWindow()
-      .setSize(new LogicalSize(Math.max(settings.dialogWidth + 40, 220), 560))
+      .setSize(new LogicalSize(expandedWidth, expandedHeight))
       .catch(() => {});
   };
 
   const handlePetAreaLeave = () => {
     hoverLeaveTimer.current = setTimeout(() => {
       setPetHovered(false);
-      getCurrentWindow().setSize(new LogicalSize(180, 190)).catch(() => {});
+      getCurrentWindow().setSize(new LogicalSize(collapsedWidth, collapsedHeight)).catch(() => {});
     }, 200);
   };
 
@@ -87,19 +94,27 @@ function PetWindow() {
     <TooltipProvider>
       <div className="fixed inset-0 overflow-hidden" style={{ background: 'transparent' }}>
         <div
-          className="absolute"
-          style={{ left: 20, top: 20, background: 'transparent' }}
+          className="absolute flex flex-col items-center"
+          style={{
+            left: 20,
+            top: 20,
+            width: petHovered ? settings.dialogWidth : collapsedWidth - 40,
+            background: 'transparent',
+          }}
           onMouseEnter={handlePetAreaEnter}
+          onPointerEnter={handlePetAreaEnter}
+          onPointerMove={() => {
+            if (!petHovered) handlePetAreaEnter();
+          }}
           onMouseLeave={handlePetAreaLeave}
         >
           <PetAvatar opacity={settings.petOpacity} scale={settings.petScale} />
 
           {petHovered && (
             <div
-              className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-30"
-              style={{ width: `${settings.dialogWidth}px`, height: 340 }}
+              className="mt-2 z-30 w-full"
             >
-              <ChatDialog />
+              <ChatDialog maxHeight={maxDialogHeight} />
             </div>
           )}
         </div>
