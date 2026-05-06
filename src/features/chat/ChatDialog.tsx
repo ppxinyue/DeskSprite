@@ -741,7 +741,7 @@ function StandaloneChatPanel({
       className={`flex min-h-0 flex-col overflow-hidden bg-[var(--bg-primary)] ${active ? 'outline outline-1 outline-[var(--border-color)]' : ''}`}
       onMouseDown={onActivate}
     >
-      <div className="flex h-9 shrink-0 items-center gap-2 px-3">
+      <div className="flex h-12 shrink-0 items-start gap-2 px-3 pt-2">
         <ModelControl
           configs={configs}
           locked={panel.modelLocked}
@@ -838,19 +838,19 @@ function ModelControl({
   if (locked) {
     return (
       <div
-        className="flex h-8 min-w-0 max-w-[280px] flex-1 items-center rounded-[8px] border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-secondary)_78%,var(--bg-primary))] px-3 text-[12px] leading-[1.5] text-[var(--text-secondary)]"
+        className="min-w-0 max-w-[180px] bg-white text-[11px] leading-[1.4] text-neutral-500"
         title={modelLabel}
       >
-        <span className="truncate">{modelLabel}</span>
+        <span className="block truncate">{modelLabel}</span>
       </div>
     );
   }
 
   return (
-    <div ref={menuRef} className="relative flex min-w-0 max-w-[300px] flex-1">
+    <div ref={menuRef} className="relative flex w-[220px] max-w-full min-w-0">
       <button
         type="button"
-        className="flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-[10px] bg-[color-mix(in_srgb,var(--bg-secondary)_82%,var(--bg-primary))] px-3 text-left text-[12px] leading-[1.5] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-secondary)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--text-secondary)_28%,transparent)]"
+        className="flex h-10 w-full min-w-0 items-center justify-between gap-2 rounded-[10px] bg-[color-mix(in_srgb,var(--bg-secondary)_82%,var(--bg-primary))] px-3 text-left text-[12px] leading-[1.5] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-secondary)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--text-secondary)_28%,transparent)]"
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -864,7 +864,7 @@ function ModelControl({
 
       {open && (
         <div
-          className="absolute left-0 top-10 z-50 w-[min(320px,calc(100vw-32px))] overflow-hidden rounded-[14px] bg-[var(--bg-primary)] py-1.5 shadow-[0_10px_34px_rgba(0,0,0,0.16)] ring-1 ring-[color-mix(in_srgb,var(--border-color)_75%,transparent)] dark:shadow-[0_14px_38px_rgba(0,0,0,0.42)]"
+          className="absolute left-0 top-11 z-50 w-[min(320px,calc(100vw-32px))] overflow-hidden rounded-[14px] bg-[var(--bg-primary)] py-1.5 shadow-[0_10px_34px_rgba(0,0,0,0.16)] ring-1 ring-[color-mix(in_srgb,var(--border-color)_75%,transparent)] dark:shadow-[0_14px_38px_rgba(0,0,0,0.42)]"
           role="listbox"
         >
           <div className="px-3 pb-1.5 pt-1 text-[11px] leading-[1.5] text-[var(--text-secondary)]">选择模型</div>
