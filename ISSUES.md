@@ -263,3 +263,15 @@
 - 涉及文件：`src-tauri/src/commands/window.rs`, `src-tauri/src/lib.rs`, `src-tauri/capabilities/default.json`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/pet/petStore.ts`, `src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/components/layouts/SettingsLayout.tsx`, `src/features/ai/defaultModel.ts`
 - 经验总结：桌面宠物的聊天入口应是明确命令而不是 hover；窗口拖拽优先使用平台原生能力，连续 IPC 移动只适合低频定位。
 - 是否需更新技术文档：是。
+
+## ISSUE-024
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：C. 窗口管理 / H. 对话系统 / E. 设置中心
+- 严重程度：严重
+- 问题现象：设置窗口和大对话窗口默认打开后仍然太小；外观滑块没有实时反映到宠物窗；右键菜单与最近历史容易显示不全；大窗口入口位置不符合预期；灵宠切换 PNG 后偶发上一张图的透明背景边框残留。
+- 原因分析：窗口尺寸使用固定像素而非屏幕比例；设置更新虽然写入数据库，但其他窗口没有主动监听 `settings:updated` 后重载；右键菜单在小型透明宠物窗内渲染，菜单加历史项后超出窗口矩形会被系统裁切；PNG 切换时图片直接替换在同一透明窗口合成层内，旧合成内容可能短暂残留。
+- 解决方案：设置窗和 chat 窗按主屏工作区 60% 居中创建；宠物窗监听 `settings:updated` 并重新加载设置；右键菜单打开时临时扩大窗口，历史收进“历史对话”二级菜单；小对话窗顶部提供模型/图片/语音/放大按钮，放大按钮调用独立 chat 窗；灵宠图片使用固定尺寸、透明背景、`contain: paint` 和 `isolation` 的绘制容器隔离每次 PNG 切换。
+- 涉及文件：`src-tauri/src/commands/window.rs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：小型桌面悬浮窗内的任何浮层都必须先保证 OS 窗口矩形足够容纳；跨窗口设置实时预览要走事件同步，而不是只依赖本窗口 zustand state。
+- 是否需更新技术文档：是。

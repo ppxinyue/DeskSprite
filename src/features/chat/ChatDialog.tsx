@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { ImagePlus, Maximize2, Mic, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useChatStore, createMessage } from './chatStore';
@@ -58,6 +60,7 @@ export function ChatDialog({
 
   useEffect(() => {
     loadConfigs();
+    if (standalone) loadHistory().catch(() => {});
     if (initialConversationId) {
       loadConversation(initialConversationId);
     } else if (initialMode === 'history') {
@@ -197,16 +200,70 @@ export function ChatDialog({
     el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
   }
 
+  if (standalone) {
+    return (
+      <div className="grid h-full grid-cols-[260px_minmax(0,1fr)] bg-background text-foreground">
+        <aside className="flex min-h-0 flex-col border-r border-border bg-muted/35">
+          <div className="border-b border-border px-4 py-3">
+            <select
+              className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+            >
+              <option value="default">默认模型</option>
+              <option value="builtin">CloseAI · {BUILTIN_CLOSEAI_CONFIG.model}</option>
+              {configs.map((c) => (
+                <option key={c.id} value={String(c.id)}>{c.provider} · {c.model}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="text-xs font-medium text-muted-foreground">历史对话</span>
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleNewConversation}>新建</Button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            {historyItems.map((item) => (
+              <button key={item.id} className="block w-full rounded-md px-2 py-2 text-left text-sm hover:bg-accent" onClick={() => loadConversation(item.id)}>
+                <div className="truncate">{item.title || `对话 ${item.id}`}</div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">{item.updatedAt}</div>
+              </button>
+            ))}
+          </div>
+        </aside>
+        <main className="flex min-h-0 flex-col">
+          <div className="flex items-center justify-between border-b border-border px-5 py-3">
+            <div>
+              <h1 className="text-sm font-semibold">DeskSprite Chat</h1>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => loadHistory().catch(() => {})}>刷新历史</Button>
+          </div>
+          <ChatBody
+            input={input}
+            isStreaming={isStreaming}
+            messages={messages}
+            onInputChange={setInput}
+            onKeyDown={handleKeyDown}
+            onSubmit={handleSend}
+            scrollRef={scrollRef}
+            textareaRef={textareaRef}
+          />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`flex w-full flex-col overflow-hidden border border-border/50 bg-[var(--color-pet-dialog-bg)] shadow-lg backdrop-blur-sm ${standalone ? 'h-full rounded-none border-0 bg-background shadow-none' : 'rounded-xl'}`}
       style={{ maxHeight: standalone ? undefined : maxHeight, height: standalone ? '100%' : undefined }}
     >
-      {showModelSelector && (
-        <div className="flex items-center gap-2 border-b border-border/50 px-4 py-3">
-          <span className="text-sm font-medium">模型</span>
+      <div className="flex items-center gap-1 border-b border-border/30 px-2 py-1.5">
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="模型">
+          <SlidersHorizontal className="h-4 w-4" />
+        </Button>
+        {showModelSelector && (
           <select
-            className="min-w-64 rounded-md border border-border bg-input px-2 py-1 text-sm"
+            className="min-w-0 flex-1 rounded-md border border-border bg-input px-2 py-1 text-xs"
             value={selectedModelId}
             onChange={(e) => setSelectedModelId(e.target.value)}
           >
@@ -216,8 +273,17 @@ export function ChatDialog({
               <option key={c.id} value={String(c.id)}>{c.provider} · {c.model}</option>
             ))}
           </select>
-        </div>
-      )}
+        )}
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="图片输入">
+          <ImagePlus className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="语音输入">
+          <Mic className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="放大" onClick={() => invoke('show_chat_window').catch(() => {})}>
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+      </div>
       {mode === 'history' && (
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2" style={{ maxHeight: standalone ? undefined : Math.max(120, maxHeight - 42) }}>
           {historyItems.length === 0 ? (
@@ -249,29 +315,96 @@ export function ChatDialog({
         </div>
       )}
 
-      {mode === 'chat' && <div className={messages.length > 0 ? "p-2 border-t border-border/30" : "p-2"}>
-        <form
-          className="flex items-end gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-        >
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="输入消息..."
-            className="min-h-[32px] max-h-[140px] resize-none overflow-y-auto text-sm leading-5"
-            rows={1}
-            disabled={isStreaming}
-          />
-          <Button size="sm" type="submit" disabled={!input.trim() || isStreaming} className="h-8 shrink-0">
-            发送
-          </Button>
-        </form>
-      </div>}
+      {mode === 'chat' && <Composer input={input} isStreaming={isStreaming} onInputChange={setInput} onKeyDown={handleKeyDown} onSubmit={handleSend} textareaRef={textareaRef} compact />}
+    </div>
+  );
+}
+
+function ChatBody({
+  input,
+  isStreaming,
+  messages,
+  onInputChange,
+  onKeyDown,
+  onSubmit,
+  scrollRef,
+  textareaRef,
+}: {
+  input: string;
+  isStreaming: boolean;
+  messages: ChatMessage[];
+  onInputChange: (value: string) => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  onSubmit: () => void;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+}) {
+  return (
+    <>
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-6">
+        <div className="mx-auto max-w-3xl py-8 space-y-4">
+          {messages.length === 0 ? (
+            <div className="pt-20 text-center text-muted-foreground">开始一次新的对话</div>
+          ) : messages.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
+        </div>
+      </div>
+      <div className="border-t border-border p-4">
+        <div className="mx-auto max-w-3xl">
+          <Composer input={input} isStreaming={isStreaming} onInputChange={onInputChange} onKeyDown={onKeyDown} onSubmit={onSubmit} textareaRef={textareaRef} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+function Composer({
+  input,
+  isStreaming,
+  onInputChange,
+  onKeyDown,
+  onSubmit,
+  textareaRef,
+  compact = false,
+}: {
+  input: string;
+  isStreaming: boolean;
+  onInputChange: (value: string) => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  onSubmit: () => void;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  compact?: boolean;
+}) {
+  return (
+    <div className={compact ? "p-2 border-t border-border/30" : ""}>
+      <form
+        className={`flex items-end gap-2 rounded-2xl border border-border bg-background p-2 shadow-sm ${compact ? 'rounded-lg border-0 bg-transparent p-0 shadow-none' : ''}`}
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+      >
+        <Button variant="ghost" size="sm" type="button" className="h-8 w-8 p-0" title="图片输入">
+          <ImagePlus className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" type="button" className="h-8 w-8 p-0" title="语音输入">
+          <Mic className="h-4 w-4" />
+        </Button>
+        <Textarea
+          ref={textareaRef}
+          value={input}
+          onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="输入消息..."
+          className="min-h-[36px] max-h-[160px] resize-none overflow-y-auto border-0 bg-transparent text-sm leading-5 shadow-none focus-visible:ring-0"
+          rows={1}
+          disabled={isStreaming}
+        />
+        <Button size="sm" type="submit" disabled={!input.trim() || isStreaming} className="h-8 shrink-0">
+          发送
+        </Button>
+      </form>
     </div>
   );
 }

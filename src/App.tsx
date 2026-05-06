@@ -59,6 +59,13 @@ function App() {
     return () => { unlisten.then(fn => fn()); };
   }, [windowLabel]);
 
+  useEffect(() => {
+    const unlisten = listen("settings:updated", () => {
+      loadSettings().catch(() => {});
+    });
+    return () => { unlisten.then(fn => fn()); };
+  }, [loadSettings]);
+
   if (windowLabel === "settings") {
     return <TooltipProvider><SettingsPanel /></TooltipProvider>;
   }
@@ -123,6 +130,7 @@ function PetWindow() {
                 initialMode={chatMode}
                 maxHeight={maxDialogHeight}
                 onClose={closeChat}
+                showModelSelector
               />
             </div>
           )}

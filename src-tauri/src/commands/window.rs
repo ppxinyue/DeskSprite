@@ -1,5 +1,19 @@
 use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 
+fn centered_sixty_percent<R: Runtime>(app: &AppHandle<R>) -> (f64, f64, f64, f64) {
+    if let Ok(Some(monitor)) = app.primary_monitor() {
+        let scale = monitor.scale_factor();
+        let work = monitor.work_area();
+        let w = work.size.width as f64 / scale * 0.6;
+        let h = work.size.height as f64 / scale * 0.6;
+        let x = work.position.x as f64 / scale + (work.size.width as f64 / scale - w) / 2.0;
+        let y = work.position.y as f64 / scale + (work.size.height as f64 / scale - h) / 2.0;
+        (x, y, w, h)
+    } else {
+        (160.0, 120.0, 1040.0, 760.0)
+    }
+}
+
 pub fn create_pet_window<R: Runtime>(app: &AppHandle<R>) {
     let (x, y) = if let Ok(Some(monitor)) = app.primary_monitor() {
         let scale = monitor.scale_factor();
@@ -40,6 +54,7 @@ pub fn set_cursor_passthrough(app: AppHandle, passthrough: bool) -> Result<(), S
 }
 
 pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    let (x, y, w, h) = centered_sixty_percent(app);
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.show();
         let _ = w.set_focus();
@@ -48,7 +63,8 @@ pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String
 
     WebviewWindowBuilder::new(app, "settings", WebviewUrl::App("index.html".into()))
         .title("DeskSprite Settings")
-        .inner_size(1040.0, 760.0)
+        .inner_size(w, h)
+        .position(x, y)
         .decorations(true)
         .always_on_top(false)
         .resizable(true)
@@ -60,6 +76,7 @@ pub fn show_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String
 
 #[tauri::command]
 pub fn show_chat_window(app: AppHandle) -> Result<(), String> {
+    let (x, y, w, h) = centered_sixty_percent(&app);
     if let Some(w) = app.get_webview_window("chat") {
         let _ = w.show();
         let _ = w.set_focus();
@@ -68,7 +85,8 @@ pub fn show_chat_window(app: AppHandle) -> Result<(), String> {
 
     WebviewWindowBuilder::new(&app, "chat", WebviewUrl::App("index.html".into()))
         .title("DeskSprite Chat")
-        .inner_size(980.0, 720.0)
+        .inner_size(w, h)
+        .position(x, y)
         .decorations(true)
         .always_on_top(false)
         .resizable(true)

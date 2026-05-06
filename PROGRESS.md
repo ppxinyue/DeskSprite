@@ -3,9 +3,9 @@
 ## 总体状态
 - 开始时间：2026-04-30
 - 当前阶段：P0（集成调试 + 拖拽稳定性修复）
-- 完成任务：11 / 11 (A-K) + 动画系统重构 + 四项修复
+- 完成任务：11 / 11 (A-K) + 动画系统重构 + 对话/拖拽迭代修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：fix: move chat into menu and add chat window
+- 最新提交：待提交：refine chat windows and menu interactions
 
 ## 任务进度
 
@@ -210,3 +210,10 @@
 - 窗口：灵宠默认出现在屏幕右下角；设置窗口默认增大到 1040×760；新增独立 chat 窗口。
 - 大聊天：独立窗口支持模型选择，列出默认模型、内置 CloseAI 和用户配置模型。
 - 文件：window.rs, lib.rs, capabilities/default.json, App.tsx, PetAvatar.tsx, ChatDialog.tsx, petStore.ts, SettingsPanel.tsx, SettingsLayout.tsx, defaultModel.ts
+
+### R15. 60% 窗口、二级历史菜单与 ChatGPT 风格大窗口（2026-05-06）
+- 问题：设置窗口和大对话窗口默认尺寸仍偏小；右键菜单最近历史直接展开导致菜单容易被裁切；“打开大窗口”不应占用右键菜单；小对话窗缺少模型/图片/语音/放大快捷入口；灵宠切换 PNG 时偶发上一帧透明边缘残留。
+- 修复：设置窗口和 chat 窗口按主屏工作区 60% 居中打开；右键菜单扩大命中窗口并把最近 3 条历史放到“历史对话”二级菜单；大窗口入口移到小对话窗顶部放大图标。
+- 对话：大窗口改为 ChatGPT 风格基础布局，左侧历史和模型选择，右侧聊天主体，输入框固定在底部；小对话窗顶部增加模型、图片、语音、放大图形按钮。
+- 外观：设置“外观”滑块拖动即写入并通过 `settings:updated` 同步宠物窗；切图时用固定透明绘制容器隔离当前 PNG，减少旧图透明框残留。
+- 文件：window.rs, App.tsx, PetAvatar.tsx, ChatDialog.tsx, SettingsPanel.tsx

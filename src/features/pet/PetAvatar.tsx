@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { usePetStore } from './petStore';
 import { getConversations } from '@/lib/db';
 import {
@@ -16,7 +16,7 @@ function toSrc(path: string): string {
 }
 
 export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?: number }) {
-  const { petState, mediaConfig, openChat, closeChat } = usePetStore();
+  const { petState, mediaConfig, openChat, dialogOpen } = usePetStore();
   const config = mediaConfig[petState];
   const frameSources = getPetFrameSources(config);
   const [currentFrame, setCurrentFrame] = useState(0);
@@ -27,6 +27,9 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   const didDrag = useRef(false);
   const startPoint = useRef<{ x: number; y: number } | null>(null);
   const petRootRef = useRef<HTMLDivElement>(null);
+  const w = Math.round(120 * scale);
+  const h = Math.round(150 * scale);
+  const collapsedSize = Math.max(220, Math.round(150 * scale) + 70);
 
   useEffect(() => () => stopPetStateEngine(), []);
 
@@ -40,7 +43,10 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
 
   useEffect(() => {
     if (!menuOpen) return;
-    const close = () => setMenuOpen(false);
+    const close = () => {
+      setMenuOpen(false);
+      if (!dialogOpen) getCurrentWindow().setSize(new LogicalSize(collapsedSize, collapsedSize)).catch(() => {});
+    };
     window.addEventListener('mousedown', close);
     window.addEventListener('wheel', close);
     window.addEventListener('blur', close);
@@ -49,7 +55,7 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
       window.removeEventListener('wheel', close);
       window.removeEventListener('blur', close);
     };
-  }, [menuOpen]);
+  }, [collapsedSize, dialogOpen, menuOpen]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -97,10 +103,6 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
       case 'history-chat':
         openChat('history');
         break;
-      case 'big-chat':
-        closeChat();
-        try { await invoke('show_chat_window'); } catch (e) { console.error(e); }
-        break;
       case 'settings':
         try { await invoke('show_settings_cmd'); } catch (e) { console.error(e); }
         break;
@@ -117,15 +119,13 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   const handleContextMenuOpen = (e: React.MouseEvent) => {
     e.preventDefault();
     didDrag.current = true;
-    setMenuPos({ x: e.clientX, y: e.clientY });
+    setMenuPos({ x: Math.min(e.clientX, 130), y: Math.min(e.clientY, 210) });
     setMenuOpen(true);
+    getCurrentWindow().setSize(new LogicalSize(320, 420)).catch(() => {});
     getConversations()
       .then((convos) => setRecentConversations(convos.slice(0, 3).map((c) => ({ id: c.id, title: c.title }))))
       .catch(() => setRecentConversations([]));
   };
-
-  const w = Math.round(120 * scale);
-  const h = Math.round(150 * scale);
 
   let src: string;
   let kind: 'img' | 'video' = 'img';
@@ -135,6 +135,10 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
   } else {
     src = toSrc(frameSources[currentFrame % frameSources.length] ?? frameSources[0]);
   }
+
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
 
   const interactiveProps = {
     onMouseDown: handleMouseDown,
@@ -150,20 +154,25 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
     >
       <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">对话</div>
       <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('new-chat')}>新对话</button>
-      <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('history-chat')}>历史对话</button>
-      {recentConversations.map((item) => (
-        <button
-          key={item.id}
-          className="block w-full max-w-40 truncate rounded px-2 py-1 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-          onClick={() => {
-            setMenuOpen(false);
-            openChat('history', item.id);
-          }}
-        >
-          {item.title || `对话 ${item.id}`}
-        </button>
-      ))}
-      <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('big-chat')}>打开大窗口</button>
+      <div className="group relative">
+        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('history-chat')}>历史对话</button>
+        <div className="absolute left-full top-0 hidden min-w-[150px] rounded-md border border-border/60 bg-popover/90 px-1 py-1 shadow-xl backdrop-blur-xl group-hover:block">
+          {recentConversations.length === 0 ? (
+            <div className="px-2 py-1 text-xs text-muted-foreground">暂无历史</div>
+          ) : recentConversations.map((item) => (
+            <button
+              key={item.id}
+              className="block w-full max-w-44 truncate rounded px-2 py-1 text-left text-xs hover:bg-accent"
+              onClick={() => {
+                setMenuOpen(false);
+                openChat('history', item.id);
+              }}
+            >
+              {item.title || `对话 ${item.id}`}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="my-1 h-px bg-border/60" />
       <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
       <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
@@ -187,16 +196,29 @@ export function PetAvatar({ opacity = 1, scale = 1 }: { opacity?: number; scale?
 
   return (
     <>
-      <div ref={petRootRef} className="cursor-pointer select-none" style={{ background: 'transparent', display: 'inline-block' }} {...interactiveProps}>
+      <div
+        ref={petRootRef}
+        className="cursor-pointer select-none"
+        style={{
+          width: w,
+          height: h,
+          background: 'transparent',
+          display: 'inline-block',
+          overflow: 'hidden',
+          isolation: 'isolate',
+          contain: 'layout paint size',
+        }}
+        {...interactiveProps}
+      >
         {kind === 'video' ? (
           <video key={src} src={src} autoPlay loop muted playsInline draggable={false} width={w} height={h}
-            className="drop-shadow-lg" style={{ objectFit: 'contain', opacity, display: 'block', background: 'transparent' }}
+            className="drop-shadow-lg" style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', background: 'transparent', backfaceVisibility: 'hidden' }}
             onError={() => setImgError(true)} />
         ) : (
           <img key={src} src={src} alt="灵宠" draggable={false} width={w} height={h}
             className="drop-shadow-lg"
-            style={{ objectFit: 'contain', opacity, display: 'block', background: 'transparent',
-                     animation: 'petBounce 4s ease-in-out infinite' }}
+            style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', background: 'transparent',
+                     backfaceVisibility: 'hidden', animation: 'petBounce 4s ease-in-out infinite' }}
             onError={() => setImgError(true)} />
         )}
       </div>
