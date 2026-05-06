@@ -5,7 +5,7 @@
 - 当前阶段：P0（集成调试 + 拖拽稳定性修复）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + 四项修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：fix: use compact pet window for reliable hover and drag
+- 最新提交：fix: keep compact pet window on screen
 
 ## 任务进度
 
@@ -182,3 +182,8 @@
 - 交互调整：聊天框只在鼠标 hover 灵宠区域时显示，鼠标离开后收起；右键菜单保留设置、隐藏、退出。
 - 默认模型：无用户默认模型时使用内置 CloseAI 兼容模型，本地记录 100000 token 估算额度，超额后提示配置自己的 API Key。
 - 文件：window.rs, App.tsx, PetAvatar.tsx, defaultModel.ts, ChatDialog.tsx, HoverInputBar.tsx
+
+### R11. 小型宠物窗启动在屏幕外（2026-05-06）
+- 问题：灵宠完全不显示。
+- 修复：宠物窗初始位置改为固定可见坐标 `(100, 120)`，创建后显式 show + always_on_top。
+- 文件：window.rs
