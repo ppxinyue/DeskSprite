@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { Columns3, Copy, Grid2X2, Mic, PanelRight, Paperclip, Plus, Rows3, X } from 'lucide-react';
+import { Check, ChevronDown, Columns3, Copy, Grid2X2, Mic, PanelRight, Paperclip, Plus, Rows3, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useChatStore, createMessage } from './chatStore';
@@ -22,6 +22,13 @@ interface SelectedImage {
   path: string;
   name: string;
   dataUrl: string;
+}
+
+interface HistoryItem {
+  id: number;
+  title: string | null;
+  updatedAt: string;
+  modelId: number | null;
 }
 
 interface SpeechRecognitionLike {
@@ -50,7 +57,7 @@ export function ChatDialog({
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [mode, setMode] = useState<'chat' | 'history'>(initialMode === 'history' ? 'history' : 'chat');
-  const [historyItems, setHistoryItems] = useState<Array<{ id: number; title: string | null; updatedAt: string }>>([]);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -114,7 +121,7 @@ export function ChatDialog({
 
   async function loadHistory() {
     const convos = await getConversations();
-    setHistoryItems(convos.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updated_at })));
+    setHistoryItems(convos.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updated_at, modelId: c.model_id })));
     setMode('history');
   }
 
@@ -143,7 +150,7 @@ export function ChatDialog({
 
     let convoId = currentConversationId;
     if (!convoId) {
-      await createConversation(messageText.slice(0, 50), apiConfig.id > 0 ? apiConfig.id : undefined);
+      await createConversation(messageText.slice(0, 50), apiConfig.id);
       const convos = await getConversations();
       convoId = convos[0]?.id ?? null;
       setCurrentConversationId(convoId);
@@ -253,7 +260,7 @@ export function ChatDialog({
               onClick={() => loadConversation(item.id)}
             >
               <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
-              <div className="mt-0.5 text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">{item.updatedAt}</div>
+              <div className="mt-0.5 text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">{formatConversationTime(item.updatedAt)}</div>
             </button>
           ))}
         </div>
@@ -265,9 +272,9 @@ export function ChatDialog({
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
           style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 60) }}
         >
-          <div className="space-y-2 py-3">
+          <div className="space-y-1.5 py-3">
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble key={msg.id} message={msg} fullWidth />
             ))}
           </div>
         </div>
@@ -298,6 +305,8 @@ interface StandalonePanel {
   id: number;
   title: string;
   modelId: string;
+  modelLocked: boolean;
+  modelLabel: string;
   messages: ChatMessage[];
   input: string;
   conversationId: number | null;
@@ -313,6 +322,8 @@ function createPanel(title = '新对话'): StandalonePanel {
     id: ++panelCounter,
     title,
     modelId: 'default',
+    modelLocked: false,
+    modelLabel: '默认模型',
     messages: [],
     input: '',
     conversationId: null,
@@ -323,7 +334,7 @@ function createPanel(title = '新对话'): StandalonePanel {
 }
 
 function StandaloneChatWorkspace() {
-  const [historyItems, setHistoryItems] = useState<Array<{ id: number; title: string | null; updatedAt: string }>>([]);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [panels, setPanels] = useState<StandalonePanel[]>(() => [createPanel()]);
   const [activePanelId, setActivePanelId] = useState<number>(() => panelCounter);
   const [layout, setLayout] = useState<LayoutMode>('single');
@@ -336,7 +347,7 @@ function StandaloneChatWorkspace() {
 
   async function refreshHistory() {
     const convos = await getConversations();
-    setHistoryItems(convos.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updated_at })));
+    setHistoryItems(convos.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updated_at, modelId: c.model_id })));
   }
 
   function updatePanel(panelId: number, update: Partial<StandalonePanel> | ((panel: StandalonePanel) => StandalonePanel)) {
@@ -369,11 +380,16 @@ function StandaloneChatWorkspace() {
 
   async function loadConversationIntoPanel(conversationId: number) {
     const panelId = activePanelId;
+    const historyItem = historyItems.find((item) => item.id === conversationId);
+    const modelId = modelIdToPanelValue(historyItem?.modelId ?? null);
     try {
       const msgs = await getMessages(conversationId);
       updatePanel(panelId, {
         conversationId,
-        title: `对话 ${conversationId}`,
+        title: historyItem?.title || `对话 ${conversationId}`,
+        modelId,
+        modelLocked: true,
+        modelLabel: getModelLabel(historyItem?.modelId ?? null, configs),
         messages: msgs.map((m) => ({
           id: `msg-${m.id}`,
           role: m.role as 'user' | 'assistant' | 'system',
@@ -429,10 +445,15 @@ function StandaloneChatWorkspace() {
 
     let convoId = panel.conversationId;
     if (!convoId) {
-      await createConversation(messageText.slice(0, 50), resolved.config.id > 0 ? resolved.config.id : undefined);
+      await createConversation(messageText.slice(0, 50), resolved.config.id);
       const convos = await getConversations();
       convoId = convos[0]?.id ?? null;
-      updatePanel(panelId, { conversationId: convoId, title: messageText.slice(0, 24) || '新对话' });
+      updatePanel(panelId, {
+        conversationId: convoId,
+        title: messageText.slice(0, 24) || '新对话',
+        modelLocked: true,
+        modelLabel: getModelLabel(resolved.config.id, configs),
+      });
     }
 
     if (convoId) await insertMessage(convoId, 'user', messageText, imageForMessage?.path || undefined);
@@ -494,7 +515,10 @@ function StandaloneChatWorkspace() {
           {historyItems.map((item) => (
             <button key={item.id} className="block w-full rounded-[8px] px-3 py-2 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" onClick={() => loadConversationIntoPanel(item.id)}>
               <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
-              <div className="mt-0.5 truncate text-[12px] leading-[1.5] text-[var(--text-secondary)]">{item.updatedAt}</div>
+              <div className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] leading-[1.5] text-[var(--text-secondary)]">
+                <span>{formatConversationTime(item.updatedAt)}</span>
+                <span className="truncate">· {getModelLabel(item.modelId, configs)}</span>
+              </div>
             </button>
           ))}
         </div>
@@ -553,6 +577,41 @@ function layoutGridStyle(layout: LayoutMode, count: number): React.CSSProperties
     };
   }
   return { gridTemplateColumns: `repeat(${Math.max(1, count)}, minmax(0, 1fr))` };
+}
+
+function modelIdToPanelValue(modelId: number | null) {
+  if (modelId === -1) return 'builtin';
+  if (typeof modelId === 'number' && modelId > 0) return String(modelId);
+  return 'default';
+}
+
+function getModelLabel(
+  modelId: number | null,
+  configs: ReturnType<typeof useApiConfigStore.getState>['configs'],
+) {
+  if (modelId === -1) return `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`;
+  if (typeof modelId === 'number' && modelId > 0) {
+    const config = configs.find((item) => item.id === modelId);
+    return config ? `${config.provider} · ${config.model}` : `模型 #${modelId}`;
+  }
+  return '默认模型';
+}
+
+function formatConversationTime(value: string) {
+  if (!value) return '';
+  const normalized = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value)
+    ? value
+    : `${value.replace(' ', 'T')}Z`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date);
 }
 
 function replaceLastAssistant(messages: ChatMessage[], content: string) {
@@ -682,17 +741,13 @@ function StandaloneChatPanel({
       onMouseDown={onActivate}
     >
       <div className="flex h-9 shrink-0 items-center gap-2 px-3">
-        <select
-          className="h-7 min-w-0 max-w-[240px] flex-1 truncate rounded-[7px] border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-secondary)_85%,var(--bg-primary))] px-2 text-[12px] leading-[1.5] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-secondary)]"
-          value={panel.modelId}
-          onChange={(e) => onModelChange(e.target.value)}
-        >
-          <option value="default">默认模型</option>
-          <option value="builtin">CloseAI · {BUILTIN_CLOSEAI_CONFIG.model}</option>
-          {configs.map((c) => (
-            <option key={c.id} value={String(c.id)}>{c.provider} · {c.model}</option>
-          ))}
-        </select>
+        <ModelControl
+          configs={configs}
+          locked={panel.modelLocked}
+          modelId={panel.modelId}
+          modelLabel={panel.modelLabel}
+          onChange={onModelChange}
+        />
         {canClose && (
           <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" onClick={onClose} title="关闭">
             <X className="h-4 w-4" />
@@ -700,7 +755,7 @@ function StandaloneChatPanel({
         )}
       </div>
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4">
-        <div className="mx-auto max-w-[720px] space-y-2 py-4">
+        <div className="mx-auto w-full max-w-none space-y-1.5 py-4">
           {panel.messages.length === 0 ? (
             <div className="pt-12 text-center text-[14px] leading-[1.5] text-[var(--text-secondary)]">开始一次新的对话</div>
           ) : panel.messages.map((msg) => (
@@ -709,7 +764,7 @@ function StandaloneChatPanel({
         </div>
       </div>
       <div className="shrink-0 px-4 pb-4">
-        <div className="mx-auto max-w-[720px]">
+        <div className="mx-auto w-full max-w-none">
           <Composer
             input={panel.input}
             isStreaming={panel.isStreaming}
@@ -725,6 +780,112 @@ function StandaloneChatPanel({
         </div>
       </div>
     </section>
+  );
+}
+
+function ModelControl({
+  configs,
+  locked,
+  modelId,
+  modelLabel,
+  onChange,
+}: {
+  configs: ReturnType<typeof useApiConfigStore.getState>['configs'];
+  locked: boolean;
+  modelId: string;
+  modelLabel: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const options = [
+    { id: 'default', title: '默认模型', description: '使用设置中的默认配置' },
+    { id: 'builtin', title: `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`, description: '内置默认模型' },
+    ...configs.map((config) => ({
+      id: String(config.id),
+      title: `${config.provider} · ${config.model}`,
+      description: config.baseUrl,
+    })),
+  ];
+  const current = options.find((item) => item.id === modelId) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  if (locked) {
+    return (
+      <div
+        className="flex h-8 min-w-0 max-w-[280px] flex-1 items-center rounded-[8px] border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-secondary)_78%,var(--bg-primary))] px-3 text-[12px] leading-[1.5] text-[var(--text-secondary)]"
+        title={modelLabel}
+      >
+        <span className="truncate">{modelLabel}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={menuRef} className="relative flex min-w-0 max-w-[300px] flex-1">
+      <button
+        type="button"
+        className="flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-[10px] bg-[color-mix(in_srgb,var(--bg-secondary)_82%,var(--bg-primary))] px-3 text-left text-[12px] leading-[1.5] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-secondary)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--text-secondary)_28%,transparent)]"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        title={current.title}
+      >
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] text-[var(--text-primary)]">{current.title}</span>
+          <span className="block truncate text-[11px] text-[var(--text-secondary)]">{current.description}</span>
+        </span>
+        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-[var(--text-secondary)] transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-10 z-50 w-[min(320px,calc(100vw-32px))] overflow-hidden rounded-[14px] bg-[var(--bg-primary)] py-1.5 shadow-[0_10px_34px_rgba(0,0,0,0.16)] ring-1 ring-[color-mix(in_srgb,var(--border-color)_75%,transparent)] dark:shadow-[0_14px_38px_rgba(0,0,0,0.42)]"
+          role="listbox"
+        >
+          <div className="px-3 pb-1.5 pt-1 text-[11px] leading-[1.5] text-[var(--text-secondary)]">选择模型</div>
+          {options.map((option) => {
+            const selected = option.id === modelId;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                className={`flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_7%,transparent)] ${
+                  selected ? 'bg-[color-mix(in_srgb,var(--text-primary)_6%,transparent)]' : ''
+                }`}
+                onClick={() => {
+                  onChange(option.id);
+                  setOpen(false);
+                }}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] leading-[1.35] text-[var(--text-primary)]">{option.title}</span>
+                  <span className="block truncate text-[11px] leading-[1.35] text-[var(--text-secondary)]">{option.description}</span>
+                </span>
+                {selected && <Check className="h-4 w-4 shrink-0 text-[var(--text-primary)]" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -796,14 +957,20 @@ function Composer({
   );
 }
 
-function MessageBubble({ message, isStreaming = false }: { message: ChatMessage; isStreaming?: boolean }) {
+function MessageBubble({ message, isStreaming = false, fullWidth = false }: { message: ChatMessage; isStreaming?: boolean; fullWidth?: boolean }) {
   const isUser = message.role === 'user';
   const isPending = message.role === 'assistant' && message.content === '...';
 
   return (
     <div className={`group flex animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`relative max-w-[80%] text-[14px] leading-[1.5] text-[var(--color-chat-text)] transition-colors ${isUser ? 'text-right' : 'text-left'}`}
+        className={`relative rounded-[10px] border border-[var(--color-chat-bubble-border)] px-3 py-2 text-[14px] leading-[1.5] text-[var(--color-chat-text)] shadow-none transition-colors ${
+          fullWidth ? 'w-full max-w-full' : 'max-w-[84%]'
+        } ${
+          isUser
+            ? 'bg-[var(--color-chat-user-bubble)] text-right'
+            : 'bg-[var(--color-chat-assistant-bubble)] text-left'
+        }`}
       >
         {(message.imageDataUrl || message.imageUrl) && (
           <img src={message.imageDataUrl || message.imageUrl} alt="" className="mb-2 max-h-48 rounded-[8px] object-contain" />

@@ -335,3 +335,15 @@
 - 涉及文件：`src/features/ai/systemPrompt.ts`, `src/features/settings/SettingsPanel.tsx`, `src-tauri/migrations/0001_initial.sql`, `src-tauri/src/commands/window.rs`, `src/components/layouts/SettingsLayout.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：跨 Space 悬浮窗需要显式声明全工作区可见；默认 prompt 升级要兼顾新安装和已安装用户，不能只改迁移。
 - 是否需更新技术文档：是。
+
+## ISSUE-030
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：A. AI 默认人格 / C. 窗口管理 / H. 大对话窗口
+- 严重程度：严重
+- 问题现象：大窗模型选择按钮仍不够精致；历史对话加载后还可以切换模型；历史时间不符合本机系统时间感知；大窗放大后聊天主体仍受固定宽度限制；其他应用全屏时灵宠仍未稳定置顶；无气泡文本流不符合最新视觉要求。
+- 原因分析：历史会话只加载 messages，没有把 `conversations.model_id` 作为只读会话属性同步到面板；SQLite `CURRENT_TIMESTAMP` 是 UTC 字符串，前端直接展示会产生时区错觉；消息和输入区仍有 720px 最大宽度；macOS 上 Tauri 的 `always_on_top` 只对应 Floating level，`visible_on_all_workspaces` 只设置 CanJoinAllSpaces，缺少 FullScreenAuxiliary 和更高窗口 level。
+- 解决方案：历史数据结构加入 `modelId`，加载历史时锁定面板模型并只展示模型标签；时间显示统一转成本机时区；消息写入后更新会话 `updated_at`；大窗主体改成全宽；恢复轻量气泡并使用黑白灰 token；通过 `objc2-app-kit` 直接设置 `FullScreenAuxiliary` 等 collection behavior 和 `NSPopUpMenuWindowLevel`。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/index.css`, `src/lib/db.ts`, `src/features/ai/systemPrompt.ts`, `src-tauri/src/commands/window.rs`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/migrations/0001_initial.sql`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：macOS 全屏 Space 不是普通置顶问题，需要同时处理 Space membership 与窗口 level；历史会话应把模型视为会话元数据而非可编辑输入。
+- 是否需更新技术文档：是。

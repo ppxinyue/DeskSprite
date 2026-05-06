@@ -114,9 +114,13 @@ export async function insertMessage(
   imagePath?: string,
   tokensUsed?: number
 ) {
-  return execute(
+  await execute(
     'INSERT INTO messages (conversation_id, role, content, image_path, tokens_used) VALUES (?, ?, ?, ?, ?)',
     [conversationId, role, content, imagePath ?? null, tokensUsed ?? null]
+  );
+  return execute(
+    'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [conversationId]
   );
 }
 

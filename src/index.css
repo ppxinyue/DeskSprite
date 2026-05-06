@@ -38,6 +38,9 @@
   --color-chat-bg: var(--bg-primary);
   --color-chat-user-text: var(--text-primary);
   --color-chat-assistant: transparent;
+  --color-chat-user-bubble: #f1f1f1;
+  --color-chat-assistant-bubble: #fafafa;
+  --color-chat-bubble-border: #dedede;
   --color-chat-text: var(--text-primary);
   --color-chat-muted: var(--text-secondary);
   --color-chat-border: var(--border-color);
@@ -82,6 +85,9 @@
   --color-chat-bg: var(--bg-primary);
   --color-chat-user-text: var(--text-primary);
   --color-chat-assistant: transparent;
+  --color-chat-user-bubble: #3f4047;
+  --color-chat-assistant-bubble: #2f3038;
+  --color-chat-bubble-border: #55565f;
   --color-chat-text: var(--text-primary);
   --color-chat-muted: var(--text-secondary);
   --color-chat-border: var(--border-color);

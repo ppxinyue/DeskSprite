@@ -255,3 +255,12 @@
 - 窗口：宠物窗创建和重新显示时同时设置 `always_on_top` 与 `visible_on_all_workspaces`，提升其他应用进入全屏 Space 后灵宠仍置顶可见的稳定性。
 - 设置：设置窗口打开/复用时按主屏工作区 70% 居中；左侧目录从 224px 收窄到 192px，降低侧栏占比。
 - 文件：systemPrompt.ts, SettingsPanel.tsx, 0001_initial.sql, window.rs, SettingsLayout.tsx
+
+### R21. 大窗历史模型锁定、轻量气泡与原生全屏置顶（2026-05-06）
+- 大窗：模型选择改为组合式触发器 + popover 菜单，触发器展示当前模型名称/描述/chevron，菜单行项支持 hover 与右侧 check；历史对话加载后只展示该会话模型，不再允许切换模型；左侧历史列表展示本地化系统时间和模型名。
+- 历史：消息写入后同步刷新 `conversations.updated_at`，避免历史列表时间停留在创建时间。
+- 布局：大聊天窗口放大后，消息主体和输入区使用全宽，不再被 720px 最大宽度限制。
+- 气泡：大小对话窗口恢复轻量气泡；浅色主题为两种浅灰黑字，深色主题为两种深灰白字；小窗气泡占满宽度，大窗气泡保留 84% 最大宽度。
+- 置顶：macOS 下宠物窗额外设置 `FullScreenAuxiliary`、`Stationary`、`IgnoresCycle` collection behavior，并提升到 `NSPopUpMenuWindowLevel`，用于覆盖其他应用全屏 Space。
+- Prompt：默认 system prompt 更新为“电脑桌面灵宠 / 专家级翻译编程写作问答分析 / wechat 式 1-50 字”版本，并兼容前两版默认 prompt 自动映射。
+- 文件：ChatDialog.tsx, index.css, db.ts, systemPrompt.ts, window.rs, Cargo.toml, Cargo.lock, 0001_initial.sql
