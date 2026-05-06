@@ -142,3 +142,47 @@
 - 解决方案：在 index.css 的 `body.has-background` 中添加 `pointer-events: auto` 确保设置窗口内容可点击。
 - 经验总结：Tauri WebView 中透明窗口和普通窗口的事件处理机制不同，需要显式启用 pointer-events。
 - 是否需更新技术文档：否
+
+## ISSUE-014
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：R4. 穿透稳定性
+- 严重程度：中等
+- 问题现象：拖拽灵宠时 onMouseLeave 触发，导致穿透恢复，鼠标事件丢失。
+- 原因分析：PetAvatar 的 onMouseLeave 在拖拽过程中也会触发（鼠标可能移出 img 元素），直接调用 disableHit 导致穿透恢复。
+- 解决方案：onMouseLeave 中检查 isDragging ref，拖拽期间不恢复穿透；拖拽 mouseup 时延迟 100ms 再恢复。
+- 经验总结：拖拽场景下 hover 事件和穿透切换需要配合，不能无条件恢复穿透。
+- 是否需更新技术文档：否
+
+## ISSUE-015
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：R5. 灰色背景
+- 严重程度：中等
+- 问题现象：灵宠切换状态时周围出现灰色/白色背景残留。
+- 原因分析：1) `transform: scale()` 触发 GPU 合成层，合成层有默认不透明背景；2) 容器 div 未显式设置 `background: transparent`，Tauri 透明窗口中未设置背景的元素渲染为不透明。
+- 解决方案：1) `#root` 设为透明；2) petBounce 动画改用 translateY 替代 scale；3) PetAvatar 和 App.tsx 中所有容器 div 显式 `background: transparent`。
+- 经验总结：Tauri 透明窗口中，所有容器元素必须显式设 `background: transparent`，CSS transform 动画可能触发合成层背景。
+- 是否需更新技术文档：否
+
+## ISSUE-016
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：R7. 设置界面重组
+- 严重程度：改进
+- 问题现象：原设置页 8 个 section 过于分散，交互体验不佳，滑块调节即时写入数据库无法预览。
+- 原因分析：初始设计将每个功能点拆为独立 section，缺少分组逻辑和预览机制。
+- 解决方案：1) 合并为 4 个 section（外观/AI对话/快捷键/隐私）；2) 外观设置用 draft state + 确认按钮；3) SettingsLayout 视觉优化。
+- 经验总结：设置页应按使用频率和关联性分组，滑块类控件适合 draft/confirm 模式。
+- 是否需更新技术文档：否
+
+## ISSUE-017
+- 发现时间：2026-05-06
+- 发现者：用户反馈
+- 相关任务：R8. 版本同步
+- 严重程度：已解决（警告）
+- 问题现象：`pnpm tauri dev` 输出 "Found version mismatched Tauri packages: tauri (v2.11.0) : @tauri-apps/api (v2.10.1)"。
+- 原因分析：Cargo.toml 中 tauri crate 版本和 package.json 中 @tauri-apps/api 版本不在同一 major/minor。
+- 解决方案：`pnpm add @tauri-apps/api@latest` 升级到 v2.11.0。
+- 经验总结：Tauri 前后端包版本应保持同步，出现 mismatch 警告时优先升级前端包。
+- 是否需更新技术文档：否
