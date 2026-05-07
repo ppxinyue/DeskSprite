@@ -380,5 +380,14 @@
 ### R41. 收起小窗不再牵动灵宠与工具栏硬边界（2026-05-07）
 - 稳定性：收起小对话窗只隐藏独立 `compact-chat` 窗口，不再触发灵宠窗口 layout 重新计算，避免边缘场景下灵宠向上跳动。
 - 工具栏：灵宠窗口折叠宽度固定预留 4 个右侧工具按钮的空间，展开小窗后图片、语音、放大按钮不会被透明窗口边界裁掉。
-- 边界：受控拖拽的硬边界改为按整个灵宠窗口计算，而不是只按宠物图片计算；拖到屏幕边缘时会被“墙”挡住，右侧按钮区域也保持在工作区内。
+- 边界：受控拖拽的硬边界改为按整个灵宠窗口计算，而不是只按宠物图片计算；拖到屏幕边缘时会被”墙”挡住，右侧按钮区域也保持在工作区内。
 - 文件：App.tsx
+
+### R42. 系统级置顶穿越全屏应用（2026-05-07）
+- 窗口层级：macOS 宠物窗使用 `NSScreenSaverWindowLevel` (1000)，可穿越全屏 Space 和全屏游戏/视频。
+- 集合行为：设置 `CanJoinAllSpaces`、`FullScreenAuxiliary`、`Stationary`、`IgnoresCycle` 让灵宠加入全屏 Space。
+- 后台守卫：新增 `start_topmost_guard` 命令，每 2 秒重新断言窗口 `orderFrontRegardless`，防止系统层级重置。
+- 生命周期：宠物窗创建/显示时自动置顶，隐藏时调用 `unpin_pet_from_fullscreen` 重置层级。
+- 设置开关：外观页新增”始终置顶显示 (穿越全屏)”切换，关闭时禁用置顶功能。
+- 命令：新增 `pin_pet_above_fullscreen_cmd`、`unpin_pet_from_fullscreen_cmd`、`start_topmost_guard`、`stop_topmost_guard`。
+- 文件：window.rs, lib.rs, App.tsx, SettingsPanel.tsx, settingsStore.ts

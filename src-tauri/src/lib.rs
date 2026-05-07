@@ -41,12 +41,20 @@ pub fn run() {
         })
         .plugin(tauri_plugin_sql::Builder::new().add_migrations(
             "sqlite:desksprite.db",
-            vec![tauri_plugin_sql::Migration {
-                version: 1,
-                description: "create initial tables",
-                sql: include_str!("../migrations/0001_initial.sql"),
-                kind: tauri_plugin_sql::MigrationKind::Up,
-            }],
+            vec![
+                tauri_plugin_sql::Migration {
+                    version: 1,
+                    description: "create initial tables",
+                    sql: include_str!("../migrations/0001_initial.sql"),
+                    kind: tauri_plugin_sql::MigrationKind::Up,
+                },
+                tauri_plugin_sql::Migration {
+                    version: 2,
+                    description: "add config name and provider id",
+                    sql: include_str!("../migrations/0002_add_config_name_and_provider.sql"),
+                    kind: tauri_plugin_sql::MigrationKind::Up,
+                },
+            ],
         ).build())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
@@ -73,6 +81,10 @@ pub fn run() {
             commands::window::close_settings_window,
             commands::window::exit_app,
             commands::window::set_cursor_passthrough,
+            commands::window::pin_pet_above_fullscreen_cmd,
+            commands::window::unpin_pet_from_fullscreen_cmd,
+            commands::window::start_topmost_guard,
+            commands::window::stop_topmost_guard,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

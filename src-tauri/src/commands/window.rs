@@ -4,6 +4,12 @@ use tauri::{
 
 #[cfg(target_os = "macos")]
 use objc2_app_kit::{NSPopUpMenuWindowLevel, NSWindow, NSWindowCollectionBehavior};
+#[cfg(target_os = "macos")]
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "macos")]
+use std::sync::Arc;
+#[cfg(target_os = "macos")]
+use std::time::Duration;
 
 fn centered_percent<R: Runtime>(app: &AppHandle<R>, percent: f64) -> (f64, f64, f64, f64) {
     centered_size_percent(app, percent, percent)
@@ -36,20 +42,54 @@ fn pin_pet_above_fullscreen<R: Runtime>(window: &tauri::WebviewWindow<R>) {
         return;
     }
 
-    // Full-screen apps live in a separate Space. CanJoinAllSpaces alone is not enough:
-    // FullScreenAuxiliary lets the pet join that Space, and a popup level keeps it above
-    // ordinary app windows without using the extreme screen-saver level.
+    // NSScreenSaverWindowLevel (1000) - above fullscreen apps and screen savers
+    const NSSCREENSAVER_WINDOW_LEVEL: isize = 1000;
+
     unsafe {
         let ns_window = &*(raw_window.cast::<NSWindow>());
         let behavior = ns_window.collectionBehavior()
-            | NSWindowCollectionBehavior::CanJoinAllSpaces
-            | NSWindowCollectionBehavior::FullScreenAuxiliary
-            | NSWindowCollectionBehavior::Stationary
-            | NSWindowCollectionBehavior::IgnoresCycle;
+            | NSWindowCollectionBehavior::CanJoinAllSpaces      // Join all Spaces
+            | NSWindowCollectionBehavior::Stationary           // Don't auto-move
+            | NSWindowCollectionBehavior::FullScreenAuxiliary   // Join fullscreen Spaces
+            | NSWindowCollectionBehavior::IgnoresCycle;         // Skip Cmd+Tab cycling
         ns_window.setCollectionBehavior(behavior);
-        ns_window.setLevel(NSPopUpMenuWindowLevel);
+        ns_window.setLevel(NSSCREENSAVER_WINDOW_LEVEL);
+        ns_window.setHidesOnDeactivate(false);  // Stay visible when switching apps
+        let _: () = msg_send![ns_window, orderFrontRegardless];  // Force to front
     }
 }
+
+#[cfg(target_os = "macos")]
+use objc2::msg_send;
+
+#[cfg(not(target_os = "macos"))]
+fn pin_pet_above_fullscreen<R: Runtime>(_window: &tauri::WebviewWindow<R>) {}
+
+#[cfg(target_os = "macos")]
+fn unpin_pet_from_fullscreen<R: Runtime>(window: &tauri::WebviewWindow<R>) {
+    let Ok(raw_window) = window.ns_window() else {
+        return;
+    };
+    if raw_window.is_null() {
+        return;
+    }
+
+    unsafe {
+        let ns_window = &*(raw_window.cast::<NSWindow>());
+        // Reset to normal window level (0)
+        ns_window.setLevel(0);
+        // Reset collection behavior to default
+        let behavior = ns_window.collectionBehavior()
+            & !NSWindowCollectionBehavior::CanJoinAllSpaces
+            & !NSWindowCollectionBehavior::FullScreenAuxiliary
+            & !NSWindowCollectionBehavior::Stationary
+            & !NSWindowCollectionBehavior::IgnoresCycle;
+        ns_window.setCollectionBehavior(behavior);
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn unpin_pet_from_fullscreen<R: Runtime>(_window: &tauri::WebviewWindow<R>) {}
 
 #[cfg(not(target_os = "macos"))]
 fn pin_pet_above_fullscreen<R: Runtime>(_window: &tauri::WebviewWindow<R>) {}
@@ -221,6 +261,7 @@ pub fn show_pet_window(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn hide_pet_window(app: AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("pet") {
+        unpin_pet_from_fullscreen(&w);
         let _ = w.hide();
     }
     if let Some(w) = app.get_webview_window("compact-chat") {
@@ -245,4 +286,100 @@ pub fn close_settings_window(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn exit_app(app: AppHandle) {
     app.exit(0);
+}
+
+// Global flag to control the topmost guard thread
+#[cfg(target_os = "macos")]
+static TOPMOST_GUARD_RUNNING: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+pub fn pin_pet_above_fullscreen_cmd(window: tauri::Window) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(w) = window.get_webview_window("pet") {
+            pin_pet_above_fullscreen(&w);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;  // Suppress unused warning
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn unpin_pet_from_fullscreen_cmd(window: tauri::Window) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(w) = window.get_webview_window("pet") {
+            unpin_pet_from_fullscreen(&w);
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;  // Suppress unused warning
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn start_topmost_guard(window: tauri::Window) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::thread;
+
+        if TOPMOST_GUARD_RUNNING.load(Ordering::SeqCst) {
+            return Ok(());  // Already running
+        }
+
+        TOPMOST_GUARD_RUNNING.store(true, Ordering::SeqCst);
+
+        // Clone the app_handle before moving into the thread
+        let app_handle = window.app_handle().clone();
+        thread::spawn(move || {
+            loop {
+                // Sleep for 2 seconds
+                thread::sleep(Duration::from_millis(2000));
+
+                // Check if we should stop
+                if !TOPMOST_GUARD_RUNNING.load(Ordering::SeqCst) {
+                    break;
+                }
+
+                // Re-assert window level if pet window is visible
+                if let Some(w) = app_handle.get_webview_window("pet") {
+                    if w.is_visible().unwrap_or(false) {
+                        if let Ok(raw_window) = w.ns_window() {
+                            if !raw_window.is_null() {
+                                unsafe {
+                                    let ns_window = &*(raw_window.cast::<NSWindow>());
+                                    // Just call orderFrontRegardless to keep it on top
+                                    let _: () = msg_send![ns_window, orderFrontRegardless];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window;  // Suppress unused warning
+        // TODO: Implement for Windows/Linux
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_topmost_guard() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        TOPMOST_GUARD_RUNNING.store(false, Ordering::SeqCst);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // TODO: Implement for Windows/Linux
+    }
+    Ok(())
 }

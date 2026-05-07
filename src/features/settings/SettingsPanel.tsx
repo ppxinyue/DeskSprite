@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Loader2, Plus, Trash2, Pencil, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SettingsLayout } from '@/components/layouts/SettingsLayout';
 import { useSettingsStore, type PetMotionName, type PetMotionSettings } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
 import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
+import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
 import { getConversations, getMessages, getSystemPrompt, updateSystemPrompt, setSetting } from '@/lib/db';
 import { maskKey } from '@/lib/keychain';
 import type { PetState, PetStateMediaConfig } from '@/features/pet/animations';
@@ -34,9 +36,12 @@ const SECTIONS: { id: SettingsSection; label: string }[] = [
 export function SettingsPanel() {
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
   const { settings, loaded, loadSettings, updateSetting, updateSettings } = useSettingsStore();
-  const { configs, loadConfigs, addConfig, removeConfig, setDefault } = useApiConfigStore();
+  const { configs, loadConfigs, addConfig, updateConfig, removeConfig, setDefault } = useApiConfigStore();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
-  const [newConfig, setNewConfig] = useState({ provider: 'openai', baseUrl: '', model: '', apiKey: '' });
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<any>(null);
+  const [testingConfigId, setTestingConfigId] = useState<number | null>(null);
+  const [testResults, setTestResults] = useState<Record<number, { success: boolean; message: string; latency?: number }>>({});
 
   useEffect(() => {
     loadSettings();
@@ -76,11 +81,29 @@ export function SettingsPanel() {
           systemPrompt={systemPrompt}
           setSystemPrompt={setSystemPrompt}
           configs={configs}
-          newConfig={newConfig}
-          setNewConfig={setNewConfig}
-          addConfig={addConfig}
-          removeConfig={removeConfig}
-          setDefault={setDefault}
+          onAdd={() => {
+            setEditingConfig(null);
+            setIsModalOpen(true);
+          }}
+          onEdit={(config) => {
+            setEditingConfig(config);
+            setIsModalOpen(true);
+          }}
+          onDelete={removeConfig}
+          onSetDefault={setDefault}
+          onTest={async (id) => {
+            setTestingConfigId(id);
+            try {
+              const result = await invoke<{ success: boolean; message: string; latency_ms: number }>('test_ai_connection', { configId: id });
+              setTestResults(prev => ({ ...prev, [id]: { success: result.success, message: result.message, latency: result.latency_ms } }));
+            } catch (e) {
+              setTestResults(prev => ({ ...prev, [id]: { success: false, message: String(e) } }));
+            } finally {
+              setTestingConfigId(null);
+            }
+          }}
+          testResults={testResults}
+          testingConfigId={testingConfigId}
         />
       )}
       {activeSection === 'shortcuts' && (
@@ -135,12 +158,26 @@ function AppearanceSection({
     compactChatFontSize: settings.compactChatFontSize,
     theme: settings.theme,
     petMotions: settings.petMotions,
+    alwaysOnTop: settings.alwaysOnTop,
   });
 
   const update = <K extends keyof typeof draft>(k: K, v: typeof draft[K]) => {
     setDraft((d) => ({ ...d, [k]: v }));
     updateSettings({ [k]: v }).catch(() => {});
   };
+
+  // Sync draft with settings when they change externally
+  useEffect(() => {
+    setDraft({
+      petOpacity: settings.petOpacity,
+      petScale: settings.petScale,
+      dialogWidth: settings.dialogWidth,
+      compactChatFontSize: settings.compactChatFontSize,
+      theme: settings.theme,
+      petMotions: settings.petMotions,
+      alwaysOnTop: settings.alwaysOnTop,
+    });
+  }, [settings.petOpacity, settings.petScale, settings.dialogWidth, settings.compactChatFontSize, settings.theme, settings.petMotions, settings.alwaysOnTop]);
 
   return (
     <>
@@ -196,6 +233,12 @@ function AppearanceSection({
         <PetMotionControls
           value={draft.petMotions}
           onChange={(petMotions) => update('petMotions', petMotions)}
+        />
+      </AppearanceRow>
+      <AppearanceRow label="始终置顶显示" hint="穿越全屏应用">
+        <Switch
+          checked={draft.alwaysOnTop}
+          onCheckedChange={(v) => update('alwaysOnTop', v)}
         />
       </AppearanceRow>
 
@@ -505,37 +548,21 @@ function ImageSection() {
 
 function AISection({
   settings, updateSetting, systemPrompt, setSystemPrompt,
-  configs, newConfig, setNewConfig, addConfig, removeConfig, setDefault,
+  configs, onAdd, onEdit, onDelete, onSetDefault, onTest, testResults, testingConfigId,
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
   systemPrompt: string;
   setSystemPrompt: (v: string) => void;
   configs: ApiConfig[];
-  newConfig: { provider: string; baseUrl: string; model: string; apiKey: string };
-  setNewConfig: (v: { provider: string; baseUrl: string; model: string; apiKey: string }) => void;
-  addConfig: (provider: string, baseUrl: string, model: string, apiKey: string) => Promise<void>;
-  removeConfig: (id: number, keyringRef: string | null) => Promise<void>;
-  setDefault: (id: number) => Promise<void>;
+  onAdd: () => void;
+  onEdit: (config: ApiConfig) => void;
+  onDelete: (id: number, keyringRef: string | null) => Promise<void>;
+  onSetDefault: (id: number) => Promise<void>;
+  onTest: (id: number) => Promise<void>;
+  testResults: Record<number, { success: boolean; message: string; latency?: number }>;
+  testingConfigId: number | null;
 }) {
-  const [testResult, setTestResult] = useState<Record<number, string>>({});
-
-  const handleAdd = async () => {
-    if (!newConfig.baseUrl || !newConfig.model || !newConfig.apiKey) return;
-    await addConfig(newConfig.provider, newConfig.baseUrl, newConfig.model, newConfig.apiKey);
-    setNewConfig({ provider: 'openai', baseUrl: '', model: '', apiKey: '' });
-  };
-
-  const handleTest = async (configId: number) => {
-    setTestResult((prev) => ({ ...prev, [configId]: '测试中...' }));
-    try {
-      const result = await invoke<{ success: boolean; message: string; latency_ms: number }>('test_ai_connection', { configId });
-      setTestResult((prev) => ({ ...prev, [configId]: result.success ? `成功 (${result.latency_ms}ms)` : `失败: ${result.message}` }));
-    } catch (e) {
-      setTestResult((prev) => ({ ...prev, [configId]: `错误: ${e}` }));
-    }
-  };
-
   return (
     <>
       <SectionTitle>宠物身份</SectionTitle>
@@ -544,7 +571,13 @@ function AISection({
       </SettingRow>
 
       <Separator className="my-6" />
-      <SectionTitle>AI 配置</SectionTitle>
+      <div className="flex items-center justify-between mb-4">
+        <SectionTitle>API 配置</SectionTitle>
+        <Button size="sm" onClick={onAdd}>
+          <Plus className="h-4 w-4 mr-1" />
+          添加配置
+        </Button>
+      </div>
 
       <div className="border border-border rounded-lg p-3 mb-3 bg-muted/40">
         <div className="flex items-center justify-between mb-2">
@@ -560,44 +593,57 @@ function AISection({
         <div className="text-xs text-muted-foreground mt-1">未配置自有默认模型时自动使用，额度 100000 token。</div>
       </div>
 
-      {configs.map((c) => (
-        <div key={c.id} className="border border-border rounded-lg p-3 mb-3">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <span className="font-medium text-sm">{c.provider}</span>
-              <span className="text-xs text-muted-foreground ml-2">
-                {c.model} · Key: {c.keyringRef ? maskKey(c.keyringRef) : '未设置'}
-              </span>
-            </div>
-            <div className="flex gap-2">
-              {c.isDefault ? (
-                <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded">默认</span>
-              ) : (
-                <Button variant="ghost" size="sm" onClick={() => setDefault(c.id)}>设为默认</Button>
-              )}
-              <Button variant="ghost" size="sm" onClick={() => handleTest(c.id)}>测试</Button>
-              <Button variant="ghost" size="sm" onClick={() => removeConfig(c.id, c.keyringRef)}>删除</Button>
-            </div>
-          </div>
-          <div className="text-xs text-muted-foreground">{c.baseUrl}</div>
-          {testResult[c.id] && <div className="text-xs mt-1">{testResult[c.id]}</div>}
-        </div>
-      ))}
+      <div className="space-y-3 mb-6">
+        {configs.map((c) => {
+          const testResult = testResults[c.id];
+          const isTesting = testingConfigId === c.id;
 
-      <Separator className="my-4" />
-      <h3 className="text-sm font-medium mb-3">添加 API 配置</h3>
-      <div className="space-y-3">
-        <select className="w-full bg-input border border-border rounded px-3 py-2 text-sm"
-          value={newConfig.provider} onChange={(e) => setNewConfig({ ...newConfig, provider: e.target.value })}>
-          <option value="openai">OpenAI</option>
-          <option value="anthropic">Anthropic</option>
-          <option value="groq">Groq</option>
-          <option value="custom">自定义</option>
-        </select>
-        <Input placeholder="Base URL" value={newConfig.baseUrl} onChange={(e) => setNewConfig({ ...newConfig, baseUrl: e.target.value })} />
-        <Input placeholder="Model" value={newConfig.model} onChange={(e) => setNewConfig({ ...newConfig, model: e.target.value })} />
-        <Input type="password" placeholder="API Key" value={newConfig.apiKey} onChange={(e) => setNewConfig({ ...newConfig, apiKey: e.target.value })} />
-        <Button onClick={handleAdd} disabled={!newConfig.baseUrl || !newConfig.model || !newConfig.apiKey}>添加</Button>
+          return (
+            <div key={c.id} className="border border-border rounded-lg p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium text-sm">{c.name || getProviderName(c.providerId || c.provider)}</span>
+                    {c.isDefault && (
+                      <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded shrink-0">默认</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground mb-1">
+                    {c.providerId || c.provider} · {c.model}
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">{c.baseUrl}</div>
+                  {testResult && (
+                    <div className={`text-xs mt-1 ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                      {testResult.message}
+                      {testResult.latency !== undefined && ` (${testResult.latency}ms)`}
+                    </div>
+                  )}
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  {!c.isDefault && (
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onSetDefault(c.id)}>
+                      设为默认
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onTest(c.id)} disabled={isTesting}>
+                    {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : '测试'}
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEdit(c)}>
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" onClick={() => onDelete(c.id, c.keyringRef)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {configs.length === 0 && (
+          <div className="text-sm text-muted-foreground border border-border rounded-lg p-4">
+            暂无 API 配置，点击"添加配置"按钮添加
+          </div>
+        )}
       </div>
 
       <Separator className="my-6" />

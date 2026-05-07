@@ -308,6 +308,16 @@ function PetWindow() {
     if (dragFrameRef.current) window.cancelAnimationFrame(dragFrameRef.current);
   }, []);
 
+  // Initialize always-on-top fullscreen pinning
+  useEffect(() => {
+    if (!settings.alwaysOnTop) return;
+    invoke("pin_pet_above_fullscreen_cmd").catch((e) => console.warn("Failed to pin pet above fullscreen:", e));
+    invoke("start_topmost_guard").catch((e) => console.warn("Failed to start topmost guard:", e));
+    return () => {
+      invoke("stop_topmost_guard").catch((e) => console.warn("Failed to stop topmost guard:", e));
+    };
+  }, [settings.alwaysOnTop]);
+
   const handleBoundedDragStart = async (point: { screenX: number; screenY: number }) => {
     setDragging(true);
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
