@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { Check, ChevronDown, Columns3, Copy, Grid2X2, Mic, PanelRight, Paperclip, Plus, Rows3, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -243,7 +244,7 @@ export function ChatDialog({
   }
 
   if (standalone) {
-    return <StandaloneChatWorkspace />;
+    return <StandaloneChatWorkspace initialConversationId={initialConversationId ?? null} />;
   }
 
   return (
@@ -339,7 +340,7 @@ function createPanel(title = '新对话'): StandalonePanel {
   };
 }
 
-function StandaloneChatWorkspace() {
+function StandaloneChatWorkspace({ initialConversationId }: { initialConversationId: number | null }) {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [panels, setPanels] = useState<StandalonePanel[]>(() => [createPanel()]);
   const [activePanelId, setActivePanelId] = useState<number>(() => panelCounter);
@@ -349,7 +350,24 @@ function StandaloneChatWorkspace() {
   useEffect(() => {
     loadConfigs();
     refreshHistory().catch(() => {});
+    if (initialConversationId) {
+      loadConversationIntoPanel(initialConversationId);
+    }
   }, []);
+
+  useEffect(() => {
+    const unlisten = listen<{ conversationId: number | null }>('chat:open-conversation', ({ payload }) => {
+      if (payload.conversationId) {
+        loadConversationIntoPanel(payload.conversationId);
+      } else {
+        const next = createPanel();
+        setPanels([next]);
+        setActivePanelId(next.id);
+        setLayout('single');
+      }
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [activePanelId, configs, historyItems, panels]);
 
   async function refreshHistory() {
     const convos = await getConversations();
