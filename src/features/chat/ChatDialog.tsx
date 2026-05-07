@@ -11,6 +11,7 @@ import { useSettingsStore } from '@/features/settings/settingsStore';
 import { streamChat } from '@/features/ai/aiService';
 import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
+import type { ApiConfig } from '@/features/ai/types';
 import {
   getMessages,
   insertMessage,
@@ -153,6 +154,11 @@ export function ChatDialog({
     const apiConfig = resolved.config;
 
     const imageForMessage = selectedImage;
+    if (imageForMessage && !supportsImageOrFileInput(apiConfig)) {
+      showUnsupportedAttachmentAlert(apiConfig);
+      return;
+    }
+
     const userMsg = createMessage('user', messageText, imageForMessage ? {
       imageUrl: imageForMessage.dataUrl,
       imageDataUrl: imageForMessage.dataUrl,
@@ -231,6 +237,10 @@ export function ChatDialog({
   async function handlePickImage() {
     const image = await pickImage();
     if (image) setSelectedImage(image);
+  }
+
+  function handlePasteImage(image: SelectedImage) {
+    setSelectedImage(image);
   }
 
   function handleVoiceInput() {
@@ -326,6 +336,7 @@ export function ChatDialog({
           onImagePick={handlePickImage}
           onInputChange={setInput}
           onKeyDown={handleKeyDown}
+          onPasteImage={handlePasteImage}
           onSubmit={handleSend}
           onVoiceInput={handleVoiceInput}
           selectedImage={selectedImage}
@@ -503,6 +514,11 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
     }
 
     const imageForMessage = panel.selectedImage;
+    if (imageForMessage && !supportsImageOrFileInput(resolved.config)) {
+      showUnsupportedAttachmentAlert(resolved.config);
+      return;
+    }
+
     const finalUserMsg = createMessage('user', messageText, imageForMessage ? {
       imageUrl: imageForMessage.dataUrl,
       imageDataUrl: imageForMessage.dataUrl,
@@ -631,6 +647,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
                 }}
                 onInputChange={(value) => updatePanel(panel.id, { input: value })}
                 onModelChange={(modelId) => updatePanel(panel.id, { modelId })}
+                onPasteImage={(image) => updatePanel(panel.id, { selectedImage: image })}
                 onSubmit={() => sendFromPanel(panel.id)}
                 onVoiceInput={() => {
                   const lang = settings.voiceInputLang === 'system' ? (navigator.language || 'zh-CN') : settings.voiceInputLang;
@@ -722,11 +739,22 @@ async function pickImage(): Promise<SelectedImage | null> {
     input.click();
   });
   if (!file) return null;
+  return fileToSelectedImage(file);
+}
+
+async function fileToSelectedImage(file: File, fallbackName = '图片'): Promise<SelectedImage> {
   return {
     path: '',
-    name: file.name,
+    name: file.name || `${fallbackName}.${imageExtensionFromType(file.type)}`,
     dataUrl: await fileToDataUrl(file),
   };
+}
+
+function imageExtensionFromType(type: string) {
+  const subtype = type.split('/')[1]?.toLowerCase();
+  if (!subtype) return 'png';
+  if (subtype === 'jpeg') return 'jpg';
+  return subtype.replace(/[^a-z0-9]/g, '') || 'png';
 }
 
 function fileToDataUrl(file: File) {
@@ -738,15 +766,65 @@ function fileToDataUrl(file: File) {
   });
 }
 
+async function clipboardImageToSelectedImage(event: React.ClipboardEvent): Promise<SelectedImage | null> {
+  const files = Array.from(event.clipboardData.files ?? []);
+  const directFile = files.find((file) => file.type.startsWith('image/'));
+  if (directFile) return fileToSelectedImage(directFile, '剪贴板图片');
+
+  const items = Array.from(event.clipboardData.items ?? []);
+  const imageItem = items.find((item) => item.kind === 'file' && item.type.startsWith('image/'));
+  const file = imageItem?.getAsFile();
+  if (!file) return null;
+  return fileToSelectedImage(file, `clipboard-${Date.now()}`);
+}
+
+function clipboardHasImage(event: React.ClipboardEvent) {
+  return Array.from(event.clipboardData.files ?? []).some((file) => file.type.startsWith('image/')) ||
+    Array.from(event.clipboardData.items ?? []).some((item) => item.kind === 'file' && item.type.startsWith('image/'));
+}
+
+function supportsImageOrFileInput(config: ApiConfig) {
+  const provider = String(config.provider).toLowerCase();
+  const model = config.model.toLowerCase();
+  if (provider === 'anthropic') {
+    return /claude-(3|4)|sonnet|haiku|opus/.test(model);
+  }
+  if (provider === 'google') {
+    return model.includes('gemini');
+  }
+  if (provider === 'deepseek' || provider === 'kimi' || provider === 'minimax') {
+    return /\b(vl|vision|image|visual|omni|multimodal)\b/.test(model);
+  }
+  if (provider === 'zhipu') {
+    return /glm-4v|vision|vl|image|visual|omni/.test(model);
+  }
+  if (provider === 'qwen') {
+    return /qwen.*(vl|omni|vision|image|visual)|vl/.test(model);
+  }
+  if (provider === 'hunyuan') {
+    return /vision|vl|image|visual|omni/.test(model);
+  }
+  return /gpt-4o|gpt-4\.1|gpt-4-turbo|gpt-5|o3|o4|vision|vl|image|visual|omni|gemini|claude|qwen.*vl|glm-4v/.test(model);
+}
+
+function showUnsupportedAttachmentAlert(config: ApiConfig) {
+  window.alert(`当前模型 ${config.model} 不支持图片或文件输入。请切换到支持视觉的模型，例如 gpt-4o、gpt-4o-mini、Claude 3/4、Gemini，或名称包含 vision/VL 的模型。`);
+}
+
 async function startSpeechInput(
   onText: (text: string) => void,
   setListening: (listening: boolean) => void,
   lang?: string
 ) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    onText('当前系统不支持麦克风权限请求。');
+    return;
+  }
+
   try {
-    // Request microphone permission
-    await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (e) {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((track) => track.stop());
+  } catch {
     onText('请允许麦克风权限以使用语音输入。');
     return;
   }
@@ -812,6 +890,7 @@ function StandaloneChatPanel({
   onImagePick,
   onInputChange,
   onModelChange,
+  onPasteImage,
   speakRate,
   onSubmit,
   onVoiceInput,
@@ -826,6 +905,7 @@ function StandaloneChatPanel({
   onImagePick: () => void;
   onInputChange: (value: string) => void;
   onModelChange: (value: string) => void;
+  onPasteImage: (image: SelectedImage) => void;
   onSubmit: () => void;
   onVoiceInput: () => void;
 }) {
@@ -892,6 +972,7 @@ function StandaloneChatPanel({
             onImagePick={onImagePick}
             onInputChange={onInputChange}
             onKeyDown={handleKeyDown}
+            onPasteImage={onPasteImage}
             onSubmit={onSubmit}
             onVoiceInput={onVoiceInput}
             selectedImage={panel.selectedImage}
@@ -1024,6 +1105,7 @@ function Composer({
   onImagePick,
   onInputChange,
   onKeyDown,
+  onPasteImage,
   onSubmit,
   onVoiceInput,
   selectedImage,
@@ -1037,6 +1119,7 @@ function Composer({
   onImagePick?: () => void;
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
+  onPasteImage?: (image: SelectedImage) => void;
   onSubmit: () => void;
   onVoiceInput?: () => void;
   selectedImage?: SelectedImage | null;
@@ -1044,6 +1127,14 @@ function Composer({
   compact?: boolean;
   compactFontSize?: number;
 }) {
+  async function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
+    if (!clipboardHasImage(event)) return;
+    event.preventDefault();
+    const image = await clipboardImageToSelectedImage(event);
+    if (!image) return;
+    onPasteImage?.(image);
+  }
+
   return (
     <div className={compact ? "p-2.5 pt-1.5" : ""}>
       {selectedImage && (
@@ -1074,6 +1165,7 @@ function Composer({
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={onKeyDown}
+          onPaste={handlePaste}
           placeholder="输入消息..."
           className={`${compact ? 'min-h-[34px] px-2.5 py-2 leading-[1.45]' : 'min-h-[40px] px-3 py-2.5 text-[14px] leading-[1.5]'} max-h-[132px] flex-1 resize-none overflow-y-auto border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
           style={{ fontSize: compact ? compactFontSize : undefined }}

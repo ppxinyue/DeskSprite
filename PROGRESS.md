@@ -427,3 +427,9 @@
 - 构建：修复语音识别类型定义里的 `stop/onerror/resultIndex/isFinal` 问题，并清理设置页/API store/pet store 中导致 `tsc` 失败的未使用导入和无效 prop。
 - 验证：`pnpm build`、`cargo check`、`git diff --check` 均通过；Rust 侧仅保留既有 CSP dead-code warning。
 - 文件：ChatDialog.tsx, App.tsx, SettingsPanel.tsx, apiConfigStore.ts, petStore.ts
+
+### R47. 语音权限、剪贴板图片与模型附件能力检查（2026-05-07）
+- 语音：首次点击语音输入时显式调用 `navigator.mediaDevices.getUserMedia({ audio: true })` 触发系统麦克风授权，并在 macOS bundle 中加入麦克风和语音识别用途说明。
+- 图片：大小对话窗口的输入框支持直接粘贴剪贴板图片，粘贴后复用现有图片预览 chip 和发送链路。
+- 模型：发送带图片的消息前检查当前模型是否支持图片/文件输入；不支持时弹出提示并阻止发送，避免把不兼容请求发到文本模型。
+- 文件：ChatDialog.tsx, Info.plist

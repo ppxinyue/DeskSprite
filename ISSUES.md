@@ -587,3 +587,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/apiConfigStore.ts`, `src/features/pet/petStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：大窗和小窗的面板组件不要隐式读取父级 hook 变量；消息从空到非空的首帧渲染是聊天窗口最关键的崩溃检查点，必须让 `pnpm build` 在合并前通过。
 - 是否需更新技术文档：是。
+
+## ISSUE-051
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：H. 对话输入 / R43 语音功能 / R45 多模型配置
+- 严重程度：改进
+- 问题现象：首次语音输入需要系统麦克风权限弹窗；对话输入不支持直接粘贴剪贴板图片；用户把图片发给不支持视觉/文件输入的模型时缺少提前提示。
+- 原因分析：语音输入只依赖 Web Speech API 启动时的隐式权限行为，macOS bundle 也缺少麦克风/语音识别用途说明；图片输入只支持文件选择器；发送链路没有在请求前根据 provider/model 做附件能力判断。
+- 解决方案：语音输入前先调用 `getUserMedia` 并立即释放音轨，确保首次使用触发系统授权；新增 `Info.plist` 声明 `NSMicrophoneUsageDescription` 和 `NSSpeechRecognitionUsageDescription`；Composer 监听 paste 事件并从 `clipboardData` 提取图片文件；发送前用模型名/provider 启发式检查视觉能力，不支持时弹出提示并阻止发送。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `src-tauri/Info.plist`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：输入附件能力要在客户端先校验，避免用户把图片请求发给文本模型后才看到 API 报错；系统隐私权限需要同时有运行时触发和 bundle 用途说明。
+- 是否需更新技术文档：是。
