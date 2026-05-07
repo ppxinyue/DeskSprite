@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Check, ChevronDown, Columns3, Copy, Grid2X2, Mic, PanelRight, Paperclip, Plus, Rows3, X } from 'lucide-react';
+import { Check, ChevronDown, Columns3, Copy, Grid2X2, Mic, PanelRight, Paperclip, Plus, Rows3, Speaker, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { PulseDot } from '@/components/loading-ui/pulse-dot';
 import { useChatStore, createMessage } from './chatStore';
 import { useApiConfigStore } from '@/features/settings/apiConfigStore';
+import { useSettingsStore } from '@/features/settings/settingsStore';
 import { streamChat } from '@/features/ai/aiService';
 import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
@@ -37,7 +38,7 @@ interface SpeechRecognitionLike {
   lang: string;
   interimResults: boolean;
   continuous: boolean;
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
+  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }>; resultIndex?: number }) => void) | null;
   onend: (() => void) | null;
   onerror: (() => void) | null;
   start: () => void;
@@ -85,6 +86,7 @@ export function ChatDialog({
   } = useChatStore();
 
   const { getDefaultConfig, loadConfigs } = useApiConfigStore();
+  const { settings } = useSettingsStore();
 
   useEffect(() => {
     if (!standalone) onConversationChange?.(currentConversationId);
@@ -198,6 +200,11 @@ export function ChatDialog({
       if (resolved.usingBuiltin) {
         await recordBuiltinUsage(chatMessages, fullContent);
       }
+
+      // Auto-speak if enabled
+      if (settings.autoSpeak && fullContent && fullContent !== '...') {
+        speakText(fullContent, settings.speakRate);
+      }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       updateLastAssistant(`出错了：${errMsg}`);
@@ -227,9 +234,11 @@ export function ChatDialog({
   }
 
   function handleVoiceInput() {
+    const lang = settings.voiceInputLang === 'system' ? (navigator.language || 'zh-CN') : settings.voiceInputLang;
     startSpeechInput(
       (text) => setInput((value) => `${value}${value ? ' ' : ''}${text}`),
       setIsListening,
+      lang,
     );
   }
 
@@ -237,11 +246,16 @@ export function ChatDialog({
     if (standalone) return;
     const imageHandler = () => { handlePickImage(); };
     const voiceHandler = () => { handleVoiceInput(); };
+    const focusHandler = () => {
+      textareaRef.current?.focus();
+    };
     window.addEventListener('desksprite:chat-image', imageHandler);
     window.addEventListener('desksprite:chat-voice', voiceHandler);
+    window.addEventListener('desksprite:chat-focus', focusHandler);
     return () => {
       window.removeEventListener('desksprite:chat-image', imageHandler);
       window.removeEventListener('desksprite:chat-voice', voiceHandler);
+      window.removeEventListener('desksprite:chat-focus', focusHandler);
     };
   }, [standalone]);
 
@@ -291,7 +305,15 @@ export function ChatDialog({
         >
           <div className="space-y-1 py-2.5">
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} fullWidth compactFontSize={compactFontSize} compact />
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                fullWidth
+                compactFontSize={compactFontSize}
+                compact
+                speakRate={settings.speakRate}
+                onSpeak={speakText}
+              />
             ))}
           </div>
         </div>
@@ -357,6 +379,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
   const [activePanelId, setActivePanelId] = useState<number>(() => panelCounter);
   const [layout, setLayout] = useState<LayoutMode>('single');
   const { configs, getDefaultConfig, loadConfigs } = useApiConfigStore();
+  const { settings } = useSettingsStore();
 
   useEffect(() => {
     loadConfigs();
@@ -533,6 +556,11 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
       if (convoId) await insertMessage(convoId, 'assistant', fullContent);
       if (resolved.usingBuiltin) await recordBuiltinUsage(chatMessages, fullContent);
       await refreshHistory();
+
+      // Auto-speak if enabled
+      if (settings.autoSpeak && fullContent && fullContent !== '...') {
+        speakText(fullContent, settings.speakRate);
+      }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       updatePanel(panelId, (current) => ({
@@ -603,10 +631,14 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
                 onInputChange={(value) => updatePanel(panel.id, { input: value })}
                 onModelChange={(modelId) => updatePanel(panel.id, { modelId })}
                 onSubmit={() => sendFromPanel(panel.id)}
-                onVoiceInput={() => startSpeechInput(
-                  (text) => updatePanel(panel.id, (current) => ({ ...current, input: `${current.input}${current.input ? ' ' : ''}${text}` })),
-                  (listening) => updatePanel(panel.id, { isListening: listening }),
-                )}
+                onVoiceInput={() => {
+                  const lang = settings.voiceInputLang === 'system' ? (navigator.language || 'zh-CN') : settings.voiceInputLang;
+                  startSpeechInput(
+                    (text) => updatePanel(panel.id, (current) => ({ ...current, input: `${current.input}${current.input ? ' ' : ''}${text}` })),
+                    (listening) => updatePanel(panel.id, { isListening: listening }),
+                    lang,
+                  );
+                }}
               />
             ))}
           </div>
@@ -705,7 +737,19 @@ function fileToDataUrl(file: File) {
   });
 }
 
-function startSpeechInput(onText: (text: string) => void, setListening: (listening: boolean) => void) {
+async function startSpeechInput(
+  onText: (text: string) => void,
+  setListening: (listening: boolean) => void,
+  lang?: string
+) {
+  try {
+    // Request microphone permission
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    onText('请允许麦克风权限以使用语音输入。');
+    return;
+  }
+
   const win = window as unknown as {
     SpeechRecognition?: new () => SpeechRecognitionLike;
     webkitSpeechRecognition?: new () => SpeechRecognitionLike;
@@ -717,15 +761,26 @@ function startSpeechInput(onText: (text: string) => void, setListening: (listeni
   }
 
   const recognition = new Recognition();
-  recognition.lang = navigator.language || 'zh-CN';
-  recognition.interimResults = false;
+  recognition.lang = lang || (navigator.language || 'zh-CN');
+  recognition.interimResults = true;
   recognition.continuous = false;
+
   recognition.onresult = (event) => {
-    const transcript = event.results[0]?.[0]?.transcript?.trim();
-    if (transcript) onText(transcript);
+    const results = event.results;
+    for (let i = event.resultIndex; i < results.length; i++) {
+      const transcript = results[i][0].transcript;
+      if (results[i].isFinal) {
+        onText(transcript.trim());
+      }
+    }
   };
+
   recognition.onend = () => setListening(false);
-  recognition.onerror = () => setListening(false);
+  recognition.onerror = (e) => {
+    console.error('Speech recognition error:', e);
+    setListening(false);
+  };
+
   setListening(true);
   recognition.start();
 }
@@ -814,7 +869,12 @@ function StandaloneChatPanel({
           {panel.messages.length === 0 ? (
             <div className="pt-12 text-center text-[14px] leading-[1.5] text-[var(--text-secondary)]">开始一次新的对话</div>
           ) : panel.messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              speakRate={settings.speakRate}
+              onSpeak={speakText}
+            />
           ))}
         </div>
       </div>
@@ -1029,15 +1089,32 @@ function MessageBubble({
   fullWidth = false,
   compact = false,
   compactFontSize = 13,
+  speakRate = 1.0,
+  onSpeak,
 }: {
   message: ChatMessage;
   isStreaming?: boolean;
   fullWidth?: boolean;
   compact?: boolean;
   compactFontSize?: number;
+  speakRate?: number;
+  onSpeak?: (text: string, rate: number) => void;
 }) {
   const isUser = message.role === 'user';
   const isPending = message.role === 'assistant' && message.content === '...';
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const handleSpeak = () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    } else {
+      window.speechSynthesis.cancel();
+      onSpeak?.(message.content, speakRate);
+      setIsSpeaking(true);
+      setTimeout(() => setIsSpeaking(false), message.content.length * 100);
+    }
+  };
 
   return (
     <div className={`group flex animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -1070,9 +1147,18 @@ function MessageBubble({
         {isStreaming && (
           <span className="inline-block w-1.5 h-4 bg-current animate-pulse ml-0.5" />
         )}
+        {!isPending && message.content && !isUser && (
+          <button
+            className={`absolute top-1 hidden h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)] group-hover:flex -right-8`}
+            title={isSpeaking ? '停止朗读' : '朗读'}
+            onClick={handleSpeak}
+          >
+            {isSpeaking ? <X className="h-3.5 w-3.5" /> : <Speaker className="h-3.5 w-3.5" />}
+          </button>
+        )}
         {!isPending && message.content && (
           <button
-            className={`absolute top-1 hidden h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)] group-hover:flex ${isUser ? '-left-8' : '-right-8'}`}
+            className={`absolute top-1 hidden h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)] group-hover:flex ${isUser ? '-left-8' : '-right-14'}`}
             title="复制"
             onClick={() => navigator.clipboard?.writeText(cleanChatText(message.content)).catch(() => {})}
           >
@@ -1089,4 +1175,39 @@ function cleanChatText(text: string) {
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
     .replace(/^[（(][^）)]{1,24}[）)]\s*/gm, '')
     .trim();
+}
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*\*(.+?)\*\*\*/g, '$1')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/```.+?```/gs, '')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/!\[.*?\]\(.+?\)/g, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function speakText(text: string, rate: number = 1.0) {
+  if (!window.speechSynthesis) {
+    console.warn('Speech synthesis not supported');
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  const cleanText = stripMarkdown(cleanChatText(text));
+  if (!cleanText) return;
+
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  utterance.lang = 'zh-CN';
+  utterance.rate = rate;
+  utterance.pitch = 1.0;
+
+  window.speechSynthesis.speak(utterance);
 }

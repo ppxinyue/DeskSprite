@@ -745,6 +745,38 @@ function AISection({
         <Switch checked={settings.voiceOutput} onCheckedChange={(v) => updateSetting('voiceOutput', v)} />
       </SettingRow>
 
+      <Separator className="my-6" />
+      <SectionTitle>语音设置</SectionTitle>
+      <SettingRow label="语音唤醒" hint="开启后，说出唤醒词即可唤醒灵宠对话">
+        <Switch checked={settings.wakeWordEnabled} onCheckedChange={(v) => updateSetting('wakeWordEnabled', v)} />
+      </SettingRow>
+      {settings.wakeWordEnabled && (
+        <SettingRow label="唤醒词">
+          <Input
+            value={settings.wakeWord}
+            onChange={(e) => updateSetting('wakeWord', e.target.value.slice(0, 20))}
+            className="w-48"
+            maxLength={20}
+          />
+        </SettingRow>
+      )}
+      <SettingRow label="自动朗读 AI 回复">
+        <Switch checked={settings.autoSpeak} onCheckedChange={(v) => updateSetting('autoSpeak', v)} />
+      </SettingRow>
+      <SettingRow label="朗读语速">
+        <div className="flex items-center gap-3">
+          <span className="w-12 text-right text-xs text-muted-foreground">{settings.speakRate.toFixed(1)}x</span>
+          <Slider
+            value={[settings.speakRate]}
+            onValueChange={([v]) => updateSetting('speakRate', v)}
+            min={0.5}
+            max={2.0}
+            step={0.1}
+            className="w-32"
+          />
+        </div>
+      </SettingRow>
+
       <ApiConfigModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editingConfig={editingConfig} />
     </>
   );

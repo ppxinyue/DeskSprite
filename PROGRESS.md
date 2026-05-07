@@ -392,6 +392,16 @@
 - 命令：新增 `pin_pet_above_fullscreen_cmd`、`unpin_pet_from_fullscreen_cmd`、`start_topmost_guard`、`stop_topmost_guard`。
 - 文件：window.rs, lib.rs, App.tsx, SettingsPanel.tsx, settingsStore.ts
 
+### R43. 语音输入、唤醒词检测和 TTS 朗读（2026-05-07）
+- 功能：实现完整的语音功能，包括麦克风语音输入、后台唤醒词检测和 AI 回复朗读。
+- 语音输入：点击麦克风按钮请求麦克风权限，使用 Web Speech API (webkitSpeechRecognition) 进行语音识别，支持实时结果显示和语音语言设置。
+- 唤醒词检测：宠物窗后台监听语音，检测到唤醒词后播放提示音并打开对话窗口，支持自动预填充唤醒词后的文本。
+- TTS 朗读：AI 消息气泡右侧新增朗读按钮，点击使用 Web Speech Synthesis API 朗读消息内容，支持暂停/继续和语速调节。
+- 自动朗读：设置页新增”自动朗读 AI 回复”开关，开启后 AI 回复完成时自动朗读，支持 0.5-2.0 倍语速调节。
+- 设置：新增唤醒词开关、自定义唤醒词（默认”你好灵宠”）、自动朗读开关、朗读语速滑块。
+- 命令：新增 `focus_compact_chat_input` 命令用于唤醒后聚焦输入框。
+- 文件：ChatDialog.tsx, App.tsx, SettingsPanel.tsx, settingsStore.ts, window.rs, lib.rs
+
 ### R45. 多模型 API 配置管理（2026-05-07）
 - 功能：新增完整的多提供商 API 配置管理系统，支持 11 个 AI 提供商预设和自定义配置。
 - 提供商：OpenAI、Anthropic (Claude)、Google Gemini、Grok (xAI)、DeepSeek、Kimi (月之暗面)、智谱 GLM、腾讯混元、MiniMax、通义千问 (Qwen)、自定义。

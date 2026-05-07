@@ -29,6 +29,10 @@ export interface AppSettings {
   streamOutput: boolean;
   voiceInputLang: string;
   voiceOutput: boolean;
+  wakeWord: string;
+  wakeWordEnabled: boolean;
+  autoSpeak: boolean;
+  speakRate: number;
   globalShortcut: string;
   screenshotShortcut: string;
 }
@@ -53,6 +57,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   streamOutput: true,
   voiceInputLang: 'system',
   voiceOutput: true,
+  wakeWord: '你好灵宠',
+  wakeWordEnabled: false,
+  autoSpeak: false,
+  speakRate: 1.0,
   globalShortcut: 'CommandOrControl+Shift+P',
   screenshotShortcut: 'CommandOrControl+Shift+S',
 };

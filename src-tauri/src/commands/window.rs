@@ -1,5 +1,5 @@
 use tauri::{
-    AppHandle, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
 };
 
 #[cfg(target_os = "macos")]
@@ -244,6 +244,11 @@ pub fn hide_compact_chat_window(app: AppHandle) -> Result<(), String> {
         let _ = w.hide();
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn focus_compact_chat_input(app: AppHandle) -> Result<(), String> {
+    app.emit_to("compact-chat", "focus-input", ()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

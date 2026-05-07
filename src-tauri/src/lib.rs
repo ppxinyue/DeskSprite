@@ -81,6 +81,7 @@ pub fn run() {
             commands::window::show_compact_chat_window,
             commands::window::position_compact_chat_window,
             commands::window::hide_compact_chat_window,
+            commands::window::focus_compact_chat_input,
             commands::window::close_settings_window,
             commands::window::exit_app,
             commands::window::set_cursor_passthrough,

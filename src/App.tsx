@@ -152,10 +152,14 @@ function CompactChatWindow() {
     const voiceListener = listen("compact-chat:voice", () => {
       window.dispatchEvent(new CustomEvent("desksprite:chat-voice"));
     });
+    const focusListener = listen("compact-chat:focus-input", () => {
+      window.dispatchEvent(new CustomEvent("desksprite:chat-focus"));
+    });
     return () => {
       openListener.then((fn) => fn());
       imageListener.then((fn) => fn());
       voiceListener.then((fn) => fn());
+      focusListener.then((fn) => fn());
     };
   }, []);
 
@@ -317,6 +321,146 @@ function PetWindow() {
       invoke("stop_topmost_guard").catch((e) => console.warn("Failed to stop topmost guard:", e));
     };
   }, [settings.alwaysOnTop]);
+
+  // Wake word detection
+  useEffect(() => {
+    if (!settings.wakeWordEnabled) return;
+
+    const win = window as unknown as {
+      SpeechRecognition?: new () => {
+        lang: string;
+        continuous: boolean;
+        interimResults: boolean;
+        onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
+        onend: (() => void) | null;
+        onerror: (() => void) | null;
+        start: () => void;
+      };
+      webkitSpeechRecognition?: new () => {
+        lang: string;
+        continuous: boolean;
+        interimResults: boolean;
+        onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
+        onend: (() => void) | null;
+        onerror: (() => void) | null;
+        start: () => void;
+      };
+    };
+
+    const Recognition = win.SpeechRecognition ?? win.webkitSpeechRecognition;
+    if (!Recognition) {
+      console.warn('Speech recognition not supported for wake word detection');
+      return;
+    }
+
+    let recognition: InstanceType<typeof Recognition> | null = null;
+    let restartTimeout: number | null = null;
+
+    const startRecognition = () => {
+      if (recognition) return;
+
+      recognition = new Recognition();
+      recognition.lang = 'zh-CN';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onresult = (event) => {
+        const results = event.results;
+        for (let i = 0; i < results.length; i++) {
+          const transcript = results[i][0]?.transcript?.toLowerCase().trim() || '';
+          const wakeWord = settings.wakeWord.toLowerCase();
+
+          if (transcript.includes(wakeWord)) {
+            // Play ding sound
+            try {
+              const ctx = new AudioContext();
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.frequency.value = 880;
+              gain.gain.value = 0.3;
+              osc.start();
+              osc.stop(ctx.currentTime + 0.15);
+            } catch (e) {
+              console.warn('Failed to play wake sound:', e);
+            }
+
+            // Open chat
+            invoke('show_compact_chat_window', { x: 0, y: 0, w: 300, h: 400 })
+              .then(() => emit('compact-chat:open', {
+                mode: 'new',
+                conversationId: null,
+              }))
+              .then(() => emit('compact-chat:focus-input', {}))
+              .catch((e) => console.warn('Failed to open chat on wake word:', e));
+
+            // Pre-fill text after wake word
+            const textAfterWakeWord = transcript.replace(wakeWord, '').trim();
+            if (textAfterWakeWord) {
+              emit('compact-chat:prefill', { text: textAfterWakeWord }).catch(() => {});
+            }
+
+            // Pause briefly after wake word
+            if (recognition) {
+              recognition.onend = null;
+              recognition.stop();
+              recognition = null;
+              restartTimeout = window.setTimeout(startRecognition, 2000);
+            }
+            break;
+          }
+        }
+      };
+
+      recognition.onend = () => {
+        if (!dialogOpen) {
+          restartTimeout = window.setTimeout(() => {
+            recognition = null;
+            startRecognition();
+          }, 100);
+        }
+      };
+
+      recognition.onerror = (e) => {
+        console.warn('Wake word recognition error:', e);
+        recognition = null;
+      };
+
+      try {
+        recognition.start();
+      } catch (e) {
+        console.warn('Failed to start wake word recognition:', e);
+        recognition = null;
+      }
+    };
+
+    startRecognition();
+
+    // Pause wake word detection when compact-chat is open
+    const unlisten = listen('compact-chat:conversation', () => {
+      if (recognition) {
+        recognition.onend = null;
+        recognition.stop();
+        recognition = null;
+      }
+      if (restartTimeout) {
+        clearTimeout(restartTimeout);
+        restartTimeout = null;
+      }
+    });
+
+    return () => {
+      if (recognition) {
+        recognition.onend = null;
+        recognition.stop();
+      }
+      if (restartTimeout) {
+        clearTimeout(restartTimeout);
+      }
+      unlisten.then((fn) => fn());
+    };
+  }, [settings.wakeWordEnabled, settings.wakeWord, dialogOpen]);
 
   const handleBoundedDragStart = async (point: { screenX: number; screenY: number }) => {
     setDragging(true);
