@@ -767,3 +767,15 @@
 - 涉及文件：`src/features/ai/providers.ts`, `src/features/ai/types.ts`, `src/features/settings/apiConfigStore.ts`, `src-tauri/src/commands/ai.rs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：默认模型可用的服务商也必须作为用户可选 provider 暴露；API Key 输入必须容忍常见复制格式。
 - 是否需更新技术文档：是。
+
+## ISSUE-066
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：D. AI 配置 / 模型测试
+- 严重程度：严重
+- 问题现象：CloseAI 用户配置仍返回 `HTTP 400: invalid token: HTTP 401: invalid token`，用户无法判断这是 base_url 不通、Key 没保存、还是服务商拒绝 token。
+- 原因分析：测试链路只展示服务商错误，不展示请求 endpoint 和实际参与测试的 Key 摘要；设置页仍提示“钥匙串保存”，与当前本地数据库保存逻辑不一致，进一步干扰判断。
+- 解决方案：测试失败信息追加 endpoint、Key 长度、尾号和短指纹；设置列表和编辑弹窗显示同样的安全摘要；保存/读取/后端请求统一移除外层引号、`Bearer `、不可见字符和误粘贴空白。
+- 涉及文件：`src/lib/apiKeyStorage.ts`, `src/features/settings/apiConfigStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src-tauri/src/commands/ai.rs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：凭证问题必须可观测但不能泄密；只显示 `invalid token` 不足以区分“服务商已响应但拒绝 token”和“应用用了错误 token”。
+- 是否需更新技术文档：是。

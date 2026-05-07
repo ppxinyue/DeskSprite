@@ -6,7 +6,7 @@ import {
   setDefaultApiConfig,
   updateApiConfig,
 } from '@/lib/db';
-import { decodeLocalApiKey } from '@/lib/apiKeyStorage';
+import { decodeLocalApiKey, normalizeApiKeyText } from '@/lib/apiKeyStorage';
 import { emit } from '@tauri-apps/api/event';
 
 export interface ApiConfig {
@@ -57,23 +57,23 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
   loadConfigs: async () => {
     try {
       const rows = await getApiConfigs();
-    set({
-      configs: rows.map((r) => ({
-        id: r.id,
-        provider: r.provider,
-        providerId: r.provider_id,
-        name: r.name,
-        baseUrl: r.base_url,
-        model: r.model,
-        apiKey: decodeLocalApiKey(r.api_key),
-        keyringRef: r.keyring_ref,
-        isDefault: r.is_default === 1,
-        lastUsedAt: r.last_used_at,
-        usageCount: r.usage_count,
-        createdAt: r.created_at,
-      })),
-      loaded: true,
-    });
+      set({
+        configs: rows.map((r) => ({
+          id: r.id,
+          provider: r.provider,
+          providerId: r.provider_id,
+          name: r.name,
+          baseUrl: r.base_url,
+          model: r.model,
+          apiKey: decodeLocalApiKey(r.api_key),
+          keyringRef: r.keyring_ref,
+          isDefault: r.is_default === 1,
+          lastUsedAt: r.last_used_at,
+          usageCount: r.usage_count,
+          createdAt: r.created_at,
+        })),
+        loaded: true,
+      });
     } catch (e) {
       console.warn('Failed to load API configs:', e);
       set({ configs: [], loaded: true });
@@ -122,12 +122,7 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
 }));
 
 function normalizeApiKey(apiKey: string) {
-  const normalizedKey = apiKey
-    .trim()
-    .replace(/^[\u200B-\u200D\uFEFF]+|[\u200B-\u200D\uFEFF]+$/g, '')
-    .replace(/^["'`]+|["'`]+$/g, '')
-    .replace(/^Bearer\s+/i, '')
-    .trim();
+  const normalizedKey = normalizeApiKeyText(apiKey);
   if (!normalizedKey) {
     throw new Error('API Key 不能为空。');
   }

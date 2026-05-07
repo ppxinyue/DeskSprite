@@ -14,7 +14,7 @@ import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
 import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
-import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
+import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getMessages, getSystemPrompt, setSetting, updateSystemPrompt } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, isBuiltinAsset, type PetStateMediaConfig } from '@/features/pet/animations';
@@ -804,6 +804,7 @@ function AISection({
                     {c.providerId || c.provider} · {c.model}
                   </div>
                   <div className="text-xs text-muted-foreground truncate">{c.baseUrl}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{describeApiKey(c.apiKey)}</div>
                   {testResult && (
                     <div className={`text-xs mt-1 ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
                       {testResult.message}
@@ -1154,7 +1155,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
         <DialogHeader>
           <DialogTitle>{editingConfig ? '编辑 API 配置' : '添加 API 配置'}</DialogTitle>
           <DialogDescription>
-            配置你的 AI 模型 API Key。Key 将安全存储在系统钥匙串中。
+            配置你的 AI 模型 API Key。Key 只保存在本机数据库中，界面不会展示明文。
           </DialogDescription>
         </DialogHeader>
 
@@ -1206,7 +1207,9 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
               onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
-              {editingConfig ? '留空则不修改现有 API Key' : 'API Key 将加密存储在系统钥匙串中'}
+              {editingConfig
+                ? `${describeApiKey(editingConfig.apiKey)}。留空保存则不修改，重新粘贴会覆盖。`
+                : '保存后会显示长度、尾号和指纹，方便确认测试时使用的是同一把 Key。'}
             </p>
           </div>
 

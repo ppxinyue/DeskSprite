@@ -74,7 +74,7 @@ pub async fn test_ai_connection(
         .map_err(|e| e.to_string())?;
 
     let mut builder = client
-        .post(endpoint)
+        .post(&endpoint)
         .header(reqwest::header::CONTENT_TYPE, "application/json");
 
     let body = if is_anthropic {
@@ -101,7 +101,12 @@ pub async fn test_ai_connection(
         Err(e) => {
             return Ok(TestAiConnectionResponse {
                 success: false,
-                message: format!("网络请求失败：{}", e),
+                message: format!(
+                    "网络请求失败：{}；目标 {}；{}",
+                    e,
+                    endpoint,
+                    token_diagnostic(&api_key)
+                ),
                 latency: started.elapsed().as_millis(),
             });
         }
@@ -115,10 +120,12 @@ pub async fn test_ai_connection(
         return Ok(TestAiConnectionResponse {
             success: false,
             message: format!(
-                "HTTP {}: {}",
+                "HTTP {}: {}；已连接到 {}；{}",
                 status.as_u16(),
                 extract_api_error_message(&text)
-                    .unwrap_or_else(|| status.canonical_reason().unwrap_or("请求失败").to_string())
+                    .unwrap_or_else(|| status.canonical_reason().unwrap_or("请求失败").to_string()),
+                endpoint,
+                token_diagnostic(&api_key)
             ),
             latency,
         });
@@ -190,10 +197,7 @@ pub async fn chat_completion(request: ChatCompletionRequest) -> Result<String, S
     parse_chat_response(&text, is_anthropic).ok_or_else(|| "模型返回内容为空。".to_string())
 }
 
-fn build_openai_chat_body(
-    model: &str,
-    messages: &[ChatMessagePayload],
-) -> serde_json::Value {
+fn build_openai_chat_body(model: &str, messages: &[ChatMessagePayload]) -> serde_json::Value {
     let messages = messages
         .iter()
         .map(|message| {
@@ -221,10 +225,7 @@ fn build_openai_chat_body(
     })
 }
 
-fn build_anthropic_chat_body(
-    model: &str,
-    messages: &[ChatMessagePayload],
-) -> serde_json::Value {
+fn build_anthropic_chat_body(model: &str, messages: &[ChatMessagePayload]) -> serde_json::Value {
     let system = messages
         .iter()
         .find(|message| message.role == "system")
@@ -323,7 +324,36 @@ fn normalize_api_key(value: &str) -> String {
     if key.len() >= 7 && key[..7].eq_ignore_ascii_case("bearer ") {
         key = key[7..].trim().to_string();
     }
-    key.trim_matches(['"', '\'', '`']).trim().to_string()
+    key = key
+        .trim_matches(['"', '\'', '`'])
+        .replace(['\u{200B}', '\u{200C}', '\u{200D}', '\u{FEFF}'], "");
+    key.split_whitespace().collect::<String>()
+}
+
+fn token_diagnostic(api_key: &str) -> String {
+    let tail = api_key
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<String>();
+    format!(
+        "Key {} 位，尾号 ...{}，指纹 {:08x}",
+        api_key.chars().count(),
+        tail,
+        fnv1a32(api_key.as_bytes())
+    )
+}
+
+fn fnv1a32(bytes: &[u8]) -> u32 {
+    let mut hash = 0x811c9dc5_u32;
+    for byte in bytes {
+        hash ^= u32::from(*byte);
+        hash = hash.wrapping_mul(0x01000193);
+    }
+    hash
 }
 
 fn extract_api_error_message(text: &str) -> Option<String> {

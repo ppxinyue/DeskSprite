@@ -6,6 +6,17 @@ const INTERNAL_ERROR_MARKERS = [
   'No matching entry found in secure storage',
 ];
 
+export function normalizeApiKeyText(apiKey: string) {
+  return apiKey
+    .trim()
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/^Bearer\s+/i, '')
+    .replace(/\s+/g, '')
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .trim();
+}
+
 export function encodeLocalApiKey(apiKey: string) {
   const bytes = new TextEncoder().encode(apiKey);
   let binary = '';
@@ -30,5 +41,21 @@ export function decodeLocalApiKey(value: string | null | undefined) {
 }
 
 export async function resolveStoredApiKey(apiKey: string | null | undefined) {
-  return decodeLocalApiKey(apiKey).trim();
+  return normalizeApiKeyText(decodeLocalApiKey(apiKey));
+}
+
+export function describeApiKey(apiKey: string | null | undefined) {
+  const normalized = normalizeApiKeyText(decodeLocalApiKey(apiKey));
+  if (!normalized) return 'Key: 未保存';
+  const tail = normalized.slice(-4);
+  return `Key: 已保存 · ${normalized.length} 位 · 尾号 ...${tail} · 指纹 ${hashApiKey(normalized)}`;
+}
+
+function hashApiKey(value: string) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
 }

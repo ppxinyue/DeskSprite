@@ -532,3 +532,10 @@
 - 后端：模型测试和聊天请求发出前再次归一化 token，避免第三方服务商收到 `Bearer Bearer ...` 或带引号 token。
 - 目的：用户如果想复刻默认模型配置，可以直接选择 CloseAI，而不是误选 OpenAI 官方地址导致 `401 invalid token`。
 - 文件：providers.ts, types.ts, apiConfigStore.ts, ai.rs
+
+### R62. API Key 测试可观测性修复（2026-05-07）
+- 诊断：模型测试失败时会同时返回请求 endpoint、Key 长度、尾号和短指纹，确认 `invalid token` 时到底用了哪一把本地保存的 Key，同时不暴露完整明文。
+- 设置：API 配置列表直接展示 Key 的长度、尾号和指纹；编辑弹窗说明改为“本机数据库保存”，不再误写系统钥匙串。
+- 归一化：保存、读取和后端请求前统一去掉 `Bearer `、外层引号、不可见字符和误粘贴的换行/空白。
+- 目的：区分“base_url 已连通但服务商拒绝 token”和“应用没有读到用户刚保存的 token”这两类问题。
+- 文件：apiKeyStorage.ts, apiConfigStore.ts, SettingsPanel.tsx, ai.rs
