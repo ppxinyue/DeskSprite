@@ -511,3 +511,10 @@
 - 编辑：已保存 API Key 的配置打开后显示 `••••••••` 点状占位，不展示明文；点击输入框可清空并重新粘贴新 key，留空保存则保留旧 key。
 - 兼容：旧配置仍可通过 keyring 引用读取；重新填写一次 API Key 后会写入新的本地持久化字段。
 - 文件：0003_add_api_key_to_configs.sql, lib.rs, apiKeyStorage.ts, db.ts, apiConfigStore.ts, SettingsPanel.tsx, defaultModel.ts, aiService.ts
+
+### R59. 模型测试与聊天请求改走后端（2026-05-07）
+- 测试：设置页模型测试不再由前端 WebView `fetch` 服务商地址，改为调用 Tauri `test_ai_connection`，由 Rust `reqwest` 发起真实请求。
+- 错误：测试失败会返回真实 HTTP 状态和服务商错误内容，避免浏览器跨域层把问题折叠成 `TypeError`。
+- 聊天：灵宠小窗、大聊天窗口和 Hover 输入都复用 `streamChat`，现在统一调用后端 `chat_completion`，自定义模型不再受 WebView CORS 限制。
+- 兼容：OpenAI 兼容接口走 `/chat/completions`，Anthropic 走 `/messages`；图片消息在后端分别转换为各自格式。
+- 文件：ai.rs, lib.rs, aiService.ts, SettingsPanel.tsx

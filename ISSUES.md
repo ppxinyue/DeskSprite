@@ -731,3 +731,15 @@
 - 涉及文件：`src-tauri/migrations/0003_add_api_key_to_configs.sql`, `src-tauri/src/lib.rs`, `src/lib/apiKeyStorage.ts`, `src/lib/db.ts`, `src/features/settings/apiConfigStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/ai/defaultModel.ts`, `src/features/ai/aiService.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：桌面应用的关键配置不能只有不可观测的外部安全存储引用；至少要有一个应用本地可迁移、可验证的持久化来源，同时 UI 要明确表达“已保存但不显示明文”。
 - 是否需更新技术文档：是。
+
+## ISSUE-063
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：D. AI 配置 / H. 对话调用
+- 严重程度：阻断
+- 问题现象：用户新增模型保存后，测试显示 `TypeError`，无法判断是 key、模型名还是服务商配置问题。
+- 原因分析：测试和聊天请求在前端 WebView 里直接 `fetch` 服务商 API；很多模型服务商不会给桌面 WebView 源设置 CORS 许可，浏览器会在请求层直接抛 `TypeError`，导致请求甚至没进入服务商接口。
+- 解决方案：模型测试改为 Tauri 后端 `reqwest` 请求；聊天调用也改为后端 `chat_completion`，前端只负责传入本地保存的 key 和消息，后端负责 OpenAI/Anthropic 格式适配。
+- 涉及文件：`src-tauri/src/commands/ai.rs`, `src-tauri/src/lib.rs`, `src/features/ai/aiService.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：桌面 App 访问第三方模型 API 不应依赖 WebView 跨域能力；所有供应商请求都应走后端网络层，前端只处理 UI 与本地配置。
+- 是否需更新技术文档：是。

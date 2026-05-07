@@ -725,72 +725,18 @@ async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; mes
     return { success: false, message: 'API Key 为空。' };
   }
 
-  const started = performance.now();
-  const provider = (config.providerId || config.provider).toLowerCase();
-  const baseUrl = config.baseUrl.replace(/\/+$/, '');
-  const isAnthropic = provider === 'anthropic';
-  const endpoint = isAnthropic ? `${baseUrl}/messages` : `${baseUrl}/chat/completions`;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (isAnthropic) {
-    headers['x-api-key'] = apiKey;
-    headers['anthropic-version'] = '2023-06-01';
-  } else {
-    headers.Authorization = `Bearer ${apiKey}`;
-  }
-
-  const body = isAnthropic
-    ? {
-        model: config.model,
-        max_tokens: 1,
-        messages: [{ role: 'user', content: 'ping' }],
-      }
-    : {
-        model: config.model,
-        max_tokens: 1,
-        stream: false,
-        messages: [{ role: 'user', content: 'ping' }],
-      };
-
-  let response: Response;
   try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
+    return await invoke<{ success: boolean; message: string; latency?: number }>('test_ai_connection', {
+      request: {
+        provider: (config.providerId || config.provider).toLowerCase(),
+        baseUrl: config.baseUrl,
+        model: config.model,
+        apiKey,
+      },
     });
   } catch (e) {
     return { success: false, message: e instanceof Error ? e.message : String(e) };
   }
-
-  const latency = Math.round(performance.now() - started);
-  const text = await response.text().catch(() => '');
-  if (!response.ok) {
-    return {
-      success: false,
-      message: `HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText || '请求失败'}`,
-      latency,
-    };
-  }
-
-  return { success: true, message: '测试通过', latency };
-}
-
-function extractApiErrorMessage(text: string) {
-  if (!text) return '';
-  try {
-    const data = JSON.parse(text);
-    const error = data?.error;
-    if (typeof error === 'string') return error;
-    if (typeof error?.message === 'string') return error.message;
-    if (typeof data?.message === 'string') return data.message;
-    if (typeof data?.detail === 'string') return data.detail;
-    if (typeof data?.errmsg === 'string') return data.errmsg;
-  } catch {
-    // Fall through to raw text.
-  }
-  return text.slice(0, 800);
 }
 
 function AISection({

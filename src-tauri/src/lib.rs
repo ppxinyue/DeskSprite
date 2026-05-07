@@ -69,6 +69,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             commands::ai::test_ai_connection,
+            commands::ai::chat_completion,
             commands::desktop::get_desktop_bounds,
             commands::desktop::can_start_speech_recognition,
             commands::desktop::open_external_url,
