@@ -5,6 +5,7 @@ import { emit } from '@tauri-apps/api/event';
 export type Theme = 'light' | 'dark' | 'system';
 export type PetMotionName = 'petJump' | 'petWobble' | 'petBreathe';
 export type VoiceProviderMode = 'system' | 'cloud-auto' | 'user-cloud';
+export type ModelMode = 'default' | 'custom';
 
 export interface PetMotionSetting {
   enabled: boolean;
@@ -25,6 +26,7 @@ export interface AppSettings {
   smartAttach: boolean;
   attachActivity: 'low' | 'medium' | 'high';
   alwaysOnTop: boolean;
+  chatModelMode: ModelMode;
   temperature: number;
   maxTokens: number;
   streamOutput: boolean;
@@ -32,6 +34,12 @@ export interface AppSettings {
   voiceOutput: boolean;
   voiceInputProvider: VoiceProviderMode;
   voiceOutputProvider: VoiceProviderMode;
+  customSttBaseUrl: string;
+  customSttModel: string;
+  customSttApiKey: string;
+  customTtsBaseUrl: string;
+  customTtsModel: string;
+  customTtsApiKey: string;
   wakeWord: string;
   wakeWordEnabled: boolean;
   autoSpeak: boolean;
@@ -55,6 +63,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   smartAttach: true,
   attachActivity: 'medium',
   alwaysOnTop: true,
+  chatModelMode: 'default',
   temperature: 0.7,
   maxTokens: 2048,
   streamOutput: true,
@@ -62,6 +71,12 @@ const DEFAULT_SETTINGS: AppSettings = {
   voiceOutput: true,
   voiceInputProvider: 'cloud-auto',
   voiceOutputProvider: 'cloud-auto',
+  customSttBaseUrl: 'https://api.openai-proxy.org/v1',
+  customSttModel: 'gpt-4o-mini-transcribe',
+  customSttApiKey: '',
+  customTtsBaseUrl: 'https://api.openai-proxy.org/v1',
+  customTtsModel: 'tts-1-hd',
+  customTtsApiKey: '',
   wakeWord: '你好灵宠',
   wakeWordEnabled: false,
   autoSpeak: false,
@@ -94,6 +109,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
             (loaded as Record<string, unknown>)[key] =
               key === 'theme' && !['system', 'light', 'dark'].includes(String(parsed))
                 ? 'system'
+                : key === 'chatModelMode' && !isModelMode(parsed)
+                  ? 'default'
                 : (key === 'voiceInputProvider' || key === 'voiceOutputProvider') && !isVoiceProviderMode(parsed)
                   ? 'system'
                 : key === 'dialogWidth' && typeof parsed === 'number'
@@ -143,6 +160,10 @@ function tryParse(value: string): unknown {
 
 function isVoiceProviderMode(value: unknown): value is VoiceProviderMode {
   return value === 'system' || value === 'cloud-auto' || value === 'user-cloud';
+}
+
+function isModelMode(value: unknown): value is ModelMode {
+  return value === 'default' || value === 'custom';
 }
 
 function normalizePetMotions(value: unknown): PetMotionSettings {

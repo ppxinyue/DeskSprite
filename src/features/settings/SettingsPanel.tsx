@@ -8,13 +8,13 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SettingsLayout } from '@/components/layouts/SettingsLayout';
-import { useSettingsStore, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
+import { useSettingsStore, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG, getBuiltinUsageStats } from '@/features/ai/defaultModel';
 import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
-import { getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
+import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getMessages, getSystemPrompt, setSetting, updateSystemPrompt } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
@@ -830,26 +830,21 @@ function AISection({
       </SettingRow>
 
       <Separator className="my-6" />
-      <div className="flex items-center justify-between mb-4">
-        <SectionTitle>API 配置</SectionTitle>
-        <Button size="sm" onClick={onAdd}>
-          <Plus className="h-4 w-4 mr-1" />
-          添加配置
-        </Button>
-      </div>
-
-      <div className="border border-border rounded-lg p-3 mb-3 bg-muted/40">
+      <SectionTitle>内置额度</SectionTitle>
+      <div className="border border-border rounded-lg p-3 mb-6 bg-muted/40">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <span className="font-medium text-sm">CloseAI</span>
-            <span className="text-xs text-muted-foreground ml-2">
-              {BUILTIN_CLOSEAI_CONFIG.model} · Key: 内置隐藏
-            </span>
+            <span className="font-medium text-sm">CloseAI 默认服务</span>
+            <span className="text-xs text-muted-foreground ml-2">Key: 内置隐藏</span>
           </div>
-          <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">内置默认</span>
+          <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">本机额度</span>
         </div>
-        <div className="text-xs text-muted-foreground">{BUILTIN_CLOSEAI_CONFIG.baseUrl}</div>
-        <div className="text-xs text-muted-foreground mt-1">未配置自有默认模型时自动使用，额度 100000 token。</div>
+        <div className="grid gap-1 text-xs text-muted-foreground">
+          <div>Chat: {BUILTIN_CLOSEAI_CONFIG.model}</div>
+          <div>STT: {BUILTIN_STT_MODEL}</div>
+          <div>TTS: {BUILTIN_TTS_MODEL}</div>
+          <div>{BUILTIN_CLOSEAI_CONFIG.baseUrl}</div>
+        </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           <UsageMeter
             label="Chat"
@@ -867,6 +862,31 @@ function AISection({
             detail={`${formatCompactNumber(builtinUsage?.voice.tts.used ?? 0)} / ${formatCompactNumber(builtinUsage?.voice.tts.limit ?? 100000)} 字符`}
           />
         </div>
+      </div>
+
+      <SectionTitle>Chat 模型</SectionTitle>
+      <SettingRow label="Chat 使用">
+        <select
+          className="bg-input border border-border rounded px-2 py-1 text-sm"
+          value={settings.chatModelMode}
+          onChange={(e) => updateSetting('chatModelMode', e.target.value as ModelMode)}
+        >
+          <option value="default">默认</option>
+          <option value="custom">自定义</option>
+        </select>
+      </SettingRow>
+      {settings.chatModelMode === 'custom' && (
+        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          Chat 自定义会使用下方 API 配置中标记为“默认”的模型；也可以在大聊天窗口中为单个面板临时选择其他模型。
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <SectionTitle>Chat 自定义配置</SectionTitle>
+        <Button size="sm" onClick={onAdd}>
+          <Plus className="h-4 w-4 mr-1" />
+          添加配置
+        </Button>
       </div>
 
       <div className="space-y-3 mb-6">
@@ -945,18 +965,47 @@ function AISection({
       </SettingRow>
 
       <Separator className="my-6" />
-      <SectionTitle>语音</SectionTitle>
-      <SettingRow label="语音输入方式" hint="云端增强优先使用内置 STT 额度，用完或失败后自动回退系统输入">
+      <SectionTitle>STT 模型</SectionTitle>
+      <SettingRow label="STT 使用" hint="默认和自定义都会在失败时回退到系统输入">
         <select
           className="bg-input border border-border rounded px-2 py-1 text-sm"
           value={settings.voiceInputProvider}
           onChange={(e) => updateSetting('voiceInputProvider', e.target.value as VoiceProviderMode)}
         >
-          <option value="cloud-auto">云端增强</option>
+          <option value="cloud-auto">默认</option>
+          <option value="user-cloud">自定义</option>
           <option value="system">系统输入</option>
-          <option value="user-cloud">用户默认模型 Key</option>
         </select>
       </SettingRow>
+      {settings.voiceInputProvider === 'user-cloud' && (
+        <div className="mb-4 grid gap-3 rounded-md border border-border bg-muted/30 p-3">
+          <SettingRow label="STT Base URL">
+            <Input
+              value={settings.customSttBaseUrl}
+              onChange={(e) => updateSetting('customSttBaseUrl', e.target.value.trim())}
+              className="w-full max-w-md"
+              placeholder="https://api.example.com/v1"
+            />
+          </SettingRow>
+          <SettingRow label="STT 模型">
+            <Input
+              value={settings.customSttModel}
+              onChange={(e) => updateSetting('customSttModel', e.target.value.trim())}
+              className="w-full max-w-md"
+              placeholder="gpt-4o-mini-transcribe"
+            />
+          </SettingRow>
+          <SettingRow label="STT API Key">
+            <Input
+              type="password"
+              value={settings.customSttApiKey}
+              onChange={(e) => updateSetting('customSttApiKey', e.target.value)}
+              className="w-full max-w-md"
+              placeholder="sk-..."
+            />
+          </SettingRow>
+        </div>
+      )}
       <SettingRow label="语音输入语言">
         <select className="bg-input border border-border rounded px-2 py-1 text-sm"
           value={settings.voiceInputLang} onChange={(e) => updateSetting('voiceInputLang', e.target.value)}>
@@ -965,20 +1014,52 @@ function AISection({
           <option value="en-US">英文</option>
         </select>
       </SettingRow>
+
+      <Separator className="my-6" />
+      <SectionTitle>TTS 模型</SectionTitle>
       <SettingRow label="语音输出">
         <Switch checked={settings.voiceOutput} onCheckedChange={(v) => updateSetting('voiceOutput', v)} />
       </SettingRow>
-      <SettingRow label="语音输出方式" hint="云端增强优先使用内置 TTS 额度，用完或失败后自动回退系统朗读">
+      <SettingRow label="TTS 使用" hint="默认和自定义都会在失败时回退到系统朗读">
         <select
           className="bg-input border border-border rounded px-2 py-1 text-sm"
           value={settings.voiceOutputProvider}
           onChange={(e) => updateSetting('voiceOutputProvider', e.target.value as VoiceProviderMode)}
         >
-          <option value="cloud-auto">云端增强</option>
+          <option value="cloud-auto">默认</option>
+          <option value="user-cloud">自定义</option>
           <option value="system">系统朗读</option>
-          <option value="user-cloud">用户默认模型 Key</option>
         </select>
       </SettingRow>
+      {settings.voiceOutputProvider === 'user-cloud' && (
+        <div className="mb-4 grid gap-3 rounded-md border border-border bg-muted/30 p-3">
+          <SettingRow label="TTS Base URL">
+            <Input
+              value={settings.customTtsBaseUrl}
+              onChange={(e) => updateSetting('customTtsBaseUrl', e.target.value.trim())}
+              className="w-full max-w-md"
+              placeholder="https://api.example.com/v1"
+            />
+          </SettingRow>
+          <SettingRow label="TTS 模型">
+            <Input
+              value={settings.customTtsModel}
+              onChange={(e) => updateSetting('customTtsModel', e.target.value.trim())}
+              className="w-full max-w-md"
+              placeholder="tts-1-hd"
+            />
+          </SettingRow>
+          <SettingRow label="TTS API Key">
+            <Input
+              type="password"
+              value={settings.customTtsApiKey}
+              onChange={(e) => updateSetting('customTtsApiKey', e.target.value)}
+              className="w-full max-w-md"
+              placeholder="sk-..."
+            />
+          </SettingRow>
+        </div>
+      )}
 
       <Separator className="my-6" />
       <SectionTitle>语音设置</SectionTitle>

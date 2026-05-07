@@ -1,13 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getSetting, setSetting } from '@/lib/db';
-import { useApiConfigStore } from '@/features/settings/apiConfigStore';
-import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
-import type { VoiceProviderMode } from '@/features/settings/settingsStore';
+import type { AppSettings, VoiceProviderMode } from '@/features/settings/settingsStore';
 
 const BUILTIN_VOICE_BASE_URL = 'https://api.openai-proxy.org/v1';
 const BUILTIN_VOICE_API_KEY = 'sk-RUPf8NG93A0bg6Phr3GvHaEXj1z2vFKb2eLIMvgjuaGCLMS7';
-const BUILTIN_STT_MODEL = 'gpt-4o-mini-transcribe';
-const BUILTIN_TTS_MODEL = 'gpt-4o-mini-tts';
+export const BUILTIN_TTS_MODEL = 'tts-1-hd';
+export const BUILTIN_STT_MODEL = 'gpt-4o-mini-transcribe';
 const BUILTIN_STT_USAGE_KEY = 'builtinCloseAiSttSecondsUsage';
 const BUILTIN_TTS_USAGE_KEY = 'builtinCloseAiTtsCharsUsage';
 
@@ -17,8 +15,7 @@ export const BUILTIN_TTS_CHARS_LIMIT = 100_000;
 interface VoiceCloudConfig {
   baseUrl: string;
   apiKey: string;
-  sttModel: string;
-  ttsModel: string;
+  model: string;
   usingBuiltin: boolean;
 }
 
@@ -36,36 +33,52 @@ export function stopCloudVoice() {
   currentVoiceAudio = null;
 }
 
-export async function resolveVoiceCloudConfig(mode: VoiceProviderMode): Promise<VoiceCloudConfig | null> {
+type VoiceModule = 'stt' | 'tts';
+type VoiceSettings = Pick<
+  AppSettings,
+  | 'customSttBaseUrl'
+  | 'customSttModel'
+  | 'customSttApiKey'
+  | 'customTtsBaseUrl'
+  | 'customTtsModel'
+  | 'customTtsApiKey'
+>;
+
+export async function resolveVoiceCloudConfig(
+  module: VoiceModule,
+  mode: VoiceProviderMode,
+  settings: VoiceSettings,
+): Promise<VoiceCloudConfig | null> {
   if (mode === 'system') return null;
 
   if (mode === 'user-cloud') {
-    const defaultConfig = useApiConfigStore.getState().getDefaultConfig();
-    if (defaultConfig) {
-      const apiKey = await resolveStoredApiKey(defaultConfig.apiKey);
-      if (apiKey) {
-        return {
-          baseUrl: defaultConfig.baseUrl,
-          apiKey,
-          sttModel: BUILTIN_STT_MODEL,
-          ttsModel: BUILTIN_TTS_MODEL,
-          usingBuiltin: false,
-        };
-      }
-    }
+    const baseUrl = module === 'stt' ? settings.customSttBaseUrl : settings.customTtsBaseUrl;
+    const model = module === 'stt' ? settings.customSttModel : settings.customTtsModel;
+    const apiKey = module === 'stt' ? settings.customSttApiKey : settings.customTtsApiKey;
+    if (!baseUrl.trim() || !model.trim() || !apiKey.trim()) return null;
+    return {
+      baseUrl,
+      model,
+      apiKey,
+      usingBuiltin: false,
+    };
   }
 
   return {
     baseUrl: BUILTIN_VOICE_BASE_URL,
     apiKey: BUILTIN_VOICE_API_KEY,
-    sttModel: BUILTIN_STT_MODEL,
-    ttsModel: BUILTIN_TTS_MODEL,
+    model: module === 'stt' ? BUILTIN_STT_MODEL : BUILTIN_TTS_MODEL,
     usingBuiltin: true,
   };
 }
 
-export async function transcribeWithCloudVoice(mode: VoiceProviderMode, lang: string, maxMs = 8_000): Promise<string> {
-  const config = await resolveVoiceCloudConfig(mode);
+export async function transcribeWithCloudVoice(
+  mode: VoiceProviderMode,
+  lang: string,
+  settings: VoiceSettings,
+  maxMs = 8_000,
+): Promise<string> {
+  const config = await resolveVoiceCloudConfig('stt', mode, settings);
   if (!config) throw new Error('cloud voice disabled');
   if (config.usingBuiltin && (await getBuiltinSttUsage()) >= BUILTIN_STT_SECONDS_LIMIT) {
     throw new Error('内置语音输入额度已用完');
@@ -74,10 +87,10 @@ export async function transcribeWithCloudVoice(mode: VoiceProviderMode, lang: st
   const { blob, durationMs } = await recordAudioClip(maxMs);
   const audioBase64 = await blobToBase64(blob);
   const text = await invoke<string>('transcribe_audio', {
-    request: {
-      baseUrl: config.baseUrl,
-      model: config.sttModel,
-      apiKey: config.apiKey,
+      request: {
+        baseUrl: config.baseUrl,
+        model: config.model,
+        apiKey: config.apiKey,
       audioBase64,
       mimeType: blob.type || 'audio/webm',
       fileName: audioFileName(blob.type),
@@ -90,10 +103,10 @@ export async function transcribeWithCloudVoice(mode: VoiceProviderMode, lang: st
   return text.trim();
 }
 
-export async function speakWithCloudVoice(text: string, mode: VoiceProviderMode): Promise<boolean> {
+export async function speakWithCloudVoice(text: string, mode: VoiceProviderMode, settings: VoiceSettings): Promise<boolean> {
   const cleanText = text.trim();
   if (!cleanText) return false;
-  const config = await resolveVoiceCloudConfig(mode);
+  const config = await resolveVoiceCloudConfig('tts', mode, settings);
   if (!config) return false;
   if (config.usingBuiltin && (await getBuiltinTtsUsage()) + cleanText.length > BUILTIN_TTS_CHARS_LIMIT) {
     return false;
@@ -103,7 +116,7 @@ export async function speakWithCloudVoice(text: string, mode: VoiceProviderMode)
     const response = await invoke<SynthesizeSpeechResponse>('synthesize_speech', {
       request: {
         baseUrl: config.baseUrl,
-        model: config.ttsModel,
+        model: config.model,
         apiKey: config.apiKey,
         input: cleanText,
         voice: 'alloy',

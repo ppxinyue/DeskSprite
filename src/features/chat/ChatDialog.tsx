@@ -150,7 +150,7 @@ export function ChatDialog({
     if ((!text && !selectedImage) || isStreaming) return;
     const messageText = text || '请分析这张图片。';
 
-    const defaultConfig = getDefaultConfig();
+    const defaultConfig = settings.chatModelMode === 'custom' ? getDefaultConfig() : undefined;
     const resolved = await resolveChatConfig(defaultConfig);
     if (!resolved.config) {
       addMessage(createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。'));
@@ -254,6 +254,7 @@ export function ChatDialog({
       setIsListening,
       lang,
       settings.voiceInputProvider,
+      settings,
     );
   }
 
@@ -493,7 +494,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
   }
 
   async function resolvePanelConfig(modelId: string) {
-    const defaultConfig = getDefaultConfig();
+    const defaultConfig = settings.chatModelMode === 'custom' ? getDefaultConfig() : undefined;
     const modelConfig = configs.find((c) => String(c.id) === modelId);
     return modelConfig
       ? { ...(await resolveStoredChatConfig(modelConfig)), usingBuiltin: false }
@@ -660,6 +661,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
                     (listening) => updatePanel(panel.id, { isListening: listening }),
                     lang,
                     settings.voiceInputProvider,
+                    settings,
                   );
                 }}
               />
@@ -841,11 +843,13 @@ async function startSpeechInput(
   setListening: (listening: boolean) => void,
   lang?: string,
   providerMode: VoiceProviderMode = 'system',
+  settings?: AppSettings,
 ) {
   if (providerMode !== 'system') {
     setListening(true);
     try {
-      const text = await transcribeWithCloudVoice(providerMode, lang || (navigator.language || 'zh-CN'));
+      if (!settings) throw new Error('missing voice settings');
+      const text = await transcribeWithCloudVoice(providerMode, lang || (navigator.language || 'zh-CN'), settings);
       setListening(false);
       if (text) {
         onText(text);
@@ -856,6 +860,8 @@ async function startSpeechInput(
       setListening(false);
       if (providerMode === 'cloud-auto') {
         window.alert('内置语音输入额度已用完或云端识别暂不可用，已切换到系统语音输入。');
+      } else if (providerMode === 'user-cloud') {
+        window.alert('自定义 STT 未配置或暂不可用，已切换到系统语音输入。');
       }
     }
   }
@@ -927,13 +933,13 @@ async function startSpeechInput(
   }
 }
 
-async function speakAssistantText(text: string, settings: Pick<AppSettings, 'voiceOutput' | 'voiceOutputProvider' | 'speakRate'>) {
+async function speakAssistantText(text: string, settings: AppSettings) {
   if (!settings.voiceOutput) return;
   const cleanText = stripMarkdown(cleanChatText(text));
   if (!cleanText) return;
 
   if (settings.voiceOutputProvider !== 'system') {
-    const spoken = await speakWithCloudVoice(cleanText, settings.voiceOutputProvider);
+    const spoken = await speakWithCloudVoice(cleanText, settings.voiceOutputProvider, settings);
     if (spoken) return;
   }
 
@@ -1034,11 +1040,7 @@ function StandaloneChatPanel({
               speakRate={speakRate}
               onSpeak={(text, rate) => {
                 const currentSettings = useSettingsStore.getState().settings;
-                speakAssistantText(text, {
-                  voiceOutput: currentSettings.voiceOutput,
-                  voiceOutputProvider: currentSettings.voiceOutputProvider,
-                  speakRate: rate,
-                });
+                speakAssistantText(text, { ...currentSettings, speakRate: rate });
               }}
             />
           ))}
@@ -1080,16 +1082,17 @@ function ModelControl({
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const chatModelMode = useSettingsStore((state) => state.settings.chatModelMode);
   const defaultConfig = configs.find((config) => config.isDefault);
   const options = configs.length === 0
     ? [{ id: 'default', title: `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`, description: '内置默认模型' }]
     : [
         {
           id: 'default',
-          title: defaultConfig
+          title: chatModelMode === 'custom' && defaultConfig
             ? `默认 · ${defaultConfig.provider} · ${defaultConfig.model}`
             : `默认 · CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`,
-          description: defaultConfig?.baseUrl ?? '内置默认模型',
+          description: chatModelMode === 'custom' && defaultConfig ? defaultConfig.baseUrl : '内置默认模型',
         },
         { id: 'builtin', title: `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`, description: '内置默认模型' },
         ...configs.map((config) => ({

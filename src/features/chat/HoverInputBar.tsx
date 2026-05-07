@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApiConfigStore } from '@/features/settings/apiConfigStore';
+import { useSettingsStore } from '@/features/settings/settingsStore';
 import { useChatStore, createMessage } from './chatStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { streamChat } from '@/features/ai/aiService';
@@ -16,6 +17,7 @@ interface HoverInputBarProps {
 export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarProps) {
   const [input, setInput] = useState('');
   const { getDefaultConfig } = useApiConfigStore();
+  const { settings } = useSettingsStore();
   const hasApiKey = true;
 
   const {
@@ -28,7 +30,7 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
     const text = input.trim();
     if (!text) return;
 
-    const defaultConfig = getDefaultConfig();
+    const defaultConfig = settings.chatModelMode === 'custom' ? getDefaultConfig() : undefined;
     const resolved = await resolveChatConfig(defaultConfig);
     if (!resolved.config) {
       addMessage(createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。'));

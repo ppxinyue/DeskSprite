@@ -560,3 +560,12 @@
 - 后端：新增 `transcribe_audio`、`synthesize_speech` Tauri 命令，并为 `reqwest` 开启 multipart 支持。
 - 验证：`pnpm build`、`cargo check --manifest-path src-tauri/Cargo.toml` 通过；`cargo check` 首次因沙箱网络限制失败，提升权限下载新增依赖后通过。
 - 文件：Cargo.toml, Cargo.lock, ai.rs, lib.rs, defaultModel.ts, voiceService.ts, ChatDialog.tsx, SettingsPanel.tsx, settingsStore.ts, voice-stt-tts-plan.md
+
+### R66. Chat/TTS/STT 模型配置拆分（2026-05-07）
+- 默认 TTS：内置 TTS 模型从 `gpt-4o-mini-tts` 切换为 `tts-1-hd`，用于验证更高质量语音输出。
+- Chat：新增 `chatModelMode`，可在设置中选择默认 CloseAI Chat 或自定义 Chat；自定义 Chat 复用 API 配置中设为默认的模型。
+- STT：设置页新增独立 STT 模型模块，支持默认、自定义、系统输入；自定义 STT 单独保存 Base URL、模型名和 API Key。
+- TTS：设置页新增独立 TTS 模型模块，支持默认、自定义、系统朗读；自定义 TTS 单独保存 Base URL、模型名和 API Key。
+- 调用：小窗、大窗和 Hover 输入都会按 Chat 模型模式选择默认或自定义；云端 STT/TTS 会按各自配置调用，失败仍回退系统能力。
+- 验证：`pnpm build`、`cargo check --manifest-path src-tauri/Cargo.toml` 通过。
+- 文件：settingsStore.ts, voiceService.ts, SettingsPanel.tsx, ChatDialog.tsx, HoverInputBar.tsx, voice-stt-tts-plan.md

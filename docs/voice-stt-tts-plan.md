@@ -26,7 +26,7 @@
 
 - base URL: `https://api.openai-proxy.org/v1`
 - STT model: `gpt-4o-mini-transcribe`
-- TTS model: `gpt-4o-mini-tts`
+- TTS model: `tts-1-hd`
 
 注意：默认 API Key 不应写入文档、日志、错误信息或可搜索的源码注释。客户端内置 key 天然可被逆向提取，只适合作为体验额度，不适合作为真正安全的免费额度系统。
 
@@ -146,8 +146,9 @@
    - 云端 TTS 播放
    - 系统回退
 4. 设置页增加“语音模型”高级区域：
-   - 输入方式：系统 / 云端增强 / 用户模型
-   - 输出方式：系统 / 云端增强 / 用户模型
+   - Chat：默认 / 自定义
+   - STT：默认 / 自定义 / 系统输入
+   - TTS：默认 / 自定义 / 系统朗读
    - 显示额度使用情况
 5. 聊天窗口语音按钮接入新 service。
 6. 自动朗读接入云端 TTS，失败回退 `speechSynthesis`。
@@ -158,6 +159,7 @@
 - 内置 TTS 额度：每台设备本地记录 100000 字符。
 - 内置 Chat 额度：每台设备本地记录 100000 token 估算值。
 - 设置页 `AI 对话` 中展示 Chat/STT/TTS 三类内置额度使用百分比。
+- Chat、STT、TTS 在设置页分开配置：Chat 自定义复用 API 配置中的默认模型，STT/TTS 自定义各自保存 base URL、模型名和 API Key。
 - 当前没有账户系统，因此额度独立跟随设备；重新安装、迁移数据或手动清理本地数据库会影响本地额度记录。
 - 云端 STT 使用 `MediaRecorder` 录音并发送到 OpenAI-compatible `/audio/transcriptions`。
 - 云端 TTS 使用 OpenAI-compatible `/audio/speech`，返回 data URL 后由前端播放。
