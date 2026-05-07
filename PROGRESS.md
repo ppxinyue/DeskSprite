@@ -499,8 +499,8 @@
 - 文件：providers.ts, types.ts, SettingsPanel.tsx, ChatDialog.tsx, desktop.rs, lib.rs
 
 ### R57. API Key 保存与测试链路修复（2026-05-07）
-- 保存：新增 API 配置时使用唯一 keyring 引用写入系统钥匙串，并在落库前立刻读回校验，避免保存成功但测试取不到 key。
-- 编辑：编辑旧配置时如果缺少 `keyring_ref`，会生成新引用、保存 API Key，并把新引用同步写回数据库。
-- 校验：编辑已有配置且不修改 API Key 时，会先确认钥匙串中仍存在原 key；若缺失则要求用户重新填写。
-- 测试：测试模型时如果钥匙串条目缺失，返回“重新填写并保存”的明确提示，而不是底层 secure storage 错误。
+- 保存：新增 API 配置时使用唯一 keyring 引用写入系统钥匙串，并把引用写入数据库。
+- 编辑：只要用户重新填写 API Key，就生成新的简单格式 keyring 引用、覆盖保存 API Key，并把新引用同步写回数据库，避免继续复用坏引用。
+- 留空：编辑已有配置且 API Key 留空时，只保留原引用，不在保存阶段读取钥匙串，避免因为旧 keychain 条目异常阻断用户修改模型参数。
+- 测试：测试模型时如果钥匙串条目缺失，返回“重新填写并保存”的明确提示；重新填写保存会刷新引用。
 - 文件：apiConfigStore.ts, db.ts, SettingsPanel.tsx

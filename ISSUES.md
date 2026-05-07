@@ -714,8 +714,8 @@
 - 相关任务：D. AI 配置 / 模型测试
 - 严重程度：严重
 - 问题现象：用户刚填写并保存 API Key 后，点击测试模型仍返回 `No matching entry found in secure storage`，说明测试链路没有读到刚保存的 key。
-- 原因分析：编辑旧配置时，如果原数据库记录没有 `keyring_ref`，前端会生成新的钥匙串引用并保存 API Key，但 `updateApiConfig` 只更新 provider/base_url/model/name/provider_id，没有把新的 `keyring_ref` 写回数据库；后续测试仍按旧引用读取，导致钥匙串查不到条目。
-- 解决方案：`updateApiConfig` 支持更新 `keyring_ref`；保存 API Key 后立即读回校验；编辑时若不修改 API Key，也会检查既有 keyring 条目是否存在，缺失时要求重新填写。
+- 原因分析：编辑旧配置时，如果原数据库记录没有 `keyring_ref` 或引用已经失效，前端可能继续复用坏引用；上一轮增加的保存后立即读回校验也会在保存阶段把旧 keychain 异常暴露给用户，导致无法完成重新保存。
+- 解决方案：`updateApiConfig` 支持更新 `keyring_ref`；用户重新填写 API Key 时总是生成新的简单格式引用并写回数据库；API Key 留空编辑时不再读取旧钥匙串，测试/调用模型时再读取并提示重新填写。
 - 涉及文件：`src/features/settings/apiConfigStore.ts`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
-- 经验总结：安全存储引用必须和数据库记录同事务语义更新；任何 keychain 写入都应该读回确认，不能只相信写入命令没有抛错。
+- 经验总结：安全存储引用必须和数据库记录同事务语义更新；“重新填写保存”应能刷新坏引用，保存阶段不能因为旧引用异常阻断用户修复配置。
 - 是否需更新技术文档：是。

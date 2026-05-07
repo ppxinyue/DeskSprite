@@ -8,7 +8,6 @@ import {
 } from '@/lib/db';
 import {
   saveApiKey,
-  getApiKey,
   deleteApiKey,
 } from '@/lib/keychain';
 import { emit } from '@tauri-apps/api/event';
@@ -92,13 +91,15 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
 
   updateConfig: async (id, provider, baseUrl, model, name, providerId, apiKey) => {
     const config = get().configs.find((c) => c.id === id);
-    const keyringRef = config?.keyringRef ?? createKeyringRef(id);
+    let keyringRef = config?.keyringRef ?? null;
 
     if (apiKey && apiKey.length > 0) {
+      keyringRef = createKeyringRef(id);
       await persistApiKey(keyringRef, apiKey);
-    } else if (config?.keyringRef) {
-      await ensureApiKeyExists(keyringRef);
-    } else if (!config?.keyringRef) {
+      if (config?.keyringRef && config.keyringRef !== keyringRef) {
+        deleteApiKey(config.keyringRef).catch(() => undefined);
+      }
+    } else if (!keyringRef) {
       throw new Error('缺少 API Key，请重新填写并保存。');
     }
 
@@ -135,7 +136,7 @@ function createKeyringRef(id?: number) {
   const randomPart = typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  return id ? `api_key/${id}_${randomPart}` : `api_key/${randomPart}`;
+  return id ? `desksprite_api_key_${id}_${randomPart}` : `desksprite_api_key_${randomPart}`;
 }
 
 async function persistApiKey(keyringRef: string, apiKey: string) {
@@ -144,19 +145,4 @@ async function persistApiKey(keyringRef: string, apiKey: string) {
     throw new Error('API Key 不能为空。');
   }
   await saveApiKey(keyringRef, normalizedKey);
-  const savedKey = await getApiKey(keyringRef);
-  if (savedKey !== normalizedKey) {
-    throw new Error('API Key 保存校验失败，请重试。');
-  }
-}
-
-async function ensureApiKeyExists(keyringRef: string) {
-  try {
-    const savedKey = await getApiKey(keyringRef);
-    if (!savedKey.trim()) {
-      throw new Error('API Key 为空。');
-    }
-  } catch {
-    throw new Error('未找到已保存的 API Key，请重新填写并保存。');
-  }
 }
