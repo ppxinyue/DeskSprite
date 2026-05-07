@@ -74,6 +74,7 @@ pub fn run() {
             commands::images::import_pet_image,
             commands::images::delete_pet_image,
             commands::images::list_pet_images,
+            commands::images::read_pet_image_data_url,
             commands::screenshot::capture_screen_region,
             commands::window::show_pet_window,
             commands::window::hide_pet_window,

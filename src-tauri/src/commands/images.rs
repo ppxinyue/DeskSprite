@@ -1,3 +1,4 @@
+use base64::{Engine, engine::general_purpose::STANDARD};
 use image::ImageFormat;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,6 +34,34 @@ fn validate_image_extension(path: &Path) -> Result<(), String> {
             "不支持的图片格式 .{}，请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 图片",
             ext
         ))
+    }
+}
+
+fn ensure_pet_image_path(app_handle: &AppHandle, path: &Path) -> Result<(), String> {
+    let local_data_dir = app_handle
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("Failed to get local data dir: {}", e))?;
+    let assets_base = local_data_dir.join("assets");
+    let canonical_path = fs::canonicalize(path)
+        .map_err(|e| format!("Failed to canonicalize image path: {}", e))?;
+    let canonical_base = fs::canonicalize(&assets_base)
+        .map_err(|e| format!("Failed to canonicalize assets directory: {}", e))?;
+
+    if canonical_path.starts_with(&canonical_base) {
+        Ok(())
+    } else {
+        Err("File path is not in allowed assets directory".to_string())
+    }
+}
+
+fn image_mime(path: &Path) -> &'static str {
+    match path.extension().and_then(|s| s.to_str()).map(|s| s.to_ascii_lowercase()).as_deref() {
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
+        Some("gif") => "image/gif",
+        Some("bmp") => "image/bmp",
+        _ => "image/png",
     }
 }
 
@@ -97,17 +126,7 @@ pub async fn delete_pet_image(
     file_path: String,
 ) -> Result<(), String> {
     let path = PathBuf::from(&file_path);
-
-    // Security check: ensure the file is in our assets directory
-    let local_data_dir = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| format!("Failed to get local data dir: {}", e))?;
-    let assets_base = local_data_dir.join("assets");
-
-    if !path.starts_with(&assets_base) {
-        return Err("File path is not in allowed assets directory".to_string());
-    }
+    ensure_pet_image_path(&app_handle, &path)?;
 
     fs::remove_file(&path)
         .map_err(|e| format!("Failed to delete file: {}", e))?;
@@ -145,4 +164,18 @@ pub async fn list_pet_images(
     images.sort();
 
     Ok(images)
+}
+
+#[tauri::command]
+pub async fn read_pet_image_data_url(
+    app_handle: AppHandle,
+    file_path: String,
+) -> Result<String, String> {
+    let path = PathBuf::from(&file_path);
+    validate_image_extension(&path)?;
+    ensure_pet_image_path(&app_handle, &path)?;
+
+    let bytes = fs::read(&path)
+        .map_err(|e| format!("Failed to read image file: {}", e))?;
+    Ok(format!("data:{};base64,{}", image_mime(&path), STANDARD.encode(bytes)))
 }

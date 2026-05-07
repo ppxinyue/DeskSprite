@@ -659,3 +659,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/pet/animations.ts`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：public 资源在桌面 WebView 中应使用绝对路径；“资源库”和“启用集合”必须分开建模，否则上传资源会隐式覆盖默认资源，无法支持逐张启用。
 - 是否需更新技术文档：是。
+
+## ISSUE-057
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：E. 设置中心 / F. 灵宠形象 / H. 小对话窗口
+- 严重程度：严重
+- 问题现象：上传的宠物图片仍然无法在设置页预览；小聊天框的朗读和复制按钮悬在气泡侧边，不符合当前小窗布局要求。
+- 原因分析：上传图依赖 `convertFileSrc` 和 Tauri asset protocol，但不同窗口、开发模式和 CSP 下 asset URL 解析仍可能失败；设置页没有独立的图片内容读取兜底。小窗和大窗共用 `MessageBubble` 的侧边绝对定位按钮，小窗宽度更窄时显得拥挤。
+- 解决方案：新增后端命令把已导入的宠物图片安全读取为 data URL，设置页和灵宠本体都优先使用 data URL；`MessageBubble` 在 compact 模式下把朗读/复制按钮渲染到气泡下方，大窗保持原布局。
+- 涉及文件：`src-tauri/src/commands/images.rs`, `src-tauri/src/lib.rs`, `src/features/settings/SettingsPanel.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：本地用户资源预览不能只依赖协议 URL；对于小窗口组件，共用消息组件时必须按 compact 模式调整操作按钮的位置。
+- 是否需更新技术文档：是。

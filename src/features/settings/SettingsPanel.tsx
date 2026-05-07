@@ -472,6 +472,7 @@ function ImageSection() {
   const { userFrames, loadUserFrames, addUserFrame, removeUserFrame, setStateMediaConfig, resetMediaConfig } = usePetStore();
   const [selectedState, setSelectedState] = useState<PetState>('idle');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const mediaConfig = usePetStore((s) => s.mediaConfig);
 
   useEffect(() => {
@@ -559,7 +560,25 @@ function ImageSection() {
   const allFrames = [...defaultFrames, ...currentStateFrames];
   const disabledFrames = new Set(config.disabledFrames ?? []);
   const enabledCount = allFrames.filter((path) => !disabledFrames.has(path)).length;
-  const toPreviewSrc = (path: string) => (isBuiltinAsset(path) ? `/${path}` : convertFileSrc(path));
+  const previewKey = allFrames.join('|');
+  const toPreviewSrc = (path: string) => (isBuiltinAsset(path) ? `/${path}` : (previewUrls[path] ?? convertFileSrc(path)));
+
+  useEffect(() => {
+    let cancelled = false;
+    const localFrames = allFrames.filter((path) => !isBuiltinAsset(path));
+    localFrames.forEach((path) => {
+      if (previewUrls[path]) return;
+      invoke<string>('read_pet_image_data_url', { filePath: path })
+        .then((dataUrl) => {
+          if (cancelled) return;
+          setPreviewUrls((current) => ({ ...current, [path]: dataUrl }));
+        })
+        .catch((e) => console.warn('Failed to load pet image preview:', e));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewKey]);
 
   const handleToggleUse = async (path: string) => {
     const disabled = new Set(config.disabledFrames ?? []);

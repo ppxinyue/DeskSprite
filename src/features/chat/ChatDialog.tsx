@@ -1224,6 +1224,8 @@ function MessageBubble({
   const isUser = message.role === 'user';
   const isPending = message.role === 'assistant' && message.content === '...';
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const canSpeak = !isPending && Boolean(message.content) && !isUser;
+  const canCopy = !isPending && Boolean(message.content);
 
   const handleSpeak = () => {
     if (isSpeaking) {
@@ -1237,8 +1239,10 @@ function MessageBubble({
     }
   };
 
+  const actionButtonClass = "flex h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)]";
+
   return (
-    <div className={`group flex animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`group flex w-full flex-col animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'items-end' : 'items-start'}`}>
       <div
         className={`relative border border-[var(--color-chat-bubble-border)] leading-[1.45] text-[var(--color-chat-text)] shadow-none transition-colors ${
           compact ? 'rounded-[9px] px-2.5 py-1.5' : 'rounded-[10px] px-3 py-2 text-[14px] leading-[1.5]'
@@ -1268,18 +1272,18 @@ function MessageBubble({
         {isStreaming && (
           <span className="inline-block w-1.5 h-4 bg-current animate-pulse ml-0.5" />
         )}
-        {!isPending && message.content && !isUser && (
+        {!compact && canSpeak && (
           <button
-            className={`absolute top-1 hidden h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)] group-hover:flex -right-8`}
+            className={`absolute top-1 hidden group-hover:flex -right-8 ${actionButtonClass}`}
             title={isSpeaking ? '停止朗读' : '朗读'}
             onClick={handleSpeak}
           >
             {isSpeaking ? <X className="h-3.5 w-3.5" /> : <Speaker className="h-3.5 w-3.5" />}
           </button>
         )}
-        {!isPending && message.content && (
+        {!compact && canCopy && (
           <button
-            className={`absolute top-1 hidden h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)] group-hover:flex ${isUser ? '-left-8' : '-right-14'}`}
+            className={`absolute top-1 hidden group-hover:flex ${isUser ? '-left-8' : '-right-14'} ${actionButtonClass}`}
             title="复制"
             onClick={() => navigator.clipboard?.writeText(cleanChatText(message.content)).catch(() => {})}
           >
@@ -1287,6 +1291,28 @@ function MessageBubble({
           </button>
         )}
       </div>
+      {compact && (canSpeak || canCopy) && (
+        <div className={`mt-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 ${isUser ? 'justify-end' : 'justify-start'}`}>
+          {canSpeak && (
+            <button
+              className={actionButtonClass}
+              title={isSpeaking ? '停止朗读' : '朗读'}
+              onClick={handleSpeak}
+            >
+              {isSpeaking ? <X className="h-3.5 w-3.5" /> : <Speaker className="h-3.5 w-3.5" />}
+            </button>
+          )}
+          {canCopy && (
+            <button
+              className={actionButtonClass}
+              title="复制"
+              onClick={() => navigator.clipboard?.writeText(cleanChatText(message.content)).catch(() => {})}
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

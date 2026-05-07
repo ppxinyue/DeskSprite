@@ -466,3 +466,11 @@
 - 安全：阻止用户把某个状态下最后一张可用图片也设为“不使用”，避免灵宠没有可渲染形象。
 - 持久化：每次切换使用状态、删除上传图、恢复默认都会同步写入 `petMedia_{state}` 设置。
 - 文件：SettingsPanel.tsx, animations.ts, PetAvatar.tsx
+
+### R53. 上传形象 dataURL 预览兜底与小窗操作按钮布局（2026-05-07）
+- 预览：新增 `read_pet_image_data_url` 命令，读取 app local data 中的宠物图片并返回 data URL，设置页上传图优先用 data URL 预览，彻底绕开 asset protocol 在窗口/CSP 下的解析差异。
+- 渲染：灵宠本体加载上传图片时同样先读取 data URL，失败才回退 `convertFileSrc`，避免设置页能看到但前端本体仍空白。
+- 安全：读取和删除上传图共用 canonical path 校验，只允许访问 `$APPLOCALDATA/assets/**` 下的宠物图片。
+- 小窗：紧凑聊天窗口中朗读/复制按钮移动到气泡下方；大聊天窗口仍保持侧边 hover 按钮。
+- 验证：`pnpm build`、`cargo check`、`git diff --check` 通过。
+- 文件：images.rs, lib.rs, SettingsPanel.tsx, PetAvatar.tsx, ChatDialog.tsx

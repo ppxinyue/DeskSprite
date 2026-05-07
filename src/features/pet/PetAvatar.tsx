@@ -208,17 +208,40 @@ export function PetAvatar({
   };
 
   let src: string;
+  let localImagePath: string | null = null;
   let kind: 'img' | 'video' = 'img';
   if (config.userAnimatedPath) {
+    localImagePath = isBuiltinAsset(config.userAnimatedPath) ? null : config.userAnimatedPath;
     src = isBuiltinAsset(config.userAnimatedPath) ? `/${config.userAnimatedPath}` : convertFileSrc(config.userAnimatedPath);
     kind = config.userAnimatedType === 'video' ? 'video' : 'img';
   } else {
-    src = toSrc(frameSources[currentFrame % frameSources.length] ?? frameSources[0]);
+    const framePath = frameSources[currentFrame % frameSources.length] ?? frameSources[0];
+    localImagePath = framePath && !isBuiltinAsset(framePath) ? framePath : null;
+    src = toSrc(framePath);
   }
+  const [resolvedSrc, setResolvedSrc] = useState(src);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (kind !== 'img' || !localImagePath) {
+      setResolvedSrc(src);
+      return;
+    }
+    invoke<string>('read_pet_image_data_url', { filePath: localImagePath })
+      .then((dataUrl) => {
+        if (!cancelled) setResolvedSrc(dataUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setResolvedSrc(src);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [kind, localImagePath, src]);
 
   useEffect(() => {
     setImgError(false);
-  }, [src]);
+  }, [resolvedSrc]);
 
   useEffect(() => {
     if (kind !== 'video') return;
@@ -229,7 +252,7 @@ export function PetAvatar({
       return;
     }
     video.play().catch(() => {});
-  }, [animationsPaused, kind, src]);
+  }, [animationsPaused, kind, resolvedSrc]);
 
   useEffect(() => {
     if (kind !== 'img') return;
@@ -291,13 +314,13 @@ export function PetAvatar({
     image.onerror = () => {
       if (!cancelled) setImgError(true);
     };
-    image.src = src;
+    image.src = resolvedSrc;
 
     return () => {
       cancelled = true;
       clearCanvas();
     };
-  }, [h, kind, opacity, src, w]);
+  }, [h, kind, opacity, resolvedSrc, w]);
 
   const interactiveProps = {
     onPointerDown: handlePointerDown,
@@ -383,12 +406,12 @@ export function PetAvatar({
         {...interactiveProps}
       >
         {kind === 'video' ? (
-          <video ref={videoRef} key={src} src={src} autoPlay={!animationsPaused} loop={!animationsPaused} muted playsInline draggable={false} width={w} height={h}
+          <video ref={videoRef} key={resolvedSrc} src={resolvedSrc} autoPlay={!animationsPaused} loop={!animationsPaused} muted playsInline draggable={false} width={w} height={h}
             style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', pointerEvents: 'none', ...motionStyle }}
             onError={() => setImgError(true)} />
         ) : (
           <canvas
-            key={src}
+            key={resolvedSrc}
             ref={canvasRef}
             aria-label="灵宠"
             className="block"
