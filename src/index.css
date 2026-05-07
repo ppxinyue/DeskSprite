@@ -128,13 +128,13 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes terminalCursorBlink {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+@keyframes pulseDot {
+  0%, 100% { opacity: 0.38; transform: scale(0.72); }
+  50% { opacity: 1; transform: scale(1); }
 }
 
-.terminal-cursor {
-  animation: terminalCursorBlink var(--duration, 1s) steps(1, end) infinite;
+.pulse-dot {
+  animation: pulseDot var(--duration, 1.2s) ease-in-out infinite;
 }
 
 .chat-markdown {

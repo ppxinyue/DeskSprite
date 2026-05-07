@@ -343,3 +343,10 @@
 - 动画：原生拖拽期间暂停 `petJump/petWobble/petBreathe`，避免窗口移动和宠物自身动画叠加成视觉抖动。
 - 职责：`PetAvatar` 不再直接修改 Tauri 窗口尺寸；窗口尺寸、位置、边界收口统一由 `PetWindow` 管理。
 - 文件：App.tsx, PetAvatar.tsx
+
+### R36. 灵宠硬边界拖拽、右键菜单防裁切与 PulseDot 占位（2026-05-07）
+- 拖拽：宠物拖动改为受控 pointer 拖拽，不再调用系统原生 `startDragging()`；拖动过程中每一帧都按当前屏幕工作区 clamp，灵宠本体不能被拖出桌面后再跳回。
+- 右键：菜单打开时通知外层窗口预留右键菜单和历史二级菜单空间；菜单位置按窗口可见区域 clamp，历史二级菜单在右侧空间不足时自动向左展开。
+- 菜单：移除右键菜单中的“退出”选项，保留新对话、历史对话、设置、隐藏。
+- 占位：LLM 回复前的占位从 Terminal prompt 改为 `PulseDot`，显示 `Generating` + 单个呼吸点。
+- 文件：App.tsx, PetAvatar.tsx, ChatDialog.tsx, pulse-dot.tsx, index.css

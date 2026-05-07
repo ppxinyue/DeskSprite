@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
+import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
 import { ChevronLeft, ChevronRight, ImagePlus, Maximize2, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,9 @@ const CHAT_HANDOFF_KEY = "desksprite:chat-handoff-conversation-id";
 const SCREEN_MARGIN = 16;
 const PET_CONTENT_MARGIN = 20;
 const MIN_DIALOG_WIDTH = 200;
+const CONTEXT_MENU_WIDTH = 112;
+const CONTEXT_SUBMENU_WIDTH = 170;
+const CONTEXT_MENU_HEIGHT = 180;
 
 function App() {
   const [windowLabel, setWindowLabel] = useState<string>(() => getCurrentWindow().label);
@@ -101,6 +104,7 @@ function App() {
 function PetWindow() {
   const { settings } = useSettingsStore();
   const { dialogOpen, chatMode, chatConversationId, closeChat, openChat } = usePetStore();
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
 
   const petSize = Math.round(150 * settings.petScale);
   const petImageWidth = Math.round(120 * settings.petScale);
@@ -115,6 +119,9 @@ function PetWindow() {
   const layoutRef = useRef(layout);
   const movedTimerRef = useRef<number | null>(null);
   const layoutApplyingRef = useRef(false);
+  const dragSessionRef = useRef<BoundedDragSession | null>(null);
+  const dragFrameRef = useRef<number | null>(null);
+  const pendingDragPointRef = useRef<{ screenX: number; screenY: number } | null>(null);
 
   useEffect(() => {
     layoutRef.current = layout;
@@ -131,6 +138,7 @@ function PetWindow() {
         toolRowWidth,
         collapsedWidth,
         collapsedHeight,
+        contextMenuOpen,
         previousLayout: layoutRef.current,
         setLayout,
       });
@@ -139,7 +147,7 @@ function PetWindow() {
         layoutApplyingRef.current = false;
       }, 80);
     }
-  }, [dialogOpen, settings.dialogWidth, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight]);
+  }, [dialogOpen, settings.dialogWidth, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight, contextMenuOpen]);
 
   useEffect(() => {
     requestLayout();
@@ -147,6 +155,7 @@ function PetWindow() {
 
   useEffect(() => {
     const unlisten = getCurrentWindow().onMoved(() => {
+      if (dragSessionRef.current) return;
       if (layoutApplyingRef.current) return;
       setDragging(true);
       if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
@@ -163,14 +172,68 @@ function PetWindow() {
 
   useEffect(() => () => {
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
+    if (dragFrameRef.current) window.cancelAnimationFrame(dragFrameRef.current);
   }, []);
 
-  const handleNativeDragStart = () => {
+  const handleBoundedDragStart = async (point: { screenX: number; screenY: number }) => {
     setDragging(true);
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
+    try {
+      const win = getCurrentWindow();
+      const monitor = await currentMonitor();
+      if (!monitor) return;
+      const position = await win.outerPosition();
+      const scale = monitor.scaleFactor;
+      const work = monitor.workArea;
+      const workLeft = work.position.x / scale;
+      const workTop = work.position.y / scale;
+      const workWidth = work.size.width / scale;
+      const workHeight = work.size.height / scale;
+      const layout = layoutRef.current;
+      const safeLeft = workLeft + SCREEN_MARGIN;
+      const safeTop = workTop + SCREEN_MARGIN;
+      const safeRight = workLeft + workWidth - SCREEN_MARGIN;
+      const safeBottom = workTop + workHeight - SCREEN_MARGIN;
+      dragSessionRef.current = {
+        startScreenX: point.screenX,
+        startScreenY: point.screenY,
+        startWindowLeft: position.x / scale,
+        startWindowTop: position.y / scale,
+        minWindowLeft: safeLeft - layout.petLeft,
+        maxWindowLeft: Math.max(safeLeft - layout.petLeft, safeRight - petImageWidth - layout.petLeft),
+        minWindowTop: safeTop - layout.petTop,
+        maxWindowTop: Math.max(safeTop - layout.petTop, safeBottom - petImageHeight - layout.petTop),
+      };
+    } catch (e) {
+      console.warn("Failed to start bounded pet drag:", e);
+    }
   };
 
-  const handleNativeDragEnd = () => {
+  const handleBoundedDragMove = (point: { screenX: number; screenY: number }) => {
+    pendingDragPointRef.current = point;
+    if (dragFrameRef.current) return;
+    dragFrameRef.current = window.requestAnimationFrame(() => {
+      dragFrameRef.current = null;
+      const session = dragSessionRef.current;
+      const pending = pendingDragPointRef.current;
+      if (!session || !pending) return;
+      const nextLeft = clamp(
+        session.startWindowLeft + pending.screenX - session.startScreenX,
+        session.minWindowLeft,
+        session.maxWindowLeft,
+      );
+      const nextTop = clamp(
+        session.startWindowTop + pending.screenY - session.startScreenY,
+        session.minWindowTop,
+        session.maxWindowTop,
+      );
+      getCurrentWindow().setPosition(new LogicalPosition(nextLeft, nextTop)).catch(() => {});
+    });
+  };
+
+  const handleBoundedDragEnd = () => {
+    dragSessionRef.current = null;
+    pendingDragPointRef.current = null;
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
     movedTimerRef.current = window.setTimeout(() => {
       setDragging(false);
@@ -192,7 +255,7 @@ function PetWindow() {
   };
 
   const expandToStandaloneChat = async () => {
-    const id = useChatConversationIdForHandoff(chatConversationId);
+    const id = getChatConversationIdForHandoff(chatConversationId);
     if (id) {
       localStorage.setItem(CHAT_HANDOFF_KEY, String(id));
     } else {
@@ -229,8 +292,10 @@ function PetWindow() {
               scale={settings.petScale}
               motions={settings.petMotions}
               dragging={dragging}
-              onDragStart={handleNativeDragStart}
-              onDragEnd={handleNativeDragEnd}
+              onDragStart={handleBoundedDragStart}
+              onDragMove={handleBoundedDragMove}
+              onDragEnd={handleBoundedDragEnd}
+              onMenuOpenChange={setContextMenuOpen}
             />
           </div>
 
@@ -330,7 +395,7 @@ function readChatHandoffConversationId(): number | null {
   return Number.isFinite(id) && id > 0 ? id : null;
 }
 
-function useChatConversationIdForHandoff(storeConversationId: number | null): number | null {
+function getChatConversationIdForHandoff(storeConversationId: number | null): number | null {
   const current = useChatStore.getState().currentConversationId ?? usePetStore.getState().chatConversationId ?? storeConversationId;
   return current && current > 0 ? current : null;
 }
@@ -346,6 +411,17 @@ interface PetWindowLayout {
   dialogMaxHeight: number;
   toolsLeft: number;
   toolsTop: number;
+}
+
+interface BoundedDragSession {
+  startScreenX: number;
+  startScreenY: number;
+  startWindowLeft: number;
+  startWindowTop: number;
+  minWindowLeft: number;
+  maxWindowLeft: number;
+  minWindowTop: number;
+  maxWindowTop: number;
 }
 
 function createDefaultPetWindowLayout(width: number, height: number): PetWindowLayout {
@@ -371,6 +447,7 @@ async function applyPetWindowLayout({
   toolRowWidth,
   collapsedWidth,
   collapsedHeight,
+  contextMenuOpen,
   previousLayout,
   setLayout,
 }: {
@@ -381,6 +458,7 @@ async function applyPetWindowLayout({
   toolRowWidth: number;
   collapsedWidth: number;
   collapsedHeight: number;
+  contextMenuOpen: boolean;
   previousLayout: PetWindowLayout;
   setLayout: (layout: PetWindowLayout) => void;
 }) {
@@ -420,7 +498,7 @@ async function applyPetWindowLayout({
     );
 
     let layout: PetWindowLayout;
-    if (!dialogOpen) {
+    if (!dialogOpen && !contextMenuOpen) {
       layout = {
         windowWidth: collapsedWidth,
         windowHeight: collapsedHeight,
@@ -432,6 +510,41 @@ async function applyPetWindowLayout({
         dialogMaxHeight: requestedDialogWidth,
         toolsLeft: PET_CONTENT_MARGIN + petImageWidth + 8,
         toolsTop: PET_CONTENT_MARGIN + petImageHeight - 32,
+      };
+    } else if (!dialogOpen && contextMenuOpen) {
+      const menuWindowWidth = Math.min(
+        maxWindowWidth,
+        Math.max(
+          collapsedWidth,
+          petImageWidth + 8 + CONTEXT_MENU_WIDTH + CONTEXT_SUBMENU_WIDTH + PET_CONTENT_MARGIN * 2,
+        ),
+      );
+      const menuWindowHeight = Math.min(
+        maxWindowHeight,
+        Math.max(collapsedHeight, petImageHeight + PET_CONTENT_MARGIN * 2, CONTEXT_MENU_HEIGHT + PET_CONTENT_MARGIN * 2),
+      );
+      const placeRight = safePetX - PET_CONTENT_MARGIN + menuWindowWidth <= safeRight;
+      const placeBelow = safePetY - PET_CONTENT_MARGIN + menuWindowHeight <= safeBottom;
+      const petLeft = placeRight
+        ? PET_CONTENT_MARGIN
+        : Math.max(PET_CONTENT_MARGIN, menuWindowWidth - petImageWidth - PET_CONTENT_MARGIN);
+      const petTop = placeBelow
+        ? PET_CONTENT_MARGIN
+        : Math.max(PET_CONTENT_MARGIN, menuWindowHeight - petImageHeight - PET_CONTENT_MARGIN);
+
+      layout = {
+        windowWidth: menuWindowWidth,
+        windowHeight: menuWindowHeight,
+        petLeft,
+        petTop,
+        dialogLeft: PET_CONTENT_MARGIN,
+        dialogTop: PET_CONTENT_MARGIN,
+        dialogWidth: requestedDialogWidth,
+        dialogMaxHeight: requestedDialogWidth,
+        toolsLeft: placeRight
+          ? petLeft + petImageWidth + 8
+          : Math.max(PET_CONTENT_MARGIN, petLeft - toolRowWidth - 8),
+        toolsTop: petTop + petImageHeight - 32,
       };
     } else {
       const maxDialogWidth = Math.max(MIN_DIALOG_WIDTH, maxWindowWidth - PET_CONTENT_MARGIN * 2);

@@ -515,3 +515,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：悬浮宠物窗口必须只有一个布局协调者；原生拖动期间不要实时纠偏，边界保护适合在移动停止后一次性完成。
 - 是否需更新技术文档：是。
+
+## ISSUE-045
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：C. 窗口管理 / H. 小对话窗口
+- 严重程度：严重
+- 问题现象：灵宠仍会被先拖出屏幕后再跳回；位于屏幕边缘时右键菜单和历史二级菜单容易显示不全；LLM 生成前占位样式需要改为单点 pulse。
+- 原因分析：系统原生拖拽不暴露实时边界约束，只能在 moved 事件后纠偏，因此会出现“先越界再回弹”；右键菜单仍由头像内部按当前小窗口尺寸渲染，没有为菜单和二级菜单预留足够窗口区域；Terminal loader 与新的 ChatGPT 式最小占位不一致。
+- 解决方案：改为受控 pointer 拖拽，每次移动都按工作区和灵宠本体尺寸计算硬边界并设置窗口位置；右键菜单打开时由 `PetWindow` 扩展透明窗口并保持灵宠屏幕锚点不变，菜单和二级菜单分别 clamp/自动左右翻转；移除“退出”；新增 `PulseDot` loader 并替换 Terminal loader。
+- 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `src/components/loading-ui/pulse-dot.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：需要硬边界的悬浮窗不能依赖系统拖拽后的补偿；边缘菜单必须同时处理外层窗口可用区域和菜单内部弹出方向。
+- 是否需更新技术文档：是。

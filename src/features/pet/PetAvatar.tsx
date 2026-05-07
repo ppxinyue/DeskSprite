@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { usePetStore } from './petStore';
 import { getConversations } from '@/lib/db';
 import {
@@ -24,6 +23,10 @@ const MOTION_BASE_DURATION: Record<PetMotionName, number> = {
 };
 const PET_DRAW_PADDING = 2;
 const SOURCE_EDGE_INSET_RATIO = 0.004;
+const MENU_WIDTH = 112;
+const MENU_HEIGHT = 172;
+const SUBMENU_WIDTH = 170;
+const MENU_MARGIN = 8;
 
 function pickNextMotion(motions: PetMotionSettings, current: PetMotionName | null): PetMotionName | null {
   const enabled = MOTION_NAMES.filter((name) => motions[name]?.enabled);
@@ -40,14 +43,18 @@ export function PetAvatar({
   motions,
   dragging = false,
   onDragStart,
+  onDragMove,
   onDragEnd,
+  onMenuOpenChange,
 }: {
   opacity?: number;
   scale?: number;
   motions: PetMotionSettings;
   dragging?: boolean;
-  onDragStart?: () => void;
+  onDragStart?: (point: { screenX: number; screenY: number }) => void;
+  onDragMove?: (point: { screenX: number; screenY: number }) => void;
   onDragEnd?: () => void;
+  onMenuOpenChange?: (open: boolean) => void;
 }) {
   const { petState, mediaConfig, openChat, dialogOpen } = usePetStore();
   const config = mediaConfig[petState];
@@ -56,6 +63,7 @@ export function PetAvatar({
   const [imgError, setImgError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  const [submenuSide, setSubmenuSide] = useState<'left' | 'right'>('right');
   const [recentConversations, setRecentConversations] = useState<Array<{ id: number; title: string | null }>>([]);
   const [currentMotion, setCurrentMotion] = useState<PetMotionName | null>(() => pickNextMotion(motions, null));
   const didDrag = useRef(false);
@@ -99,6 +107,7 @@ export function PetAvatar({
     if (!menuOpen) return;
     const close = () => {
       setMenuOpen(false);
+      onMenuOpenChange?.(false);
     };
     window.addEventListener('mousedown', close);
     window.addEventListener('wheel', close);
@@ -108,36 +117,42 @@ export function PetAvatar({
       window.removeEventListener('wheel', close);
       window.removeEventListener('blur', close);
     };
-  }, [menuOpen]);
+  }, [menuOpen, onMenuOpenChange]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     setMenuOpen(false);
+    onMenuOpenChange?.(false);
     didDrag.current = false;
-    startPoint.current = { x: e.clientX, y: e.clientY };
+    startPoint.current = { x: e.screenX, y: e.screenY };
+    e.currentTarget.setPointerCapture(e.pointerId);
 
-    const onMouseMove = (ev: MouseEvent) => {
+    const onPointerMove = (ev: PointerEvent) => {
       const start = startPoint.current;
+      if (dragging || didDrag.current) {
+        onDragMove?.({ screenX: ev.screenX, screenY: ev.screenY });
+        return;
+      }
       if (!start) return;
-      const dx = ev.clientX - start.x;
-      const dy = ev.clientY - start.y;
+      const dx = ev.screenX - start.x;
+      const dy = ev.screenY - start.y;
       if (Math.hypot(dx, dy) > 4) {
         didDrag.current = true;
         startPoint.current = null;
-        window.removeEventListener('mousemove', onMouseMove);
-        window.removeEventListener('mouseup', onMouseUp);
-        onDragStart?.();
-        getCurrentWindow().startDragging().finally(() => onDragEnd?.()).catch(() => {});
+        onDragStart?.({ screenX: ev.screenX, screenY: ev.screenY });
       }
     };
 
-    const onMouseUp = () => {
+    const onPointerUp = () => {
       startPoint.current = null;
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      if (didDrag.current) onDragEnd?.();
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
     };
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
   };
 
   const handleClick = () => {
@@ -150,6 +165,7 @@ export function PetAvatar({
 
   const handleContextMenu = async (action: string) => {
     setMenuOpen(false);
+    onMenuOpenChange?.(false);
     switch (action) {
       case 'new-chat':
         openChat('new');
@@ -163,18 +179,26 @@ export function PetAvatar({
       case 'hide':
         try { await invoke('hide_pet_window'); } catch (e) { console.error(e); }
         break;
-      case 'quit':
-        try { const { exit } = await import('@tauri-apps/plugin-process'); await exit(0); }
-        catch { try { await invoke('exit_app'); } catch (e) { console.error(e); } }
-        break;
     }
   };
 
   const handleContextMenuOpen = (e: React.MouseEvent) => {
     e.preventDefault();
     didDrag.current = true;
-    setMenuPos({ x: Math.min(e.clientX, 130), y: Math.min(e.clientY, 210) });
-    setMenuOpen(true);
+    onMenuOpenChange?.(true);
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    window.setTimeout(() => {
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+      const x = clamp(clientX, MENU_MARGIN, Math.max(MENU_MARGIN, windowWidth - MENU_WIDTH - MENU_MARGIN));
+      const y = clamp(clientY, MENU_MARGIN, Math.max(MENU_MARGIN, windowHeight - MENU_HEIGHT - MENU_MARGIN));
+      const canOpenRight = x + MENU_WIDTH + SUBMENU_WIDTH + MENU_MARGIN <= windowWidth;
+      const canOpenLeft = x - SUBMENU_WIDTH - MENU_MARGIN >= 0;
+      setSubmenuSide(canOpenRight || !canOpenLeft ? 'right' : 'left');
+      setMenuPos({ x, y });
+      setMenuOpen(true);
+    }, 40);
     getConversations()
       .then((convos) => setRecentConversations(convos.slice(0, 3).map((c) => ({ id: c.id, title: c.title }))))
       .catch(() => setRecentConversations([]));
@@ -273,14 +297,14 @@ export function PetAvatar({
   }, [h, kind, opacity, src, w]);
 
   const interactiveProps = {
-    onMouseDown: handleMouseDown,
+    onPointerDown: handlePointerDown,
     onClick: handleClick,
     onContextMenu: handleContextMenuOpen,
   };
 
   const menu = menuOpen && (
     <div
-      className="fixed z-50 min-w-[96px] rounded-md border border-border/60 bg-popover/80 px-1 py-1 text-popover-foreground shadow-xl backdrop-blur-xl"
+      className="fixed z-50 w-[112px] rounded-md border border-border/60 bg-popover/80 px-1 py-1 text-popover-foreground shadow-xl backdrop-blur-xl"
       style={{ left: menuPos.x, top: menuPos.y }}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -288,7 +312,11 @@ export function PetAvatar({
       <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('new-chat')}>新对话</button>
       <div className="group relative">
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('history-chat')}>历史对话</button>
-        <div className="absolute left-full top-0 hidden min-w-[150px] rounded-md border border-border/60 bg-popover/90 px-1 py-1 shadow-xl backdrop-blur-xl group-hover:block">
+        <div
+          className={`absolute top-0 hidden w-[170px] rounded-md border border-border/60 bg-popover/90 px-1 py-1 shadow-xl backdrop-blur-xl group-hover:block ${
+            submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
+          }`}
+        >
           {recentConversations.length === 0 ? (
             <div className="px-2 py-1 text-xs text-muted-foreground">暂无历史</div>
           ) : recentConversations.map((item) => (
@@ -297,6 +325,7 @@ export function PetAvatar({
               className="block w-full max-w-44 truncate rounded px-2 py-1 text-left text-xs hover:bg-accent"
               onClick={() => {
                 setMenuOpen(false);
+                onMenuOpenChange?.(false);
                 openChat('history', item.id);
               }}
             >
@@ -308,7 +337,6 @@ export function PetAvatar({
       <div className="my-1 h-px bg-border/60" />
       <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
       <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
-      <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('quit')}>退出</button>
     </div>
   );
 
@@ -374,4 +402,8 @@ export function PetAvatar({
       {menu}
     </>
   );
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
