@@ -14,9 +14,9 @@ import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
 import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
-import { getConversations, getMessages, getSystemPrompt, updateSystemPrompt } from '@/lib/db';
+import { getConversations, getMessages, getSystemPrompt, setSetting, updateSystemPrompt } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
-import { ALL_PET_STATES, STATE_META } from '@/features/pet/animations';
+import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, isBuiltinAsset, type PetStateMediaConfig } from '@/features/pet/animations';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -469,7 +469,7 @@ function ThemeSelect({
 }
 
 function ImageSection() {
-  const { userFrames, loadUserFrames, addUserFrame, removeUserFrame, resetMediaConfig } = usePetStore();
+  const { userFrames, loadUserFrames, addUserFrame, removeUserFrame, setStateMediaConfig, resetMediaConfig } = usePetStore();
   const [selectedState, setSelectedState] = useState<PetState>('idle');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const mediaConfig = usePetStore((s) => s.mediaConfig);
@@ -477,6 +477,11 @@ function ImageSection() {
   useEffect(() => {
     loadUserFrames();
   }, [loadUserFrames]);
+
+  const persistMediaConfig = async (state: PetState, nextConfig: PetStateMediaConfig) => {
+    setStateMediaConfig(state, nextConfig);
+    await setSetting(`petMedia_${state}`, JSON.stringify(nextConfig));
+  };
 
   const handleAddImages = async () => {
     const result = await open({
@@ -495,6 +500,11 @@ function ImageSection() {
           state: selectedState,
         });
         addUserFrame(selectedState, importedPath);
+        const nextConfig = {
+          ...mediaConfig[selectedState],
+          disabledFrames: (mediaConfig[selectedState].disabledFrames ?? []).filter((p) => p !== importedPath),
+        };
+        await persistMediaConfig(selectedState, nextConfig);
       } catch (e) {
         console.error('Failed to import image:', e);
         alert(e instanceof Error ? e.message : String(e));
@@ -510,6 +520,11 @@ function ImageSection() {
         const { invoke } = await import('@tauri-apps/api/core');
         await invoke('delete_pet_image', { filePath: path });
         removeUserFrame(selectedState, path);
+        const nextConfig = {
+          ...mediaConfig[selectedState],
+          disabledFrames: (mediaConfig[selectedState].disabledFrames ?? []).filter((p) => p !== path),
+        };
+        await persistMediaConfig(selectedState, nextConfig);
       } catch (e) {
         console.error('Failed to delete image:', e);
       }
@@ -531,6 +546,9 @@ function ImageSection() {
         }
       }
       resetMediaConfig();
+      for (const state of ALL_PET_STATES) {
+        await setSetting(`petMedia_${state}`, JSON.stringify(DEFAULT_MEDIA_CONFIG[state]));
+      }
       await loadUserFrames();
     }
   };
@@ -538,6 +556,68 @@ function ImageSection() {
   const currentStateFrames = userFrames[selectedState] || [];
   const config = mediaConfig[selectedState];
   const defaultFrames = config.defaultAssets;
+  const allFrames = [...defaultFrames, ...currentStateFrames];
+  const disabledFrames = new Set(config.disabledFrames ?? []);
+  const enabledCount = allFrames.filter((path) => !disabledFrames.has(path)).length;
+  const toPreviewSrc = (path: string) => (isBuiltinAsset(path) ? `/${path}` : convertFileSrc(path));
+
+  const handleToggleUse = async (path: string) => {
+    const disabled = new Set(config.disabledFrames ?? []);
+    const isEnabled = !disabled.has(path);
+    if (isEnabled && enabledCount <= 1) {
+      alert('至少需要保留一张正在使用的灵宠图片。');
+      return;
+    }
+    if (isEnabled) disabled.add(path);
+    else disabled.delete(path);
+    await persistMediaConfig(selectedState, {
+      ...config,
+      disabledFrames: Array.from(disabled),
+    });
+  };
+
+  const ImageTile = ({ path, source }: { path: string; source: 'default' | 'user' }) => {
+    const enabled = !disabledFrames.has(path);
+    return (
+      <div
+        key={`${source}-${path}`}
+        className={`relative group aspect-square rounded-lg overflow-hidden border ${
+          enabled ? 'border-border/70 bg-muted/20' : 'border-border/40 bg-muted/10 opacity-70'
+        }`}
+      >
+        <img
+          src={toPreviewSrc(path)}
+          alt=""
+          className="h-full w-full object-contain p-2"
+          draggable={false}
+        />
+        <span className="absolute left-1.5 top-1.5 rounded bg-background/85 px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm">
+          {source === 'default' ? '默认' : '上传'}
+        </span>
+        <div className="absolute inset-x-1.5 bottom-1.5 z-20 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            onClick={() => handleToggleUse(path)}
+            className="min-w-0 flex-1 rounded-md bg-background/90 px-2 py-1 text-[11px] text-foreground shadow-sm hover:bg-background"
+          >
+            {enabled ? '不使用' : '使用'}
+          </button>
+          <button
+            onClick={() => source === 'user' && handleDeleteImage(path)}
+            disabled={source === 'default' || isDeleting === path}
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-background/90 text-destructive shadow-sm hover:bg-background disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-55"
+            title={source === 'default' ? '系统默认图片不可删除' : '删除'}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        {!enabled && (
+          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/45 text-xs text-muted-foreground">
+            未使用
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -570,40 +650,8 @@ function ImageSection() {
 
       {/* Image Grid */}
       <div className="grid grid-cols-4 gap-3">
-        {defaultFrames.map((path) => (
-          <div
-            key={`default-${path}`}
-            className="relative group aspect-square bg-muted/30 rounded-lg overflow-hidden border border-border/60"
-          >
-            <img
-              src={path}
-              alt=""
-              className="w-full h-full object-contain p-2"
-            />
-            <span className="absolute left-1.5 top-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm">
-              默认
-            </span>
-          </div>
-        ))}
-        {currentStateFrames.map((path) => (
-          <div
-            key={path}
-            className="relative group aspect-square bg-muted/30 rounded-lg overflow-hidden border border-border/60"
-          >
-            <img
-              src={convertFileSrc(path)}
-              alt=""
-              className="w-full h-full object-contain p-2"
-            />
-            <button
-              onClick={() => handleDeleteImage(path)}
-              disabled={isDeleting === path}
-              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
-          </div>
-        ))}
+        {defaultFrames.map((path) => <ImageTile key={`default-${path}`} path={path} source="default" />)}
+        {currentStateFrames.map((path) => <ImageTile key={`user-${path}`} path={path} source="user" />)}
         <button
           onClick={handleAddImages}
           className="aspect-square rounded-lg border-2 border-dashed border-border/60 hover:border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
@@ -616,9 +664,7 @@ function ImageSection() {
       <p className="text-xs text-muted-foreground">
         {config.userAnimatedPath
           ? `当前使用：${config.userAnimatedPath}`
-          : currentStateFrames.length > 0
-            ? `当前使用 ${currentStateFrames.length} 张自定义图片；内置默认图片仍保留展示`
-            : `当前使用 ${defaultFrames.length} 张内置默认图片`}
+          : `当前使用 ${enabledCount} / ${allFrames.length} 张图片`}
       </p>
 
       {/* Reset All */}

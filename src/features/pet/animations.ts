@@ -6,6 +6,7 @@ export type PetState =
 export interface PetStateMediaConfig {
   defaultAssets: string[];
   userFrames: string[];
+  disabledFrames?: string[];
   frameInterval: number;
   userAnimatedPath: string | null;
   userAnimatedType: 'gif' | 'video' | null;
@@ -59,8 +60,10 @@ export function isBuiltinAsset(path: string): boolean {
 
 export function getPetFrameSources(config: PetStateMediaConfig, userFrames?: string[]): string[] {
   if (config.userAnimatedPath) return [config.userAnimatedPath];
-  if (userFrames && userFrames.length > 0) return userFrames;
-  return config.userFrames.length > 0 ? config.userFrames : config.defaultAssets;
+  const disabled = new Set(config.disabledFrames ?? []);
+  const sources = Array.from(new Set([...config.defaultAssets, ...(userFrames ?? config.userFrames)]));
+  const enabled = sources.filter((source) => !disabled.has(source));
+  return enabled.length > 0 ? enabled : config.defaultAssets;
 }
 
 export function getRandomFrameSwitchDelay(): number {

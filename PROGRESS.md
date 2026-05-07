@@ -458,3 +458,11 @@
 - 兼容：`Info.plist` 检查按字节匹配 key，兼容 XML 和二进制 plist。
 - 验证：`pnpm build`、`cargo check` 通过；Rust 侧仅保留既有 CSP dead-code warning。
 - 文件：desktop.rs, lib.rs, App.tsx, ChatDialog.tsx
+
+### R52. 个性化形象预览和使用开关修复（2026-05-07）
+- 预览：内置默认图统一使用 `/assets/...` 绝对资源路径，本地上传图继续使用 `convertFileSrc`，修复设置页默认图和上传图都显示为空占位的问题。
+- 使用状态：为每个状态新增 `disabledFrames` 配置；默认图和上传图都可点击“使用/不使用”，灵宠随机切换时只从未禁用的图片中选择。
+- 操作：上传图显示“使用/不使用”和“删除”；系统默认图显示“使用/不使用”，删除按钮置灰不可用。
+- 安全：阻止用户把某个状态下最后一张可用图片也设为“不使用”，避免灵宠没有可渲染形象。
+- 持久化：每次切换使用状态、删除上传图、恢复默认都会同步写入 `petMedia_{state}` 设置。
+- 文件：SettingsPanel.tsx, animations.ts, PetAvatar.tsx

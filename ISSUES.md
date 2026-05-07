@@ -647,3 +647,15 @@
 - 涉及文件：`src-tauri/src/commands/desktop.rs`, `src-tauri/src/lib.rs`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：macOS TCC 缺用途说明是进程级硬崩，不能依赖 try/catch；所有隐私敏感 API 都必须在调用前确认 bundle 声明和运行环境。
 - 是否需更新技术文档：是。
+
+## ISSUE-056
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：E. 设置中心 / F. 灵宠形象
+- 严重程度：严重
+- 问题现象：个性化形象中的默认图片和新上传图片都只显示为空占位框；图片卡片缺少明确的“使用/不使用”状态控制，系统默认图片需要不可删除但可选择不使用。
+- 原因分析：设置页默认图使用 `assets/...` 相对路径，在当前 Tauri/Vite WebView 下可能解析不到 public 资源；同时形象配置只有“默认图列表”和“上传图列表”，渲染逻辑一旦发现上传图就默认全部使用上传图，缺少每张图片的启用/禁用状态。
+- 解决方案：内置图片预览和灵宠渲染改为 `/assets/...` 绝对路径；新增 `disabledFrames` 配置记录不参与随机切换的图片；设置页所有图片都显示使用切换，上传图可删除，默认图删除按钮置灰。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/pet/animations.ts`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：public 资源在桌面 WebView 中应使用绝对路径；“资源库”和“启用集合”必须分开建模，否则上传资源会隐式覆盖默认资源，无法支持逐张启用。
+- 是否需更新技术文档：是。

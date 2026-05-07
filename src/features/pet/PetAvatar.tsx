@@ -12,7 +12,7 @@ import { stopPetStateEngine } from './petStateEngine';
 import type { PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
 
 function toSrc(path: string): string {
-  return isBuiltinAsset(path) ? path : convertFileSrc(path);
+  return isBuiltinAsset(path) ? `/${path}` : convertFileSrc(path);
 }
 
 const MOTION_NAMES: PetMotionName[] = ['petJump', 'petWobble', 'petBreathe'];
@@ -210,7 +210,7 @@ export function PetAvatar({
   let src: string;
   let kind: 'img' | 'video' = 'img';
   if (config.userAnimatedPath) {
-    src = isBuiltinAsset(config.userAnimatedPath) ? config.userAnimatedPath : convertFileSrc(config.userAnimatedPath);
+    src = isBuiltinAsset(config.userAnimatedPath) ? `/${config.userAnimatedPath}` : convertFileSrc(config.userAnimatedPath);
     kind = config.userAnimatedType === 'video' ? 'video' : 'img';
   } else {
     src = toSrc(frameSources[currentFrame % frameSources.length] ?? frameSources[0]);
