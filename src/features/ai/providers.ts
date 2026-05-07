@@ -7,6 +7,7 @@ export interface ProviderPreset {
 }
 
 export const PROVIDER_PRESETS: ProviderPreset[] = [
+  { id: 'closeai', name: 'CloseAI', baseUrl: 'https://api.openai-proxy.org/v1', apiKeyHint: 'sk-...', docsUrl: '' },
   { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', apiKeyHint: 'sk-...', docsUrl: 'https://platform.openai.com/api-keys' },
   { id: 'anthropic', name: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1', apiKeyHint: 'sk-ant-...', docsUrl: 'https://console.anthropic.com/settings/keys' },
   { id: 'google', name: 'Google', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKeyHint: 'AIza...', docsUrl: 'https://aistudio.google.com/app/apikey' },

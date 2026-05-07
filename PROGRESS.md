@@ -525,3 +525,10 @@
 - 防护：加载旧数据时兼容解码历史 `local:v1:` 值，同时丢弃此前误存的“未找到 API Key”等内部错误文本，避免把错误提示当 token 发给服务商。
 - 调用：测试模型、默认配置解析、大小聊天窗口都只从本地 `api_key` 得到 key，彻底避免错误态混入 Authorization header。
 - 文件：apiKeyStorage.ts, apiConfigStore.ts, db.ts, SettingsPanel.tsx, defaultModel.ts, aiService.ts
+
+### R61. CloseAI 预设与 token 归一化（2026-05-07）
+- 服务商：在用户模型配置里新增 CloseAI provider，base_url 与内置默认模型保持一致：`https://api.openai-proxy.org/v1`。
+- 防错：保存 API Key 时去掉用户可能粘贴的 `Bearer ` 前缀、外层引号和不可见空格。
+- 后端：模型测试和聊天请求发出前再次归一化 token，避免第三方服务商收到 `Bearer Bearer ...` 或带引号 token。
+- 目的：用户如果想复刻默认模型配置，可以直接选择 CloseAI，而不是误选 OpenAI 官方地址导致 `401 invalid token`。
+- 文件：providers.ts, types.ts, apiConfigStore.ts, ai.rs

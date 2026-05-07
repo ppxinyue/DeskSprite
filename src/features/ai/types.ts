@@ -1,4 +1,5 @@
 export type Provider =
+  | 'closeai'
   | 'openai'
   | 'anthropic'
   | 'google'

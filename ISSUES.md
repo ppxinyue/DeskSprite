@@ -755,3 +755,15 @@
 - 涉及文件：`src/lib/apiKeyStorage.ts`, `src/features/settings/apiConfigStore.ts`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/ai/defaultModel.ts`, `src/features/ai/aiService.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：错误文本绝不能进入凭证数据流；凭证的真实来源必须单一，默认模型和用户模型应共享同样的调用语义。
 - 是否需更新技术文档：是。
+
+## ISSUE-065
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：D. AI 配置 / 模型测试
+- 严重程度：严重
+- 问题现象：用户确认配置正确后仍返回 `HTTP 401: invalid token`；默认 CloseAI 模型能工作，但用户新增模型容易失败。
+- 原因分析：内置默认模型使用 CloseAI proxy base_url，但用户可选服务商中没有 CloseAI，容易误选 OpenAI 官方 base_url；另外用户粘贴 API Key 时可能包含 `Bearer ` 前缀、引号或不可见空格，导致服务商认为 token 无效。
+- 解决方案：新增 CloseAI provider，base_url 与内置默认模型一致；保存和后端请求前都归一化 API Key，去掉 Bearer 前缀、外层引号和不可见空格。
+- 涉及文件：`src/features/ai/providers.ts`, `src/features/ai/types.ts`, `src/features/settings/apiConfigStore.ts`, `src-tauri/src/commands/ai.rs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：默认模型可用的服务商也必须作为用户可选 provider 暴露；API Key 输入必须容忍常见复制格式。
+- 是否需更新技术文档：是。

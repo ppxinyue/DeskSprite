@@ -41,7 +41,7 @@ pub struct TestAiConnectionResponse {
 pub async fn test_ai_connection(
     request: TestAiConnectionRequest,
 ) -> Result<TestAiConnectionResponse, String> {
-    let api_key = request.api_key.trim();
+    let api_key = normalize_api_key(&request.api_key);
     if api_key.is_empty() {
         return Ok(TestAiConnectionResponse {
             success: false,
@@ -79,7 +79,7 @@ pub async fn test_ai_connection(
 
     let body = if is_anthropic {
         builder = builder
-            .header("x-api-key", api_key)
+            .header("x-api-key", &api_key)
             .header("anthropic-version", "2023-06-01");
         json!({
             "model": request.model,
@@ -87,7 +87,7 @@ pub async fn test_ai_connection(
             "messages": [{ "role": "user", "content": "ping" }]
         })
     } else {
-        builder = builder.bearer_auth(api_key);
+        builder = builder.bearer_auth(&api_key);
         json!({
             "model": request.model,
             "max_tokens": 1,
@@ -133,7 +133,7 @@ pub async fn test_ai_connection(
 
 #[tauri::command]
 pub async fn chat_completion(request: ChatCompletionRequest) -> Result<String, String> {
-    let api_key = request.api_key.trim();
+    let api_key = normalize_api_key(&request.api_key);
     if api_key.is_empty() {
         return Err("API Key 为空。".to_string());
     }
@@ -162,11 +162,11 @@ pub async fn chat_completion(request: ChatCompletionRequest) -> Result<String, S
 
     let body = if is_anthropic {
         builder = builder
-            .header("x-api-key", api_key)
+            .header("x-api-key", &api_key)
             .header("anthropic-version", "2023-06-01");
         build_anthropic_chat_body(&request.model, &request.messages)
     } else {
-        builder = builder.bearer_auth(api_key);
+        builder = builder.bearer_auth(&api_key);
         build_openai_chat_body(&request.model, &request.messages)
     };
 
@@ -312,6 +312,18 @@ fn parse_chat_response(text: &str, is_anthropic: bool) -> Option<String> {
         }
     }
     None
+}
+
+fn normalize_api_key(value: &str) -> String {
+    let mut key = value
+        .trim()
+        .trim_matches(['"', '\'', '`'])
+        .trim()
+        .to_string();
+    if key.len() >= 7 && key[..7].eq_ignore_ascii_case("bearer ") {
+        key = key[7..].trim().to_string();
+    }
+    key.trim_matches(['"', '\'', '`']).trim().to_string()
 }
 
 fn extract_api_error_message(text: &str) -> Option<String> {

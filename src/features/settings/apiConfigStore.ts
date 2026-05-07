@@ -122,7 +122,12 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
 }));
 
 function normalizeApiKey(apiKey: string) {
-  const normalizedKey = apiKey.trim();
+  const normalizedKey = apiKey
+    .trim()
+    .replace(/^[\u200B-\u200D\uFEFF]+|[\u200B-\u200D\uFEFF]+$/g, '')
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/^Bearer\s+/i, '')
+    .trim();
   if (!normalizedKey) {
     throw new Error('API Key 不能为空。');
   }
