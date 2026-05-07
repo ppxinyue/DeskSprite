@@ -482,3 +482,11 @@
 - 设置：个性化形象上传在调用 Rust 导入命令前先过滤路径扩展名，若选中非图片文件会即时提醒并跳过。
 - 验证：`pnpm build`、`cargo check`、`git diff --check` 通过。
 - 文件：ChatDialog.tsx, SettingsPanel.tsx
+
+### R55. 模型服务商预设和真实连接测试（2026-05-07）
+- 服务商：模型配置改为固定使用 OpenAI、Anthropic、Google、Grok、DeepSeek、Kimi、GLM、Hunyuan、MiniMax、MiMo、Qwen 这 11 个 provider 及其指定 base_url。
+- 模型名：移除预设模型下拉，模型名称全部由用户手动填写，避免列表过期或限制用户使用新模型。
+- Base URL：选择服务商后自动填充并锁定 base_url；旧 `zhipu` 配置编辑时自动映射到 `glm`。
+- 测试：每条 API 配置的“测试”按钮改为真实请求模型接口；OpenAI 兼容服务走 `/chat/completions`，Anthropic 走 `/messages`。
+- 错误：测试失败时直接展示 HTTP 状态和服务商返回的错误消息，例如 API key 无效、model 不存在、权限不足等。
+- 文件：providers.ts, SettingsPanel.tsx

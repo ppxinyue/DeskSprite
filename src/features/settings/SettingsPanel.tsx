@@ -14,6 +14,7 @@ import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
 import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
+import { getApiKey } from '@/lib/keychain';
 import { getConversations, getMessages, getSystemPrompt, setSetting, updateSystemPrompt } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, isBuiltinAsset, type PetStateMediaConfig } from '@/features/pet/animations';
@@ -91,13 +92,13 @@ export function SettingsPanel() {
           }}
           onDelete={removeConfig}
           onSetDefault={setDefault}
-          onTest={async (id) => {
-            setTestingConfigId(id);
+          onTest={async (config) => {
+            setTestingConfigId(config.id);
             try {
-              const result = await invoke<{ success: boolean; message: string; latency_ms: number }>('test_ai_connection', { configId: id });
-              setTestResults(prev => ({ ...prev, [id]: { success: result.success, message: result.message, latency: result.latency_ms } }));
+              const result = await testApiConfig(config);
+              setTestResults(prev => ({ ...prev, [config.id]: result }));
             } catch (e) {
-              setTestResults(prev => ({ ...prev, [id]: { success: false, message: String(e) } }));
+              setTestResults(prev => ({ ...prev, [config.id]: { success: false, message: String(e) } }));
             } finally {
               setTestingConfigId(null);
             }
@@ -709,6 +710,83 @@ function isAllowedPetImagePath(path: string) {
   return ALLOWED_PET_IMAGE_EXTENSIONS.has(ext);
 }
 
+async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; message: string; latency?: number }> {
+  if (!config.keyringRef) {
+    return { success: false, message: '缺少 API Key，请重新保存配置。' };
+  }
+  const apiKey = await getApiKey(config.keyringRef);
+  if (!apiKey.trim()) {
+    return { success: false, message: 'API Key 为空。' };
+  }
+
+  const started = performance.now();
+  const provider = (config.providerId || config.provider).toLowerCase();
+  const baseUrl = config.baseUrl.replace(/\/+$/, '');
+  const isAnthropic = provider === 'anthropic';
+  const endpoint = isAnthropic ? `${baseUrl}/messages` : `${baseUrl}/chat/completions`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (isAnthropic) {
+    headers['x-api-key'] = apiKey;
+    headers['anthropic-version'] = '2023-06-01';
+  } else {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  const body = isAnthropic
+    ? {
+        model: config.model,
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'ping' }],
+      }
+    : {
+        model: config.model,
+        max_tokens: 1,
+        stream: false,
+        messages: [{ role: 'user', content: 'ping' }],
+      };
+
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    return { success: false, message: e instanceof Error ? e.message : String(e) };
+  }
+
+  const latency = Math.round(performance.now() - started);
+  const text = await response.text().catch(() => '');
+  if (!response.ok) {
+    return {
+      success: false,
+      message: `HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText || '请求失败'}`,
+      latency,
+    };
+  }
+
+  return { success: true, message: '测试通过', latency };
+}
+
+function extractApiErrorMessage(text: string) {
+  if (!text) return '';
+  try {
+    const data = JSON.parse(text);
+    const error = data?.error;
+    if (typeof error === 'string') return error;
+    if (typeof error?.message === 'string') return error.message;
+    if (typeof data?.message === 'string') return data.message;
+    if (typeof data?.detail === 'string') return data.detail;
+    if (typeof data?.errmsg === 'string') return data.errmsg;
+  } catch {
+    // Fall through to raw text.
+  }
+  return text.slice(0, 800);
+}
+
 function AISection({
   settings, updateSetting, systemPrompt, setSystemPrompt,
   configs, onAdd, onEdit, onDelete, onSetDefault, onTest, testResults, testingConfigId,
@@ -723,7 +801,7 @@ function AISection({
   onEdit: (config: ApiConfig) => void;
   onDelete: (id: number, keyringRef: string | null) => Promise<void>;
   onSetDefault: (id: number) => Promise<void>;
-  onTest: (id: number) => Promise<void>;
+  onTest: (config: ApiConfig) => Promise<void>;
   testResults: Record<number, { success: boolean; message: string; latency?: number }>;
   testingConfigId: number | null;
   isModalOpen: boolean;
@@ -792,7 +870,7 @@ function AISection({
                       设为默认
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onTest(c.id)} disabled={isTesting}>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onTest(c)} disabled={isTesting}>
                     {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : '测试'}
                   </Button>
                   <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEdit(c)}>
@@ -1038,6 +1116,16 @@ const EMPTY_FORM: ApiConfigForm = {
   isDefault: false,
 };
 
+function defaultApiConfigForm(): ApiConfigForm {
+  const provider = PROVIDER_PRESETS[0];
+  return {
+    ...EMPTY_FORM,
+    providerId: provider.id,
+    name: provider.name,
+    baseUrl: provider.baseUrl,
+  };
+}
+
 function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; onClose: () => void; editingConfig: ApiConfig | null }) {
   const { addConfig, updateConfig } = useApiConfigStore();
   const [isSaving, setIsSaving] = useState(false);
@@ -1047,19 +1135,22 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
   useEffect(() => {
     if (isOpen) {
       if (editingConfig) {
+        const providerId = (editingConfig.providerId || editingConfig.provider) === 'zhipu'
+          ? 'glm'
+          : editingConfig.providerId || editingConfig.provider;
+        const provider = PROVIDER_PRESETS.find(p => p.id === providerId) || PROVIDER_PRESETS[0];
         setForm({
           id: editingConfig.id,
-          providerId: editingConfig.providerId || editingConfig.provider,
+          providerId: provider.id,
           name: editingConfig.name || `${editingConfig.provider} · ${editingConfig.model}`,
-          baseUrl: editingConfig.baseUrl,
+          baseUrl: provider.baseUrl,
           model: editingConfig.model,
           apiKey: '',
           isDefault: editingConfig.isDefault,
         });
-        const provider = PROVIDER_PRESETS.find(p => p.id === (editingConfig.providerId || editingConfig.provider)) || PROVIDER_PRESETS[0];
         setSelectedProvider(provider);
       } else {
-        setForm(EMPTY_FORM);
+        setForm(defaultApiConfigForm());
         setSelectedProvider(PROVIDER_PRESETS[0]);
       }
     }
@@ -1090,8 +1181,9 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
       setForm(prev => ({
         ...prev,
         providerId,
-        baseUrl: provider.id === 'custom' ? prev.baseUrl : provider.baseUrl,
-        model: provider.models[0] || '',
+        name: prev.name && prev.name !== selectedProvider.name ? prev.name : provider.name,
+        baseUrl: provider.baseUrl,
+        model: '',
       }));
     }
   };
@@ -1132,31 +1224,20 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           <div className="space-y-2">
             <label className="text-sm font-medium">Base URL</label>
             <Input
+              readOnly
               placeholder="https://api.example.com/v1"
               value={form.baseUrl}
-              onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
+              className="bg-muted/50"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">模型</label>
-            {selectedProvider.id === 'custom' || selectedProvider.models.length === 0 ? (
-              <Input
-                placeholder="例如：gpt-4o"
-                value={form.model}
-                onChange={(e) => setForm({ ...form, model: e.target.value })}
-              />
-            ) : (
-              <select
-                className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
-                value={form.model}
-                onChange={(e) => setForm({ ...form, model: e.target.value })}
-              >
-                {selectedProvider.models.map(model => (
-                  <option key={model} value={model}>{model}</option>
-                ))}
-              </select>
-            )}
+            <label className="text-sm font-medium">模型名称</label>
+            <Input
+              placeholder="请填写模型名称，例如：gpt-4o-mini"
+              value={form.model}
+              onChange={(e) => setForm({ ...form, model: e.target.value.trim() })}
+            />
           </div>
 
           <div className="space-y-2">

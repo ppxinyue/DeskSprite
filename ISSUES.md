@@ -683,3 +683,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：文件选择器过滤只能提升默认体验，不能作为校验；图片入口的图标和校验都要表达“这里只接收图片”。
 - 是否需更新技术文档：是。
+
+## ISSUE-059
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：D. AI 配置 / H. 大对话窗口
+- 严重程度：严重
+- 问题现象：模型配置里的服务商 base_url 与用户指定列表不一致；模型名称不应由内置列表限制；快速测试按钮不能真实返回 API key 无效、模型不存在等服务端错误。
+- 原因分析：旧 provider preset 维护了一组容易过期的模型列表，且 kimi/minimax/qwen 等 base_url 与目标值不一致；测试命令只检查本地 keychain，甚至没有使用配置里的真实 keyring_ref，也不会向服务商发请求。
+- 解决方案：provider preset 改为用户指定的 11 个服务商和 base_url；模型名改为手填；测试按钮在前端读取配置对应 API Key 并发起最小模型请求，失败时解析并展示服务商原始错误信息。
+- 涉及文件：`src/features/ai/providers.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：模型测试必须验证“base_url + model + API key”组合，而不是只验证本地保存状态；模型名应由用户输入以适配不断变化的供应商模型。
+- 是否需更新技术文档：是。
