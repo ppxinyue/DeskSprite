@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::{Duration, Instant};
@@ -27,6 +28,36 @@ pub struct ChatMessagePayload {
     role: String,
     content: String,
     image_data_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscribeAudioRequest {
+    base_url: String,
+    model: String,
+    api_key: String,
+    audio_base64: String,
+    mime_type: String,
+    file_name: Option<String>,
+    language: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SynthesizeSpeechRequest {
+    base_url: String,
+    model: String,
+    api_key: String,
+    input: String,
+    voice: Option<String>,
+    format: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SynthesizeSpeechResponse {
+    data_url: String,
+    mime_type: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -197,6 +228,119 @@ pub async fn chat_completion(request: ChatCompletionRequest) -> Result<String, S
     parse_chat_response(&text, is_anthropic).ok_or_else(|| "模型返回内容为空。".to_string())
 }
 
+#[tauri::command]
+pub async fn transcribe_audio(request: TranscribeAudioRequest) -> Result<String, String> {
+    let api_key = normalize_api_key(&request.api_key);
+    if api_key.is_empty() {
+        return Err("API Key 为空。".to_string());
+    }
+
+    let base_url = normalize_base_url(&request.base_url)?;
+    let endpoint = format!("{}/audio/transcriptions", base_url);
+    let audio_bytes = base64_to_bytes(&request.audio_base64)?;
+    if audio_bytes.is_empty() {
+        return Err("录音内容为空。".to_string());
+    }
+
+    let file_name = request
+        .file_name
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| audio_file_name(&request.mime_type).to_string());
+    let file_part = reqwest::multipart::Part::bytes(audio_bytes)
+        .file_name(file_name)
+        .mime_str(&request.mime_type)
+        .map_err(|e| format!("音频格式无效：{}", e))?;
+    let mut form = reqwest::multipart::Form::new()
+        .text("model", request.model)
+        .part("file", file_part);
+    if let Some(language) = request.language.filter(|value| !value.trim().is_empty()) {
+        form = form.text("language", normalize_language_code(&language));
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response = client
+        .post(&endpoint)
+        .bearer_auth(&api_key)
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("语音识别请求失败：{}", e))?;
+
+    let status = response.status();
+    let text = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(format!(
+            "HTTP {}: {}",
+            status.as_u16(),
+            extract_api_error_message(&text).unwrap_or_else(|| status
+                .canonical_reason()
+                .unwrap_or("语音识别失败")
+                .to_string())
+        ));
+    }
+
+    parse_transcription_response(&text).ok_or_else(|| "语音识别返回内容为空。".to_string())
+}
+
+#[tauri::command]
+pub async fn synthesize_speech(
+    request: SynthesizeSpeechRequest,
+) -> Result<SynthesizeSpeechResponse, String> {
+    let api_key = normalize_api_key(&request.api_key);
+    if api_key.is_empty() {
+        return Err("API Key 为空。".to_string());
+    }
+
+    let base_url = normalize_base_url(&request.base_url)?;
+    let endpoint = format!("{}/audio/speech", base_url);
+    let format = request.format.unwrap_or_else(|| "mp3".to_string());
+    let mime_type = audio_response_mime(&format);
+    let body = json!({
+        "model": request.model,
+        "input": request.input,
+        "voice": request.voice.unwrap_or_else(|| "alloy".to_string()),
+        "response_format": format,
+    });
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let response = client
+        .post(&endpoint)
+        .bearer_auth(&api_key)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("语音合成请求失败：{}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let text = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "HTTP {}: {}",
+            status.as_u16(),
+            extract_api_error_message(&text).unwrap_or_else(|| status
+                .canonical_reason()
+                .unwrap_or("语音合成失败")
+                .to_string())
+        ));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("读取语音合成结果失败：{}", e))?;
+    Ok(SynthesizeSpeechResponse {
+        data_url: format!("data:{};base64,{}", mime_type, STANDARD.encode(bytes)),
+        mime_type: mime_type.to_string(),
+    })
+}
+
 fn build_openai_chat_body(model: &str, messages: &[ChatMessagePayload]) -> serde_json::Value {
     let messages = messages
         .iter()
@@ -281,6 +425,54 @@ fn split_data_url(data_url: &str) -> (&str, &str) {
     }
 }
 
+fn normalize_base_url(value: &str) -> Result<String, String> {
+    let base_url = value.trim().trim_end_matches('/');
+    if !(base_url.starts_with("https://") || base_url.starts_with("http://")) {
+        return Err("Base URL 必须以 http:// 或 https:// 开头。".to_string());
+    }
+    Ok(base_url.to_string())
+}
+
+fn base64_to_bytes(value: &str) -> Result<Vec<u8>, String> {
+    let data = value
+        .split_once(',')
+        .map(|(_, data)| data)
+        .unwrap_or(value)
+        .trim();
+    STANDARD
+        .decode(data)
+        .map_err(|e| format!("音频数据解码失败：{}", e))
+}
+
+fn audio_file_name(mime_type: &str) -> &'static str {
+    match mime_type {
+        "audio/mp4" | "audio/mp4a-latm" => "recording.m4a",
+        "audio/mpeg" | "audio/mp3" => "recording.mp3",
+        "audio/wav" | "audio/wave" => "recording.wav",
+        "audio/ogg" => "recording.ogg",
+        _ => "recording.webm",
+    }
+}
+
+fn normalize_language_code(language: &str) -> String {
+    language
+        .split(['-', '_'])
+        .next()
+        .unwrap_or(language)
+        .to_lowercase()
+}
+
+fn audio_response_mime(format: &str) -> &'static str {
+    match format {
+        "opus" => "audio/ogg",
+        "aac" => "audio/aac",
+        "flac" => "audio/flac",
+        "wav" => "audio/wav",
+        "pcm" => "audio/wav",
+        _ => "audio/mpeg",
+    }
+}
+
 fn parse_chat_response(text: &str, is_anthropic: bool) -> Option<String> {
     let data: serde_json::Value = serde_json::from_str(text).ok()?;
     if is_anthropic {
@@ -313,6 +505,14 @@ fn parse_chat_response(text: &str, is_anthropic: bool) -> Option<String> {
         }
     }
     None
+}
+
+fn parse_transcription_response(text: &str) -> Option<String> {
+    let data: serde_json::Value = serde_json::from_str(text).ok()?;
+    data.get("text")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn normalize_api_key(value: &str) -> String {

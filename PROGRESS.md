@@ -551,3 +551,12 @@
 - 置顶：macOS pet/compact-chat 窗口增加更强的 fullscreen auxiliary/overlay 行为；topmost guard 周期性重申 window level、全 Space 可见和前置顺序；智能附着不再把全屏态灵宠挪到屏幕外隐藏。
 - 语音：新增 `docs/voice-stt-tts-plan.md`，建议把 CloseAI STT/TTS 做成高级云端增强，免费额度内使用默认模型，超额或失败回退系统语音；默认 key 不写入文档或日志。
 - 文件：SettingsPanel.tsx, attachEngine.ts, window.rs, voice-stt-tts-plan.md, PROGRESS.md, ISSUES.md
+
+### R65. 内置云端 STT/TTS 与本机额度展示（2026-05-07）
+- 语音输入：新增云端 STT 服务，点击语音按钮时默认走内置语音增强；录音通过 `MediaRecorder` 获取，后端调用 OpenAI-compatible `/audio/transcriptions`，失败或超额后回退系统语音识别。
+- 语音输出：自动朗读和大窗朗读按钮优先调用内置云端 TTS `/audio/speech`，失败或超额后回退系统 `speechSynthesis`。
+- 设置：`AI 对话` 增加语音输入方式、语音输出方式；支持系统、云端增强、用户默认模型 Key 三种模式。
+- 额度：设置页展示内置 Chat/STT/TTS 的本机已用百分比；当前无账户系统，额度跟随设备独立记录。
+- 后端：新增 `transcribe_audio`、`synthesize_speech` Tauri 命令，并为 `reqwest` 开启 multipart 支持。
+- 验证：`pnpm build`、`cargo check --manifest-path src-tauri/Cargo.toml` 通过；`cargo check` 首次因沙箱网络限制失败，提升权限下载新增依赖后通过。
+- 文件：Cargo.toml, Cargo.lock, ai.rs, lib.rs, defaultModel.ts, voiceService.ts, ChatDialog.tsx, SettingsPanel.tsx, settingsStore.ts, voice-stt-tts-plan.md

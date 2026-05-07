@@ -8,12 +8,13 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SettingsLayout } from '@/components/layouts/SettingsLayout';
-import { useSettingsStore, type PetMotionName, type PetMotionSettings } from '@/features/settings/settingsStore';
+import { useSettingsStore, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
-import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
+import { BUILTIN_CLOSEAI_CONFIG, getBuiltinUsageStats } from '@/features/ai/defaultModel';
 import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
+import { getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getMessages, getSystemPrompt, setSetting, updateSystemPrompt } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
@@ -804,6 +805,23 @@ function AISection({
   setIsModalOpen: (v: boolean) => void;
   editingConfig: ApiConfig | null;
 }) {
+  const [builtinUsage, setBuiltinUsage] = useState<{
+    chat: Awaited<ReturnType<typeof getBuiltinUsageStats>>;
+    voice: Awaited<ReturnType<typeof getBuiltinVoiceUsageStats>>;
+  } | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadUsage() {
+      const [chat, voice] = await Promise.all([getBuiltinUsageStats(), getBuiltinVoiceUsageStats()]);
+      if (alive) setBuiltinUsage({ chat, voice });
+    }
+    loadUsage().catch(() => {
+      if (alive) setBuiltinUsage(null);
+    });
+    return () => { alive = false; };
+  }, []);
+
   return (
     <>
       <SectionTitle>宠物身份</SectionTitle>
@@ -832,6 +850,23 @@ function AISection({
         </div>
         <div className="text-xs text-muted-foreground">{BUILTIN_CLOSEAI_CONFIG.baseUrl}</div>
         <div className="text-xs text-muted-foreground mt-1">未配置自有默认模型时自动使用，额度 100000 token。</div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <UsageMeter
+            label="Chat"
+            value={builtinUsage?.chat.percent ?? 0}
+            detail={`${formatCompactNumber(builtinUsage?.chat.used ?? 0)} / ${formatCompactNumber(builtinUsage?.chat.limit ?? 100000)} token`}
+          />
+          <UsageMeter
+            label="STT"
+            value={builtinUsage?.voice.stt.percent ?? 0}
+            detail={`${formatDurationSeconds(builtinUsage?.voice.stt.used ?? 0)} / ${formatDurationSeconds(builtinUsage?.voice.stt.limit ?? 3600)}`}
+          />
+          <UsageMeter
+            label="TTS"
+            value={builtinUsage?.voice.tts.percent ?? 0}
+            detail={`${formatCompactNumber(builtinUsage?.voice.tts.used ?? 0)} / ${formatCompactNumber(builtinUsage?.voice.tts.limit ?? 100000)} 字符`}
+          />
+        </div>
       </div>
 
       <div className="space-y-3 mb-6">
@@ -911,6 +946,17 @@ function AISection({
 
       <Separator className="my-6" />
       <SectionTitle>语音</SectionTitle>
+      <SettingRow label="语音输入方式" hint="云端增强优先使用内置 STT 额度，用完或失败后自动回退系统输入">
+        <select
+          className="bg-input border border-border rounded px-2 py-1 text-sm"
+          value={settings.voiceInputProvider}
+          onChange={(e) => updateSetting('voiceInputProvider', e.target.value as VoiceProviderMode)}
+        >
+          <option value="cloud-auto">云端增强</option>
+          <option value="system">系统输入</option>
+          <option value="user-cloud">用户默认模型 Key</option>
+        </select>
+      </SettingRow>
       <SettingRow label="语音输入语言">
         <select className="bg-input border border-border rounded px-2 py-1 text-sm"
           value={settings.voiceInputLang} onChange={(e) => updateSetting('voiceInputLang', e.target.value)}>
@@ -921,6 +967,17 @@ function AISection({
       </SettingRow>
       <SettingRow label="语音输出">
         <Switch checked={settings.voiceOutput} onCheckedChange={(v) => updateSetting('voiceOutput', v)} />
+      </SettingRow>
+      <SettingRow label="语音输出方式" hint="云端增强优先使用内置 TTS 额度，用完或失败后自动回退系统朗读">
+        <select
+          className="bg-input border border-border rounded px-2 py-1 text-sm"
+          value={settings.voiceOutputProvider}
+          onChange={(e) => updateSetting('voiceOutputProvider', e.target.value as VoiceProviderMode)}
+        >
+          <option value="cloud-auto">云端增强</option>
+          <option value="system">系统朗读</option>
+          <option value="user-cloud">用户默认模型 Key</option>
+        </select>
       </SettingRow>
 
       <Separator className="my-6" />
@@ -958,6 +1015,33 @@ function AISection({
       <ApiConfigModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editingConfig={editingConfig} />
     </>
   );
+}
+
+function UsageMeter({ label, value, detail }: { label: string; value: number; detail: string }) {
+  const percent = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
+  return (
+    <div className="rounded-md border border-border/70 bg-background/70 px-2.5 py-2">
+      <div className="flex items-center justify-between gap-2 text-xs">
+        <span className="font-medium">{label}</span>
+        <span className="text-muted-foreground">{percent}%</span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className="h-full rounded-full bg-foreground/70" style={{ width: `${percent}%` }} />
+      </div>
+      <div className="mt-1.5 truncate text-[11px] text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 }).format(value);
+}
+
+function formatDurationSeconds(seconds: number) {
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}min`;
+  return `${Math.round(minutes / 60)}h`;
 }
 
 function ShortcutsSection({

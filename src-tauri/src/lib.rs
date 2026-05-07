@@ -70,6 +70,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::ai::test_ai_connection,
             commands::ai::chat_completion,
+            commands::ai::transcribe_audio,
+            commands::ai::synthesize_speech,
             commands::desktop::get_desktop_bounds,
             commands::desktop::can_start_speech_recognition,
             commands::desktop::open_external_url,

@@ -4,6 +4,7 @@ import { emit } from '@tauri-apps/api/event';
 
 export type Theme = 'light' | 'dark' | 'system';
 export type PetMotionName = 'petJump' | 'petWobble' | 'petBreathe';
+export type VoiceProviderMode = 'system' | 'cloud-auto' | 'user-cloud';
 
 export interface PetMotionSetting {
   enabled: boolean;
@@ -29,6 +30,8 @@ export interface AppSettings {
   streamOutput: boolean;
   voiceInputLang: string;
   voiceOutput: boolean;
+  voiceInputProvider: VoiceProviderMode;
+  voiceOutputProvider: VoiceProviderMode;
   wakeWord: string;
   wakeWordEnabled: boolean;
   autoSpeak: boolean;
@@ -57,6 +60,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   streamOutput: true,
   voiceInputLang: 'system',
   voiceOutput: true,
+  voiceInputProvider: 'cloud-auto',
+  voiceOutputProvider: 'cloud-auto',
   wakeWord: '你好灵宠',
   wakeWordEnabled: false,
   autoSpeak: false,
@@ -89,6 +94,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
             (loaded as Record<string, unknown>)[key] =
               key === 'theme' && !['system', 'light', 'dark'].includes(String(parsed))
                 ? 'system'
+                : (key === 'voiceInputProvider' || key === 'voiceOutputProvider') && !isVoiceProviderMode(parsed)
+                  ? 'system'
                 : key === 'dialogWidth' && typeof parsed === 'number'
                   ? Math.min(600, Math.max(200, parsed))
                 : key === 'compactChatFontSize' && typeof parsed === 'number'
@@ -132,6 +139,10 @@ function tryParse(value: string): unknown {
   } catch {
     return value;
   }
+}
+
+function isVoiceProviderMode(value: unknown): value is VoiceProviderMode {
+  return value === 'system' || value === 'cloud-auto' || value === 'user-cloud';
 }
 
 function normalizePetMotions(value: unknown): PetMotionSettings {

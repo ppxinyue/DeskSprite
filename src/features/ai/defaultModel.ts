@@ -4,7 +4,7 @@ import { getSetting, setSetting } from '@/lib/db';
 import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
 
 const BUILTIN_USAGE_KEY = 'builtinCloseAiTokenUsage';
-const BUILTIN_TOKEN_LIMIT = 100_000;
+export const BUILTIN_TOKEN_LIMIT = 100_000;
 
 export const BUILTIN_CLOSEAI_CONFIG: ApiConfig = {
   id: -1,
@@ -70,11 +70,20 @@ export async function recordBuiltinUsage(messages: Message[], output: string) {
   await setSetting(BUILTIN_USAGE_KEY, JSON.stringify(current + estimateTokens(messages, output)));
 }
 
-async function getBuiltinUsage(): Promise<number> {
+export async function getBuiltinUsage(): Promise<number> {
   const raw = await getSetting(BUILTIN_USAGE_KEY);
   if (!raw) return 0;
   const parsed = JSON.parse(raw);
   return typeof parsed === 'number' ? parsed : 0;
+}
+
+export async function getBuiltinUsageStats() {
+  const used = await getBuiltinUsage();
+  return {
+    used,
+    limit: BUILTIN_TOKEN_LIMIT,
+    percent: Math.min(100, Math.round((used / BUILTIN_TOKEN_LIMIT) * 100)),
+  };
 }
 
 function estimateTokens(messages: Message[], output: string): number {

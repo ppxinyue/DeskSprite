@@ -7,11 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { PulseDot } from '@/components/loading-ui/pulse-dot';
 import { useChatStore, createMessage } from './chatStore';
 import { useApiConfigStore } from '@/features/settings/apiConfigStore';
-import { useSettingsStore } from '@/features/settings/settingsStore';
+import { useSettingsStore, type AppSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
 import { streamChat } from '@/features/ai/aiService';
 import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
 import { getProviderName } from '@/features/ai/providers';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
+import { speakWithCloudVoice, stopCloudVoice, transcribeWithCloudVoice } from '@/features/voice/voiceService';
 import type { ApiConfig } from '@/features/ai/types';
 import {
   getMessages,
@@ -211,9 +212,8 @@ export function ChatDialog({
         await recordBuiltinUsage(chatMessages, fullContent);
       }
 
-      // Auto-speak if enabled
       if (settings.autoSpeak && fullContent && fullContent !== '...') {
-        speakText(fullContent, settings.speakRate);
+        speakAssistantText(fullContent, settings);
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
@@ -253,6 +253,7 @@ export function ChatDialog({
       (text) => setInput((value) => `${value}${value ? ' ' : ''}${text}`),
       setIsListening,
       lang,
+      settings.voiceInputProvider,
     );
   }
 
@@ -326,7 +327,7 @@ export function ChatDialog({
                 compactFontSize={compactFontSize}
                 compact
                 speakRate={settings.speakRate}
-                onSpeak={speakText}
+                onSpeak={(text) => speakAssistantText(text, settings)}
               />
             ))}
           </div>
@@ -577,9 +578,8 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
       if (resolved.usingBuiltin) await recordBuiltinUsage(chatMessages, fullContent);
       await refreshHistory();
 
-      // Auto-speak if enabled
       if (settings.autoSpeak && fullContent && fullContent !== '...') {
-        speakText(fullContent, settings.speakRate);
+        speakAssistantText(fullContent, settings);
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
@@ -659,6 +659,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
                     (text) => updatePanel(panel.id, (current) => ({ ...current, input: `${current.input}${current.input ? ' ' : ''}${text}` })),
                     (listening) => updatePanel(panel.id, { isListening: listening }),
                     lang,
+                    settings.voiceInputProvider,
                   );
                 }}
               />
@@ -838,8 +839,27 @@ function showUnsupportedAttachmentAlert(config: ApiConfig) {
 async function startSpeechInput(
   onText: (text: string) => void,
   setListening: (listening: boolean) => void,
-  lang?: string
+  lang?: string,
+  providerMode: VoiceProviderMode = 'system',
 ) {
+  if (providerMode !== 'system') {
+    setListening(true);
+    try {
+      const text = await transcribeWithCloudVoice(providerMode, lang || (navigator.language || 'zh-CN'));
+      setListening(false);
+      if (text) {
+        onText(text);
+        return;
+      }
+    } catch (e) {
+      console.warn('Cloud speech recognition failed, falling back to system speech:', e);
+      setListening(false);
+      if (providerMode === 'cloud-auto') {
+        window.alert('内置语音输入额度已用完或云端识别暂不可用，已切换到系统语音输入。');
+      }
+    }
+  }
+
   setListening(true);
   let canStart = true;
   try {
@@ -905,6 +925,19 @@ async function startSpeechInput(
     setListening(false);
     onText('无法启动系统语音输入。');
   }
+}
+
+async function speakAssistantText(text: string, settings: Pick<AppSettings, 'voiceOutput' | 'voiceOutputProvider' | 'speakRate'>) {
+  if (!settings.voiceOutput) return;
+  const cleanText = stripMarkdown(cleanChatText(text));
+  if (!cleanText) return;
+
+  if (settings.voiceOutputProvider !== 'system') {
+    const spoken = await speakWithCloudVoice(cleanText, settings.voiceOutputProvider);
+    if (spoken) return;
+  }
+
+  speakText(cleanText, settings.speakRate);
 }
 
 function LayoutButton({ title, active, onClick, children }: { title: string; active: boolean; onClick: () => void; children: React.ReactNode }) {
@@ -999,7 +1032,14 @@ function StandaloneChatPanel({
               key={msg.id}
               message={msg}
               speakRate={speakRate}
-              onSpeak={speakText}
+              onSpeak={(text, rate) => {
+                const currentSettings = useSettingsStore.getState().settings;
+                speakAssistantText(text, {
+                  voiceOutput: currentSettings.voiceOutput,
+                  voiceOutputProvider: currentSettings.voiceOutputProvider,
+                  speakRate: rate,
+                });
+              }}
             />
           ))}
         </div>
@@ -1247,9 +1287,11 @@ function MessageBubble({
   const handleSpeak = () => {
     if (isSpeaking) {
       window.speechSynthesis.cancel();
+      stopCloudVoice();
       setIsSpeaking(false);
     } else {
       window.speechSynthesis.cancel();
+      stopCloudVoice();
       onSpeak?.(message.content, speakRate);
       setIsSpeaking(true);
       setTimeout(() => setIsSpeaking(false), message.content.length * 100);

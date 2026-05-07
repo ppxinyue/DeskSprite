@@ -815,3 +815,15 @@
 - 涉及文件：`docs/voice-stt-tts-plan.md`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：语音云端增强应是渐进增强而非硬依赖；客户端内置 key 只能视为体验 key，不能承担安全额度控制。
 - 是否需更新技术文档：是。
+
+## ISSUE-070
+- 发现时间：2026-05-07
+- 发现者：实现推进
+- 相关任务：I. 语音输入输出 / 设置页额度
+- 严重程度：改进
+- 问题现象：只有方案文档，没有真实 STT/TTS 调用、额度统计和设置入口；用户无法体验默认语音模型，也无法查看内置额度已用百分比。
+- 原因分析：此前语音只保留系统 `SpeechRecognition` / `speechSynthesis`，没有后端音频上传接口；默认 Chat 额度已有本地计数，但 STT/TTS 还没有本机 usage key。
+- 解决方案：新增 Rust `transcribe_audio` / `synthesize_speech` 命令；前端新增 `voiceService.ts` 统一处理录音、云端 STT、云端 TTS、额度计数和系统回退；设置页增加语音输入/输出模式和 Chat/STT/TTS 三类内置额度百分比。
+- 涉及文件：`src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/src/commands/ai.rs`, `src-tauri/src/lib.rs`, `src/features/voice/voiceService.ts`, `src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `docs/voice-stt-tts-plan.md`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：云端语音必须设计成“可失败”的增强路径；桌面端要保留系统输入输出兜底，同时把本机额度写成独立 usage key，方便未来替换成服务端额度系统。
+- 是否需更新技术文档：是。

@@ -4,7 +4,7 @@
 
 ## 结论
 
-建议把云端 STT/TTS 做成“高级语音体验”，但不要替代当前系统语音输入/输出。
+已把云端 STT/TTS 做成“高级语音体验”，但不替代当前系统语音输入/输出。
 
 原因：
 
@@ -13,13 +13,12 @@
 - 系统 TTS `speechSynthesis` 可用性高，但声音质量和语言选择受系统影响。
 - 云端 STT/TTS 可以提供稳定质量，但有成本、隐私和默认 key 暴露风险。
 
-因此推荐策略：
+当前策略：
 
-1. 默认仍使用系统语音输入/输出。
-2. 增加“云端语音增强”高级功能。
-3. 在免费额度内使用内置默认 STT/TTS 配置。
-4. 超出额度、网络失败或服务端拒绝时，自动回退系统语音输入/输出。
-5. 用户配置自己的语音模型后，优先使用用户配置。
+1. 默认使用“云端增强”，优先走内置 STT/TTS 体验额度。
+2. 超出额度、网络失败或服务端拒绝时，自动回退系统语音输入/输出。
+3. 用户也可以手动切换到系统语音输入/输出。
+4. 用户选择“用户默认模型 Key”时，使用设置中默认 API 配置的 key；语音模型名仍使用内置 STT/TTS 模型。
 
 ## 默认模型
 
@@ -39,9 +38,8 @@
 
 - `voiceInputProvider`: `system | cloud-auto | user-cloud`
 - `voiceOutputProvider`: `system | cloud-auto | user-cloud`
-- `cloudVoiceEnabled`: boolean
-- `cloudVoiceQuotaUsed`: number
-- `cloudVoiceQuotaLimit`: number
+- `builtinCloseAiSttSecondsUsage`: number，本机内置 STT 已用秒数
+- `builtinCloseAiTtsCharsUsage`: number，本机内置 TTS 已用字符数
 
 语义：
 
@@ -136,6 +134,8 @@
 
 ## 实施步骤
 
+当前已完成：
+
 1. 新增后端命令：
    - `transcribe_audio`
    - `synthesize_speech`
@@ -151,6 +151,16 @@
    - 显示额度使用情况
 5. 聊天窗口语音按钮接入新 service。
 6. 自动朗读接入云端 TTS，失败回退 `speechSynthesis`。
+
+## 当前实现细节
+
+- 内置 STT 额度：每台设备本地记录 3600 秒。
+- 内置 TTS 额度：每台设备本地记录 100000 字符。
+- 内置 Chat 额度：每台设备本地记录 100000 token 估算值。
+- 设置页 `AI 对话` 中展示 Chat/STT/TTS 三类内置额度使用百分比。
+- 当前没有账户系统，因此额度独立跟随设备；重新安装、迁移数据或手动清理本地数据库会影响本地额度记录。
+- 云端 STT 使用 `MediaRecorder` 录音并发送到 OpenAI-compatible `/audio/transcriptions`。
+- 云端 TTS 使用 OpenAI-compatible `/audio/speech`，返回 data URL 后由前端播放。
 
 ## 安全边界
 
