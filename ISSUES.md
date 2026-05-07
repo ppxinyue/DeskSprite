@@ -707,3 +707,15 @@
 - 涉及文件：`src/features/ai/providers.ts`, `src/features/ai/types.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/chat/ChatDialog.tsx`, `src-tauri/src/commands/desktop.rs`, `src-tauri/src/lib.rs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：桌面应用里的外部文档入口应走系统浏览器；模型配置表单只保留真实影响连接的字段。
 - 是否需更新技术文档：是。
+
+## ISSUE-061
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：D. AI 配置 / 模型测试
+- 严重程度：严重
+- 问题现象：用户刚填写并保存 API Key 后，点击测试模型仍返回 `No matching entry found in secure storage`，说明测试链路没有读到刚保存的 key。
+- 原因分析：编辑旧配置时，如果原数据库记录没有 `keyring_ref`，前端会生成新的钥匙串引用并保存 API Key，但 `updateApiConfig` 只更新 provider/base_url/model/name/provider_id，没有把新的 `keyring_ref` 写回数据库；后续测试仍按旧引用读取，导致钥匙串查不到条目。
+- 解决方案：`updateApiConfig` 支持更新 `keyring_ref`；保存 API Key 后立即读回校验；编辑时若不修改 API Key，也会检查既有 keyring 条目是否存在，缺失时要求重新填写。
+- 涉及文件：`src/features/settings/apiConfigStore.ts`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：安全存储引用必须和数据库记录同事务语义更新；任何 keychain 写入都应该读回确认，不能只相信写入命令没有抛错。
+- 是否需更新技术文档：是。

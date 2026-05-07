@@ -497,3 +497,10 @@
 - 兼容：数据库中的 `name` 字段保留作历史兼容，但不再作为用户可编辑字段；编辑旧未知 provider 时按自定义配置处理并保留原 Base URL。
 - 文档：获取 API Key 不再使用 WebView 内普通链接，改为调用 `open_external_url` 后端命令，用系统浏览器真正打开对应服务商文档页面。
 - 文件：providers.ts, types.ts, SettingsPanel.tsx, ChatDialog.tsx, desktop.rs, lib.rs
+
+### R57. API Key 保存与测试链路修复（2026-05-07）
+- 保存：新增 API 配置时使用唯一 keyring 引用写入系统钥匙串，并在落库前立刻读回校验，避免保存成功但测试取不到 key。
+- 编辑：编辑旧配置时如果缺少 `keyring_ref`，会生成新引用、保存 API Key，并把新引用同步写回数据库。
+- 校验：编辑已有配置且不修改 API Key 时，会先确认钥匙串中仍存在原 key；若缺失则要求用户重新填写。
+- 测试：测试模型时如果钥匙串条目缺失，返回“重新填写并保存”的明确提示，而不是底层 secure storage 错误。
+- 文件：apiConfigStore.ts, db.ts, SettingsPanel.tsx

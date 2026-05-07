@@ -714,7 +714,12 @@ async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; mes
   if (!config.keyringRef) {
     return { success: false, message: '缺少 API Key，请重新保存配置。' };
   }
-  const apiKey = await getApiKey(config.keyringRef);
+  let apiKey = '';
+  try {
+    apiKey = await getApiKey(config.keyringRef);
+  } catch {
+    return { success: false, message: '未找到已保存的 API Key，请编辑该配置并重新填写。' };
+  }
   if (!apiKey.trim()) {
     return { success: false, message: 'API Key 为空。' };
   }
@@ -1158,6 +1163,11 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
     if (!form.providerId || !form.baseUrl || !form.model) {
       return;
     }
+    const requiresApiKey = !editingConfig || !editingConfig.keyringRef;
+    if (requiresApiKey && !form.apiKey.trim()) {
+      alert('请填写 API Key。');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -1167,6 +1177,8 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
         await addConfig(form.providerId, form.baseUrl, form.model, form.apiKey, selectedProvider.name, form.providerId);
       }
       onClose();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e));
     } finally {
       setIsSaving(false);
     }
@@ -1233,7 +1245,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
             <label className="text-sm font-medium">API Key</label>
             <Input
               type="password"
-              placeholder={selectedProvider.apiKeyHint}
+              placeholder={editingConfig?.keyringRef ? '••••••••（已保存，留空则不修改）' : selectedProvider.apiKeyHint}
               value={form.apiKey}
               onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
             />
@@ -1261,7 +1273,16 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           <Button variant="outline" onClick={onClose}>
             取消
           </Button>
-          <Button onClick={handleSave} disabled={isSaving || !form.providerId || !form.baseUrl || !form.model || (!form.apiKey && !editingConfig)}>
+          <Button
+            onClick={handleSave}
+            disabled={
+              isSaving
+              || !form.providerId
+              || !form.baseUrl
+              || !form.model
+              || ((!editingConfig || !editingConfig.keyringRef) && !form.apiKey.trim())
+            }
+          >
             {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
             {editingConfig ? '保存' : '添加'}
           </Button>

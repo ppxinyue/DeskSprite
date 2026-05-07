@@ -57,11 +57,12 @@ export async function updateApiConfig(
   baseUrl: string,
   model: string,
   name: string,
-  providerId: string
+  providerId: string,
+  keyringRef: string | null
 ) {
   return execute(
-    'UPDATE api_configs SET provider = ?, base_url = ?, model = ?, name = ?, provider_id = ? WHERE id = ?',
-    [provider, baseUrl, model, name, providerId, id]
+    'UPDATE api_configs SET provider = ?, base_url = ?, model = ?, name = ?, provider_id = ?, keyring_ref = ? WHERE id = ?',
+    [provider, baseUrl, model, name, providerId, keyringRef, id]
   );
 }
 
