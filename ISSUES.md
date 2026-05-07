@@ -779,3 +779,15 @@
 - 涉及文件：`src/lib/apiKeyStorage.ts`, `src/features/settings/apiConfigStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src-tauri/src/commands/ai.rs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：凭证问题必须可观测但不能泄密；只显示 `invalid token` 不足以区分“服务商已响应但拒绝 token”和“应用用了错误 token”。
 - 是否需更新技术文档：是。
+
+## ISSUE-067
+- 发现时间：2026-05-07
+- 发现者：复盘整理
+- 相关任务：D. AI 配置 / 模型测试 / 工程流程
+- 严重程度：改进
+- 问题现象：API Key 保存与测试问题被反复修了多轮，每轮只解决一层表象，缺少一份串联“保存、读取、测试、调用、错误解释”的排查说明。
+- 原因分析：相关经验分散在多个 issue 和 progress 条目中；技术规格仍保留早期 Keychain/前端直连假设，容易让后续实现者重新走回旧路径。
+- 解决方案：新增 `docs/model-config-debugging.md`，记录完整失败链路、当前正确流程、错误含义和 Debug Checklist；后续修改 AI 配置时先对照该文档。
+- 涉及文件：`docs/model-config-debugging.md`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：反复失败的 bug 必须沉淀成单独复盘文档；凭证类问题尤其要写清楚“数据源、错误流、可观测性、安全边界”，否则很容易把错误文案、旧引用或浏览器层问题误判成服务商问题。
+- 是否需更新技术文档：是，后续需要把 `docs/tech-spec-v0.2.md` 中 Keychain-only 和前端直连的旧假设同步为当前后端请求 + 本地可验证凭证源的实现策略。

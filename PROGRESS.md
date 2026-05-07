@@ -539,3 +539,9 @@
 - 归一化：保存、读取和后端请求前统一去掉 `Bearer `、外层引号、不可见字符和误粘贴的换行/空白。
 - 目的：区分“base_url 已连通但服务商拒绝 token”和“应用没有读到用户刚保存的 token”这两类问题。
 - 文件：apiKeyStorage.ts, apiConfigStore.ts, SettingsPanel.tsx, ai.rs
+
+### R63. API Key / 模型测试排查复盘（2026-05-07）
+- 复盘：新增 `docs/model-config-debugging.md`，集中记录从 Keychain 读取失败、错误文本混入 token、WebView `TypeError`、CloseAI provider 缺失，到最终通过安全摘要确认真实 key 的完整排查过程。
+- 经验：用户配置模型和内置默认模型必须共享同一套 `base_url + model + api_key` 调用语义；凭证链路必须可观测但不能泄露明文。
+- 排查法：以后遇到 `invalid token`，先看 endpoint、Key 长度、尾号和指纹，再判断是 base_url 错、保存读取错，还是服务商真实拒绝。
+- 文件：docs/model-config-debugging.md, PROGRESS.md, ISSUES.md
