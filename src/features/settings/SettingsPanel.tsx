@@ -712,15 +712,10 @@ function isAllowedPetImagePath(path: string) {
 }
 
 async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; message: string; latency?: number }> {
-  if (!config.apiKey && !config.keyringRef) {
+  if (!config.apiKey) {
     return { success: false, message: '缺少 API Key，请重新保存配置。' };
   }
-  let apiKey = '';
-  try {
-    apiKey = await resolveStoredApiKey(config.apiKey, config.keyringRef);
-  } catch {
-    return { success: false, message: '未找到已保存的 API Key，请编辑该配置并重新填写。' };
-  }
+  const apiKey = await resolveStoredApiKey(config.apiKey);
   if (!apiKey.trim()) {
     return { success: false, message: 'API Key 为空。' };
   }
@@ -1076,7 +1071,7 @@ function defaultApiConfigForm(): ApiConfigForm {
 }
 
 function hasSavedApiKey(config: ApiConfig | null) {
-  return Boolean(config?.apiKey?.trim() || config?.keyringRef);
+  return Boolean(config?.apiKey?.trim());
 }
 
 function apiKeyForSave(value: string) {

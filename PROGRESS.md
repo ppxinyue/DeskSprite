@@ -518,3 +518,10 @@
 - 聊天：灵宠小窗、大聊天窗口和 Hover 输入都复用 `streamChat`，现在统一调用后端 `chat_completion`，自定义模型不再受 WebView CORS 限制。
 - 兼容：OpenAI 兼容接口走 `/chat/completions`，Anthropic 走 `/messages`；图片消息在后端分别转换为各自格式。
 - 文件：ai.rs, lib.rs, aiService.ts, SettingsPanel.tsx
+
+### R60. 用户模型 API Key 读取逻辑收敛（2026-05-07）
+- 简化：用户新增模型改为和内置默认模型一样，运行时直接使用配置对象里的 `apiKey`，不再回退读取 Keychain。
+- 保存：新建模型时 `api_key` 字段原样保存用户填写的 key；编辑模型留空则保留原 key，重新填写则覆盖。
+- 防护：加载旧数据时兼容解码历史 `local:v1:` 值，同时丢弃此前误存的“未找到 API Key”等内部错误文本，避免把错误提示当 token 发给服务商。
+- 调用：测试模型、默认配置解析、大小聊天窗口都只从本地 `api_key` 得到 key，彻底避免错误态混入 Authorization header。
+- 文件：apiKeyStorage.ts, apiConfigStore.ts, db.ts, SettingsPanel.tsx, defaultModel.ts, aiService.ts

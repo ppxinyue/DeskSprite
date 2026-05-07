@@ -743,3 +743,15 @@
 - 涉及文件：`src-tauri/src/commands/ai.rs`, `src-tauri/src/lib.rs`, `src/features/ai/aiService.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：桌面 App 访问第三方模型 API 不应依赖 WebView 跨域能力；所有供应商请求都应走后端网络层，前端只处理 UI 与本地配置。
 - 是否需更新技术文档：是。
+
+## ISSUE-064
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：D. AI 配置 / H. 对话调用
+- 严重程度：阻断
+- 问题现象：测试返回 `HTTP 400: invalid token: 未找到已保存的 API Key...`，说明内部错误提示被当成 API token 发给了服务商。
+- 原因分析：用户模型读取链路同时存在本地 `api_key`、历史 `local:v1:` 编码值和 Keychain fallback；在早期错误路径中，错误提示文本可能进入本地 key 字段，后续解析又把非空字符串当作有效 token。
+- 解决方案：用户新增模型改为和默认模型一样，运行时只使用配置对象里的本地 `apiKey`；保存时原样写入 `api_key`，不再 fallback 到 Keychain；加载旧数据时过滤内部错误提示文本。
+- 涉及文件：`src/lib/apiKeyStorage.ts`, `src/features/settings/apiConfigStore.ts`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/ai/defaultModel.ts`, `src/features/ai/aiService.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：错误文本绝不能进入凭证数据流；凭证的真实来源必须单一，默认模型和用户模型应共享同样的调用语义。
+- 是否需更新技术文档：是。

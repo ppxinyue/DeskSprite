@@ -6,7 +6,7 @@ export async function* streamChat(
   messages: Message[],
   config: ApiConfig & { keyringRef?: string | null },
 ): AsyncGenerator<string, void, undefined> {
-  const apiKey = await resolveStoredApiKey(config.apiKey, config.keyringRef);
+  const apiKey = await resolveStoredApiKey(config.apiKey);
   try {
     const content = await invoke<string>('chat_completion', {
       request: {
@@ -28,7 +28,7 @@ export async function vision(
   config: ApiConfig & { keyringRef?: string | null },
   prompt = '请详细描述并分析图片中的内容。',
 ): Promise<string> {
-  const apiKey = await resolveStoredApiKey(config.apiKey, config.keyringRef);
+  const apiKey = await resolveStoredApiKey(config.apiKey);
   try {
     return await invoke<string>('chat_completion', {
       request: {

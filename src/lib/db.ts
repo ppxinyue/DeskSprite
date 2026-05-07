@@ -41,7 +41,7 @@ export async function insertApiConfig(
   provider: string,
   baseUrl: string,
   model: string,
-  keyringRef: string,
+  keyringRef: string | null,
   isDefault = 0,
   name?: string,
   providerId?: string,

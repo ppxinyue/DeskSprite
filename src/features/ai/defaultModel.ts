@@ -33,7 +33,7 @@ export async function resolveChatConfig(defaultConfig: StoredApiConfig | undefin
   }
 
   try {
-    const apiKey = await resolveStoredApiKey(defaultConfig.apiKey, defaultConfig.keyringRef);
+    const apiKey = await resolveStoredApiKey(defaultConfig.apiKey);
     if (!apiKey.trim()) {
       throw new Error('missing api key');
     }
