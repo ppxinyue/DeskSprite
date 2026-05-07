@@ -57,8 +57,9 @@ export function isBuiltinAsset(path: string): boolean {
   return path.startsWith('assets/');
 }
 
-export function getPetFrameSources(config: PetStateMediaConfig): string[] {
+export function getPetFrameSources(config: PetStateMediaConfig, userFrames?: string[]): string[] {
   if (config.userAnimatedPath) return [config.userAnimatedPath];
+  if (userFrames && userFrames.length > 0) return userFrames;
   return config.userFrames.length > 0 ? config.userFrames : config.defaultAssets;
 }
 

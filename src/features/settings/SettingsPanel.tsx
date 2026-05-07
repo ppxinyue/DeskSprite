@@ -464,84 +464,148 @@ function ThemeSelect({
 }
 
 function ImageSection() {
+  const { userFrames, loadUserFrames, addUserFrame, removeUserFrame, resetMediaConfig } = usePetStore();
+  const [selectedState, setSelectedState] = useState<PetState>('idle');
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const mediaConfig = usePetStore((s) => s.mediaConfig);
-  const { setStateMediaConfig, resetMediaConfig } = usePetStore();
 
-  const handleUploadPng = async (state: PetState) => {
+  useEffect(() => {
+    loadUserFrames();
+  }, [loadUserFrames]);
+
+  const handleAddImages = async () => {
     const result = await open({
       multiple: true,
-      filters: [{ name: 'PNG序列', extensions: ['png'] }],
+      filters: [
+        { name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'] }
+      ],
     });
     if (!result || result.length === 0) return;
-    const frames = (Array.isArray(result) ? result : [result]).sort();
-    const newConfig: PetStateMediaConfig = {
-      ...mediaConfig[state], userFrames: frames, userAnimatedPath: null, userAnimatedType: null,
-    };
-    setStateMediaConfig(state, newConfig);
-    await setSetting(`petMedia_${state}`, JSON.stringify(newConfig));
-  };
-
-  const handleClear = async (state: PetState) => {
-    setStateMediaConfig(state, DEFAULT_MEDIA_CONFIG[state]);
-    await setSetting(`petMedia_${state}`, JSON.stringify(DEFAULT_MEDIA_CONFIG[state]));
-  };
-
-  const handleResetAll = async () => {
-    resetMediaConfig();
-    for (const state of ALL_PET_STATES) {
-      await setSetting(`petMedia_${state}`, JSON.stringify(DEFAULT_MEDIA_CONFIG[state]));
+    const files = Array.isArray(result) ? result : [result];
+    const { invoke } = await import('@tauri-apps/api/core');
+    for (const file of files) {
+      try {
+        const importedPath = await invoke<string>('import_pet_image', {
+          srcPath: file,
+          state: selectedState,
+        });
+        addUserFrame(selectedState, importedPath);
+      } catch (e) {
+        console.error('Failed to import image:', e);
+      }
     }
   };
 
+  const handleDeleteImage = async (path: string) => {
+    setIsDeleting(path);
+    const confirmed = confirm('确定要删除这张图片吗？');
+    if (confirmed) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('delete_pet_image', { filePath: path });
+        removeUserFrame(selectedState, path);
+      } catch (e) {
+        console.error('Failed to delete image:', e);
+      }
+    }
+    setIsDeleting(null);
+  };
+
+  const handleResetAll = async () => {
+    const confirmed = confirm('确定要恢复全部默认吗？这将删除所有自定义图片。');
+    if (confirmed) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      for (const state of ALL_PET_STATES) {
+        for (const path of userFrames[state]) {
+          try {
+            await invoke('delete_pet_image', { filePath: path });
+          } catch (e) {
+            console.error('Failed to delete image:', e);
+          }
+        }
+      }
+      resetMediaConfig();
+      await loadUserFrames();
+    }
+  };
+
+  const currentStateFrames = userFrames[selectedState] || [];
+  const config = mediaConfig[selectedState];
+
   return (
     <div className="space-y-4">
-      {ALL_PET_STATES.map((state) => {
-        const cfg = mediaConfig[state];
-        const meta = STATE_META[state];
+      {/* State Tabs */}
+      <div className="flex gap-2 border-b border-border/60">
+        {ALL_PET_STATES.map((state) => {
+          const meta = STATE_META[state];
+          const isActive = selectedState === state;
+          const count = userFrames[state]?.length ?? 0;
+          return (
+            <button
+              key={state}
+              className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                isActive
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              onClick={() => setSelectedState(state)}
+            >
+              {meta.label}
+              {count > 0 && (
+                <span className="ml-1.5 text-xs text-muted-foreground">({count})</span>
+              )}
+              {isActive && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-        const previewSrc = cfg.userAnimatedPath
-          ? convertFileSrc(cfg.userAnimatedPath)
-          : cfg.userFrames.length > 0
-            ? convertFileSrc(cfg.userFrames[0])
-            : cfg.defaultAssets[0];
-
-        let configDesc = '内置默认';
-        if (cfg.userAnimatedPath) {
-          const name = cfg.userAnimatedPath.split('/').pop() ?? '';
-          configDesc = `文件：${name}`;
-        } else if (cfg.userFrames.length > 0) {
-          configDesc = `${cfg.userFrames.length}张 · 随机1-5分钟切换`;
-        } else if (cfg.defaultAssets.length > 1) {
-          configDesc = `${cfg.defaultAssets.length}张内置 · 随机1-5分钟切换`;
-        }
-
-        return (
-          <div key={state} className="border border-border rounded-lg p-3">
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded border border-border overflow-hidden flex items-center justify-center bg-muted flex-shrink-0">
-                {previewSrc ? (
-                  <img src={previewSrc} alt={meta.label} className="w-full h-full object-contain" />
-                ) : (
-                  <span className="text-lg">PNG</span>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="font-medium text-sm">{meta.label}</span>
-                  <span className="text-xs text-muted-foreground">{configDesc}</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleUploadPng(state)}>PNG</Button>
-                  {(cfg.userFrames.length > 0 || cfg.userAnimatedPath) && (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleClear(state)}>清除</Button>
-                  )}
-                </div>
-              </div>
-            </div>
+      {/* Image Grid */}
+      <div className="grid grid-cols-4 gap-3">
+        {currentStateFrames.map((path) => (
+          <div
+            key={path}
+            className="relative group aspect-square bg-muted/30 rounded-lg overflow-hidden border border-border/60"
+          >
+            <img
+              src={convertFileSrc(path)}
+              alt=""
+              className="w-full h-full object-contain p-2"
+            />
+            <button
+              onClick={() => handleDeleteImage(path)}
+              disabled={isDeleting === path}
+              className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
           </div>
-        );
-      })}
-      <Button variant="outline" size="sm" onClick={handleResetAll}>恢复全部默认</Button>
+        ))}
+        <button
+          onClick={handleAddImages}
+          className="aspect-square rounded-lg border-2 border-dashed border-border/60 hover:border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
+
+      {/* Current config info */}
+      <p className="text-xs text-muted-foreground">
+        {config.userAnimatedPath
+          ? `当前使用：${config.userAnimatedPath}`
+          : currentStateFrames.length > 0
+            ? `当前使用 ${currentStateFrames.length} 张自定义图片`
+            : '当前使用内置默认图片'}
+      </p>
+
+      {/* Reset All */}
+      <div className="pt-2 border-t border-border/40">
+        <Button variant="outline" size="sm" onClick={handleResetAll}>
+          恢复全部默认
+        </Button>
+      </div>
     </div>
   );
 }

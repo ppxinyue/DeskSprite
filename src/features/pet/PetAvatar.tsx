@@ -56,9 +56,9 @@ export function PetAvatar({
   onDragEnd?: () => void;
   onMenuOpenChange?: (open: boolean) => void;
 }) {
-  const { petState, mediaConfig, openChat, dialogOpen } = usePetStore();
+  const { petState, mediaConfig, userFrames, openChat, dialogOpen, loadUserFrames } = usePetStore();
   const config = mediaConfig[petState];
-  const frameSources = getPetFrameSources(config);
+  const frameSources = getPetFrameSources(config, userFrames[petState]);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [imgError, setImgError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -75,7 +75,10 @@ export function PetAvatar({
   const h = Math.round(150 * scale);
   const animationsPaused = dragging;
 
-  useEffect(() => () => stopPetStateEngine(), []);
+  useEffect(() => {
+    loadUserFrames();
+    return () => stopPetStateEngine();
+  }, [loadUserFrames]);
 
   useEffect(() => {
     if (dialogOpen || config.userAnimatedPath || frameSources.length <= 1) return;

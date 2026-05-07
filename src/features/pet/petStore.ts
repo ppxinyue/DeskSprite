@@ -10,6 +10,11 @@ interface PetStore {
   chatMode: 'new' | 'history';
   chatConversationId: number | null;
   mediaConfig: PetMediaConfig;
+  userFrames: {
+    idle: string[];
+    thinking: string[];
+    sleeping: string[];
+  };
 
   setPetState: (state: PetState) => void;
   setPosition: (pos: { x: number; y: number }) => void;
@@ -20,9 +25,12 @@ interface PetStore {
   toggleDialog: () => void;
   setStateMediaConfig: (state: PetState, config: PetStateMediaConfig) => void;
   resetMediaConfig: () => void;
+  loadUserFrames: () => Promise<void>;
+  addUserFrame: (state: PetState, path: string) => void;
+  removeUserFrame: (state: PetState, path: string) => void;
 }
 
-export const usePetStore = create<PetStore>((set) => ({
+export const usePetStore = create<PetStore>((set, get) => ({
   petState: 'idle',
   position: { x: 100, y: 100 },
   visible: true,
@@ -30,6 +38,11 @@ export const usePetStore = create<PetStore>((set) => ({
   chatMode: 'new',
   chatConversationId: null,
   mediaConfig: DEFAULT_MEDIA_CONFIG,
+  userFrames: {
+    idle: [],
+    thinking: [],
+    sleeping: [],
+  },
 
   setPetState: (petState) => set({ petState }),
   setPosition: (position) => set({ position }),
@@ -41,4 +54,39 @@ export const usePetStore = create<PetStore>((set) => ({
   setStateMediaConfig: (state, config) =>
     set((s) => ({ mediaConfig: { ...s.mediaConfig, [state]: config } })),
   resetMediaConfig: () => set({ mediaConfig: DEFAULT_MEDIA_CONFIG }),
+  loadUserFrames: async () => {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const states: PetState[] = ['idle', 'thinking', 'sleeping'];
+    const results = await Promise.allSettled(
+      states.map(async (state) => {
+        try {
+          const paths = await invoke<string[]>('list_pet_images', { state });
+          return { state, paths };
+        } catch {
+          return { state, paths: [] };
+        }
+      })
+    );
+    const userFrames: Record<PetState, string[]> = { idle: [], thinking: [], sleeping: [] };
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        userFrames[result.value.state] = result.value.paths;
+      }
+    }
+    set({ userFrames });
+  },
+  addUserFrame: (state, path) =>
+    set((s) => ({
+      userFrames: {
+        ...s.userFrames,
+        [state]: [...s.userFrames[state], path],
+      },
+    })),
+  removeUserFrame: (state, path) =>
+    set((s) => ({
+      userFrames: {
+        ...s.userFrames,
+        [state]: s.userFrames[state].filter((p) => p !== path),
+      },
+    })),
 }));

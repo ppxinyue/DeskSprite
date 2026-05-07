@@ -397,6 +397,15 @@
 - 提供商：OpenAI、Anthropic (Claude)、Google Gemini、Grok (xAI)、DeepSeek、Kimi (月之暗面)、智谱 GLM、腾讯混元、MiniMax、通义千问 (Qwen)、自定义。
 - 数据库：新增 `name` 和 `provider_id` 字段到 `api_configs` 表，支持用户自定义配置名称和提供商 ID。
 - 界面：设置页 AI 对话 section 重写，新增添加/编辑/删除/设为默认/测试连接功能。
+
+### R44. 多格式图片上传与管理（2026-05-07）
+- 功能：新增完整的灵宠形象管理系统，支持多格式图片上传、管理和渲染。
+- 格式支持：PNG、JPEG、GIF、WebP、BMP、SVG 等常见图片格式，上传时自动转换为 PNG 格式存储。
+- 存储：用户上传的图片保存在 `appLocalDataDir/assets/{state}/` 目录，按状态（待机/思考/睡眠）分别存储。
+- Rust 命令：新增 `import_pet_image`、`delete_pet_image`、`list_pet_images` 三个命令用于图片管理。
+- 界面：设置页"外观" section 重写，新增状态切换标签页、4 列图片网格预览、添加/删除图片功能。
+- 渲染：PetAvatar 组件优先使用用户上传图片，无自定义时回退到内置默认资源；启动时自动加载用户图片列表。
+- 文件：images.rs, mod.rs, lib.rs, petStore.ts, PetAvatar.tsx, SettingsPanel.tsx, animations.ts
 - 模态框：新增 `ApiConfigModal` 组件，支持从 11 个提供商预设选择、自动填充 Base URL 和模型列表、测试连接按钮。
 - 存储：API Key 继续存储在系统钥匙串中，数据库仅存储 keyring 引用；编辑配置时留空 API Key 则不修改现有 Key。
 - 模型选择：大聊天窗口模型选择显示格式为"{配置名称} · 模型名"，优先显示用户自定义配置名，否则显示提供商名称。
