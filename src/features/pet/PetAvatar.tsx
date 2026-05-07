@@ -73,7 +73,7 @@ export function PetAvatar({
   const videoRef = useRef<HTMLVideoElement>(null);
   const w = Math.round(120 * scale);
   const h = Math.round(150 * scale);
-  const animationsPaused = dialogOpen || dragging;
+  const animationsPaused = dragging;
 
   useEffect(() => () => stopPetStateEngine(), []);
 

@@ -126,6 +126,10 @@ function PetWindow() {
   const pendingDragPointRef = useRef<{ screenX: number; screenY: number } | null>(null);
   const suppressMovedUntilRef = useRef(0);
   const previousDialogOpenRef = useRef<boolean | null>(null);
+  const applyLayoutState = useCallback((nextLayout: PetWindowLayout) => {
+    layoutRef.current = nextLayout;
+    setLayout(nextLayout);
+  }, []);
 
   useEffect(() => {
     layoutRef.current = layout;
@@ -146,14 +150,14 @@ function PetWindow() {
         collapsedHeight,
         contextMenuOpen: targetContextMenuOpen,
         previousLayout: layoutRef.current,
-        setLayout,
+        applyLayout: applyLayoutState,
       });
     } finally {
       window.setTimeout(() => {
         layoutApplyingRef.current = false;
       }, 80);
     }
-  }, [dialogOpen, settings.dialogWidth, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight, contextMenuOpen]);
+  }, [applyLayoutState, dialogOpen, settings.dialogWidth, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight, contextMenuOpen]);
 
   useEffect(() => {
     if (previousDialogOpenRef.current === dialogOpen) return;
@@ -477,7 +481,7 @@ async function applyPetWindowLayout({
   collapsedHeight,
   contextMenuOpen,
   previousLayout,
-  setLayout,
+  applyLayout,
 }: {
   dialogOpen: boolean;
   requestedDialogWidth: number;
@@ -488,7 +492,7 @@ async function applyPetWindowLayout({
   collapsedHeight: number;
   contextMenuOpen: boolean;
   previousLayout: PetWindowLayout;
-  setLayout: (layout: PetWindowLayout) => void;
+  applyLayout: (layout: PetWindowLayout) => void;
 }) {
   try {
     const win = getCurrentWindow();
@@ -663,18 +667,23 @@ async function applyPetWindowLayout({
 
     const nextWindowLeft = clamp(safePetX - layout.petLeft, safeLeft, Math.max(safeLeft, safeRight - layout.windowWidth));
     const nextWindowTop = clamp(safePetY - layout.petTop, safeTop, Math.max(safeTop, safeBottom - layout.windowHeight));
-    if (!layoutsEqual(previousLayout, layout)) setLayout(layout);
-
     const nextX = Math.round(nextWindowLeft * scale);
     const nextY = Math.round(nextWindowTop * scale);
     const shouldMove = Math.abs(position.x - nextX) > 1 || Math.abs(position.y - nextY) > 1;
     const shouldResize =
       Math.abs(windowWidth - layout.windowWidth) > 1 ||
       Math.abs(windowHeight - layout.windowHeight) > 1;
-    const updates: Array<Promise<void>> = [];
-    if (shouldMove) updates.push(win.setPosition(new PhysicalPosition(nextX, nextY)));
-    if (shouldResize) updates.push(win.setSize(new LogicalSize(layout.windowWidth, layout.windowHeight)));
-    if (updates.length > 0) await Promise.all(updates);
+    const isExpanding = layout.windowWidth >= windowWidth || layout.windowHeight >= windowHeight;
+    if (shouldResize && isExpanding) {
+      await win.setSize(new LogicalSize(layout.windowWidth, layout.windowHeight));
+    }
+    if (shouldMove) {
+      await win.setPosition(new PhysicalPosition(nextX, nextY));
+    }
+    if (!layoutsEqual(previousLayout, layout)) applyLayout(layout);
+    if (shouldResize && !isExpanding) {
+      await win.setSize(new LogicalSize(layout.windowWidth, layout.windowHeight));
+    }
   } catch (e) {
     console.warn("Failed to apply pet window layout:", e);
   }

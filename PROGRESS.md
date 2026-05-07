@@ -363,3 +363,9 @@
 ### R38. 内置默认模型切换为 gpt-4o-mini（2026-05-07）
 - 默认模型：内置 CloseAI 兼容配置的模型名从 `qwen3.5-flash` 改为 `gpt-4o-mini`；大窗模型菜单、小窗调用和设置页展示都会读取同一常量同步更新。
 - 文件：defaultModel.ts, PROGRESS.md
+
+### R39. 小窗展开几何顺序与对话时动作保持（2026-05-07）
+- 小窗：展开小对话窗时，先完成原生透明窗口尺寸/位置更新，再提交 React 内部 `petLeft/petTop` 布局，减少旧窗口坐标和新布局坐标不同步造成的灵宠跳动。
+- 顺序：窗口展开时改为先 resize、再 move、最后 apply layout，避免 `Promise.all` 等待 resize 时让已移动窗口和旧内部布局同时暴露。
+- 动作：小窗对话打开时不再暂停灵宠 `petJump/petWobble/petBreathe` 运动状态；仅拖拽期间暂停动作，松手后恢复。
+- 文件：App.tsx, PetAvatar.tsx

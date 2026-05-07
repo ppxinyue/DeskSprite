@@ -539,3 +539,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/components/loading-ui/pulse-dot.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：透明悬浮窗的内容挂载要晚于原生窗口几何变更；拖拽硬边界要同时避免拖动过程越界和拖动结束后的补偿事件。
 - 是否需更新技术文档：是。
+
+## ISSUE-047
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：C. 窗口管理 / F. 灵宠动画 / H. 小对话窗口
+- 严重程度：严重
+- 问题现象：弹出小对话窗时，灵宠本体有时仍会跳动或闪烁；打开小窗对话后灵宠动作被暂停，但用户希望运动状态保持不变。
+- 原因分析：原生透明窗口的 move/resize 与 React 内部 `petLeft/petTop` 更新不是原子操作；旧逻辑先提交内部布局，再等待原生窗口移动/缩放，或用 `Promise.all` 让 move 先完成但 resize 未完成，都会暴露一帧旧窗口/新布局不一致的画面；`PetAvatar` 把 `dialogOpen` 纳入 `animationsPaused`，导致小窗打开时停止动作。
+- 解决方案：将 layout 提交延后到原生窗口几何变更之后；窗口展开时按 resize -> move -> apply layout 的顺序执行，缩短中间帧；`animationsPaused` 改为只受拖拽状态控制，小窗对话时动作继续播放。
+- 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：透明悬浮窗口的视觉稳定性取决于原生窗口几何和 DOM 内部坐标的提交顺序；对话态不应隐式改变用户配置的灵宠运动状态。
+- 是否需更新技术文档：是。
