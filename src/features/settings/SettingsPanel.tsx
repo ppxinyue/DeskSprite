@@ -14,10 +14,9 @@ import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
 import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
-import { getConversations, getMessages, getSystemPrompt, updateSystemPrompt, setSetting } from '@/lib/db';
-import { maskKey } from '@/lib/keychain';
-import type { PetState, PetStateMediaConfig } from '@/features/pet/animations';
-import { DEFAULT_MEDIA_CONFIG, ALL_PET_STATES, STATE_META } from '@/features/pet/animations';
+import { getConversations, getMessages, getSystemPrompt, updateSystemPrompt } from '@/lib/db';
+import type { PetState } from '@/features/pet/animations';
+import { ALL_PET_STATES, STATE_META } from '@/features/pet/animations';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -36,7 +35,7 @@ const SECTIONS: { id: SettingsSection; label: string }[] = [
 export function SettingsPanel() {
   const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
   const { settings, loaded, loadSettings, updateSetting, updateSettings } = useSettingsStore();
-  const { configs, loadConfigs, addConfig, updateConfig, removeConfig, setDefault } = useApiConfigStore();
+  const { configs, loadConfigs, removeConfig, setDefault } = useApiConfigStore();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<any>(null);
@@ -138,10 +137,13 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
   );
 }
 
-function AppearanceRow({ label, children }: { label: string; children: ReactNode }) {
+function AppearanceRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[120px_minmax(280px,420px)] items-center py-3 border-b border-border/40 last:border-0">
-      <span className="text-sm text-foreground">{label}</span>
+      <div>
+        <span className="text-sm text-foreground">{label}</span>
+        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+      </div>
       <div className="min-w-0">{children}</div>
     </div>
   );
@@ -928,7 +930,7 @@ const EMPTY_FORM: ApiConfigForm = {
 };
 
 function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; onClose: () => void; editingConfig: ApiConfig | null }) {
-  const { configs, addConfig, updateConfig } = useApiConfigStore();
+  const { addConfig, updateConfig } = useApiConfigStore();
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState<ApiConfigForm>(EMPTY_FORM);
   const [selectedProvider, setSelectedProvider] = useState(PROVIDER_PRESETS[0]);

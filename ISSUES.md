@@ -575,3 +575,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：独立小窗之后，聊天开关不应再参与宠物窗口几何；透明工具区也是可见交互面，边界计算必须把它纳入同一个硬约束。
 - 是否需更新技术文档：是。
+
+## ISSUE-050
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：H. 大对话窗口 / R43 语音功能 / R45 多模型配置
+- 严重程度：严重
+- 问题现象：大对话窗口发送消息后白屏，无法正常继续对话；同时当前仓库 `pnpm build` 失败。
+- 原因分析：多模型/朗读功能接入后，`StandaloneChatPanel` 在消息渲染处直接引用外层不存在的 `settings` 变量；发送后 `panel.messages` 从空变为非空，渲染 `MessageBubble` 时触发 `ReferenceError`，导致 React 白屏。新增语音和设置代码还带入了若干 TypeScript 错误，包括 Web Speech API 类型缺少 `stop`、`onerror` 签名不匹配、`resultIndex` 可空，以及设置页无效 `hint` prop 和未使用导入。
+- 解决方案：由 `StandaloneChatWorkspace` 把 `settings.speakRate` 作为 prop 传给 `StandaloneChatPanel`；补全语音识别类型并防御 `resultIndex` 缺省；清理未使用导入/解构，给 `AppearanceRow` 增加 `hint` prop 支持。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/apiConfigStore.ts`, `src/features/pet/petStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：大窗和小窗的面板组件不要隐式读取父级 hook 变量；消息从空到非空的首帧渲染是聊天窗口最关键的崩溃检查点，必须让 `pnpm build` 在合并前通过。
+- 是否需更新技术文档：是。

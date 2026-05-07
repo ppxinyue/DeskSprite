@@ -38,9 +38,9 @@ interface SpeechRecognitionLike {
   lang: string;
   interimResults: boolean;
   continuous: boolean;
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }>; resultIndex?: number }) => void) | null;
+  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }>; resultIndex?: number }) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: Event) => void) | null;
   start: () => void;
 }
 
@@ -622,6 +622,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
                 active={panel.id === activePanelId}
                 canClose={panels.length > 1}
                 configs={configs}
+                speakRate={settings.speakRate}
                 onActivate={() => setActivePanelId(panel.id)}
                 onClose={() => closePanel(panel.id)}
                 onImagePick={async () => {
@@ -767,9 +768,11 @@ async function startSpeechInput(
 
   recognition.onresult = (event) => {
     const results = event.results;
-    for (let i = event.resultIndex; i < results.length; i++) {
-      const transcript = results[i][0].transcript;
-      if (results[i].isFinal) {
+    const startIndex = event.resultIndex ?? 0;
+    for (let i = startIndex; i < results.length; i += 1) {
+      const result = results[i];
+      const transcript = result?.[0]?.transcript ?? '';
+      if (result?.isFinal) {
         onText(transcript.trim());
       }
     }
@@ -809,6 +812,7 @@ function StandaloneChatPanel({
   onImagePick,
   onInputChange,
   onModelChange,
+  speakRate,
   onSubmit,
   onVoiceInput,
 }: {
@@ -816,6 +820,7 @@ function StandaloneChatPanel({
   active: boolean;
   canClose: boolean;
   configs: ReturnType<typeof useApiConfigStore.getState>['configs'];
+  speakRate: number;
   onActivate: () => void;
   onClose: () => void;
   onImagePick: () => void;
@@ -872,7 +877,7 @@ function StandaloneChatPanel({
             <MessageBubble
               key={msg.id}
               message={msg}
-              speakRate={settings.speakRate}
+              speakRate={speakRate}
               onSpeak={speakText}
             />
           ))}

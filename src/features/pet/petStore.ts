@@ -30,7 +30,7 @@ interface PetStore {
   removeUserFrame: (state: PetState, path: string) => void;
 }
 
-export const usePetStore = create<PetStore>((set, get) => ({
+export const usePetStore = create<PetStore>((set) => ({
   petState: 'idle',
   position: { x: 100, y: 100 },
   visible: true,

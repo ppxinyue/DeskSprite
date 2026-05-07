@@ -333,8 +333,9 @@ function PetWindow() {
         interimResults: boolean;
         onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
         onend: (() => void) | null;
-        onerror: (() => void) | null;
+        onerror: ((event: Event) => void) | null;
         start: () => void;
+        stop: () => void;
       };
       webkitSpeechRecognition?: new () => {
         lang: string;
@@ -342,8 +343,9 @@ function PetWindow() {
         interimResults: boolean;
         onresult: ((event: { results: ArrayLike<{ 0: { transcript: string } }> }) => void) | null;
         onend: (() => void) | null;
-        onerror: (() => void) | null;
+        onerror: ((event: Event) => void) | null;
         start: () => void;
+        stop: () => void;
       };
     };
 

@@ -9,10 +9,8 @@ import {
 import {
   saveApiKey,
   deleteApiKey,
-  getApiKey,
 } from '@/lib/keychain';
 import { emit } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/core';
 
 export interface ApiConfig {
   id: number;

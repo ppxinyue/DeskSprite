@@ -421,3 +421,9 @@
 - 模型选择：大聊天窗口模型选择显示格式为"{配置名称} · 模型名"，优先显示用户自定义配置名，否则显示提供商名称。
 - 测试连接：完善 Rust `test_ai_connection` 命令，从钥匙串读取 API Key 并验证格式。
 - 文件：providers.ts（新增）、apiConfigStore.ts、SettingsPanel.tsx、ChatDialog.tsx、aiService.ts、0002_add_config_name_and_provider.sql（新增）、lib.rs、ai.rs
+
+### R46. 修复大对话窗口发送后白屏（2026-05-07）
+- 崩溃：大窗消息列表渲染时 `StandaloneChatPanel` 读取了作用域外的 `settings.speakRate`，发送第一条消息后立即触发 React runtime error 并白屏；改为由工作区显式传入 `speakRate`。
+- 构建：修复语音识别类型定义里的 `stop/onerror/resultIndex/isFinal` 问题，并清理设置页/API store/pet store 中导致 `tsc` 失败的未使用导入和无效 prop。
+- 验证：`pnpm build`、`cargo check`、`git diff --check` 均通过；Rust 侧仅保留既有 CSP dead-code warning。
+- 文件：ChatDialog.tsx, App.tsx, SettingsPanel.tsx, apiConfigStore.ts, petStore.ts
