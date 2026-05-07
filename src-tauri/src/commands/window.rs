@@ -350,17 +350,21 @@ pub fn start_topmost_guard(window: tauri::Window) -> Result<(), String> {
                 }
 
                 // Re-assert window level if pet window is visible
+                // MUST dispatch to main thread — AppKit forbids NSWindow calls from background threads
                 if let Some(w) = app_handle.get_webview_window("pet") {
                     if w.is_visible().unwrap_or(false) {
-                        if let Ok(raw_window) = w.ns_window() {
-                            if !raw_window.is_null() {
-                                unsafe {
-                                    let ns_window = &*(raw_window.cast::<NSWindow>());
-                                    // Just call orderFrontRegardless to keep it on top
-                                    let _: () = msg_send![ns_window, orderFrontRegardless];
+                        let w = w.clone();
+                        // Use tauri's run_on_main_thread to safely call on main thread
+                        app_handle.run_on_main_thread(move || {
+                            if let Ok(raw_window) = w.ns_window() {
+                                if !raw_window.is_null() {
+                                    unsafe {
+                                        let ns_window = &*(raw_window.cast::<NSWindow>());
+                                        let _: () = msg_send![ns_window, orderFrontRegardless];
+                                    }
                                 }
                             }
-                        }
+                        }).unwrap_or_else(|e| eprintln!("topmost guard dispatch failed: {}", e));
                     }
                 }
             }
