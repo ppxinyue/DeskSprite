@@ -49,6 +49,7 @@ export function ChatDialog({
   initialConversationId,
   initialMode,
   maxHeight,
+  onConversationChange,
   standalone = false,
 }: {
   dialogOpacity?: number;
@@ -57,6 +58,7 @@ export function ChatDialog({
   initialMode: 'new' | 'history';
   maxHeight: number;
   onClose?: () => void;
+  onConversationChange?: (conversationId: number | null) => void;
   standalone?: boolean;
 }) {
   const [input, setInput] = useState('');
@@ -83,6 +85,10 @@ export function ChatDialog({
   } = useChatStore();
 
   const { getDefaultConfig, loadConfigs } = useApiConfigStore();
+
+  useEffect(() => {
+    if (!standalone) onConversationChange?.(currentConversationId);
+  }, [currentConversationId, onConversationChange, standalone]);
 
   useEffect(() => {
     loadConfigs();

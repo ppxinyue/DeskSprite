@@ -145,6 +145,68 @@ pub fn show_chat_window(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn show_compact_chat_window(
+    app: AppHandle,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("compact-chat") {
+        let _ = window.set_size(LogicalSize::new(w, h));
+        let _ = window.set_position(LogicalPosition::new(x, y));
+        let _ = window.show();
+        let _ = window.set_always_on_top(true);
+        let _ = window.set_visible_on_all_workspaces(true);
+        pin_pet_above_fullscreen(&window);
+        return Ok(());
+    }
+
+    let window = WebviewWindowBuilder::new(&app, "compact-chat", WebviewUrl::App("index.html".into()))
+        .title("")
+        .inner_size(w, h)
+        .position(x, y)
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .accept_first_mouse(true)
+        .always_on_top(true)
+        .visible_on_all_workspaces(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_visible_on_all_workspaces(true);
+    pin_pet_above_fullscreen(&window);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn position_compact_chat_window(
+    app: AppHandle,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("compact-chat") {
+        let _ = window.set_size(LogicalSize::new(w, h));
+        let _ = window.set_position(LogicalPosition::new(x, y));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn hide_compact_chat_window(app: AppHandle) -> Result<(), String> {
+    if let Some(w) = app.get_webview_window("compact-chat") {
+        let _ = w.hide();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn show_pet_window(app: AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("pet") {
         let _ = w.show();
@@ -159,6 +221,9 @@ pub fn show_pet_window(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn hide_pet_window(app: AppHandle) -> Result<(), String> {
     if let Some(w) = app.get_webview_window("pet") {
+        let _ = w.hide();
+    }
+    if let Some(w) = app.get_webview_window("compact-chat") {
         let _ = w.hide();
     }
     Ok(())

@@ -551,3 +551,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：透明悬浮窗口的视觉稳定性取决于原生窗口几何和 DOM 内部坐标的提交顺序；对话态不应隐式改变用户配置的灵宠运动状态。
 - 是否需更新技术文档：是。
+
+## ISSUE-048
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：C. 窗口管理 / H. 小对话窗口
+- 严重程度：严重
+- 问题现象：即使调整了窗口 resize/move 与 DOM layout 的提交顺序，灵宠接近屏幕边缘时，弹出小对话窗仍会出现可见闪烁和跳动。
+- 原因分析：只要小对话框和灵宠共用同一个透明窗口，靠近边缘时就必须同时改变窗口左上角和灵宠在窗口内部的相对坐标；这两个变化无法在 WebView 与原生窗口之间完全原子化提交，因此边缘场景仍会露出中间帧。
+- 解决方案：将小对话框拆分为独立 `compact-chat` 透明窗口；灵宠窗口不再因小窗打开/关闭而 resize/move/re-layout，只负责本体和工具按钮；小窗独立跟随灵宠屏幕坐标定位，工具按钮通过事件转发图片/语音操作，小窗回传 conversationId 供大窗接续。
+- 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src-tauri/src/commands/window.rs`, `src-tauri/src/lib.rs`, `src-tauri/capabilities/default.json`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：悬浮宠物本体要稳定，就不能让外部面板改变它所在窗口的几何；复杂面板应独立成 sibling window，而不是塞进同一个透明宠物窗口。
+- 是否需更新技术文档：是。

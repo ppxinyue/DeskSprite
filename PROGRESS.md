@@ -369,3 +369,10 @@
 - 顺序：窗口展开时改为先 resize、再 move、最后 apply layout，避免 `Promise.all` 等待 resize 时让已移动窗口和旧内部布局同时暴露。
 - 动作：小窗对话打开时不再暂停灵宠 `petJump/petWobble/petBreathe` 运动状态；仅拖拽期间暂停动作，松手后恢复。
 - 文件：App.tsx, PetAvatar.tsx
+
+### R40. 小对话窗拆分为独立透明窗口（2026-05-07）
+- 架构：新增 `compact-chat` 透明窗口承载小对话框，灵宠窗口只保留灵宠本体和 4 个右侧工具按钮；打开/关闭小窗不再 resize 或重排灵宠窗口。
+- 定位：小对话窗根据灵宠当前屏幕坐标独立定位，优先在灵宠下方，底部空间不足时放左右侧，并在拖拽时跟随移动。
+- 交互：图片、语音按钮改为通过 Tauri event 转发给 `compact-chat` 窗口；小窗会把当前会话 id 回传给灵宠窗口，用于“放大”时接续同一会话。
+- 窗口：新增 `show_compact_chat_window`、`position_compact_chat_window`、`hide_compact_chat_window` 命令，并把 `compact-chat` 加入窗口 capabilities。
+- 文件：App.tsx, ChatDialog.tsx, window.rs, lib.rs, default.json
