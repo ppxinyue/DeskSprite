@@ -474,3 +474,11 @@
 - 小窗：紧凑聊天窗口中朗读/复制按钮移动到气泡下方；大聊天窗口仍保持侧边 hover 按钮。
 - 验证：`pnpm build`、`cargo check`、`git diff --check` 通过。
 - 文件：images.rs, lib.rs, SettingsPanel.tsx, PetAvatar.tsx, ChatDialog.tsx
+
+### R54. 小窗去除消息操作与图片上传前置校验（2026-05-07）
+- 小窗：删除紧凑聊天窗口里的复制和朗读按钮，避免小聊天框视觉拥挤；大聊天窗口继续保留侧边复制/朗读按钮。
+- 图标：大聊天窗口上传入口从回形针改为图片图标，并保留“上传图片”标签，避免误解为上传任意文件。
+- 校验：聊天图片选择在读取前校验 MIME 和扩展名，只允许 PNG/JPG/JPEG/WEBP/GIF/BMP；不合法时立即提示。
+- 设置：个性化形象上传在调用 Rust 导入命令前先过滤路径扩展名，若选中非图片文件会即时提醒并跳过。
+- 验证：`pnpm build`、`cargo check`、`git diff --check` 通过。
+- 文件：ChatDialog.tsx, SettingsPanel.tsx

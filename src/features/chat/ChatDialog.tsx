@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Check, ChevronDown, Columns3, Copy, Grid2X2, Mic, PanelRight, Paperclip, Plus, Rows3, Speaker, X } from 'lucide-react';
+import { Check, ChevronDown, Columns3, Copy, Grid2X2, ImagePlus, Mic, PanelRight, Plus, Rows3, Speaker, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { PulseDot } from '@/components/loading-ui/pulse-dot';
@@ -27,6 +27,9 @@ interface SelectedImage {
   name: string;
   dataUrl: string;
 }
+
+const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']);
+const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
 
 interface HistoryItem {
   id: number;
@@ -746,15 +749,28 @@ async function pickImage(): Promise<SelectedImage | null> {
     input.click();
   });
   if (!file) return null;
+  if (!isAllowedImageFile(file)) {
+    window.alert('只能上传图片，请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 格式。');
+    return null;
+  }
   return fileToSelectedImage(file);
 }
 
 async function fileToSelectedImage(file: File, fallbackName = '图片'): Promise<SelectedImage> {
+  if (!isAllowedImageFile(file)) {
+    throw new Error('Unsupported image type');
+  }
   return {
     path: '',
     name: file.name || `${fallbackName}.${imageExtensionFromType(file.type)}`,
     dataUrl: await fileToDataUrl(file),
   };
+}
+
+function isAllowedImageFile(file: File) {
+  const typeAllowed = file.type ? ALLOWED_IMAGE_MIME_TYPES.has(file.type.toLowerCase()) : false;
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  return typeAllowed || ALLOWED_IMAGE_EXTENSIONS.has(ext);
 }
 
 function imageExtensionFromType(type: string) {
@@ -1176,8 +1192,8 @@ function Composer({
       >
         {!compact && (
           <>
-            <Button variant="ghost" size="sm" type="button" className="ml-1 h-9 w-8 p-0 text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]" title="上传图片" onClick={onImagePick}>
-              <Paperclip className="h-4 w-4" />
+            <Button variant="ghost" size="sm" type="button" className="ml-1 h-9 w-8 p-0 text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]" title="上传图片" aria-label="上传图片" onClick={onImagePick}>
+              <ImagePlus className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="sm" type="button" className={`h-9 w-8 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${isListening ? 'animate-pulse text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
               <Mic className="h-4 w-4" />
@@ -1291,28 +1307,6 @@ function MessageBubble({
           </button>
         )}
       </div>
-      {compact && (canSpeak || canCopy) && (
-        <div className={`mt-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 ${isUser ? 'justify-end' : 'justify-start'}`}>
-          {canSpeak && (
-            <button
-              className={actionButtonClass}
-              title={isSpeaking ? '停止朗读' : '朗读'}
-              onClick={handleSpeak}
-            >
-              {isSpeaking ? <X className="h-3.5 w-3.5" /> : <Speaker className="h-3.5 w-3.5" />}
-            </button>
-          )}
-          {canCopy && (
-            <button
-              className={actionButtonClass}
-              title="复制"
-              onClick={() => navigator.clipboard?.writeText(cleanChatText(message.content)).catch(() => {})}
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

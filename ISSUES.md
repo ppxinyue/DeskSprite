@@ -671,3 +671,15 @@
 - 涉及文件：`src-tauri/src/commands/images.rs`, `src-tauri/src/lib.rs`, `src/features/settings/SettingsPanel.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：本地用户资源预览不能只依赖协议 URL；对于小窗口组件，共用消息组件时必须按 compact 模式调整操作按钮的位置。
 - 是否需更新技术文档：是。
+
+## ISSUE-058
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：H. 小对话窗口 / H. 图片输入 / E. 个性化形象
+- 严重程度：改进
+- 问题现象：小聊天框里不需要复制和朗读按钮；大聊天窗口的上传图标像“上传文件”而不是“上传图片”；上传图片入口仍可能让用户选中非图片文件，随后才由后端报错。
+- 原因分析：`MessageBubble` 复用了大窗操作按钮逻辑并在 compact 模式额外渲染按钮；图片选择器只依赖 `accept`/dialog filter，不同系统文件选择器仍可能允许用户切到所有文件或选中不符合格式的材料。
+- 解决方案：compact 模式完全不渲染复制/朗读按钮；上传入口改用 `ImagePlus` 图片图标；聊天上传和设置上传都在前端先校验 PNG/JPG/JPEG/WEBP/GIF/BMP，不合法时立即弹出提示并阻止导入。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：文件选择器过滤只能提升默认体验，不能作为校验；图片入口的图标和校验都要表达“这里只接收图片”。
+- 是否需更新技术文档：是。

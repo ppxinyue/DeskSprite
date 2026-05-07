@@ -23,6 +23,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import type { ReactNode } from 'react';
 
 type SettingsSection = 'appearance' | 'ai' | 'history' | 'shortcuts' | 'privacy';
+const ALLOWED_PET_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: 'appearance', label: '外观' },
@@ -493,8 +494,14 @@ function ImageSection() {
     });
     if (!result || result.length === 0) return;
     const files = Array.isArray(result) ? result : [result];
+    const imageFiles = files.filter(isAllowedPetImagePath);
+    const rejectedCount = files.length - imageFiles.length;
+    if (rejectedCount > 0) {
+      alert('只能上传图片，请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 格式。');
+    }
+    if (imageFiles.length === 0) return;
     const { invoke } = await import('@tauri-apps/api/core');
-    for (const file of files) {
+    for (const file of imageFiles) {
       try {
         const importedPath = await invoke<string>('import_pet_image', {
           srcPath: file,
@@ -694,6 +701,12 @@ function ImageSection() {
       </div>
     </div>
   );
+}
+
+function isAllowedPetImagePath(path: string) {
+  const cleanPath = path.split(/[?#]/)[0] ?? path;
+  const ext = cleanPath.split('.').pop()?.toLowerCase() ?? '';
+  return ALLOWED_PET_IMAGE_EXTENSIONS.has(ext);
 }
 
 function AISection({
