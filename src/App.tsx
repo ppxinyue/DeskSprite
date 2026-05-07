@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
-import { ImagePlus, Maximize2, Mic } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImagePlus, Maximize2, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
@@ -10,7 +10,7 @@ import { ChatDialog } from "@/features/chat/ChatDialog";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore } from "@/features/settings/settingsStore";
-import { getSetting } from "@/lib/db";
+import { getConversations, getSetting } from "@/lib/db";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG } from "@/features/pet/animations";
 import "./index.css";
 
@@ -88,7 +88,7 @@ function App() {
 
 function PetWindow() {
   const { settings } = useSettingsStore();
-  const { dialogOpen, chatMode, chatConversationId, closeChat } = usePetStore();
+  const { dialogOpen, chatMode, chatConversationId, closeChat, openChat } = usePetStore();
 
   const petSize = Math.round(150 * settings.petScale);
   const petImageWidth = Math.round(120 * settings.petScale);
@@ -108,12 +108,18 @@ function PetWindow() {
       .catch(() => {});
   }, [dialogOpen, expandedWidth, expandedHeight, collapsedWidth, collapsedHeight]);
 
-  useEffect(() => {
-    const unlisten = getCurrentWindow().onFocusChanged(({ payload }) => {
-      if (!payload) closeChat();
-    });
-    return () => { unlisten.then((fn) => fn()); };
-  }, [closeChat]);
+  const openLatestChat = async () => {
+    try {
+      const [latest] = await getConversations();
+      if (latest) {
+        openChat('history', latest.id);
+        return;
+      }
+    } catch (e) {
+      console.warn('Failed to open latest chat:', e);
+    }
+    openChat('new');
+  };
 
   return (
     <TooltipProvider>
@@ -128,6 +134,25 @@ function PetWindow() {
           }}
         >
           <PetAvatar opacity={settings.petOpacity} scale={settings.petScale} motions={settings.petMotions} />
+
+          <div
+            className="absolute z-50"
+            style={{
+              left: petImageWidth + 8,
+              top: Math.max(0, Math.round(petImageHeight / 2) - 16),
+            }}
+          >
+            <FloatingToolButton
+              opacity={settings.petOpacity}
+              title={dialogOpen ? "收起对话" : "展开对话"}
+              onClick={() => {
+                if (dialogOpen) closeChat();
+                else openLatestChat();
+              }}
+            >
+              {dialogOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </FloatingToolButton>
+          </div>
 
           {dialogOpen && (
             <>
