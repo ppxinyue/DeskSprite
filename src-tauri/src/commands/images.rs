@@ -1,7 +1,9 @@
 use image::ImageFormat;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
+
+const ALLOWED_IMAGE_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "gif", "bmp"];
 
 /// Get the assets directory for a specific pet state
 fn get_assets_dir(app_handle: &AppHandle, state: &str) -> Result<PathBuf, String> {
@@ -15,6 +17,23 @@ fn get_assets_dir(app_handle: &AppHandle, state: &str) -> Result<PathBuf, String
         .map_err(|e| format!("Failed to create directory {:?}: {}", state_dir, e))?;
 
     Ok(state_dir)
+}
+
+fn validate_image_extension(path: &Path) -> Result<(), String> {
+    let ext = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .ok_or("请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 图片".to_string())?;
+
+    if ALLOWED_IMAGE_EXTENSIONS.contains(&ext.as_str()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "不支持的图片格式 .{}，请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 图片",
+            ext
+        ))
+    }
 }
 
 /// Import a pet image, converting it to PNG format
@@ -31,6 +50,7 @@ pub async fn import_pet_image(
 
     // Read source image
     let src_path_buf = PathBuf::from(&src_path);
+    validate_image_extension(&src_path_buf)?;
     let src_path_canonical = fs::canonicalize(&src_path_buf)
         .map_err(|e| format!("Failed to canonicalize source path: {}", e))?;
 

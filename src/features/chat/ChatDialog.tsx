@@ -741,7 +741,7 @@ async function pickImage(): Promise<SelectedImage | null> {
   const file = await new Promise<File | null>((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/png,image/jpeg,image/webp';
+    input.accept = 'image/png,image/jpeg,image/webp,image/gif,image/bmp';
     input.onchange = () => resolve(input.files?.[0] ?? null);
     input.click();
   });

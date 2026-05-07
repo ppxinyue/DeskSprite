@@ -482,7 +482,7 @@ function ImageSection() {
     const result = await open({
       multiple: true,
       filters: [
-        { name: '图片文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'] }
+        { name: '常见图片格式', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }
       ],
     });
     if (!result || result.length === 0) return;
@@ -497,6 +497,7 @@ function ImageSection() {
         addUserFrame(selectedState, importedPath);
       } catch (e) {
         console.error('Failed to import image:', e);
+        alert(e instanceof Error ? e.message : String(e));
       }
     }
   };
@@ -536,6 +537,7 @@ function ImageSection() {
 
   const currentStateFrames = userFrames[selectedState] || [];
   const config = mediaConfig[selectedState];
+  const defaultFrames = config.defaultAssets;
 
   return (
     <div className="space-y-4">
@@ -545,6 +547,7 @@ function ImageSection() {
           const meta = STATE_META[state];
           const isActive = selectedState === state;
           const count = userFrames[state]?.length ?? 0;
+          const defaultCount = mediaConfig[state].defaultAssets.length;
           return (
             <button
               key={state}
@@ -556,9 +559,7 @@ function ImageSection() {
               onClick={() => setSelectedState(state)}
             >
               {meta.label}
-              {count > 0 && (
-                <span className="ml-1.5 text-xs text-muted-foreground">({count})</span>
-              )}
+              <span className="ml-1.5 text-xs text-muted-foreground">({defaultCount + count})</span>
               {isActive && (
                 <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
               )}
@@ -569,6 +570,21 @@ function ImageSection() {
 
       {/* Image Grid */}
       <div className="grid grid-cols-4 gap-3">
+        {defaultFrames.map((path) => (
+          <div
+            key={`default-${path}`}
+            className="relative group aspect-square bg-muted/30 rounded-lg overflow-hidden border border-border/60"
+          >
+            <img
+              src={path}
+              alt=""
+              className="w-full h-full object-contain p-2"
+            />
+            <span className="absolute left-1.5 top-1.5 rounded bg-background/80 px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm">
+              默认
+            </span>
+          </div>
+        ))}
         {currentStateFrames.map((path) => (
           <div
             key={path}
@@ -601,8 +617,8 @@ function ImageSection() {
         {config.userAnimatedPath
           ? `当前使用：${config.userAnimatedPath}`
           : currentStateFrames.length > 0
-            ? `当前使用 ${currentStateFrames.length} 张自定义图片`
-            : '当前使用内置默认图片'}
+            ? `当前使用 ${currentStateFrames.length} 张自定义图片；内置默认图片仍保留展示`
+            : `当前使用 ${defaultFrames.length} 张内置默认图片`}
       </p>
 
       {/* Reset All */}

@@ -444,3 +444,9 @@
 - 图片：上传/粘贴图片发送时，把图片 dataURL 写入消息记录；历史会话加载时识别 dataURL 并恢复图片预览。
 - 历史：设置-历史对话详情页也会显示消息图片，列表 preview 用 `[图片]` 标记含图消息。
 - 文件：ChatDialog.tsx, SettingsPanel.tsx
+
+### R50. 个性化形象默认图展示与本地图片渲染修复（2026-05-07）
+- 设置：个性化形象网格现在同时显示系统内置默认灵宠图和用户自定义图，默认图带“默认”标签且不可删除。
+- 渲染：启用 Tauri asset protocol，并在 CSP 中放行 `asset:` / `http://asset.localhost` 图片和媒体源，修复上传图片在设置页和灵宠前端无法显示的问题。
+- 上传：形象上传和聊天图片选择都限制为常见位图格式 PNG/JPG/JPEG/WEBP/GIF/BMP；Rust 导入命令同步校验扩展名并返回清晰错误。
+- 文件：SettingsPanel.tsx, ChatDialog.tsx, images.rs, tauri.conf.json, Cargo.toml, Cargo.lock

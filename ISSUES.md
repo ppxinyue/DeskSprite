@@ -623,3 +623,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：历史记录要保存可恢复的数据本体，不能只保存临时浏览器文件引用；外置按钮触发的异步能力必须有显式状态或错误反馈。
 - 是否需更新技术文档：是。
+
+## ISSUE-054
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：E. 设置中心 / F. 灵宠形象
+- 严重程度：严重
+- 问题现象：设置-个性化形象里看不到系统默认灵宠形象；上传新图片后，设置页无法显示，灵宠前端也无法渲染；文件选择器允许选择不适合的图片格式。
+- 原因分析：设置页只渲染 `userFrames`，没有把 `defaultAssets` 纳入网格展示。用户上传图片保存到 app local data 后通过 `convertFileSrc` 渲染，但 Tauri 配置未启用 `protocol-asset`/`assetProtocol`，CSP 也没有放行 `asset:` 和 `http://asset.localhost`，导致本地图片被 WebView 拦截。文件选择器包含 SVG，但 Rust `image` 转码链路不支持 SVG。
+- 解决方案：设置页默认图和自定义图同时展示，默认图只读；启用 asset protocol 并限制 scope 到 `$APPLOCALDATA/assets/**`，CSP 放行 asset 图片/媒体；文件选择器和 Rust 导入命令统一限制为 PNG/JPG/JPEG/WEBP/GIF/BMP。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/chat/ChatDialog.tsx`, `src-tauri/src/commands/images.rs`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：`convertFileSrc` 不是纯前端转换，必须同时打开 Tauri asset protocol、设置访问 scope、并在 CSP 中允许对应协议；设置页应展示“可用资源全集”，而不是只展示用户覆盖资源。
+- 是否需更新技术文档：是。
