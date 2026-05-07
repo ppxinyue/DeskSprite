@@ -19,6 +19,7 @@ const CHAT_HANDOFF_KEY = "desksprite:chat-handoff-conversation-id";
 const SCREEN_MARGIN = 16;
 const PET_CONTENT_MARGIN = 20;
 const MIN_DIALOG_WIDTH = 200;
+const MIN_DIALOG_HEIGHT = 90;
 const CONTEXT_MENU_WIDTH = 112;
 const CONTEXT_SUBMENU_WIDTH = 170;
 const CONTEXT_MENU_HEIGHT = 180;
@@ -105,12 +106,13 @@ function PetWindow() {
   const { settings } = useSettingsStore();
   const { dialogOpen, chatMode, chatConversationId, closeChat, openChat } = usePetStore();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [dialogSurfaceReady, setDialogSurfaceReady] = useState(dialogOpen);
 
   const petSize = Math.round(150 * settings.petScale);
   const petImageWidth = Math.round(120 * settings.petScale);
   const petImageHeight = Math.round(150 * settings.petScale);
-  const toolButtonSize = 32;
-  const toolGap = 6;
+  const toolButtonSize = 28;
+  const toolGap = 4;
   const toolRowWidth = toolButtonSize * 4 + toolGap * 3;
   const collapsedWidth = Math.max(220, petSize + 70);
   const collapsedHeight = Math.max(220, petSize + 70);
@@ -122,23 +124,27 @@ function PetWindow() {
   const dragSessionRef = useRef<BoundedDragSession | null>(null);
   const dragFrameRef = useRef<number | null>(null);
   const pendingDragPointRef = useRef<{ screenX: number; screenY: number } | null>(null);
+  const suppressMovedUntilRef = useRef(0);
+  const previousDialogOpenRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     layoutRef.current = layout;
   }, [layout]);
 
-  const requestLayout = useCallback(async () => {
+  const requestLayout = useCallback(async (overrides: { dialogOpen?: boolean; contextMenuOpen?: boolean } = {}) => {
+    const targetDialogOpen = overrides.dialogOpen ?? dialogOpen;
+    const targetContextMenuOpen = overrides.contextMenuOpen ?? contextMenuOpen;
     layoutApplyingRef.current = true;
     try {
       await applyPetWindowLayout({
-        dialogOpen,
+        dialogOpen: targetDialogOpen,
         requestedDialogWidth: settings.dialogWidth,
         petImageWidth,
         petImageHeight,
         toolRowWidth,
         collapsedWidth,
         collapsedHeight,
-        contextMenuOpen,
+        contextMenuOpen: targetContextMenuOpen,
         previousLayout: layoutRef.current,
         setLayout,
       });
@@ -150,13 +156,33 @@ function PetWindow() {
   }, [dialogOpen, settings.dialogWidth, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight, contextMenuOpen]);
 
   useEffect(() => {
-    requestLayout();
-  }, [requestLayout]);
+    if (previousDialogOpenRef.current === dialogOpen) return;
+    previousDialogOpenRef.current = dialogOpen;
+    let cancelled = false;
+    if (dialogOpen) setDialogSurfaceReady(false);
+    requestLayout({ dialogOpen }).then(() => {
+      if (!cancelled) setDialogSurfaceReady(dialogOpen);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dialogOpen, requestLayout]);
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+    requestLayout({ dialogOpen: true }).catch(() => {});
+  }, [settings.dialogWidth, settings.compactChatFontSize, requestLayout, dialogOpen]);
+
+  useEffect(() => {
+    if (dialogOpen) return;
+    requestLayout({ dialogOpen: false, contextMenuOpen }).catch(() => {});
+  }, [contextMenuOpen, dialogOpen, requestLayout]);
 
   useEffect(() => {
     const unlisten = getCurrentWindow().onMoved(() => {
       if (dragSessionRef.current) return;
       if (layoutApplyingRef.current) return;
+      if (Date.now() < suppressMovedUntilRef.current) return;
       setDragging(true);
       if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
       movedTimerRef.current = window.setTimeout(() => {
@@ -227,6 +253,7 @@ function PetWindow() {
         session.minWindowTop,
         session.maxWindowTop,
       );
+      suppressMovedUntilRef.current = Date.now() + 180;
       getCurrentWindow().setPosition(new LogicalPosition(nextLeft, nextTop)).catch(() => {});
     });
   };
@@ -234,11 +261,9 @@ function PetWindow() {
   const handleBoundedDragEnd = () => {
     dragSessionRef.current = null;
     pendingDragPointRef.current = null;
+    suppressMovedUntilRef.current = Date.now() + 800;
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
-    movedTimerRef.current = window.setTimeout(() => {
-      setDragging(false);
-      requestLayout();
-    }, 180);
+    setDragging(false);
   };
 
   const openLatestChat = async () => {
@@ -311,28 +336,30 @@ function PetWindow() {
               opacity={settings.petOpacity}
               title={dialogOpen ? "收起对话" : "展开对话"}
               onClick={() => {
-                if (dialogOpen) closeChat();
-                else openLatestChat();
+                if (dialogOpen) {
+                  setDialogSurfaceReady(false);
+                  closeChat();
+                } else openLatestChat();
               }}
             >
-              {dialogOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {dialogOpen ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </FloatingToolButton>
-            {dialogOpen && (
+            {dialogOpen && dialogSurfaceReady && (
               <>
                 <FloatingToolButton muted opacity={settings.petOpacity} title="图片输入" onClick={() => window.dispatchEvent(new CustomEvent("desksprite:chat-image"))}>
-                  <ImagePlus className="h-4 w-4" />
+                  <ImagePlus className="h-3.5 w-3.5" />
                 </FloatingToolButton>
                 <FloatingToolButton muted opacity={settings.petOpacity} title="语音输入" onClick={() => window.dispatchEvent(new CustomEvent("desksprite:chat-voice"))}>
-                  <Mic className="h-4 w-4" />
+                  <Mic className="h-3.5 w-3.5" />
                 </FloatingToolButton>
                 <FloatingToolButton muted opacity={settings.petOpacity} title="放大" onClick={expandToStandaloneChat}>
-                  <Maximize2 className="h-4 w-4" />
+                  <Maximize2 className="h-3.5 w-3.5" />
                 </FloatingToolButton>
               </>
             )}
           </div>
 
-          {dialogOpen && (
+          {dialogOpen && dialogSurfaceReady && (
             <>
               <div
                 className="absolute z-30"
@@ -342,6 +369,7 @@ function PetWindow() {
                   initialConversationId={chatConversationId}
                   initialMode={chatMode}
                   dialogOpacity={settings.petOpacity}
+                  compactFontSize={settings.compactChatFontSize}
                   maxHeight={layout.dialogMaxHeight}
                   onClose={closeChat}
                 />
@@ -378,7 +406,7 @@ function FloatingToolButton({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`h-8 w-8 rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] p-0 text-[var(--color-chat-muted)] shadow-none transition-all hover:bg-[color-mix(in_srgb,var(--color-chat-text)_8%,transparent)] hover:text-[var(--color-chat-text)] ${
+      className={`h-7 w-7 rounded-[8px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] p-0 text-[var(--color-chat-muted)] shadow-none transition-all hover:bg-[color-mix(in_srgb,var(--color-chat-text)_8%,transparent)] hover:text-[var(--color-chat-text)] ${
         muted ? "saturate-0 hover:saturate-100" : ""
       }`}
       style={{ opacity: muted && !hovered ? opacity * 0.42 : opacity }}
@@ -509,7 +537,7 @@ async function applyPetWindowLayout({
         dialogWidth: requestedDialogWidth,
         dialogMaxHeight: requestedDialogWidth,
         toolsLeft: PET_CONTENT_MARGIN + petImageWidth + 8,
-        toolsTop: PET_CONTENT_MARGIN + petImageHeight - 32,
+        toolsTop: PET_CONTENT_MARGIN + petImageHeight - 28,
       };
     } else if (!dialogOpen && contextMenuOpen) {
       const menuWindowWidth = Math.min(
@@ -544,38 +572,78 @@ async function applyPetWindowLayout({
         toolsLeft: placeRight
           ? petLeft + petImageWidth + 8
           : Math.max(PET_CONTENT_MARGIN, petLeft - toolRowWidth - 8),
-        toolsTop: petTop + petImageHeight - 32,
+        toolsTop: petTop + petImageHeight - 28,
       };
     } else {
       const maxDialogWidth = Math.max(MIN_DIALOG_WIDTH, maxWindowWidth - PET_CONTENT_MARGIN * 2);
       const dialogWidth = clamp(requestedDialogWidth, MIN_DIALOG_WIDTH, maxDialogWidth);
-      const dialogMaxHeight = Math.max(120, Math.min(dialogWidth, maxWindowHeight - petImageHeight - PET_CONTENT_MARGIN * 2 - 12));
-      const expandedWindowWidth = Math.min(
-        maxWindowWidth,
-        Math.max(
-          dialogWidth + PET_CONTENT_MARGIN * 2,
-          petImageWidth + 8 + toolRowWidth + PET_CONTENT_MARGIN * 2,
-        ),
-      );
-      const expandedWindowHeight = Math.min(
-        maxWindowHeight,
-        petImageHeight + dialogMaxHeight + PET_CONTENT_MARGIN * 2 + 12,
-      );
-      const placeRight = safePetX - PET_CONTENT_MARGIN + expandedWindowWidth <= safeRight;
-      const placeBelow = safePetY - PET_CONTENT_MARGIN + expandedWindowHeight <= safeBottom;
+      const availableBelow = safeBottom - (safePetY + petImageHeight + 12);
+      const belowDialogHeight = Math.min(dialogWidth, Math.max(0, availableBelow));
+      const placeBelow = belowDialogHeight >= MIN_DIALOG_HEIGHT;
 
-      const petLeft = placeRight
-        ? PET_CONTENT_MARGIN
-        : Math.max(PET_CONTENT_MARGIN, expandedWindowWidth - petImageWidth - PET_CONTENT_MARGIN);
-      const petTop = placeBelow
-        ? PET_CONTENT_MARGIN
-        : Math.max(PET_CONTENT_MARGIN, expandedWindowHeight - petImageHeight - PET_CONTENT_MARGIN);
-      const dialogLeft = placeRight
-        ? PET_CONTENT_MARGIN
-        : Math.max(PET_CONTENT_MARGIN, expandedWindowWidth - dialogWidth - PET_CONTENT_MARGIN);
-      const dialogTop = placeBelow
-        ? petTop + petImageHeight + 12
-        : PET_CONTENT_MARGIN;
+      let expandedWindowWidth: number;
+      let expandedWindowHeight: number;
+      let petLeft: number;
+      let petTop: number;
+      let dialogLeft: number;
+      let dialogTop: number;
+      let dialogMaxHeight: number;
+      let placeRight: boolean;
+
+      if (placeBelow) {
+        dialogMaxHeight = Math.max(MIN_DIALOG_HEIGHT, belowDialogHeight);
+        expandedWindowWidth = Math.min(
+          maxWindowWidth,
+          Math.max(
+            dialogWidth + PET_CONTENT_MARGIN * 2,
+            petImageWidth + 8 + toolRowWidth + PET_CONTENT_MARGIN * 2,
+          ),
+        );
+        expandedWindowHeight = Math.min(
+          maxWindowHeight,
+          petImageHeight + dialogMaxHeight + PET_CONTENT_MARGIN * 2 + 12,
+        );
+        placeRight = safePetX - PET_CONTENT_MARGIN + expandedWindowWidth <= safeRight;
+        petLeft = placeRight
+          ? PET_CONTENT_MARGIN
+          : Math.max(PET_CONTENT_MARGIN, expandedWindowWidth - petImageWidth - PET_CONTENT_MARGIN);
+        petTop = PET_CONTENT_MARGIN;
+        dialogLeft = placeRight
+          ? PET_CONTENT_MARGIN
+          : Math.max(PET_CONTENT_MARGIN, expandedWindowWidth - dialogWidth - PET_CONTENT_MARGIN);
+        dialogTop = petTop + petImageHeight + 12;
+      } else {
+        dialogMaxHeight = Math.max(
+          MIN_DIALOG_HEIGHT,
+          Math.min(dialogWidth, maxWindowHeight - PET_CONTENT_MARGIN * 2),
+        );
+        expandedWindowWidth = Math.min(
+          maxWindowWidth,
+          dialogWidth + petImageWidth + 12 + PET_CONTENT_MARGIN * 2,
+        );
+        expandedWindowHeight = Math.min(
+          maxWindowHeight,
+          Math.max(petImageHeight, dialogMaxHeight) + PET_CONTENT_MARGIN * 2,
+        );
+        placeRight = safePetX + petImageWidth + 12 + dialogWidth + PET_CONTENT_MARGIN <= safeRight;
+        petLeft = placeRight
+          ? PET_CONTENT_MARGIN
+          : Math.max(PET_CONTENT_MARGIN, expandedWindowWidth - petImageWidth - PET_CONTENT_MARGIN);
+        const minPetTop = Math.max(PET_CONTENT_MARGIN, safePetY - (safeBottom - expandedWindowHeight));
+        const maxPetTop = Math.min(
+          expandedWindowHeight - petImageHeight - PET_CONTENT_MARGIN,
+          safePetY - safeTop,
+        );
+        petTop = clamp(PET_CONTENT_MARGIN, minPetTop, Math.max(minPetTop, maxPetTop));
+        dialogLeft = placeRight
+          ? petLeft + petImageWidth + 12
+          : PET_CONTENT_MARGIN;
+        dialogTop = clamp(
+          petTop,
+          PET_CONTENT_MARGIN,
+          Math.max(PET_CONTENT_MARGIN, expandedWindowHeight - dialogMaxHeight - PET_CONTENT_MARGIN),
+        );
+      }
 
       layout = {
         windowWidth: expandedWindowWidth,
@@ -589,7 +657,7 @@ async function applyPetWindowLayout({
         toolsLeft: placeRight
           ? petLeft + petImageWidth + 8
           : Math.max(PET_CONTENT_MARGIN, petLeft - toolRowWidth - 8),
-        toolsTop: petTop + petImageHeight - 32,
+        toolsTop: petTop + petImageHeight - 28,
       };
     }
 

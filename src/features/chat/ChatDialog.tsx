@@ -45,12 +45,14 @@ interface SpeechRecognitionLike {
 
 export function ChatDialog({
   dialogOpacity = 1,
+  compactFontSize = 13,
   initialConversationId,
   initialMode,
   maxHeight,
   standalone = false,
 }: {
   dialogOpacity?: number;
+  compactFontSize?: number;
   initialConversationId?: number | null;
   initialMode: 'new' | 'history';
   maxHeight: number;
@@ -255,20 +257,21 @@ export function ChatDialog({
         maxHeight: standalone ? undefined : maxHeight,
         height: standalone ? '100%' : undefined,
         opacity: standalone ? 1 : dialogOpacity,
+        fontSize: standalone ? undefined : compactFontSize,
       }}
     >
       {mode === 'history' && (
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" style={{ maxHeight: standalone ? undefined : Math.max(120, maxHeight - 42) }}>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" style={{ maxHeight: standalone ? undefined : Math.max(120, maxHeight - 42) }}>
           {historyItems.length === 0 ? (
             <div className="px-2 py-6 text-center text-[12px] text-[var(--color-chat-muted)]">暂无历史对话</div>
           ) : historyItems.map((item) => (
             <button
               key={item.id}
-              className="block w-full rounded-[8px] px-3 py-2 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-chat-text)_8%,transparent)]"
+              className="block w-full rounded-[8px] px-2.5 py-1.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-chat-text)_8%,transparent)]"
               onClick={() => loadConversation(item.id)}
             >
-              <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
-              <div className="mt-0.5 text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">{formatConversationTime(item.updatedAt)}</div>
+              <div className="truncate leading-[1.45]" style={{ fontSize: compactFontSize }}>{item.title || `对话 ${item.id}`}</div>
+              <div className="mt-0.5 text-[11px] leading-[1.45] text-[var(--color-chat-muted)]">{formatConversationTime(item.updatedAt)}</div>
             </button>
           ))}
         </div>
@@ -277,12 +280,12 @@ export function ChatDialog({
       {mode === 'chat' && messages.length > 0 && (
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
           style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 60) }}
         >
-          <div className="space-y-1.5 py-3">
+          <div className="space-y-1 py-2.5">
             {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} fullWidth />
+              <MessageBubble key={msg.id} message={msg} fullWidth compactFontSize={compactFontSize} compact />
             ))}
           </div>
         </div>
@@ -300,6 +303,7 @@ export function ChatDialog({
           selectedImage={selectedImage}
           textareaRef={textareaRef}
           compact
+          compactFontSize={compactFontSize}
           isListening={isListening}
         />
       )}
@@ -950,6 +954,7 @@ function Composer({
   selectedImage,
   textareaRef,
   compact = false,
+  compactFontSize = 13,
 }: {
   input: string;
   isStreaming: boolean;
@@ -962,9 +967,10 @@ function Composer({
   selectedImage?: SelectedImage | null;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   compact?: boolean;
+  compactFontSize?: number;
 }) {
   return (
-    <div className={compact ? "p-3 pt-2" : ""}>
+    <div className={compact ? "p-2.5 pt-1.5" : ""}>
       {selectedImage && (
         <div className="mb-2 flex items-center gap-2 rounded-[8px] border border-[var(--color-chat-border)] px-2 py-1.5 text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
           <img src={selectedImage.dataUrl} alt="" className="h-8 w-8 rounded-[6px] object-cover" />
@@ -972,7 +978,7 @@ function Composer({
         </div>
       )}
       <form
-        className="flex w-full items-end gap-1 rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-input-bg)] p-0 shadow-none transition-[border-color,box-shadow] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_18%,transparent)]"
+        className={`${compact ? 'rounded-[9px]' : 'rounded-[10px]'} flex w-full items-end gap-1 border border-[var(--color-chat-border)] bg-[var(--color-chat-input-bg)] p-0 shadow-none transition-[border-color,box-shadow] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_18%,transparent)]`}
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit();
@@ -994,11 +1000,12 @@ function Composer({
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder="输入消息..."
-          className="min-h-[40px] max-h-[132px] flex-1 resize-none overflow-y-auto border-0 bg-transparent px-3 py-2.5 text-[14px] leading-[1.5] text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0"
+          className={`${compact ? 'min-h-[34px] px-2.5 py-2 leading-[1.45]' : 'min-h-[40px] px-3 py-2.5 text-[14px] leading-[1.5]'} max-h-[132px] flex-1 resize-none overflow-y-auto border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
+          style={{ fontSize: compact ? compactFontSize : undefined }}
           rows={1}
           disabled={isStreaming}
         />
-        <Button size="sm" type="submit" disabled={(!input.trim() && !selectedImage) || isStreaming} className="m-1 h-8 shrink-0 rounded-[8px] px-3 text-[12px]">
+        <Button size="sm" type="submit" disabled={(!input.trim() && !selectedImage) || isStreaming} className={`${compact ? 'm-0.5 h-7 rounded-[7px] px-2.5 text-[11px]' : 'm-1 h-8 rounded-[8px] px-3 text-[12px]'} shrink-0`}>
           发送
         </Button>
       </form>
@@ -1006,20 +1013,35 @@ function Composer({
   );
 }
 
-function MessageBubble({ message, isStreaming = false, fullWidth = false }: { message: ChatMessage; isStreaming?: boolean; fullWidth?: boolean }) {
+function MessageBubble({
+  message,
+  isStreaming = false,
+  fullWidth = false,
+  compact = false,
+  compactFontSize = 13,
+}: {
+  message: ChatMessage;
+  isStreaming?: boolean;
+  fullWidth?: boolean;
+  compact?: boolean;
+  compactFontSize?: number;
+}) {
   const isUser = message.role === 'user';
   const isPending = message.role === 'assistant' && message.content === '...';
 
   return (
     <div className={`group flex animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`relative rounded-[10px] border border-[var(--color-chat-bubble-border)] px-3 py-2 text-[14px] leading-[1.5] text-[var(--color-chat-text)] shadow-none transition-colors ${
+        className={`relative border border-[var(--color-chat-bubble-border)] leading-[1.45] text-[var(--color-chat-text)] shadow-none transition-colors ${
+          compact ? 'rounded-[9px] px-2.5 py-1.5' : 'rounded-[10px] px-3 py-2 text-[14px] leading-[1.5]'
+        } ${
           fullWidth ? 'max-w-full' : 'max-w-[84%]'
         } ${
           isUser
             ? 'bg-[var(--color-chat-user-bubble)] text-right'
             : 'bg-[var(--color-chat-assistant-bubble)] text-left'
         }`}
+        style={{ fontSize: compact ? compactFontSize : undefined }}
       >
         {(message.imageDataUrl || message.imageUrl) && (
           <img src={message.imageDataUrl || message.imageUrl} alt="" className="mb-2 max-h-48 rounded-[8px] object-contain" />

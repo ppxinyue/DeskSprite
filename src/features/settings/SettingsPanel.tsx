@@ -132,6 +132,7 @@ function AppearanceSection({
     petOpacity: settings.petOpacity,
     petScale: settings.petScale,
     dialogWidth: settings.dialogWidth,
+    compactChatFontSize: settings.compactChatFontSize,
     theme: settings.theme,
     petMotions: settings.petMotions,
   });
@@ -178,6 +179,16 @@ function AppearanceSection({
             value={[draft.dialogWidth]}
             onValueChange={([v]) => update('dialogWidth', v)}
             min={200} max={600} step={10} className="w-48"
+          />
+        </div>
+      </AppearanceRow>
+      <AppearanceRow label="对话字号">
+        <div className="flex items-center gap-3">
+          <span className="w-12 text-right text-xs text-muted-foreground">{draft.compactChatFontSize}px</span>
+          <Slider
+            value={[draft.compactChatFontSize]}
+            onValueChange={([v]) => update('compactChatFontSize', v)}
+            min={11} max={15} step={1} className="w-48"
           />
         </div>
       </AppearanceRow>

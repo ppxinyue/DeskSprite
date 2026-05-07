@@ -527,3 +527,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `src/components/loading-ui/pulse-dot.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：需要硬边界的悬浮窗不能依赖系统拖拽后的补偿；边缘菜单必须同时处理外层窗口可用区域和菜单内部弹出方向。
 - 是否需更新技术文档：是。
+
+## ISSUE-046
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：C. 窗口管理 / H. 小对话窗口 / E. 设置中心
+- 严重程度：严重
+- 问题现象：展开小对话窗、拖拽到边界或切换窗口布局时仍会出现一次闪烁；边界拖拽仍有轻微回弹；小窗图标、对话框和文字偏大；用户希望小窗不再显示在灵宠上方，并且可以设置字号。
+- 原因分析：`dialogOpen` 后立即渲染 ChatDialog，但透明窗口 resize/reposition 仍在异步执行，中间帧会暴露旧尺寸旧坐标；受控拖拽结束后仍可能收到延迟 moved 事件并触发收尾 layout；旧布局在底部空间不足时会把对话框放到灵宠上方；小窗字号没有持久化设置项。
+- 解决方案：增加 `dialogSurfaceReady` 门控，小窗内容等原生窗口布局完成后再挂载；受控拖拽期间和松手后一段时间忽略 moved 事件，并取消松手后的二次 layout；小窗布局优先下方，空间不足时切到左右侧；缩小工具按钮和 compact chat 间距；新增 `compactChatFontSize` 设置并接入小窗消息、历史、输入框和 PulseDot。
+- 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/components/loading-ui/pulse-dot.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：透明悬浮窗的内容挂载要晚于原生窗口几何变更；拖拽硬边界要同时避免拖动过程越界和拖动结束后的补偿事件。
+- 是否需更新技术文档：是。

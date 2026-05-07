@@ -18,6 +18,7 @@ export interface AppSettings {
   petOpacity: number;
   petScale: number;
   dialogWidth: number;
+  compactChatFontSize: number;
   petMotions: PetMotionSettings;
   petName: string;
   smartAttach: boolean;
@@ -37,6 +38,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   petOpacity: 1.0,
   petScale: 1.0,
   dialogWidth: 300,
+  compactChatFontSize: 13,
   petMotions: {
     petJump: { enabled: true, amplitude: 4, speed: 1 },
     petWobble: { enabled: false, amplitude: 3, speed: 1 },
@@ -81,6 +83,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
                 ? 'system'
                 : key === 'dialogWidth' && typeof parsed === 'number'
                   ? Math.min(600, Math.max(200, parsed))
+                : key === 'compactChatFontSize' && typeof parsed === 'number'
+                  ? Math.min(15, Math.max(11, parsed))
                 : key === 'petMotions'
                   ? normalizePetMotions(parsed)
                 : parsed;

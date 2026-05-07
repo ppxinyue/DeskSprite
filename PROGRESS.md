@@ -350,3 +350,12 @@
 - 菜单：移除右键菜单中的“退出”选项，保留新对话、历史对话、设置、隐藏。
 - 占位：LLM 回复前的占位从 Terminal prompt 改为 `PulseDot`，显示 `Generating` + 单个呼吸点。
 - 文件：App.tsx, PetAvatar.tsx, ChatDialog.tsx, pulse-dot.tsx, index.css
+
+### R37. 小窗无闪烁挂载、硬边界收尾与字号设置（2026-05-07）
+- 闪烁：小对话窗打开时先完成透明窗口 resize/reposition，再挂载对话框和后 3 个工具图标，避免中间帧把旧布局暴露出来；拖拽产生的 moved 事件会被吞掉，松手后不再触发二次贴边校正。
+- 拖拽：拖动结束后延长受控移动事件的 suppress 窗口，去掉边缘处的轻微回弹，边界表现更接近“墙”。
+- 小窗：4 个悬浮图标从 32px 缩到 28px，图标从 16px 缩到 14px；小窗气泡、输入框、列表间距和字号整体收紧。
+- 设置：外观页新增“对话字号”滑块，默认 13px，范围 11-15px，实时控制小对话窗口文字字号。
+- 位置：小对话框优先放在灵宠下方；底部空间不足时改放左右侧，不再放在灵宠上方。
+- 占位：PulseDot 顺序调整为“点 + Generating...”，并继承当前对话字号。
+- 文件：App.tsx, ChatDialog.tsx, SettingsPanel.tsx, settingsStore.ts, pulse-dot.tsx, index.css
