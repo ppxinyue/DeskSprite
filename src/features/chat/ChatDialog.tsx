@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { Check, ChevronDown, Columns3, Copy, Grid2X2, Mic, PanelRight, Paperclip, Plus, Rows3, Speaker, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -824,6 +824,18 @@ async function startSpeechInput(
   lang?: string
 ) {
   setListening(true);
+  let canStart = true;
+  try {
+    canStart = await invoke<boolean>('can_start_speech_recognition');
+  } catch (e) {
+    console.warn('Failed to check speech recognition availability:', e);
+  }
+  if (!canStart) {
+    setListening(false);
+    window.alert('当前运行环境缺少系统语音识别权限说明，已阻止启动以避免 macOS 闪退。请使用打包后的 .app 版本。');
+    return;
+  }
+
   if (navigator.mediaDevices?.getUserMedia) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });

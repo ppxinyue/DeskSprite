@@ -635,3 +635,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/chat/ChatDialog.tsx`, `src-tauri/src/commands/images.rs`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：`convertFileSrc` 不是纯前端转换，必须同时打开 Tauri asset protocol、设置访问 scope、并在 CSP 中允许对应协议；设置页应展示“可用资源全集”，而不是只展示用户覆盖资源。
 - 是否需更新技术文档：是。
+
+## ISSUE-055
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：H. 语音输入 / R43 唤醒词检测
+- 严重程度：阻断
+- 问题现象：软件启动后快速闪退；崩溃报告显示 `Namespace TCC, Code 0`，原因是访问语音识别隐私数据时缺少 `NSSpeechRecognitionUsageDescription`。
+- 原因分析：开发模式由 `node` 启动裸 Tauri 可执行文件，不一定处于带 `Info.plist` 的 `.app` bundle；如果用户曾开启唤醒词，宠物窗口启动后会自动调用 `SpeechRecognition.start()`，macOS 在缺少语音识别用途说明时不会返回普通错误，而是直接终止进程。
+- 解决方案：新增后端安全检查命令，只有当前 macOS 运行环境确认具备 `NSMicrophoneUsageDescription` 和 `NSSpeechRecognitionUsageDescription` 时，前端才允许启动 `SpeechRecognition`；唤醒词和语音按钮都接入该检查。
+- 涉及文件：`src-tauri/src/commands/desktop.rs`, `src-tauri/src/lib.rs`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：macOS TCC 缺用途说明是进程级硬崩，不能依赖 try/catch；所有隐私敏感 API 都必须在调用前确认 bundle 声明和运行环境。
+- 是否需更新技术文档：是。

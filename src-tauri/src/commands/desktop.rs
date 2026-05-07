@@ -45,6 +45,41 @@ pub fn get_desktop_bounds() -> DesktopBounds {
     }
 }
 
+#[tauri::command]
+pub fn can_start_speech_recognition() -> bool {
+    #[cfg(not(target_os = "macos"))]
+    {
+        true
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let Ok(exe) = std::env::current_exe() else {
+            return false;
+        };
+        let Some(app_dir) = exe
+            .ancestors()
+            .find(|path| path.extension().and_then(|ext| ext.to_str()) == Some("app"))
+        else {
+            return false;
+        };
+        let plist_path = app_dir.join("Contents").join("Info.plist");
+        let Ok(contents) = std::fs::read(plist_path) else {
+            return false;
+        };
+
+        contains_bytes(&contents, b"NSMicrophoneUsageDescription")
+            && contains_bytes(&contents, b"NSSpeechRecognitionUsageDescription")
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
+    haystack
+        .windows(needle.len())
+        .any(|window| window == needle)
+}
+
 #[cfg(target_os = "macos")]
 fn get_desktop_bounds_macos() -> DesktopBounds {
     use xcap::Monitor;

@@ -437,7 +437,17 @@ function PetWindow() {
       }
     };
 
-    startRecognition();
+    let disposed = false;
+    invoke<boolean>('can_start_speech_recognition')
+      .then((canStart) => {
+        if (disposed) return;
+        if (!canStart) {
+          console.warn('Wake word detection disabled: speech recognition is not available in the current macOS runtime.');
+          return;
+        }
+        startRecognition();
+      })
+      .catch((e) => console.warn('Failed to check speech recognition availability:', e));
 
     // Pause wake word detection when compact-chat is open
     const unlisten = listen('compact-chat:conversation', () => {
@@ -453,6 +463,7 @@ function PetWindow() {
     });
 
     return () => {
+      disposed = true;
       if (recognition) {
         recognition.onend = null;
         recognition.stop();

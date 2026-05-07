@@ -64,6 +64,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::ai::test_ai_connection,
             commands::desktop::get_desktop_bounds,
+            commands::desktop::can_start_speech_recognition,
             commands::csp::add_csp_origin,
             commands::csp::get_csp_origins,
             commands::csp::remove_csp_origin,

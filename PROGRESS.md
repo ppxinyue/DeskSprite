@@ -450,3 +450,11 @@
 - 渲染：启用 Tauri asset protocol，并在 CSP 中放行 `asset:` / `http://asset.localhost` 图片和媒体源，修复上传图片在设置页和灵宠前端无法显示的问题。
 - 上传：形象上传和聊天图片选择都限制为常见位图格式 PNG/JPG/JPEG/WEBP/GIF/BMP；Rust 导入命令同步校验扩展名并返回清晰错误。
 - 文件：SettingsPanel.tsx, ChatDialog.tsx, images.rs, tauri.conf.json, Cargo.toml, Cargo.lock
+
+### R51. 修复启动时语音识别 TCC 闪退（2026-05-07）
+- 崩溃：macOS 在未找到 `NSSpeechRecognitionUsageDescription` 的运行环境里触发系统语音识别权限请求时会直接 TCC abort；开发模式下唤醒词监听可能在应用启动后自动调用 `SpeechRecognition.start()`，导致软件快速闪退。
+- 后端：新增 `can_start_speech_recognition` 命令，macOS 上只在当前可执行文件位于 `.app` bundle 且 `Info.plist` 同时包含麦克风和语音识别用途说明时允许启动系统语音识别。
+- 前端：唤醒词后台监听和语音输入按钮都先调用安全检查；不安全时阻止启动并给出提示，避免启动路径或点击语音按钮触发系统级崩溃。
+- 兼容：`Info.plist` 检查按字节匹配 key，兼容 XML 和二进制 plist。
+- 验证：`pnpm build`、`cargo check` 通过；Rust 侧仅保留既有 CSP dead-code warning。
+- 文件：desktop.rs, lib.rs, App.tsx, ChatDialog.tsx
