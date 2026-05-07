@@ -438,3 +438,9 @@
 - 修复：移除 `getUserMedia` 不存在时的硬失败；当前 WebView 不暴露媒体权限 API 时，仍继续直接启动系统 `SpeechRecognition`。
 - 行为：只有 `getUserMedia` 存在且用户明确拒绝权限时，才提示允许麦克风；`SpeechRecognition.start()` 启动失败时给出单独的系统语音输入失败提示。
 - 文件：ChatDialog.tsx
+
+### R49. 语音按钮反馈与历史图片持久化（2026-05-07）
+- 语音：点击语音输入后立即进入 listening 视觉反馈；如果当前 WebView 没有暴露系统语音识别接口，改为弹窗明确提示，避免按钮像没有反应。
+- 图片：上传/粘贴图片发送时，把图片 dataURL 写入消息记录；历史会话加载时识别 dataURL 并恢复图片预览。
+- 历史：设置-历史对话详情页也会显示消息图片，列表 preview 用 `[图片]` 标记含图消息。
+- 文件：ChatDialog.tsx, SettingsPanel.tsx

@@ -821,7 +821,7 @@ function HistorySection() {
     id: number;
     title: string | null;
     updatedAt: string;
-    messages: Array<{ id: number; role: string; content: string; timestamp: string }>;
+    messages: Array<{ id: number; role: string; content: string; timestamp: string; imageUrl?: string; imageDataUrl?: string }>;
   } | null>(null);
 
   useEffect(() => {
@@ -830,7 +830,7 @@ function HistorySection() {
       const convos = await getConversations();
       const loaded = await Promise.all(convos.map(async (c) => {
         const msgs = await getMessages(c.id);
-        const preview = msgs.map((m) => `${m.role}: ${m.content}`).join('\n').slice(0, 240);
+        const preview = msgs.map((m) => `${m.role}: ${m.image_path ? '[图片] ' : ''}${m.content}`).join('\n').slice(0, 240);
         return { id: c.id, title: c.title, updatedAt: c.updated_at, preview };
       }));
       if (alive) setItems(loaded);
@@ -856,6 +856,13 @@ function HistorySection() {
                 <span className="text-xs font-medium text-muted-foreground">{msg.role}</span>
                 <span className="text-xs text-muted-foreground">{msg.timestamp}</span>
               </div>
+              {(msg.imageDataUrl || msg.imageUrl) && (
+                <img
+                  src={msg.imageDataUrl || msg.imageUrl}
+                  alt=""
+                  className="mb-2 max-h-64 rounded-md object-contain"
+                />
+              )}
               <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
             </div>
           ))}
@@ -875,6 +882,7 @@ function HistorySection() {
         role: m.role,
         content: m.content,
         timestamp: m.timestamp,
+        ...historyMessageImageFields(m.image_path),
       })),
     });
   };
@@ -907,6 +915,13 @@ function HistorySection() {
       </div>
     </>
   );
+}
+
+function historyMessageImageFields(imagePath: string | null | undefined) {
+  if (!imagePath) return {};
+  if (imagePath.startsWith('data:image/')) return { imageDataUrl: imagePath };
+  if (/[/\\]/.test(imagePath)) return { imageUrl: convertFileSrc(imagePath) };
+  return {};
 }
 
 interface ApiConfigForm {

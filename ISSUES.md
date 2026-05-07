@@ -611,3 +611,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：权限预请求只能作为增强路径，不能阻断真正的系统能力调用；桌面 WebView 中浏览器 API 暴露情况比普通浏览器更不稳定。
 - 是否需更新技术文档：是。
+
+## ISSUE-053
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：H. 语音输入 / H. 历史对话
+- 严重程度：严重
+- 问题现象：语音输入按钮点击后看起来没有任何反应；历史聊天记录中上传/粘贴过的图片消失，只剩文字。
+- 原因分析：语音失败路径只把错误写入输入框，在小窗外置语音按钮场景下反馈不明显；当前 WebView 不支持 `SpeechRecognition` 时没有显式弹窗。图片方面，消息表只保存 `image_path`，但文件选择器和剪贴板图片只有 dataURL 没有真实路径，插入数据库时写入空 path，历史加载自然无法恢复图片。
+- 解决方案：语音点击后先进入 listening 状态；缺少系统语音识别接口时弹窗提示。发送含图消息时把 dataURL 写入 `image_path` 字段；历史加载时识别 `data:image/...` 并填充 `imageDataUrl`，设置页历史详情同步渲染图片。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：历史记录要保存可恢复的数据本体，不能只保存临时浏览器文件引用；外置按钮触发的异步能力必须有显式状态或错误反馈。
+- 是否需更新技术文档：是。

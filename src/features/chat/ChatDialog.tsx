@@ -125,7 +125,7 @@ export function ChatDialog({
           role: m.role as 'user' | 'assistant' | 'system',
           content: m.content,
           timestamp: new Date(m.timestamp).getTime(),
-          imageUrl: m.image_path && /[/\\]/.test(m.image_path) ? convertFileSrc(m.image_path) : undefined,
+          ...messageImageFields(m.image_path),
         }))
       );
       setMode('chat');
@@ -177,7 +177,7 @@ export function ChatDialog({
     }
 
     if (convoId) {
-      await insertMessage(convoId, 'user', messageText, imageForMessage?.path || undefined);
+      await insertMessage(convoId, 'user', messageText, imageForMessage?.dataUrl || imageForMessage?.path || undefined);
     }
 
     setStreaming(true);
@@ -471,7 +471,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
           role: m.role as 'user' | 'assistant' | 'system',
           content: m.content,
           timestamp: new Date(m.timestamp).getTime(),
-          imageUrl: m.image_path && /[/\\]/.test(m.image_path) ? convertFileSrc(m.image_path) : undefined,
+          ...messageImageFields(m.image_path),
         })),
       };
       setPanels((items) => {
@@ -545,7 +545,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
       });
     }
 
-    if (convoId) await insertMessage(convoId, 'user', messageText, imageForMessage?.path || undefined);
+    if (convoId) await insertMessage(convoId, 'user', messageText, imageForMessage?.dataUrl || imageForMessage?.path || undefined);
 
     try {
       const systemPrompt = await getActiveSystemPrompt();
@@ -730,6 +730,13 @@ function replaceLastAssistant(messages: ChatMessage[], content: string) {
   return next;
 }
 
+function messageImageFields(imagePath: string | null | undefined): Partial<Pick<ChatMessage, 'imageUrl' | 'imageDataUrl'>> {
+  if (!imagePath) return {};
+  if (imagePath.startsWith('data:image/')) return { imageDataUrl: imagePath };
+  if (/[/\\]/.test(imagePath)) return { imageUrl: convertFileSrc(imagePath) };
+  return {};
+}
+
 async function pickImage(): Promise<SelectedImage | null> {
   const file = await new Promise<File | null>((resolve) => {
     const input = document.createElement('input');
@@ -816,11 +823,13 @@ async function startSpeechInput(
   setListening: (listening: boolean) => void,
   lang?: string
 ) {
+  setListening(true);
   if (navigator.mediaDevices?.getUserMedia) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
     } catch {
+      setListening(false);
       onText('请允许麦克风权限以使用语音输入。');
       return;
     }
@@ -832,7 +841,8 @@ async function startSpeechInput(
   };
   const Recognition = win.SpeechRecognition ?? win.webkitSpeechRecognition;
   if (!Recognition) {
-    onText('当前系统 WebView 不支持语音识别。');
+    setListening(false);
+    window.alert('当前系统 WebView 没有暴露系统语音识别接口，无法直接启动语音输入。');
     return;
   }
 
@@ -859,7 +869,6 @@ async function startSpeechInput(
     setListening(false);
   };
 
-  setListening(true);
   try {
     recognition.start();
   } catch (e) {
