@@ -816,17 +816,14 @@ async function startSpeechInput(
   setListening: (listening: boolean) => void,
   lang?: string
 ) {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    onText('当前系统不支持麦克风权限请求。');
-    return;
-  }
-
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach((track) => track.stop());
-  } catch {
-    onText('请允许麦克风权限以使用语音输入。');
-    return;
+  if (navigator.mediaDevices?.getUserMedia) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((track) => track.stop());
+    } catch {
+      onText('请允许麦克风权限以使用语音输入。');
+      return;
+    }
   }
 
   const win = window as unknown as {
@@ -863,7 +860,13 @@ async function startSpeechInput(
   };
 
   setListening(true);
-  recognition.start();
+  try {
+    recognition.start();
+  } catch (e) {
+    console.error('Failed to start speech recognition:', e);
+    setListening(false);
+    onText('无法启动系统语音输入。');
+  }
 }
 
 function LayoutButton({ title, active, onClick, children }: { title: string; active: boolean; onClick: () => void; children: React.ReactNode }) {

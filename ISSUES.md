@@ -599,3 +599,15 @@
 - 涉及文件：`src/features/chat/ChatDialog.tsx`, `src-tauri/Info.plist`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：输入附件能力要在客户端先校验，避免用户把图片请求发给文本模型后才看到 API 报错；系统隐私权限需要同时有运行时触发和 bundle 用途说明。
 - 是否需更新技术文档：是。
+
+## ISSUE-052
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：H. 语音输入
+- 严重程度：严重
+- 问题现象：点击语音输入时出现“当前系统不支持麦克风权限请求”，导致无法继续尝试系统语音输入。
+- 原因分析：上一轮把 `navigator.mediaDevices.getUserMedia` 当作语音输入的必要前置条件；但 Tauri/WKWebView 环境可能没有暴露该 API，即使系统 `SpeechRecognition` 仍可直接启动并请求麦克风。
+- 解决方案：把 `getUserMedia` 改为可选预请求；存在时先用它触发权限，不存在时直接调用 `SpeechRecognition.start()`；启动失败时再提示系统语音输入不可用。
+- 涉及文件：`src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：权限预请求只能作为增强路径，不能阻断真正的系统能力调用；桌面 WebView 中浏览器 API 暴露情况比普通浏览器更不稳定。
+- 是否需更新技术文档：是。

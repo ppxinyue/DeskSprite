@@ -433,3 +433,8 @@
 - 图片：大小对话窗口的输入框支持直接粘贴剪贴板图片，粘贴后复用现有图片预览 chip 和发送链路。
 - 模型：发送带图片的消息前检查当前模型是否支持图片/文件输入；不支持时弹出提示并阻止发送，避免把不兼容请求发到文本模型。
 - 文件：ChatDialog.tsx, Info.plist
+
+### R48. 语音输入权限降级策略（2026-05-07）
+- 修复：移除 `getUserMedia` 不存在时的硬失败；当前 WebView 不暴露媒体权限 API 时，仍继续直接启动系统 `SpeechRecognition`。
+- 行为：只有 `getUserMedia` 存在且用户明确拒绝权限时，才提示允许麦克风；`SpeechRecognition.start()` 启动失败时给出单独的系统语音输入失败提示。
+- 文件：ChatDialog.tsx
