@@ -185,7 +185,11 @@ function PetWindow() {
   const toolButtonSize = 28;
   const toolGap = 4;
   const toolRowWidth = toolButtonSize * 4 + toolGap * 3;
-  const collapsedWidth = Math.max(220, petSize + 70);
+  const collapsedWidth = Math.max(
+    220,
+    petSize + 70,
+    PET_CONTENT_MARGIN + petImageWidth + 8 + toolRowWidth + PET_CONTENT_MARGIN,
+  );
   const collapsedHeight = Math.max(220, petSize + 70);
   const [layout, setLayout] = useState<PetWindowLayout>(() => createDefaultPetWindowLayout(collapsedWidth, collapsedHeight));
   const [dragging, setDragging] = useState(false);
@@ -213,7 +217,7 @@ function PetWindow() {
     try {
       await applyPetWindowLayout({
         dialogOpen: targetDialogOpen,
-        requestedDialogWidth: settings.dialogWidth,
+        requestedDialogWidth: 300,
         petImageWidth,
         petImageHeight,
         toolRowWidth,
@@ -228,7 +232,7 @@ function PetWindow() {
         layoutApplyingRef.current = false;
       }, 80);
     }
-  }, [applyLayoutState, dialogOpen, settings.dialogWidth, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight, contextMenuOpen]);
+  }, [applyLayoutState, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight, contextMenuOpen]);
 
   const positionCompactChatWindow = useCallback(async ({
     show,
@@ -277,9 +281,8 @@ function PetWindow() {
   }, [settings.dialogWidth, settings.compactChatFontSize, dialogOpen, positionCompactChatWindow]);
 
   useEffect(() => {
-    if (dialogOpen) return;
     requestLayout({ dialogOpen: false, contextMenuOpen }).catch(() => {});
-  }, [contextMenuOpen, dialogOpen, requestLayout]);
+  }, [contextMenuOpen, requestLayout]);
 
   useEffect(() => {
     const unlisten = getCurrentWindow().onMoved(() => {
@@ -329,10 +332,10 @@ function PetWindow() {
         startScreenY: point.screenY,
         startWindowLeft: position.x / scale,
         startWindowTop: position.y / scale,
-        minWindowLeft: safeLeft - layout.petLeft,
-        maxWindowLeft: Math.max(safeLeft - layout.petLeft, safeRight - petImageWidth - layout.petLeft),
-        minWindowTop: safeTop - layout.petTop,
-        maxWindowTop: Math.max(safeTop - layout.petTop, safeBottom - petImageHeight - layout.petTop),
+        minWindowLeft: safeLeft,
+        maxWindowLeft: Math.max(safeLeft, safeRight - layout.windowWidth),
+        minWindowTop: safeTop,
+        maxWindowTop: Math.max(safeTop, safeBottom - layout.windowHeight),
       };
     } catch (e) {
       console.warn("Failed to start bounded pet drag:", e);

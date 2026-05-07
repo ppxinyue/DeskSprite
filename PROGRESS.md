@@ -376,3 +376,9 @@
 - 交互：图片、语音按钮改为通过 Tauri event 转发给 `compact-chat` 窗口；小窗会把当前会话 id 回传给灵宠窗口，用于“放大”时接续同一会话。
 - 窗口：新增 `show_compact_chat_window`、`position_compact_chat_window`、`hide_compact_chat_window` 命令，并把 `compact-chat` 加入窗口 capabilities。
 - 文件：App.tsx, ChatDialog.tsx, window.rs, lib.rs, default.json
+
+### R41. 收起小窗不再牵动灵宠与工具栏硬边界（2026-05-07）
+- 稳定性：收起小对话窗只隐藏独立 `compact-chat` 窗口，不再触发灵宠窗口 layout 重新计算，避免边缘场景下灵宠向上跳动。
+- 工具栏：灵宠窗口折叠宽度固定预留 4 个右侧工具按钮的空间，展开小窗后图片、语音、放大按钮不会被透明窗口边界裁掉。
+- 边界：受控拖拽的硬边界改为按整个灵宠窗口计算，而不是只按宠物图片计算；拖到屏幕边缘时会被“墙”挡住，右侧按钮区域也保持在工作区内。
+- 文件：App.tsx
