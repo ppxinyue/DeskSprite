@@ -336,3 +336,10 @@
 - 占位：LLM 第一段 token 返回前，不再显示三个点；改为 CLI 风格 `$` prompt + 闪烁方块光标。
 - 实现：新增 `components/loading-ui/terminal.tsx`，prompt 和光标继承当前文字颜色；闪烁速度通过 `--duration` CSS 变量控制。
 - 文件：ChatDialog.tsx, terminal.tsx, index.css
+
+### R35. 灵宠拖拽与小窗展开布局防抖（2026-05-07）
+- 拖拽：移除拖动过程中的连续贴边修正，改为用户移动停止后再做一次安全边界收尾；程序自身 `setPosition/setSize` 触发的 moved 事件会被跳过，避免反馈循环造成抖动。
+- 锚定：小对话窗展开/收起时以灵宠当前屏幕坐标为锚点，按屏幕剩余空间自动选择对话框在灵宠上/下、左/右侧的位置；对话框宽度和高度按工作区动态收窄，避免角落展开时裁切。
+- 动画：原生拖拽期间暂停 `petJump/petWobble/petBreathe`，避免窗口移动和宠物自身动画叠加成视觉抖动。
+- 职责：`PetAvatar` 不再直接修改 Tauri 窗口尺寸；窗口尺寸、位置、边界收口统一由 `PetWindow` 管理。
+- 文件：App.tsx, PetAvatar.tsx

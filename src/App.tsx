@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -17,6 +17,8 @@ import "./index.css";
 
 const CHAT_HANDOFF_KEY = "desksprite:chat-handoff-conversation-id";
 const SCREEN_MARGIN = 16;
+const PET_CONTENT_MARGIN = 20;
+const MIN_DIALOG_WIDTH = 200;
 
 function App() {
   const [windowLabel, setWindowLabel] = useState<string>(() => getCurrentWindow().label);
@@ -99,7 +101,6 @@ function App() {
 function PetWindow() {
   const { settings } = useSettingsStore();
   const { dialogOpen, chatMode, chatConversationId, closeChat, openChat } = usePetStore();
-  const [workAreaWidth, setWorkAreaWidth] = useState<number | null>(null);
 
   const petSize = Math.round(150 * settings.petScale);
   const petImageWidth = Math.round(120 * settings.petScale);
@@ -107,37 +108,75 @@ function PetWindow() {
   const toolButtonSize = 32;
   const toolGap = 6;
   const toolRowWidth = toolButtonSize * 4 + toolGap * 3;
-  const maxDialogWidth = workAreaWidth
-    ? Math.max(200, workAreaWidth - SCREEN_MARGIN * 2 - 40)
-    : settings.dialogWidth;
-  const dialogWidth = Math.min(settings.dialogWidth, maxDialogWidth);
-  const maxDialogHeight = dialogWidth;
-  const expandedWidth = Math.max(dialogWidth + 40, 20 + petImageWidth + 8 + toolRowWidth + 20);
-  const expandedHeight = 20 + petSize + 12 + maxDialogHeight + 28;
   const collapsedWidth = Math.max(220, petSize + 70);
   const collapsedHeight = Math.max(220, petSize + 70);
+  const [layout, setLayout] = useState<PetWindowLayout>(() => createDefaultPetWindowLayout(collapsedWidth, collapsedHeight));
+  const [dragging, setDragging] = useState(false);
+  const layoutRef = useRef(layout);
+  const movedTimerRef = useRef<number | null>(null);
+  const layoutApplyingRef = useRef(false);
 
   useEffect(() => {
-    getCurrentWindow()
-      .setSize(dialogOpen ? new LogicalSize(expandedWidth, expandedHeight) : new LogicalSize(collapsedWidth, collapsedHeight))
-      .then(() => clampPetWindowToWorkArea())
-      .catch(() => {});
-  }, [dialogOpen, expandedWidth, expandedHeight, collapsedWidth, collapsedHeight]);
+    layoutRef.current = layout;
+  }, [layout]);
+
+  const requestLayout = useCallback(async () => {
+    layoutApplyingRef.current = true;
+    try {
+      await applyPetWindowLayout({
+        dialogOpen,
+        requestedDialogWidth: settings.dialogWidth,
+        petImageWidth,
+        petImageHeight,
+        toolRowWidth,
+        collapsedWidth,
+        collapsedHeight,
+        previousLayout: layoutRef.current,
+        setLayout,
+      });
+    } finally {
+      window.setTimeout(() => {
+        layoutApplyingRef.current = false;
+      }, 80);
+    }
+  }, [dialogOpen, settings.dialogWidth, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight]);
 
   useEffect(() => {
-    const refreshWorkAreaWidth = async () => {
-      const monitor = await currentMonitor();
-      if (!monitor) return;
-      setWorkAreaWidth(monitor.workArea.size.width / monitor.scaleFactor);
-    };
+    requestLayout();
+  }, [requestLayout]);
 
-    refreshWorkAreaWidth();
+  useEffect(() => {
     const unlisten = getCurrentWindow().onMoved(() => {
-      refreshWorkAreaWidth();
-      window.setTimeout(() => { clampPetWindowToWorkArea(); }, 80);
+      if (layoutApplyingRef.current) return;
+      setDragging(true);
+      if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
+      movedTimerRef.current = window.setTimeout(() => {
+        setDragging(false);
+        requestLayout();
+      }, 220);
     });
-    return () => { unlisten.then((fn) => fn()); };
+    return () => {
+      if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
+      unlisten.then((fn) => fn());
+    };
+  }, [requestLayout]);
+
+  useEffect(() => () => {
+    if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
   }, []);
+
+  const handleNativeDragStart = () => {
+    setDragging(true);
+    if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
+  };
+
+  const handleNativeDragEnd = () => {
+    if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
+    movedTimerRef.current = window.setTimeout(() => {
+      setDragging(false);
+      requestLayout();
+    }, 180);
+  };
 
   const openLatestChat = async () => {
     try {
@@ -174,19 +213,32 @@ function PetWindow() {
         <div
           className="absolute flex flex-col items-start"
           style={{
-            left: 20,
-            top: 20,
-            width: dialogOpen ? dialogWidth : collapsedWidth - 40,
+            left: 0,
+            top: 0,
+            width: layout.windowWidth,
+            height: layout.windowHeight,
             background: 'transparent',
           }}
         >
-          <PetAvatar opacity={settings.petOpacity} scale={settings.petScale} motions={settings.petMotions} />
+          <div
+            className="absolute"
+            style={{ left: layout.petLeft, top: layout.petTop }}
+          >
+            <PetAvatar
+              opacity={settings.petOpacity}
+              scale={settings.petScale}
+              motions={settings.petMotions}
+              dragging={dragging}
+              onDragStart={handleNativeDragStart}
+              onDragEnd={handleNativeDragEnd}
+            />
+          </div>
 
           <div
             className="absolute z-40 flex items-center gap-1.5"
             style={{
-              left: petImageWidth + 8,
-              top: petImageHeight - toolButtonSize,
+              left: layout.toolsLeft,
+              top: layout.toolsTop,
             }}
           >
             <FloatingToolButton
@@ -217,12 +269,15 @@ function PetWindow() {
 
           {dialogOpen && (
             <>
-              <div className="mt-2 z-30 w-full">
+              <div
+                className="absolute z-30"
+                style={{ left: layout.dialogLeft, top: layout.dialogTop, width: layout.dialogWidth }}
+              >
                 <ChatDialog
                   initialConversationId={chatConversationId}
                   initialMode={chatMode}
                   dialogOpacity={settings.petOpacity}
-                  maxHeight={maxDialogHeight}
+                  maxHeight={layout.dialogMaxHeight}
                   onClose={closeChat}
                 />
               </div>
@@ -280,26 +335,187 @@ function useChatConversationIdForHandoff(storeConversationId: number | null): nu
   return current && current > 0 ? current : null;
 }
 
-async function clampPetWindowToWorkArea() {
+interface PetWindowLayout {
+  windowWidth: number;
+  windowHeight: number;
+  petLeft: number;
+  petTop: number;
+  dialogLeft: number;
+  dialogTop: number;
+  dialogWidth: number;
+  dialogMaxHeight: number;
+  toolsLeft: number;
+  toolsTop: number;
+}
+
+function createDefaultPetWindowLayout(width: number, height: number): PetWindowLayout {
+  return {
+    windowWidth: width,
+    windowHeight: height,
+    petLeft: PET_CONTENT_MARGIN,
+    petTop: PET_CONTENT_MARGIN,
+    dialogLeft: PET_CONTENT_MARGIN,
+    dialogTop: PET_CONTENT_MARGIN,
+    dialogWidth: 300,
+    dialogMaxHeight: 300,
+    toolsLeft: PET_CONTENT_MARGIN + 128,
+    toolsTop: PET_CONTENT_MARGIN + 118,
+  };
+}
+
+async function applyPetWindowLayout({
+  dialogOpen,
+  requestedDialogWidth,
+  petImageWidth,
+  petImageHeight,
+  toolRowWidth,
+  collapsedWidth,
+  collapsedHeight,
+  previousLayout,
+  setLayout,
+}: {
+  dialogOpen: boolean;
+  requestedDialogWidth: number;
+  petImageWidth: number;
+  petImageHeight: number;
+  toolRowWidth: number;
+  collapsedWidth: number;
+  collapsedHeight: number;
+  previousLayout: PetWindowLayout;
+  setLayout: (layout: PetWindowLayout) => void;
+}) {
   try {
     const win = getCurrentWindow();
     const monitor = await currentMonitor();
     if (!monitor) return;
-    const [position, size] = await Promise.all([win.outerPosition(), win.outerSize()]);
+    const position = await win.outerPosition();
+    const size = await win.outerSize();
     const work = monitor.workArea;
-    const margin = Math.round(SCREEN_MARGIN * monitor.scaleFactor);
-    const minX = work.position.x + margin;
-    const minY = work.position.y + margin;
-    const maxX = work.position.x + work.size.width - size.width - margin;
-    const maxY = work.position.y + work.size.height - size.height - margin;
-    const nextX = clamp(position.x, minX, Math.max(minX, maxX));
-    const nextY = clamp(position.y, minY, Math.max(minY, maxY));
-    if (Math.abs(nextX - position.x) > 1 || Math.abs(nextY - position.y) > 1) {
-      await win.setPosition(new PhysicalPosition(nextX, nextY));
+    const scale = monitor.scaleFactor;
+    const workLeft = work.position.x / scale;
+    const workTop = work.position.y / scale;
+    const workWidth = work.size.width / scale;
+    const workHeight = work.size.height / scale;
+    const workRight = workLeft + workWidth;
+    const workBottom = workTop + workHeight;
+    const windowLeft = position.x / scale;
+    const windowTop = position.y / scale;
+    const windowWidth = size.width / scale;
+    const windowHeight = size.height / scale;
+    const safeLeft = workLeft + SCREEN_MARGIN;
+    const safeTop = workTop + SCREEN_MARGIN;
+    const safeRight = workRight - SCREEN_MARGIN;
+    const safeBottom = workBottom - SCREEN_MARGIN;
+    const maxWindowWidth = Math.max(160, workWidth - SCREEN_MARGIN * 2);
+    const maxWindowHeight = Math.max(160, workHeight - SCREEN_MARGIN * 2);
+    const safePetX = clamp(
+      windowLeft + previousLayout.petLeft,
+      safeLeft,
+      Math.max(safeLeft, safeRight - petImageWidth),
+    );
+    const safePetY = clamp(
+      windowTop + previousLayout.petTop,
+      safeTop,
+      Math.max(safeTop, safeBottom - petImageHeight),
+    );
+
+    let layout: PetWindowLayout;
+    if (!dialogOpen) {
+      layout = {
+        windowWidth: collapsedWidth,
+        windowHeight: collapsedHeight,
+        petLeft: PET_CONTENT_MARGIN,
+        petTop: PET_CONTENT_MARGIN,
+        dialogLeft: PET_CONTENT_MARGIN,
+        dialogTop: PET_CONTENT_MARGIN,
+        dialogWidth: requestedDialogWidth,
+        dialogMaxHeight: requestedDialogWidth,
+        toolsLeft: PET_CONTENT_MARGIN + petImageWidth + 8,
+        toolsTop: PET_CONTENT_MARGIN + petImageHeight - 32,
+      };
+    } else {
+      const maxDialogWidth = Math.max(MIN_DIALOG_WIDTH, maxWindowWidth - PET_CONTENT_MARGIN * 2);
+      const dialogWidth = clamp(requestedDialogWidth, MIN_DIALOG_WIDTH, maxDialogWidth);
+      const dialogMaxHeight = Math.max(120, Math.min(dialogWidth, maxWindowHeight - petImageHeight - PET_CONTENT_MARGIN * 2 - 12));
+      const expandedWindowWidth = Math.min(
+        maxWindowWidth,
+        Math.max(
+          dialogWidth + PET_CONTENT_MARGIN * 2,
+          petImageWidth + 8 + toolRowWidth + PET_CONTENT_MARGIN * 2,
+        ),
+      );
+      const expandedWindowHeight = Math.min(
+        maxWindowHeight,
+        petImageHeight + dialogMaxHeight + PET_CONTENT_MARGIN * 2 + 12,
+      );
+      const placeRight = safePetX - PET_CONTENT_MARGIN + expandedWindowWidth <= safeRight;
+      const placeBelow = safePetY - PET_CONTENT_MARGIN + expandedWindowHeight <= safeBottom;
+
+      const petLeft = placeRight
+        ? PET_CONTENT_MARGIN
+        : Math.max(PET_CONTENT_MARGIN, expandedWindowWidth - petImageWidth - PET_CONTENT_MARGIN);
+      const petTop = placeBelow
+        ? PET_CONTENT_MARGIN
+        : Math.max(PET_CONTENT_MARGIN, expandedWindowHeight - petImageHeight - PET_CONTENT_MARGIN);
+      const dialogLeft = placeRight
+        ? PET_CONTENT_MARGIN
+        : Math.max(PET_CONTENT_MARGIN, expandedWindowWidth - dialogWidth - PET_CONTENT_MARGIN);
+      const dialogTop = placeBelow
+        ? petTop + petImageHeight + 12
+        : PET_CONTENT_MARGIN;
+
+      layout = {
+        windowWidth: expandedWindowWidth,
+        windowHeight: expandedWindowHeight,
+        petLeft,
+        petTop,
+        dialogLeft,
+        dialogTop,
+        dialogWidth,
+        dialogMaxHeight,
+        toolsLeft: placeRight
+          ? petLeft + petImageWidth + 8
+          : Math.max(PET_CONTENT_MARGIN, petLeft - toolRowWidth - 8),
+        toolsTop: petTop + petImageHeight - 32,
+      };
     }
+
+    const nextWindowLeft = clamp(safePetX - layout.petLeft, safeLeft, Math.max(safeLeft, safeRight - layout.windowWidth));
+    const nextWindowTop = clamp(safePetY - layout.petTop, safeTop, Math.max(safeTop, safeBottom - layout.windowHeight));
+    if (!layoutsEqual(previousLayout, layout)) setLayout(layout);
+
+    const nextX = Math.round(nextWindowLeft * scale);
+    const nextY = Math.round(nextWindowTop * scale);
+    const shouldMove = Math.abs(position.x - nextX) > 1 || Math.abs(position.y - nextY) > 1;
+    const shouldResize =
+      Math.abs(windowWidth - layout.windowWidth) > 1 ||
+      Math.abs(windowHeight - layout.windowHeight) > 1;
+    const updates: Array<Promise<void>> = [];
+    if (shouldMove) updates.push(win.setPosition(new PhysicalPosition(nextX, nextY)));
+    if (shouldResize) updates.push(win.setSize(new LogicalSize(layout.windowWidth, layout.windowHeight)));
+    if (updates.length > 0) await Promise.all(updates);
   } catch (e) {
-    console.warn("Failed to clamp pet window:", e);
+    console.warn("Failed to apply pet window layout:", e);
   }
+}
+
+function layoutsEqual(a: PetWindowLayout, b: PetWindowLayout): boolean {
+  return (
+    nearlyEqual(a.windowWidth, b.windowWidth) &&
+    nearlyEqual(a.windowHeight, b.windowHeight) &&
+    nearlyEqual(a.petLeft, b.petLeft) &&
+    nearlyEqual(a.petTop, b.petTop) &&
+    nearlyEqual(a.dialogLeft, b.dialogLeft) &&
+    nearlyEqual(a.dialogTop, b.dialogTop) &&
+    nearlyEqual(a.dialogWidth, b.dialogWidth) &&
+    nearlyEqual(a.dialogMaxHeight, b.dialogMaxHeight) &&
+    nearlyEqual(a.toolsLeft, b.toolsLeft) &&
+    nearlyEqual(a.toolsTop, b.toolsTop)
+  );
+}
+
+function nearlyEqual(a: number, b: number): boolean {
+  return Math.abs(a - b) <= 0.5;
 }
 
 function clamp(value: number, min: number, max: number): number {

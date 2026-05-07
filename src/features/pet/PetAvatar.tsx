@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
-import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { usePetStore } from './petStore';
 import { getConversations } from '@/lib/db';
 import {
@@ -38,10 +38,16 @@ export function PetAvatar({
   opacity = 1,
   scale = 1,
   motions,
+  dragging = false,
+  onDragStart,
+  onDragEnd,
 }: {
   opacity?: number;
   scale?: number;
   motions: PetMotionSettings;
+  dragging?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }) {
   const { petState, mediaConfig, openChat, dialogOpen } = usePetStore();
   const config = mediaConfig[petState];
@@ -59,8 +65,7 @@ export function PetAvatar({
   const videoRef = useRef<HTMLVideoElement>(null);
   const w = Math.round(120 * scale);
   const h = Math.round(150 * scale);
-  const collapsedSize = Math.max(220, Math.round(150 * scale) + 70);
-  const animationsPaused = dialogOpen;
+  const animationsPaused = dialogOpen || dragging;
 
   useEffect(() => () => stopPetStateEngine(), []);
 
@@ -94,7 +99,6 @@ export function PetAvatar({
     if (!menuOpen) return;
     const close = () => {
       setMenuOpen(false);
-      if (!dialogOpen) getCurrentWindow().setSize(new LogicalSize(collapsedSize, collapsedSize)).catch(() => {});
     };
     window.addEventListener('mousedown', close);
     window.addEventListener('wheel', close);
@@ -104,7 +108,7 @@ export function PetAvatar({
       window.removeEventListener('wheel', close);
       window.removeEventListener('blur', close);
     };
-  }, [collapsedSize, dialogOpen, menuOpen]);
+  }, [menuOpen]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -122,7 +126,8 @@ export function PetAvatar({
         startPoint.current = null;
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
-        getCurrentWindow().startDragging().catch(() => {});
+        onDragStart?.();
+        getCurrentWindow().startDragging().finally(() => onDragEnd?.()).catch(() => {});
       }
     };
 
@@ -170,7 +175,6 @@ export function PetAvatar({
     didDrag.current = true;
     setMenuPos({ x: Math.min(e.clientX, 130), y: Math.min(e.clientY, 210) });
     setMenuOpen(true);
-    getCurrentWindow().setSize(new LogicalSize(320, 420)).catch(() => {});
     getConversations()
       .then((convos) => setRecentConversations(convos.slice(0, 3).map((c) => ({ id: c.id, title: c.title }))))
       .catch(() => setRecentConversations([]));
