@@ -3,11 +3,9 @@ use tauri::{
 };
 
 #[cfg(target_os = "macos")]
-use objc2_app_kit::{NSPopUpMenuWindowLevel, NSWindow, NSWindowCollectionBehavior};
+use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
 #[cfg(target_os = "macos")]
 use std::sync::atomic::{AtomicBool, Ordering};
-#[cfg(target_os = "macos")]
-use std::sync::Arc;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
 
