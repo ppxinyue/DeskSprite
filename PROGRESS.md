@@ -268,7 +268,7 @@
 ### R22. 大窗标题清理与模型菜单减噪（2026-05-06）
 - 窗口：chat 窗口原生标题置空，去掉窗口顶端 app bar 中的 “DeskSprite Chat”。
 - 模型入口：触发器只显示当前模型名称和 chevron，不再显示描述小字；描述仅保留在浮层菜单行项里。
-- 菜单：没有用户自定义 API 配置时，模型菜单只显示一个 `CloseAI · qwen3.5-flash`，避免“默认模型”和 CloseAI 重复。
+- 菜单：没有用户自定义 API 配置时，模型菜单只显示一个 `CloseAI · gpt-4o-mini`，避免“默认模型”和 CloseAI 重复。
 - 文件：window.rs, ChatDialog.tsx
 
 ### R23. 大窗模型入口尺寸与历史模型标签（2026-05-06）
@@ -359,3 +359,7 @@
 - 位置：小对话框优先放在灵宠下方；底部空间不足时改放左右侧，不再放在灵宠上方。
 - 占位：PulseDot 顺序调整为“点 + Generating...”，并继承当前对话字号。
 - 文件：App.tsx, ChatDialog.tsx, SettingsPanel.tsx, settingsStore.ts, pulse-dot.tsx, index.css
+
+### R38. 内置默认模型切换为 gpt-4o-mini（2026-05-07）
+- 默认模型：内置 CloseAI 兼容配置的模型名从 `qwen3.5-flash` 改为 `gpt-4o-mini`；大窗模型菜单、小窗调用和设置页展示都会读取同一常量同步更新。
+- 文件：defaultModel.ts, PROGRESS.md

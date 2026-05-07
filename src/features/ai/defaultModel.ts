@@ -10,7 +10,7 @@ export const BUILTIN_CLOSEAI_CONFIG: ApiConfig = {
   id: -1,
   provider: 'custom',
   baseUrl: 'https://api.openai-proxy.org/v1',
-  model: 'qwen3.5-flash',
+  model: 'gpt-4o-mini',
   apiKey: 'sk-PByFO1hQJwL32oh0xy3TyAov6bDwJdc91phAdmDDjkU3K6KO',
   isDefault: true,
 };
