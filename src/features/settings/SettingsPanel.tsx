@@ -476,6 +476,7 @@ function ImageSection() {
   const [selectedState, setSelectedState] = useState<PetState>('idle');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [previewErrors, setPreviewErrors] = useState<Record<string, string>>({});
   const mediaConfig = usePetStore((s) => s.mediaConfig);
 
   useEffect(() => {
@@ -570,19 +571,32 @@ function ImageSection() {
   const disabledFrames = new Set(config.disabledFrames ?? []);
   const enabledCount = allFrames.filter((path) => !disabledFrames.has(path)).length;
   const previewKey = allFrames.join('|');
-  const toPreviewSrc = (path: string) => (isBuiltinAsset(path) ? `/${path}` : (previewUrls[path] ?? convertFileSrc(path)));
+  const toPreviewSrc = (path: string) => {
+    if (previewUrls[path]) return previewUrls[path];
+    if (isBuiltinAsset(path)) return getBuiltinAssetUrl(path);
+    return convertFileSrc(path);
+  };
 
   useEffect(() => {
     let cancelled = false;
-    const localFrames = allFrames.filter((path) => !isBuiltinAsset(path));
-    localFrames.forEach((path) => {
-      if (previewUrls[path]) return;
-      invoke<string>('read_pet_image_data_url', { filePath: path })
+    allFrames.forEach((path) => {
+      loadPetPreviewDataUrl(path)
         .then((dataUrl) => {
           if (cancelled) return;
-          setPreviewUrls((current) => ({ ...current, [path]: dataUrl }));
+          setPreviewUrls((current) => current[path] === dataUrl ? current : { ...current, [path]: dataUrl });
+          setPreviewErrors((current) => {
+            if (!current[path]) return current;
+            const next = { ...current };
+            delete next[path];
+            return next;
+          });
         })
-        .catch((e) => console.warn('Failed to load pet image preview:', e));
+        .catch((e) => {
+          if (cancelled) return;
+          const message = e instanceof Error ? e.message : String(e);
+          setPreviewErrors((current) => ({ ...current, [path]: message }));
+          console.warn('Failed to load pet image preview:', path, e);
+        });
     });
     return () => {
       cancelled = true;
@@ -606,6 +620,8 @@ function ImageSection() {
 
   const ImageTile = ({ path, source }: { path: string; source: 'default' | 'user' }) => {
     const enabled = !disabledFrames.has(path);
+    const src = toPreviewSrc(path);
+    const hasError = Boolean(previewErrors[path]);
     return (
       <div
         key={`${source}-${path}`}
@@ -613,12 +629,21 @@ function ImageSection() {
           enabled ? 'border-border/70 bg-muted/20' : 'border-border/40 bg-muted/10 opacity-70'
         }`}
       >
-        <img
-          src={toPreviewSrc(path)}
-          alt=""
-          className="h-full w-full object-contain p-2"
-          draggable={false}
-        />
+        {!hasError ? (
+          <img
+            src={src}
+            alt=""
+            className="h-full w-full object-contain p-2"
+            draggable={false}
+            onError={() => {
+              setPreviewErrors((current) => ({ ...current, [path]: '图片无法预览' }));
+            }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center px-3 text-center text-[11px] leading-snug text-muted-foreground">
+            图片无法预览
+          </div>
+        )}
         <span className="absolute left-1.5 top-1.5 rounded bg-background/85 px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm">
           {source === 'default' ? '默认' : '上传'}
         </span>
@@ -709,6 +734,30 @@ function isAllowedPetImagePath(path: string) {
   const cleanPath = path.split(/[?#]/)[0] ?? path;
   const ext = cleanPath.split('.').pop()?.toLowerCase() ?? '';
   return ALLOWED_PET_IMAGE_EXTENSIONS.has(ext);
+}
+
+function getBuiltinAssetUrl(path: string) {
+  return new URL(path.replace(/^\/+/, ''), window.location.href).href;
+}
+
+async function loadPetPreviewDataUrl(path: string) {
+  if (isBuiltinAsset(path)) {
+    const response = await fetch(getBuiltinAssetUrl(path), { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch builtin asset: ${response.status}`);
+    }
+    return blobToDataUrl(await response.blob());
+  }
+  return invoke<string>('read_pet_image_data_url', { filePath: path });
+}
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read image preview'));
+    reader.readAsDataURL(blob);
+  });
 }
 
 async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; message: string; latency?: number }> {

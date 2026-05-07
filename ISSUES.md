@@ -791,3 +791,27 @@
 - 涉及文件：`docs/model-config-debugging.md`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：反复失败的 bug 必须沉淀成单独复盘文档；凭证类问题尤其要写清楚“数据源、错误流、可观测性、安全边界”，否则很容易把错误文案、旧引用或浏览器层问题误判成服务商问题。
 - 是否需更新技术文档：是，后续需要把 `docs/tech-spec-v0.2.md` 中 Keychain-only 和前端直连的旧假设同步为当前后端请求 + 本地可验证凭证源的实现策略。
+
+## ISSUE-068
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：E. 个性化形象 / F. 灵宠窗口
+- 严重程度：严重
+- 问题现象：设置页中默认图片和用户上传图片都无法正常预览，只剩空占位框；其他应用进入 macOS 全屏后，灵宠消失或不再置顶显示。
+- 原因分析：预览层仍依赖 public `/assets/...` 路径和本地 asset protocol，任何协议、CSP 或 WebView 解析差异都会让 `<img>` 静默失败；全屏问题一方面来自 macOS Space 对辅助窗口的重新分层，另一方面旧智能附着逻辑在 fullscreen 模式会主动把灵宠挪到屏幕外。
+- 解决方案：设置页预览统一转成 data URL 渲染并显示失败状态；macOS 置顶策略增加 fullscreen auxiliary、transient、disallow tiling、setCanHide(false) 等行为，并让 topmost guard 定期重申 pet/compact-chat 两个窗口的 level 和前置顺序；智能附着 fullscreen 模式改为可见悬浮。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/pet/attachEngine.ts`, `src-tauri/src/commands/window.rs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：设置页预览不能依赖“图片 URL 理论上可访问”，应把资源加载结果变成显式状态；macOS 全屏置顶要同时处理窗口 level、collection behavior、Space membership 和应用自己的隐藏逻辑。
+- 是否需更新技术文档：是。
+
+## ISSUE-069
+- 发现时间：2026-05-07
+- 发现者：方案评估
+- 相关任务：I. 语音输入输出
+- 严重程度：改进
+- 问题现象：当前语音输入依赖系统 Web Speech API，WebView 暴露情况不稳定；系统 TTS 可用但质量不统一。用户希望提供默认 STT/TTS 模型和免费额度，超额后回退系统能力。
+- 原因分析：云端 STT/TTS 能提升体验，但默认 API Key 如果直接打包进客户端会被提取，本地额度也只能作为体验限制，不能真正防滥用。
+- 解决方案：新增 `docs/voice-stt-tts-plan.md`，建议语音能力设计为 `system | cloud-auto | user-cloud` 三种模式；云端增强使用 CloseAI OpenAI-compatible STT/TTS 接口，失败或超额自动回退系统语音；真正安全的免费额度需要服务端代理控制。
+- 涉及文件：`docs/voice-stt-tts-plan.md`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：语音云端增强应是渐进增强而非硬依赖；客户端内置 key 只能视为体验 key，不能承担安全额度控制。
+- 是否需更新技术文档：是。

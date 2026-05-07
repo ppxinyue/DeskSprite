@@ -1,5 +1,6 @@
 use tauri::{
-    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
+    AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl,
+    WebviewWindowBuilder,
 };
 
 #[cfg(target_os = "macos")]
@@ -40,20 +41,23 @@ fn pin_pet_above_fullscreen<R: Runtime>(window: &tauri::WebviewWindow<R>) {
         return;
     }
 
-    // NSScreenSaverWindowLevel (1000) - above fullscreen apps and screen savers
+    // NSScreenSaverWindowLevel (1000) keeps the pet above normal and fullscreen app windows.
     const NSSCREENSAVER_WINDOW_LEVEL: isize = 1000;
 
     unsafe {
         let ns_window = &*(raw_window.cast::<NSWindow>());
         let behavior = ns_window.collectionBehavior()
             | NSWindowCollectionBehavior::CanJoinAllSpaces      // Join all Spaces
+            | NSWindowCollectionBehavior::Transient             // Behave like a lightweight overlay
             | NSWindowCollectionBehavior::Stationary           // Don't auto-move
             | NSWindowCollectionBehavior::FullScreenAuxiliary   // Join fullscreen Spaces
-            | NSWindowCollectionBehavior::IgnoresCycle;         // Skip Cmd+Tab cycling
+            | NSWindowCollectionBehavior::FullScreenDisallowsTiling
+            | NSWindowCollectionBehavior::IgnoresCycle; // Skip Cmd+Tab cycling
         ns_window.setCollectionBehavior(behavior);
         ns_window.setLevel(NSSCREENSAVER_WINDOW_LEVEL);
-        ns_window.setHidesOnDeactivate(false);  // Stay visible when switching apps
-        let _: () = msg_send![ns_window, orderFrontRegardless];  // Force to front
+        ns_window.setCanHide(false);
+        ns_window.setHidesOnDeactivate(false); // Stay visible when switching apps
+        let _: () = msg_send![ns_window, orderFrontRegardless]; // Force to front
     }
 }
 
@@ -79,7 +83,9 @@ fn unpin_pet_from_fullscreen<R: Runtime>(window: &tauri::WebviewWindow<R>) {
         // Reset collection behavior to default
         let behavior = ns_window.collectionBehavior()
             & !NSWindowCollectionBehavior::CanJoinAllSpaces
+            & !NSWindowCollectionBehavior::Transient
             & !NSWindowCollectionBehavior::FullScreenAuxiliary
+            & !NSWindowCollectionBehavior::FullScreenDisallowsTiling
             & !NSWindowCollectionBehavior::Stationary
             & !NSWindowCollectionBehavior::IgnoresCycle;
         ns_window.setCollectionBehavior(behavior);
@@ -200,20 +206,21 @@ pub fn show_compact_chat_window(
         return Ok(());
     }
 
-    let window = WebviewWindowBuilder::new(&app, "compact-chat", WebviewUrl::App("index.html".into()))
-        .title("")
-        .inner_size(w, h)
-        .position(x, y)
-        .decorations(false)
-        .transparent(true)
-        .shadow(false)
-        .accept_first_mouse(true)
-        .always_on_top(true)
-        .visible_on_all_workspaces(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let window =
+        WebviewWindowBuilder::new(&app, "compact-chat", WebviewUrl::App("index.html".into()))
+            .title("")
+            .inner_size(w, h)
+            .position(x, y)
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .accept_first_mouse(true)
+            .always_on_top(true)
+            .visible_on_all_workspaces(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .build()
+            .map_err(|e| e.to_string())?;
     let _ = window.set_always_on_top(true);
     let _ = window.set_visible_on_all_workspaces(true);
     pin_pet_above_fullscreen(&window);
@@ -246,7 +253,8 @@ pub fn hide_compact_chat_window(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub fn focus_compact_chat_input(app: AppHandle) -> Result<(), String> {
-    app.emit_to("compact-chat", "focus-input", ()).map_err(|e| e.to_string())
+    app.emit_to("compact-chat", "focus-input", ())
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -305,7 +313,7 @@ pub fn pin_pet_above_fullscreen_cmd(window: tauri::Window) -> Result<(), String>
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = window;  // Suppress unused warning
+        let _ = window; // Suppress unused warning
     }
     Ok(())
 }
@@ -320,7 +328,7 @@ pub fn unpin_pet_from_fullscreen_cmd(window: tauri::Window) -> Result<(), String
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = window;  // Suppress unused warning
+        let _ = window; // Suppress unused warning
     }
     Ok(())
 }
@@ -332,7 +340,7 @@ pub fn start_topmost_guard(window: tauri::Window) -> Result<(), String> {
         use std::thread;
 
         if TOPMOST_GUARD_RUNNING.load(Ordering::SeqCst) {
-            return Ok(());  // Already running
+            return Ok(()); // Already running
         }
 
         TOPMOST_GUARD_RUNNING.store(true, Ordering::SeqCst);
@@ -349,31 +357,36 @@ pub fn start_topmost_guard(window: tauri::Window) -> Result<(), String> {
                     break;
                 }
 
-                // Re-assert window level if pet window is visible
+                // Re-assert window level if overlay windows are visible. macOS fullscreen
+                // Spaces can drop auxiliary windows behind the active app unless we keep
+                // refreshing level, collection behavior, and front order on the main thread.
                 // MUST dispatch to main thread — AppKit forbids NSWindow calls from background threads
-                if let Some(w) = app_handle.get_webview_window("pet") {
-                    if w.is_visible().unwrap_or(false) {
-                        let w = w.clone();
-                        // Use tauri's run_on_main_thread to safely call on main thread
-                        app_handle.run_on_main_thread(move || {
-                            if let Ok(raw_window) = w.ns_window() {
-                                if !raw_window.is_null() {
-                                    unsafe {
-                                        let ns_window = &*(raw_window.cast::<NSWindow>());
-                                        let _: () = msg_send![ns_window, orderFrontRegardless];
-                                    }
-                                }
-                            }
-                        }).unwrap_or_else(|e| eprintln!("topmost guard dispatch failed: {}", e));
-                    }
+                let windows = ["pet", "compact-chat"]
+                    .into_iter()
+                    .filter_map(|label| app_handle.get_webview_window(label))
+                    .filter(|w| w.is_visible().unwrap_or(false))
+                    .collect::<Vec<_>>();
+                if windows.is_empty() {
+                    continue;
                 }
+                let app_for_main = app_handle.clone();
+                app_handle
+                    .run_on_main_thread(move || {
+                        for w in windows {
+                            let _ = w.set_always_on_top(true);
+                            let _ = w.set_visible_on_all_workspaces(true);
+                            pin_pet_above_fullscreen(&w);
+                        }
+                        let _ = app_for_main.emit("topmost:refreshed", ());
+                    })
+                    .unwrap_or_else(|e| eprintln!("topmost guard dispatch failed: {}", e));
             }
         });
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = window;  // Suppress unused warning
-        // TODO: Implement for Windows/Linux
+        let _ = window; // Suppress unused warning
+                        // TODO: Implement for Windows/Linux
     }
     Ok(())
 }

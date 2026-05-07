@@ -545,3 +545,9 @@
 - 经验：用户配置模型和内置默认模型必须共享同一套 `base_url + model + api_key` 调用语义；凭证链路必须可观测但不能泄露明文。
 - 排查法：以后遇到 `invalid token`，先看 endpoint、Key 长度、尾号和指纹，再判断是 base_url 错、保存读取错，还是服务商真实拒绝。
 - 文件：docs/model-config-debugging.md, PROGRESS.md, ISSUES.md
+
+### R64. 形象预览、全屏置顶与语音方案整理（2026-05-07）
+- 预览：设置页个性化形象改为默认资源和上传资源都先加载为 data URL；失败时显示明确“图片无法预览”，避免只留下空占位框。
+- 置顶：macOS pet/compact-chat 窗口增加更强的 fullscreen auxiliary/overlay 行为；topmost guard 周期性重申 window level、全 Space 可见和前置顺序；智能附着不再把全屏态灵宠挪到屏幕外隐藏。
+- 语音：新增 `docs/voice-stt-tts-plan.md`，建议把 CloseAI STT/TTS 做成高级云端增强，免费额度内使用默认模型，超额或失败回退系统语音；默认 key 不写入文档或日志。
+- 文件：SettingsPanel.tsx, attachEngine.ts, window.rs, voice-stt-tts-plan.md, PROGRESS.md, ISSUES.md

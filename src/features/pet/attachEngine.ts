@@ -12,7 +12,7 @@ interface DesktopBounds {
   fullscreen_active: boolean;
 }
 
-export type AttachMode = 'dock_sleep' | 'fullscreen_hide' | 'desktop_float' | 'none';
+export type AttachMode = 'dock_sleep' | 'fullscreen_float' | 'desktop_float' | 'none';
 
 const POLL_INTERVAL = 2000;
 const RESUME_DELAY = 5000;
@@ -59,7 +59,7 @@ async function poll() {
 
     let newMode: AttachMode;
     if (bounds.fullscreen_active) {
-      newMode = 'fullscreen_hide';
+      newMode = 'fullscreen_float';
     } else if (bounds.dock_visible) {
       newMode = 'dock_sleep';
     } else {
@@ -90,13 +90,14 @@ function applyMode(mode: AttachMode, bounds: DesktopBounds) {
       }
       break;
     }
-    case 'fullscreen_hide': {
-      // Hide at top-right corner, peek on hover
+    case 'fullscreen_float': {
+      // Stay visible above fullscreen Spaces; hiding here makes the pet look like it lost topmost.
       store.setPetState('sleeping');
       store.setPosition({
-        x: bounds.width - 130,
-        y: -80, // mostly hidden, only ears visible
+        x: bounds.width - 200,
+        y: bounds.height - 250,
       });
+      invoke('show_pet_window').catch(() => {});
       break;
     }
     case 'desktop_float': {
