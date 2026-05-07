@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event';
 import { Check, ChevronDown, Columns3, Copy, Grid2X2, Mic, PanelRight, Paperclip, Plus, Rows3, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Terminal } from '@/components/loading-ui/terminal';
 import { useChatStore, createMessage } from './chatStore';
 import { useApiConfigStore } from '@/features/settings/apiConfigStore';
 import { streamChat } from '@/features/ai/aiService';
@@ -1024,7 +1025,7 @@ function MessageBubble({ message, isStreaming = false, fullWidth = false }: { me
           <img src={message.imageDataUrl || message.imageUrl} alt="" className="mb-2 max-h-48 rounded-[8px] object-contain" />
         )}
         {isPending ? (
-          <TypingDots />
+          <Terminal prompt="$" className="text-[var(--color-chat-muted)]" />
         ) : isUser ? (
           <p className="whitespace-pre-wrap">{cleanChatText(message.content)}</p>
         ) : (
@@ -1056,14 +1057,4 @@ function cleanChatText(text: string) {
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
     .replace(/^[（(][^）)]{1,24}[）)]\s*/gm, '')
     .trim();
-}
-
-function TypingDots() {
-  return (
-    <span className="inline-flex h-5 items-center gap-1">
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.2s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current [animation-delay:-0.1s]" />
-      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-current" />
-    </span>
-  );
 }

@@ -331,3 +331,8 @@
 - 大窗：点击放大时先记录当前小窗会话 id，再收起小窗并打开大聊天窗口；新建大窗通过 handoff id 初始加载当前会话，已打开大窗通过 `chat:open-conversation` 事件切换到该会话。
 - 边界：宠物窗口拖动/尺寸变化后会被夹回当前屏幕工作区并保留 16px 间距；小对话框会根据工作区宽度自动收窄，避免在屏幕边缘被裁切。
 - 文件：App.tsx, ChatDialog.tsx
+
+### R34. LLM 输出前 Terminal 占位动效（2026-05-07）
+- 占位：LLM 第一段 token 返回前，不再显示三个点；改为 CLI 风格 `$` prompt + 闪烁方块光标。
+- 实现：新增 `components/loading-ui/terminal.tsx`，prompt 和光标继承当前文字颜色；闪烁速度通过 `--duration` CSS 变量控制。
+- 文件：ChatDialog.tsx, terminal.tsx, index.css

@@ -491,3 +491,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：小窗和大窗是同一对话任务的两个视图，切换视图必须传递会话上下文；桌面悬浮窗需要在每次移动和尺寸变化后主动做屏幕边界保护。
 - 是否需更新技术文档：是。
+
+## ISSUE-043
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：H. 对话窗口 UI
+- 严重程度：改进
+- 问题现象：LLM 回复生成前的占位仍是三个点，不符合新的 developer-facing CLI 风格要求。
+- 原因分析：小窗和大窗都通过 `message.content === '...'` 识别 pending assistant 消息，并渲染 `TypingDots`。
+- 解决方案：新增 `Terminal` loading component，渲染等宽 prompt 和闪烁方块光标；`MessageBubble` 保留内部 `...` sentinel，但 pending UI 改为 `<Terminal prompt="$" />`。
+- 涉及文件：`src/components/loading-ui/terminal.tsx`, `src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：流式消息状态标记和展示组件要解耦，内部 sentinel 可以稳定状态机，外部 loader 可以随 UI 规范替换。
+- 是否需更新技术文档：是。
