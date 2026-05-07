@@ -835,7 +835,7 @@
 - 严重程度：改进
 - 问题现象：内置 TTS 模型响应偏慢；设置页把 Chat、TTS、STT 混在同一套默认/用户模型语义里，用户无法单独配置自己的 TTS/STT 模型。
 - 原因分析：上一轮实现将 `user-cloud` 语音模式复用 Chat 默认 API 配置，只能换 key，不能为 STT/TTS 分别设置不同 base URL 和模型名；Chat 是否使用默认模型也缺少显式开关。
-- 解决方案：把 Chat/TTS/STT 拆成三个设置模块；Chat 增加默认/自定义模式，自定义时使用 API 配置中设为默认的模型；STT/TTS 自定义各自保存 Base URL、模型名和 API Key；内置 TTS 改为 `tts-1-hd`。
+- 解决方案：把 Chat/TTS/STT 拆成三个设置模块；Chat 增加默认/自定义模式，自定义时使用 API 配置中设为默认的模型；STT/TTS 自定义各自保存 Base URL、模型名和 API Key；内置 TTS 先试 `tts-1-hd` 后按听感反馈改为 `tts-1`。
 - 涉及文件：`src/features/settings/settingsStore.ts`, `src/features/voice/voiceService.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `docs/voice-stt-tts-plan.md`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Chat、STT、TTS 虽然都走 OpenAI-compatible 接口，但模型、权限和性能特征不同，设置层不能强行共用一个“默认模型”抽象。
 - 是否需更新技术文档：是。

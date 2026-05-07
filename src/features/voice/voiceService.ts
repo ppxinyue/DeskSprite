@@ -4,7 +4,7 @@ import type { AppSettings, VoiceProviderMode } from '@/features/settings/setting
 
 const BUILTIN_VOICE_BASE_URL = 'https://api.openai-proxy.org/v1';
 const BUILTIN_VOICE_API_KEY = 'sk-RUPf8NG93A0bg6Phr3GvHaEXj1z2vFKb2eLIMvgjuaGCLMS7';
-export const BUILTIN_TTS_MODEL = 'tts-1-hd';
+export const BUILTIN_TTS_MODEL = 'tts-1';
 export const BUILTIN_STT_MODEL = 'gpt-4o-mini-transcribe';
 const BUILTIN_STT_USAGE_KEY = 'builtinCloseAiSttSecondsUsage';
 const BUILTIN_TTS_USAGE_KEY = 'builtinCloseAiTtsCharsUsage';

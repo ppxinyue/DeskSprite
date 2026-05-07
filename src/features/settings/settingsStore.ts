@@ -75,7 +75,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   customSttModel: 'gpt-4o-mini-transcribe',
   customSttApiKey: '',
   customTtsBaseUrl: 'https://api.openai-proxy.org/v1',
-  customTtsModel: 'tts-1-hd',
+  customTtsModel: 'tts-1',
   customTtsApiKey: '',
   wakeWord: '你好灵宠',
   wakeWordEnabled: false,

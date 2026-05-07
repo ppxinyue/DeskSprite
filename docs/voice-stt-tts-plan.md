@@ -26,7 +26,7 @@
 
 - base URL: `https://api.openai-proxy.org/v1`
 - STT model: `gpt-4o-mini-transcribe`
-- TTS model: `tts-1-hd`
+- TTS model: `tts-1`
 
 注意：默认 API Key 不应写入文档、日志、错误信息或可搜索的源码注释。客户端内置 key 天然可被逆向提取，只适合作为体验额度，不适合作为真正安全的免费额度系统。
 

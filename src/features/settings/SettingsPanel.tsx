@@ -1046,7 +1046,7 @@ function AISection({
               value={settings.customTtsModel}
               onChange={(e) => updateSetting('customTtsModel', e.target.value.trim())}
               className="w-full max-w-md"
-              placeholder="tts-1-hd"
+              placeholder="tts-1"
             />
           </SettingRow>
           <SettingRow label="TTS API Key">
