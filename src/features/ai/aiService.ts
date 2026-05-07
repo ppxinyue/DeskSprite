@@ -1,11 +1,11 @@
 import type { ApiConfig, Message, AiError } from './types';
-import { getApiKey } from '@/lib/keychain';
+import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
 
 export async function* streamChat(
   messages: Message[],
   config: ApiConfig & { keyringRef?: string | null },
 ): AsyncGenerator<string, void, undefined> {
-  const apiKey = config.apiKey || (config.keyringRef ? await getApiKey(config.keyringRef) : '');
+  const apiKey = await resolveStoredApiKey(config.apiKey, config.keyringRef);
   const configWithKey = { ...config, apiKey };
   const body = buildRequestBody(messages, configWithKey, true);
   const headers = buildHeaders(configWithKey);
@@ -61,7 +61,7 @@ export async function vision(
   config: ApiConfig & { keyringRef?: string | null },
   prompt = '请详细描述并分析图片中的内容。',
 ): Promise<string> {
-  const apiKey = config.apiKey || (config.keyringRef ? await getApiKey(config.keyringRef) : '');
+  const apiKey = await resolveStoredApiKey(config.apiKey, config.keyringRef);
   const configWithKey = { ...config, apiKey };
   const headers = buildHeaders(configWithKey);
   const body = buildVisionBody(imageBase64, prompt, configWithKey);

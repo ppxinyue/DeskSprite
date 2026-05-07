@@ -719,3 +719,15 @@
 - 涉及文件：`src/features/settings/apiConfigStore.ts`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：安全存储引用必须和数据库记录同事务语义更新；“重新填写保存”应能刷新坏引用，保存阶段不能因为旧引用异常阻断用户修复配置。
 - 是否需更新技术文档：是。
+
+## ISSUE-062
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：D. AI 配置 / 模型测试 / H. 对话调用
+- 严重程度：阻断
+- 问题现象：API Key 已经能保存，但测试仍提示“未找到已保存的 API Key”；再次编辑配置时，API Key 输入框看起来又是空的，用户无法确认 key 已本地保存。
+- 原因分析：应用把系统 Keychain 当作唯一实际存储，只在数据库保存引用；当前开发/运行环境下 Keychain 写入与读取不稳定，导致数据库有配置但没有可读取的 key。编辑弹窗为了不泄露明文把输入框置空，但没有点状已保存状态，用户会误以为 key 没保存。
+- 解决方案：新增本地 `api_key` 持久化字段作为主读取源，Keychain 仅作为兼容备份；保存时写本地隐藏值，测试和对话优先读取本地值；编辑弹窗显示 `••••••••` 占位并支持重新粘贴覆盖。
+- 涉及文件：`src-tauri/migrations/0003_add_api_key_to_configs.sql`, `src-tauri/src/lib.rs`, `src/lib/apiKeyStorage.ts`, `src/lib/db.ts`, `src/features/settings/apiConfigStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/ai/defaultModel.ts`, `src/features/ai/aiService.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：桌面应用的关键配置不能只有不可观测的外部安全存储引用；至少要有一个应用本地可迁移、可验证的持久化来源，同时 UI 要明确表达“已保存但不显示明文”。
+- 是否需更新技术文档：是。

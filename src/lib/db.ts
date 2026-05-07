@@ -33,6 +33,7 @@ export async function getApiConfigs() {
     created_at: string;
     name: string | null;
     provider_id: string | null;
+    api_key: string | null;
   }>('SELECT * FROM api_configs ORDER BY created_at DESC');
 }
 
@@ -43,11 +44,12 @@ export async function insertApiConfig(
   keyringRef: string,
   isDefault = 0,
   name?: string,
-  providerId?: string
+  providerId?: string,
+  apiKey?: string | null
 ) {
   return execute(
-    'INSERT INTO api_configs (provider, base_url, model, keyring_ref, is_default, name, provider_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [provider, baseUrl, model, keyringRef, isDefault, name ?? null, providerId ?? null]
+    'INSERT INTO api_configs (provider, base_url, model, keyring_ref, is_default, name, provider_id, api_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [provider, baseUrl, model, keyringRef, isDefault, name ?? null, providerId ?? null, apiKey ?? null]
   );
 }
 
@@ -58,11 +60,18 @@ export async function updateApiConfig(
   model: string,
   name: string,
   providerId: string,
-  keyringRef: string | null
+  keyringRef: string | null,
+  apiKey?: string | null
 ) {
+  if (apiKey === undefined) {
+    return execute(
+      'UPDATE api_configs SET provider = ?, base_url = ?, model = ?, name = ?, provider_id = ?, keyring_ref = ? WHERE id = ?',
+      [provider, baseUrl, model, name, providerId, keyringRef, id]
+    );
+  }
   return execute(
-    'UPDATE api_configs SET provider = ?, base_url = ?, model = ?, name = ?, provider_id = ?, keyring_ref = ? WHERE id = ?',
-    [provider, baseUrl, model, name, providerId, keyringRef, id]
+    'UPDATE api_configs SET provider = ?, base_url = ?, model = ?, name = ?, provider_id = ?, keyring_ref = ?, api_key = ? WHERE id = ?',
+    [provider, baseUrl, model, name, providerId, keyringRef, apiKey, id]
   );
 }
 

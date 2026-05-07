@@ -14,7 +14,7 @@ import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG } from '@/features/ai/defaultModel';
 import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
-import { getApiKey } from '@/lib/keychain';
+import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getMessages, getSystemPrompt, setSetting, updateSystemPrompt } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, isBuiltinAsset, type PetStateMediaConfig } from '@/features/pet/animations';
@@ -25,6 +25,7 @@ import type { ReactNode } from 'react';
 
 type SettingsSection = 'appearance' | 'ai' | 'history' | 'shortcuts' | 'privacy';
 const ALLOWED_PET_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
+const MASKED_API_KEY = '••••••••';
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: 'appearance', label: '外观' },
@@ -711,12 +712,12 @@ function isAllowedPetImagePath(path: string) {
 }
 
 async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; message: string; latency?: number }> {
-  if (!config.keyringRef) {
+  if (!config.apiKey && !config.keyringRef) {
     return { success: false, message: '缺少 API Key，请重新保存配置。' };
   }
   let apiKey = '';
   try {
-    apiKey = await getApiKey(config.keyringRef);
+    apiKey = await resolveStoredApiKey(config.apiKey, config.keyringRef);
   } catch {
     return { success: false, message: '未找到已保存的 API Key，请编辑该配置并重新填写。' };
   }
@@ -1128,6 +1129,14 @@ function defaultApiConfigForm(): ApiConfigForm {
   };
 }
 
+function hasSavedApiKey(config: ApiConfig | null) {
+  return Boolean(config?.apiKey?.trim() || config?.keyringRef);
+}
+
+function apiKeyForSave(value: string) {
+  return value === MASKED_API_KEY ? '' : value;
+}
+
 function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; onClose: () => void; editingConfig: ApiConfig | null }) {
   const { addConfig, updateConfig } = useApiConfigStore();
   const [isSaving, setIsSaving] = useState(false);
@@ -1148,7 +1157,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           providerId: provider.id,
           baseUrl: provider.id === 'custom' ? editingConfig.baseUrl : provider.baseUrl,
           model: editingConfig.model,
-          apiKey: '',
+          apiKey: hasSavedApiKey(editingConfig) ? MASKED_API_KEY : '',
           isDefault: editingConfig.isDefault,
         });
         setSelectedProvider(provider);
@@ -1163,8 +1172,9 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
     if (!form.providerId || !form.baseUrl || !form.model) {
       return;
     }
-    const requiresApiKey = !editingConfig || !editingConfig.keyringRef;
-    if (requiresApiKey && !form.apiKey.trim()) {
+    const nextApiKey = apiKeyForSave(form.apiKey);
+    const requiresApiKey = !hasSavedApiKey(editingConfig);
+    if (requiresApiKey && !nextApiKey.trim()) {
       alert('请填写 API Key。');
       return;
     }
@@ -1172,9 +1182,9 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
     setIsSaving(true);
     try {
       if (form.id) {
-        await updateConfig(form.id, form.providerId, form.baseUrl, form.model, selectedProvider.name, form.providerId, form.apiKey || undefined);
+        await updateConfig(form.id, form.providerId, form.baseUrl, form.model, selectedProvider.name, form.providerId, nextApiKey || undefined);
       } else {
-        await addConfig(form.providerId, form.baseUrl, form.model, form.apiKey, selectedProvider.name, form.providerId);
+        await addConfig(form.providerId, form.baseUrl, form.model, nextApiKey, selectedProvider.name, form.providerId);
       }
       onClose();
     } catch (e) {
@@ -1245,8 +1255,13 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
             <label className="text-sm font-medium">API Key</label>
             <Input
               type="password"
-              placeholder={editingConfig?.keyringRef ? '••••••••（已保存，留空则不修改）' : selectedProvider.apiKeyHint}
+              placeholder={hasSavedApiKey(editingConfig) ? '已保存，留空则不修改' : selectedProvider.apiKeyHint}
               value={form.apiKey}
+              onFocus={() => {
+                if (form.apiKey === MASKED_API_KEY) {
+                  setForm({ ...form, apiKey: '' });
+                }
+              }}
               onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">
@@ -1280,7 +1295,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
               || !form.providerId
               || !form.baseUrl
               || !form.model
-              || ((!editingConfig || !editingConfig.keyringRef) && !form.apiKey.trim())
+              || (!hasSavedApiKey(editingConfig) && !apiKeyForSave(form.apiKey).trim())
             }
           >
             {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}

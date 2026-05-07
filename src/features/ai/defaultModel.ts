@@ -1,7 +1,7 @@
 import type { ApiConfig, Message } from './types';
 import type { ApiConfig as StoredApiConfig } from '@/features/settings/apiConfigStore';
 import { getSetting, setSetting } from '@/lib/db';
-import { getApiKey } from '@/lib/keychain';
+import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
 
 const BUILTIN_USAGE_KEY = 'builtinCloseAiTokenUsage';
 const BUILTIN_TOKEN_LIMIT = 100_000;
@@ -33,9 +33,10 @@ export async function resolveChatConfig(defaultConfig: StoredApiConfig | undefin
   }
 
   try {
-    const apiKey = defaultConfig.keyringRef
-      ? await getApiKey(defaultConfig.keyringRef)
-      : '';
+    const apiKey = await resolveStoredApiKey(defaultConfig.apiKey, defaultConfig.keyringRef);
+    if (!apiKey.trim()) {
+      throw new Error('missing api key');
+    }
     return {
       config: {
         id: defaultConfig.id,

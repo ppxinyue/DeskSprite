@@ -504,3 +504,10 @@
 - 留空：编辑已有配置且 API Key 留空时，只保留原引用，不在保存阶段读取钥匙串，避免因为旧 keychain 条目异常阻断用户修改模型参数。
 - 测试：测试模型时如果钥匙串条目缺失，返回“重新填写并保存”的明确提示；重新填写保存会刷新引用。
 - 文件：apiConfigStore.ts, db.ts, SettingsPanel.tsx
+
+### R58. API Key 本地持久化兜底（2026-05-07）
+- 存储：为 `api_configs` 增加本地 `api_key` 字段，保存时写入本地数据库隐藏值；系统 Keychain 仍尝试写入，但不再作为唯一可信来源。
+- 读取：测试模型、默认模型解析、大小聊天窗口发起请求时，优先读取本地保存的 API Key，缺失时才回退到旧 `keyring_ref`。
+- 编辑：已保存 API Key 的配置打开后显示 `••••••••` 点状占位，不展示明文；点击输入框可清空并重新粘贴新 key，留空保存则保留旧 key。
+- 兼容：旧配置仍可通过 keyring 引用读取；重新填写一次 API Key 后会写入新的本地持久化字段。
+- 文件：0003_add_api_key_to_configs.sql, lib.rs, apiKeyStorage.ts, db.ts, apiConfigStore.ts, SettingsPanel.tsx, defaultModel.ts, aiService.ts

@@ -10,6 +10,7 @@ import {
   saveApiKey,
   deleteApiKey,
 } from '@/lib/keychain';
+import { decodeLocalApiKey, encodeLocalApiKey } from '@/lib/apiKeyStorage';
 import { emit } from '@tauri-apps/api/event';
 
 export interface ApiConfig {
@@ -19,6 +20,7 @@ export interface ApiConfig {
   name: string | null;
   baseUrl: string;
   model: string;
+  apiKey: string | null;
   keyringRef: string | null;
   isDefault: boolean;
   lastUsedAt: string | null;
@@ -67,6 +69,7 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
         name: r.name,
         baseUrl: r.base_url,
         model: r.model,
+        apiKey: decodeLocalApiKey(r.api_key),
         keyringRef: r.keyring_ref,
         isDefault: r.is_default === 1,
         lastUsedAt: r.last_used_at,
@@ -83,8 +86,9 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
 
   addConfig: async (provider, baseUrl, model, apiKey, name, providerId) => {
     const keyringRef = createKeyringRef();
-    await persistApiKey(keyringRef, apiKey);
-    await insertApiConfig(provider, baseUrl, model, keyringRef, 0, name, providerId);
+    const normalizedKey = normalizeApiKey(apiKey);
+    await persistApiKey(keyringRef, normalizedKey);
+    await insertApiConfig(provider, baseUrl, model, keyringRef, 0, name, providerId, encodeLocalApiKey(normalizedKey));
     await get().loadConfigs();
     await emit('api-config:changed', {});
   },
@@ -92,18 +96,21 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
   updateConfig: async (id, provider, baseUrl, model, name, providerId, apiKey) => {
     const config = get().configs.find((c) => c.id === id);
     let keyringRef = config?.keyringRef ?? null;
+    let encodedApiKey: string | undefined;
 
     if (apiKey && apiKey.length > 0) {
+      const normalizedKey = normalizeApiKey(apiKey);
       keyringRef = createKeyringRef(id);
-      await persistApiKey(keyringRef, apiKey);
+      encodedApiKey = encodeLocalApiKey(normalizedKey);
+      await persistApiKey(keyringRef, normalizedKey);
       if (config?.keyringRef && config.keyringRef !== keyringRef) {
         deleteApiKey(config.keyringRef).catch(() => undefined);
       }
-    } else if (!keyringRef) {
+    } else if (!keyringRef && !config?.apiKey) {
       throw new Error('缺少 API Key，请重新填写并保存。');
     }
 
-    await updateApiConfig(id, provider, baseUrl, model, name, providerId, keyringRef);
+    await updateApiConfig(id, provider, baseUrl, model, name, providerId, keyringRef, encodedApiKey);
     await get().loadConfigs();
     await emit('api-config:changed', {});
   },
@@ -140,9 +147,15 @@ function createKeyringRef(id?: number) {
 }
 
 async function persistApiKey(keyringRef: string, apiKey: string) {
+  saveApiKey(keyringRef, apiKey).catch((e) => {
+    console.warn('Failed to save API key to system keychain; local storage fallback is active:', e);
+  });
+}
+
+function normalizeApiKey(apiKey: string) {
   const normalizedKey = apiKey.trim();
   if (!normalizedKey) {
     throw new Error('API Key 不能为空。');
   }
-  await saveApiKey(keyringRef, normalizedKey);
+  return normalizedKey;
 }

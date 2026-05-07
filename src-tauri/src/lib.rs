@@ -54,6 +54,12 @@ pub fn run() {
                     sql: include_str!("../migrations/0002_add_config_name_and_provider.sql"),
                     kind: tauri_plugin_sql::MigrationKind::Up,
                 },
+                tauri_plugin_sql::Migration {
+                    version: 3,
+                    description: "add local api key cache",
+                    sql: include_str!("../migrations/0003_add_api_key_to_configs.sql"),
+                    kind: tauri_plugin_sql::MigrationKind::Up,
+                },
             ],
         ).build())
         .plugin(tauri_plugin_store::Builder::new().build())
