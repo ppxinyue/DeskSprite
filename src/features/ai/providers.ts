@@ -18,6 +18,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
   { id: 'minimax', name: 'MiniMax', baseUrl: 'https://api.minimax.io/v1', apiKeyHint: '...', docsUrl: 'https://www.minimaxi.com/user-center/basic-information/interface-key' },
   { id: 'mimo', name: 'MiMo', baseUrl: 'https://api.xiaomimimo.com/v1', apiKeyHint: '...', docsUrl: '' },
   { id: 'qwen', name: 'Qwen', baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', apiKeyHint: 'sk-...', docsUrl: 'https://dashscope.console.aliyun.com/apiKey' },
+  { id: 'custom', name: '自定义', baseUrl: '', apiKeyHint: '自定义 API Key', docsUrl: '' },
 ];
 
 export function getProviderById(id: string): ProviderPreset | undefined {

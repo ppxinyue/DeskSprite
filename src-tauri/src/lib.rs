@@ -65,6 +65,7 @@ pub fn run() {
             commands::ai::test_ai_connection,
             commands::desktop::get_desktop_bounds,
             commands::desktop::can_start_speech_recognition,
+            commands::desktop::open_external_url,
             commands::csp::add_csp_origin,
             commands::csp::get_csp_origins,
             commands::csp::remove_csp_origin,

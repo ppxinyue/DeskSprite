@@ -490,3 +490,10 @@
 - 测试：每条 API 配置的“测试”按钮改为真实请求模型接口；OpenAI 兼容服务走 `/chat/completions`，Anthropic 走 `/messages`。
 - 错误：测试失败时直接展示 HTTP 状态和服务商返回的错误消息，例如 API key 无效、model 不存在、权限不足等。
 - 文件：providers.ts, SettingsPanel.tsx
+
+### R56. API 配置自定义项与文档打开修复（2026-05-07）
+- 自定义：模型配置重新保留“自定义”服务商；选择后可手动填写 Base URL，预设服务商仍自动填充并锁定 Base URL。
+- 精简：删除新增/编辑 API 配置弹窗中的“配置名称”字段；设置列表和大聊天窗口模型标签只展示服务商名与模型名。
+- 兼容：数据库中的 `name` 字段保留作历史兼容，但不再作为用户可编辑字段；编辑旧未知 provider 时按自定义配置处理并保留原 Base URL。
+- 文档：获取 API Key 不再使用 WebView 内普通链接，改为调用 `open_external_url` 后端命令，用系统浏览器真正打开对应服务商文档页面。
+- 文件：providers.ts, types.ts, SettingsPanel.tsx, ChatDialog.tsx, desktop.rs, lib.rs

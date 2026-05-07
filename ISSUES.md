@@ -695,3 +695,15 @@
 - 涉及文件：`src/features/ai/providers.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：模型测试必须验证“base_url + model + API key”组合，而不是只验证本地保存状态；模型名应由用户输入以适配不断变化的供应商模型。
 - 是否需更新技术文档：是。
+
+## ISSUE-060
+- 发现时间：2026-05-07
+- 发现者：用户反馈
+- 相关任务：D. AI 配置
+- 严重程度：改进
+- 问题现象：模型配置缺少自定义服务商；新增/编辑弹窗里的“配置名称”字段造成额外认知负担；“获取 API Key”链接在桌面 WebView 内不保证能真正打开外部网页。
+- 原因分析：上一轮固定 provider preset 时把自定义项一起移除了；配置名称只是展示别名，不是实际模型连接所需字段；普通 `<a target="_blank">` 在 Tauri WebView 中可能被窗口策略拦截或留在应用内。
+- 解决方案：恢复“自定义”选项并允许编辑 Base URL；删除配置名称输入和界面展示；新增 `open_external_url` 命令，通过系统浏览器打开服务商 API key 文档。
+- 涉及文件：`src/features/ai/providers.ts`, `src/features/ai/types.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/chat/ChatDialog.tsx`, `src-tauri/src/commands/desktop.rs`, `src-tauri/src/lib.rs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：桌面应用里的外部文档入口应走系统浏览器；模型配置表单只保留真实影响连接的字段。
+- 是否需更新技术文档：是。

@@ -848,7 +848,7 @@ function AISection({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm">{c.name || getProviderName(c.providerId || c.provider)}</span>
+                    <span className="font-medium text-sm">{getProviderName(c.providerId || c.provider)}</span>
                     {c.isDefault && (
                       <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded shrink-0">默认</span>
                     )}
@@ -1099,7 +1099,6 @@ function historyMessageImageFields(imagePath: string | null | undefined) {
 interface ApiConfigForm {
   id: number | null;
   providerId: string;
-  name: string;
   baseUrl: string;
   model: string;
   apiKey: string;
@@ -1109,7 +1108,6 @@ interface ApiConfigForm {
 const EMPTY_FORM: ApiConfigForm = {
   id: null,
   providerId: '',
-  name: '',
   baseUrl: '',
   model: '',
   apiKey: '',
@@ -1121,7 +1119,6 @@ function defaultApiConfigForm(): ApiConfigForm {
   return {
     ...EMPTY_FORM,
     providerId: provider.id,
-    name: provider.name,
     baseUrl: provider.baseUrl,
   };
 }
@@ -1138,12 +1135,13 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
         const providerId = (editingConfig.providerId || editingConfig.provider) === 'zhipu'
           ? 'glm'
           : editingConfig.providerId || editingConfig.provider;
-        const provider = PROVIDER_PRESETS.find(p => p.id === providerId) || PROVIDER_PRESETS[0];
+        const provider = PROVIDER_PRESETS.find(p => p.id === providerId)
+          || PROVIDER_PRESETS.find(p => p.id === 'custom')
+          || PROVIDER_PRESETS[0];
         setForm({
           id: editingConfig.id,
           providerId: provider.id,
-          name: editingConfig.name || `${editingConfig.provider} · ${editingConfig.model}`,
-          baseUrl: provider.baseUrl,
+          baseUrl: provider.id === 'custom' ? editingConfig.baseUrl : provider.baseUrl,
           model: editingConfig.model,
           apiKey: '',
           isDefault: editingConfig.isDefault,
@@ -1164,9 +1162,9 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
     setIsSaving(true);
     try {
       if (form.id) {
-        await updateConfig(form.id, form.providerId, form.baseUrl, form.model, form.name, form.providerId, form.apiKey || undefined);
+        await updateConfig(form.id, form.providerId, form.baseUrl, form.model, selectedProvider.name, form.providerId, form.apiKey || undefined);
       } else {
-        await addConfig(form.providerId, form.baseUrl, form.model, form.apiKey, form.name, form.providerId);
+        await addConfig(form.providerId, form.baseUrl, form.model, form.apiKey, selectedProvider.name, form.providerId);
       }
       onClose();
     } finally {
@@ -1181,7 +1179,6 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
       setForm(prev => ({
         ...prev,
         providerId,
-        name: prev.name && prev.name !== selectedProvider.name ? prev.name : provider.name,
         baseUrl: provider.baseUrl,
         model: '',
       }));
@@ -1213,21 +1210,13 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">配置名称</label>
-            <Input
-              placeholder="例如：我的 GPT-4o"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
             <label className="text-sm font-medium">Base URL</label>
             <Input
-              readOnly
+              readOnly={selectedProvider.id !== 'custom'}
               placeholder="https://api.example.com/v1"
               value={form.baseUrl}
-              className="bg-muted/50"
+              onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
+              className={selectedProvider.id === 'custom' ? '' : 'bg-muted/50'}
             />
           </div>
 
@@ -1256,15 +1245,14 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           {selectedProvider.docsUrl && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>获取 API Key：</span>
-              <a
-                href={selectedProvider.docsUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
                 className="flex items-center gap-1 text-primary hover:underline"
+                onClick={() => invoke('open_external_url', { url: selectedProvider.docsUrl }).catch((e) => alert(String(e)))}
               >
                 {selectedProvider.name}
                 <ExternalLink className="h-3 w-3" />
-              </a>
+              </button>
             </div>
           )}
         </div>

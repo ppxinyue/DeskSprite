@@ -10,6 +10,7 @@ import { useApiConfigStore } from '@/features/settings/apiConfigStore';
 import { useSettingsStore } from '@/features/settings/settingsStore';
 import { streamChat } from '@/features/ai/aiService';
 import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
+import { getProviderName } from '@/features/ai/providers';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
 import type { ApiConfig } from '@/features/ai/types';
 import {
@@ -697,7 +698,7 @@ function getModelLabel(
   if (typeof modelId === 'number' && modelId > 0) {
     const config = configs.find((item) => item.id === modelId);
     if (config) {
-      const providerName = config.name || config.provider;
+      const providerName = getProviderName(config.providerId || config.provider);
       return `${providerName} · ${config.model}`;
     }
     return `模型 #${modelId}`;

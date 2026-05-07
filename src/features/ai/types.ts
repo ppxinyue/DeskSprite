@@ -1,4 +1,16 @@
-export type Provider = 'openai' | 'anthropic' | 'groq' | 'custom';
+export type Provider =
+  | 'openai'
+  | 'anthropic'
+  | 'google'
+  | 'grok'
+  | 'deepseek'
+  | 'kimi'
+  | 'glm'
+  | 'hunyuan'
+  | 'minimax'
+  | 'mimo'
+  | 'qwen'
+  | 'custom';
 
 export interface ApiConfig {
   id: number;
