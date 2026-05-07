@@ -31,6 +31,8 @@ export async function getApiConfigs() {
     last_used_at: string | null;
     usage_count: number;
     created_at: string;
+    name: string | null;
+    provider_id: string | null;
   }>('SELECT * FROM api_configs ORDER BY created_at DESC');
 }
 
@@ -39,11 +41,27 @@ export async function insertApiConfig(
   baseUrl: string,
   model: string,
   keyringRef: string,
-  isDefault = 0
+  isDefault = 0,
+  name?: string,
+  providerId?: string
 ) {
   return execute(
-    'INSERT INTO api_configs (provider, base_url, model, keyring_ref, is_default) VALUES (?, ?, ?, ?, ?)',
-    [provider, baseUrl, model, keyringRef, isDefault]
+    'INSERT INTO api_configs (provider, base_url, model, keyring_ref, is_default, name, provider_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [provider, baseUrl, model, keyringRef, isDefault, name ?? null, providerId ?? null]
+  );
+}
+
+export async function updateApiConfig(
+  id: number,
+  provider: string,
+  baseUrl: string,
+  model: string,
+  name: string,
+  providerId: string
+) {
+  return execute(
+    'UPDATE api_configs SET provider = ?, base_url = ?, model = ?, name = ?, provider_id = ? WHERE id = ?',
+    [provider, baseUrl, model, name, providerId, id]
   );
 }
 

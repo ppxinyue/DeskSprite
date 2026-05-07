@@ -391,3 +391,14 @@
 - 设置开关：外观页新增”始终置顶显示 (穿越全屏)”切换，关闭时禁用置顶功能。
 - 命令：新增 `pin_pet_above_fullscreen_cmd`、`unpin_pet_from_fullscreen_cmd`、`start_topmost_guard`、`stop_topmost_guard`。
 - 文件：window.rs, lib.rs, App.tsx, SettingsPanel.tsx, settingsStore.ts
+
+### R45. 多模型 API 配置管理（2026-05-07）
+- 功能：新增完整的多提供商 API 配置管理系统，支持 11 个 AI 提供商预设和自定义配置。
+- 提供商：OpenAI、Anthropic (Claude)、Google Gemini、Grok (xAI)、DeepSeek、Kimi (月之暗面)、智谱 GLM、腾讯混元、MiniMax、通义千问 (Qwen)、自定义。
+- 数据库：新增 `name` 和 `provider_id` 字段到 `api_configs` 表，支持用户自定义配置名称和提供商 ID。
+- 界面：设置页 AI 对话 section 重写，新增添加/编辑/删除/设为默认/测试连接功能。
+- 模态框：新增 `ApiConfigModal` 组件，支持从 11 个提供商预设选择、自动填充 Base URL 和模型列表、测试连接按钮。
+- 存储：API Key 继续存储在系统钥匙串中，数据库仅存储 keyring 引用；编辑配置时留空 API Key 则不修改现有 Key。
+- 模型选择：大聊天窗口模型选择显示格式为"{配置名称} · 模型名"，优先显示用户自定义配置名，否则显示提供商名称。
+- 测试连接：完善 Rust `test_ai_connection` 命令，从钥匙串读取 API Key 并验证格式。
+- 文件：providers.ts（新增）、apiConfigStore.ts、SettingsPanel.tsx、ChatDialog.tsx、aiService.ts、0002_add_config_name_and_provider.sql（新增）、lib.rs、ai.rs

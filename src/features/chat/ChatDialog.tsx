@@ -643,7 +643,11 @@ function getModelLabel(
   if (modelId === null && configs.length === 0) return `CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`;
   if (typeof modelId === 'number' && modelId > 0) {
     const config = configs.find((item) => item.id === modelId);
-    return config ? `${config.provider} · ${config.model}` : `模型 #${modelId}`;
+    if (config) {
+      const providerName = config.name || config.provider;
+      return `${providerName} · ${config.model}`;
+    }
+    return `模型 #${modelId}`;
   }
   return '默认模型';
 }

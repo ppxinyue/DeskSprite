@@ -1,15 +1,18 @@
 import type { ApiConfig, Message, AiError } from './types';
+import { getApiKey } from '@/lib/keychain';
 
 export async function* streamChat(
   messages: Message[],
-  config: ApiConfig,
+  config: ApiConfig & { keyringRef?: string | null },
 ): AsyncGenerator<string, void, undefined> {
-  const body = buildRequestBody(messages, config, true);
-  const headers = buildHeaders(config);
+  const apiKey = config.apiKey || (config.keyringRef ? await getApiKey(config.keyringRef) : '');
+  const configWithKey = { ...config, apiKey };
+  const body = buildRequestBody(messages, configWithKey, true);
+  const headers = buildHeaders(configWithKey);
 
   let response: Response;
   try {
-    response = await fetch(`${config.baseUrl}/chat/completions`, {
+    response = await fetch(`${configWithKey.baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -55,15 +58,17 @@ export async function* streamChat(
 
 export async function vision(
   imageBase64: string,
-  config: ApiConfig,
+  config: ApiConfig & { keyringRef?: string | null },
   prompt = '请详细描述并分析图片中的内容。',
 ): Promise<string> {
-  const headers = buildHeaders(config);
-  const body = buildVisionBody(imageBase64, prompt, config);
+  const apiKey = config.apiKey || (config.keyringRef ? await getApiKey(config.keyringRef) : '');
+  const configWithKey = { ...config, apiKey };
+  const headers = buildHeaders(configWithKey);
+  const body = buildVisionBody(imageBase64, prompt, configWithKey);
 
   let response: Response;
   try {
-    response = await fetch(`${config.baseUrl}/chat/completions`, {
+    response = await fetch(`${configWithKey.baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),

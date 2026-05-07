@@ -680,6 +680,8 @@ function AISection({
       <SettingRow label="语音输出">
         <Switch checked={settings.voiceOutput} onCheckedChange={(v) => updateSetting('voiceOutput', v)} />
       </SettingRow>
+
+      <ApiConfigModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editingConfig={editingConfig} />
     </>
   );
 }
@@ -799,6 +801,190 @@ function HistorySection() {
         ))}
       </div>
     </>
+  );
+}
+
+interface ApiConfigForm {
+  id: number | null;
+  providerId: string;
+  name: string;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  isDefault: boolean;
+}
+
+const EMPTY_FORM: ApiConfigForm = {
+  id: null,
+  providerId: '',
+  name: '',
+  baseUrl: '',
+  model: '',
+  apiKey: '',
+  isDefault: false,
+};
+
+function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; onClose: () => void; editingConfig: ApiConfig | null }) {
+  const { configs, addConfig, updateConfig } = useApiConfigStore();
+  const [isSaving, setIsSaving] = useState(false);
+  const [form, setForm] = useState<ApiConfigForm>(EMPTY_FORM);
+  const [selectedProvider, setSelectedProvider] = useState(PROVIDER_PRESETS[0]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (editingConfig) {
+        setForm({
+          id: editingConfig.id,
+          providerId: editingConfig.providerId || editingConfig.provider,
+          name: editingConfig.name || `${editingConfig.provider} · ${editingConfig.model}`,
+          baseUrl: editingConfig.baseUrl,
+          model: editingConfig.model,
+          apiKey: '',
+          isDefault: editingConfig.isDefault,
+        });
+        const provider = PROVIDER_PRESETS.find(p => p.id === (editingConfig.providerId || editingConfig.provider)) || PROVIDER_PRESETS[0];
+        setSelectedProvider(provider);
+      } else {
+        setForm(EMPTY_FORM);
+        setSelectedProvider(PROVIDER_PRESETS[0]);
+      }
+    }
+  }, [isOpen, editingConfig]);
+
+  const handleSave = async () => {
+    if (!form.providerId || !form.baseUrl || !form.model) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (form.id) {
+        await updateConfig(form.id, form.providerId, form.baseUrl, form.model, form.name, form.providerId, form.apiKey || undefined);
+      } else {
+        await addConfig(form.providerId, form.baseUrl, form.model, form.apiKey, form.name, form.providerId);
+      }
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleProviderChange = (providerId: string) => {
+    const provider = PROVIDER_PRESETS.find(p => p.id === providerId);
+    if (provider) {
+      setSelectedProvider(provider);
+      setForm(prev => ({
+        ...prev,
+        providerId,
+        baseUrl: provider.id === 'custom' ? prev.baseUrl : provider.baseUrl,
+        model: provider.models[0] || '',
+      }));
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>{editingConfig ? '编辑 API 配置' : '添加 API 配置'}</DialogTitle>
+          <DialogDescription>
+            配置你的 AI 模型 API Key。Key 将安全存储在系统钥匙串中。
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">服务提供商</label>
+            <select
+              className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+              value={form.providerId}
+              onChange={(e) => handleProviderChange(e.target.value)}
+            >
+              {PROVIDER_PRESETS.map(provider => (
+                <option key={provider.id} value={provider.id}>{provider.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">配置名称</label>
+            <Input
+              placeholder="例如：我的 GPT-4o"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Base URL</label>
+            <Input
+              placeholder="https://api.example.com/v1"
+              value={form.baseUrl}
+              onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">模型</label>
+            {selectedProvider.id === 'custom' || selectedProvider.models.length === 0 ? (
+              <Input
+                placeholder="例如：gpt-4o"
+                value={form.model}
+                onChange={(e) => setForm({ ...form, model: e.target.value })}
+              />
+            ) : (
+              <select
+                className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+                value={form.model}
+                onChange={(e) => setForm({ ...form, model: e.target.value })}
+              >
+                {selectedProvider.models.map(model => (
+                  <option key={model} value={model}>{model}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">API Key</label>
+            <Input
+              type="password"
+              placeholder={selectedProvider.apiKeyHint}
+              value={form.apiKey}
+              onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              {editingConfig ? '留空则不修改现有 API Key' : 'API Key 将加密存储在系统钥匙串中'}
+            </p>
+          </div>
+
+          {selectedProvider.docsUrl && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>获取 API Key：</span>
+              <a
+                href={selectedProvider.docsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-primary hover:underline"
+              >
+                {selectedProvider.name}
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            取消
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving || !form.providerId || !form.baseUrl || !form.model || (!form.apiKey && !editingConfig)}>
+            {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            {editingConfig ? '保存' : '添加'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

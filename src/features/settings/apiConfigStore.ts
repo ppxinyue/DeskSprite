@@ -4,16 +4,21 @@ import {
   insertApiConfig,
   deleteApiConfig,
   setDefaultApiConfig,
+  updateApiConfig,
 } from '@/lib/db';
 import {
   saveApiKey,
   deleteApiKey,
+  getApiKey,
 } from '@/lib/keychain';
 import { emit } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface ApiConfig {
   id: number;
   provider: string;
+  providerId: string | null;
+  name: string | null;
   baseUrl: string;
   model: string;
   keyringRef: string | null;
@@ -31,7 +36,18 @@ interface ApiConfigState {
     provider: string,
     baseUrl: string,
     model: string,
-    apiKey: string
+    apiKey: string,
+    name?: string,
+    providerId?: string
+  ) => Promise<void>;
+  updateConfig: (
+    id: number,
+    provider: string,
+    baseUrl: string,
+    model: string,
+    name: string,
+    providerId: string,
+    apiKey?: string
   ) => Promise<void>;
   removeConfig: (id: number, keyringRef: string | null) => Promise<void>;
   setDefault: (id: number) => Promise<void>;
@@ -49,6 +65,8 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
       configs: rows.map((r) => ({
         id: r.id,
         provider: r.provider,
+        providerId: r.provider_id,
+        name: r.name,
         baseUrl: r.base_url,
         model: r.model,
         keyringRef: r.keyring_ref,
@@ -65,10 +83,23 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
     }
   },
 
-  addConfig: async (provider, baseUrl, model, apiKey) => {
+  addConfig: async (provider, baseUrl, model, apiKey, name, providerId) => {
     const keyringRef = `api_key/${Date.now()}`;
     await saveApiKey(keyringRef, apiKey);
-    await insertApiConfig(provider, baseUrl, model, keyringRef, 0);
+    await insertApiConfig(provider, baseUrl, model, keyringRef, 0, name, providerId);
+    await get().loadConfigs();
+    await emit('api-config:changed', {});
+  },
+
+  updateConfig: async (id, provider, baseUrl, model, name, providerId, apiKey) => {
+    const config = get().configs.find((c) => c.id === id);
+    const keyringRef = config?.keyringRef ?? `api_key/${id}_${Date.now()}`;
+
+    if (apiKey && apiKey.length > 0) {
+      await saveApiKey(keyringRef, apiKey);
+    }
+
+    await updateApiConfig(id, provider, baseUrl, model, name, providerId);
     await get().loadConfigs();
     await emit('api-config:changed', {});
   },
