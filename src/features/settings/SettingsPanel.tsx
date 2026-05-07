@@ -104,6 +104,9 @@ export function SettingsPanel() {
           }}
           testResults={testResults}
           testingConfigId={testingConfigId}
+          isModalOpen={isModalOpen}
+          setIsModalOpen={setIsModalOpen}
+          editingConfig={editingConfig}
         />
       )}
       {activeSection === 'shortcuts' && (
@@ -613,6 +616,7 @@ function ImageSection() {
 function AISection({
   settings, updateSetting, systemPrompt, setSystemPrompt,
   configs, onAdd, onEdit, onDelete, onSetDefault, onTest, testResults, testingConfigId,
+  isModalOpen, setIsModalOpen, editingConfig,
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
@@ -626,6 +630,9 @@ function AISection({
   onTest: (id: number) => Promise<void>;
   testResults: Record<number, { success: boolean; message: string; latency?: number }>;
   testingConfigId: number | null;
+  isModalOpen: boolean;
+  setIsModalOpen: (v: boolean) => void;
+  editingConfig: ApiConfig | null;
 }) {
   return (
     <>
