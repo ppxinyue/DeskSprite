@@ -2,28 +2,37 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
-import { ChevronLeft, ChevronRight, ImagePlus, Maximize2, Mic } from "lucide-react";
+import { MessageCircle, Minus, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
 import { ChatDialog } from "@/features/chat/ChatDialog";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
-import { useChatStore } from "@/features/chat/chatStore";
 import { useSettingsStore } from "@/features/settings/settingsStore";
 import { getConversations, getSetting } from "@/lib/db";
-import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG } from "@/features/pet/animations";
+import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
 import "./index.css";
 
 const CHAT_HANDOFF_KEY = "desksprite:chat-handoff-conversation-id";
 const COMPACT_CHAT_KEY = "desksprite:compact-chat";
+const COMPACT_CHAT_DISMISSED_KEY = "desksprite:compact-chat-dismissed";
 const SCREEN_MARGIN = 16;
 const PET_CONTENT_MARGIN = 20;
 const MIN_DIALOG_WIDTH = 200;
 const MIN_DIALOG_HEIGHT = 90;
+const COMPACT_CHAT_SIDE_CHROME = 10;
+const COMPACT_CHAT_TOP_CHROME = 20;
+const COMPACT_CHAT_BOTTOM_CHROME = 10;
+const COMPACT_CHAT_PREFERRED_HEIGHT = 340;
 const CONTEXT_MENU_WIDTH = 112;
 const CONTEXT_SUBMENU_WIDTH = 170;
-const CONTEXT_MENU_HEIGHT = 180;
+const CONTEXT_MENU_HEIGHT = 204;
+const PET_RIGHT_EDGE_MENU_THRESHOLD = 0.62;
+
+function isCompactChatDismissed() {
+  return localStorage.getItem(COMPACT_CHAT_DISMISSED_KEY) === "1";
+}
 
 function App() {
   const [windowLabel, setWindowLabel] = useState<string>(() => getCurrentWindow().label);
@@ -32,6 +41,12 @@ function App() {
   useEffect(() => {
     const label = getCurrentWindow().label;
     setWindowLabel(label);
+    if (label === "chat") invoke("hide_compact_chat_window").catch(() => {});
+    if (label === "settings") {
+      localStorage.setItem(COMPACT_CHAT_DISMISSED_KEY, "1");
+      invoke("hide_compact_chat_window").catch(() => {});
+      emit("compact-chat:collapsed", {}).catch(() => {});
+    }
 
     loadSettings().then(async () => {
       for (const state of ALL_PET_STATES) {
@@ -39,16 +54,18 @@ function App() {
           const raw = await getSetting(`petMedia_${state}`);
           if (raw) {
             const parsed = JSON.parse(raw);
-            usePetStore.getState().setStateMediaConfig(state, { ...DEFAULT_MEDIA_CONFIG[state], ...parsed });
+            usePetStore.getState().setStateMediaConfig(state, normalizePetMediaConfig(state, parsed));
           }
         } catch { /* use default */ }
       }
     });
 
     if (label === "settings") {
+      document.title = "";
       document.body.classList.add("has-background");
     }
     if (label === "chat") {
+      document.title = "";
       document.body.classList.add("has-background");
     }
   }, []);
@@ -75,10 +92,31 @@ function App() {
 
   useEffect(() => {
     const unlisten = listen("settings:updated", () => {
+      if (windowLabel === "settings") return;
       loadSettings().catch(() => {});
     });
     return () => { unlisten.then(fn => fn()); };
-  }, [loadSettings]);
+  }, [loadSettings, windowLabel]);
+
+  useEffect(() => {
+    const reloadPetMedia = async () => {
+      const store = usePetStore.getState();
+      await store.loadUserFrames();
+      for (const state of ALL_PET_STATES) {
+        try {
+          const raw = await getSetting(`petMedia_${state}`);
+          const parsed = raw ? JSON.parse(raw) : {};
+          store.setStateMediaConfig(state, normalizePetMediaConfig(state, parsed));
+        } catch {
+          store.setStateMediaConfig(state, DEFAULT_MEDIA_CONFIG[state]);
+        }
+      }
+    };
+    const unlisten = listen("pet-media:changed", () => {
+      reloadPetMedia().catch((e) => console.warn("Failed to reload pet media:", e));
+    });
+    return () => { unlisten.then(fn => fn()); };
+  }, []);
 
   if (windowLabel === "settings") {
     return <TooltipProvider><SettingsPanel /></TooltipProvider>;
@@ -119,7 +157,8 @@ interface CompactChatSession {
 
 function CompactChatWindow() {
   const { settings } = useSettingsStore();
-  const [maxHeight, setMaxHeight] = useState(() => window.innerHeight);
+  const lastCompactHeightRef = useRef(0);
+  const [chatContentHeight, setChatContentHeight] = useState(MIN_DIALOG_HEIGHT - COMPACT_CHAT_TOP_CHROME - COMPACT_CHAT_BOTTOM_CHROME);
   const [session, setSession] = useState<CompactChatSession>(() => ({
     ...readCompactChatSession(),
     version: 0,
@@ -130,12 +169,6 @@ function CompactChatWindow() {
       conversationId,
     }));
     emit("compact-chat:conversation", { conversationId }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    const resize = () => setMaxHeight(window.innerHeight);
-    window.addEventListener("resize", resize);
-    return () => window.removeEventListener("resize", resize);
   }, []);
 
   useEffect(() => {
@@ -163,32 +196,90 @@ function CompactChatWindow() {
     };
   }, []);
 
+  const expandToStandaloneChat = useCallback(async () => {
+    if (session.conversationId) {
+      localStorage.setItem(CHAT_HANDOFF_KEY, String(session.conversationId));
+    } else {
+      localStorage.removeItem(CHAT_HANDOFF_KEY);
+    }
+    try {
+      await invoke("show_chat_window");
+      await emit("chat:open-conversation", { conversationId: session.conversationId });
+    } catch (e) {
+      console.warn("Failed to expand compact chat:", e);
+    }
+  }, [session.conversationId]);
+
+  const collapseCompactChat = useCallback(async () => {
+    localStorage.setItem(COMPACT_CHAT_DISMISSED_KEY, "1");
+    await invoke("hide_compact_chat_window").catch(() => {});
+    await emit("compact-chat:collapsed", {}).catch(() => {});
+  }, []);
+
+  const handleContentHeightChange = useCallback((contentHeight: number) => {
+    const nextContentHeight = Math.min(
+      Math.max(1, Math.ceil(contentHeight)),
+      COMPACT_CHAT_PREFERRED_HEIGHT,
+    );
+    const nextHeight = Math.min(
+      Math.max(MIN_DIALOG_HEIGHT, nextContentHeight + COMPACT_CHAT_TOP_CHROME + COMPACT_CHAT_BOTTOM_CHROME),
+      COMPACT_CHAT_PREFERRED_HEIGHT + COMPACT_CHAT_TOP_CHROME + COMPACT_CHAT_BOTTOM_CHROME,
+    );
+    setChatContentHeight((current) => (Math.abs(current - nextContentHeight) <= 2 ? current : nextContentHeight));
+    if (Math.abs(lastCompactHeightRef.current - nextHeight) <= 2) return;
+    lastCompactHeightRef.current = nextHeight;
+    invoke("resize_compact_chat_window", { height: nextHeight }).catch(() => {});
+  }, []);
+
+  const hoverFrameHeight = Math.max(
+    MIN_DIALOG_HEIGHT,
+    Math.min(
+      COMPACT_CHAT_PREFERRED_HEIGHT + COMPACT_CHAT_TOP_CHROME + COMPACT_CHAT_BOTTOM_CHROME,
+      chatContentHeight + COMPACT_CHAT_TOP_CHROME + COMPACT_CHAT_BOTTOM_CHROME,
+    ),
+  );
+
   return (
-    <div className="h-screen w-screen overflow-hidden bg-transparent p-0">
-      <ChatDialog
-        key={`${session.mode}-${session.conversationId ?? 'new'}-${session.version}`}
-        initialConversationId={session.conversationId}
-        initialMode={session.mode}
-        dialogOpacity={settings.petOpacity}
-        compactFontSize={settings.compactChatFontSize}
-        maxHeight={maxHeight}
-        onConversationChange={handleConversationChange}
-      />
+    <div className="group relative w-screen overflow-hidden bg-transparent p-0" style={{ height: hoverFrameHeight }}>
+      <div className="pointer-events-none absolute left-0 right-0 top-0 rounded-[6px] border border-foreground/0 bg-background/0 opacity-0 shadow-[0_8px_26px_rgba(42,38,31,0.08)] backdrop-blur-[2px] transition-all duration-200 group-hover:border-foreground/22 group-hover:bg-background/24 group-hover:opacity-100" style={{ height: hoverFrameHeight }} />
+      <div className="absolute right-1 top-1 z-30 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <MacControlButton title="收起" onClick={collapseCompactChat}>
+          <Minus className="h-2.5 w-2.5" />
+        </MacControlButton>
+        <MacControlButton title="放大到大聊天框" onClick={expandToStandaloneChat}>
+          <Maximize2 className="h-2.5 w-2.5" />
+        </MacControlButton>
+      </div>
+      <div className="absolute left-[10px] right-[10px] top-[20px]">
+        <ChatDialog
+          key={`${session.mode}-${session.conversationId ?? 'new'}-${session.version}`}
+          initialConversationId={session.conversationId}
+          initialMode={session.mode}
+          dialogOpacity={settings.petOpacity}
+          compactFontSize={settings.compactChatFontSize}
+          maxHeight={COMPACT_CHAT_PREFERRED_HEIGHT}
+          onContentHeightChange={handleContentHeightChange}
+          onConversationChange={handleConversationChange}
+        />
+      </div>
     </div>
   );
 }
 
 function PetWindow() {
   const { settings } = useSettingsStore();
-  const { dialogOpen, chatMode, chatConversationId, closeChat, openChat } = usePetStore();
+  const { dialogOpen, chatMode, chatConversationId, openChat, closeChat, petState, mediaConfig, userFrames, userGifs } = usePetStore();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [chatBurst, setChatBurst] = useState(false);
+  const [petHovering, setPetHovering] = useState(false);
+  const [compactVisible, setCompactVisible] = useState(false);
 
   const petSize = Math.round(150 * settings.petScale);
   const petImageWidth = Math.round(120 * settings.petScale);
   const petImageHeight = Math.round(150 * settings.petScale);
   const toolButtonSize = 28;
   const toolGap = 4;
-  const toolRowWidth = toolButtonSize * 4 + toolGap * 3;
+  const toolRowWidth = toolButtonSize + toolGap;
   const collapsedWidth = Math.max(
     220,
     petSize + 70,
@@ -203,8 +294,10 @@ function PetWindow() {
   const dragSessionRef = useRef<BoundedDragSession | null>(null);
   const dragFrameRef = useRef<number | null>(null);
   const pendingDragPointRef = useRef<{ screenX: number; screenY: number } | null>(null);
+  const lastDragPositionRef = useRef<{ left: number; top: number } | null>(null);
   const suppressMovedUntilRef = useRef(0);
   const compactConversationIdRef = useRef<number | null>(chatConversationId);
+  const compactDismissedRef = useRef(false);
   const applyLayoutState = useCallback((nextLayout: PetWindowLayout) => {
     layoutRef.current = nextLayout;
     setLayout(nextLayout);
@@ -214,20 +307,20 @@ function PetWindow() {
     layoutRef.current = layout;
   }, [layout]);
 
-  const requestLayout = useCallback(async (overrides: { dialogOpen?: boolean; contextMenuOpen?: boolean } = {}) => {
+  const requestLayout = useCallback(async (overrides: { contextMenuOpen?: boolean } = {}) => {
     const targetDialogOpen = false;
     const targetContextMenuOpen = overrides.contextMenuOpen ?? contextMenuOpen;
     layoutApplyingRef.current = true;
     try {
       await applyPetWindowLayout({
         dialogOpen: targetDialogOpen,
+        contextMenuOpen: targetContextMenuOpen,
         requestedDialogWidth: 300,
         petImageWidth,
         petImageHeight,
         toolRowWidth,
         collapsedWidth,
         collapsedHeight,
-        contextMenuOpen: targetContextMenuOpen,
         previousLayout: layoutRef.current,
         applyLayout: applyLayoutState,
       });
@@ -247,8 +340,10 @@ function PetWindow() {
     windowLeft?: number;
     windowTop?: number;
   }) => {
+    if (show && isCompactChatDismissed()) return;
     const geometry = await getCompactChatGeometry({
       requestedDialogWidth: settings.dialogWidth,
+      compact: compactConversationIdRef.current == null,
       petImageWidth,
       petImageHeight,
       layout: layoutRef.current,
@@ -259,16 +354,52 @@ function PetWindow() {
     await invoke(show ? "show_compact_chat_window" : "position_compact_chat_window", geometry);
   }, [settings.dialogWidth, petImageWidth, petImageHeight]);
 
+  const forceShowCompactChat = useCallback(async (mode: 'new' | 'history', conversationId: number | null = null) => {
+    compactDismissedRef.current = false;
+    localStorage.removeItem(COMPACT_CHAT_DISMISSED_KEY);
+    const payload = { mode, conversationId };
+    localStorage.setItem(COMPACT_CHAT_KEY, JSON.stringify(payload));
+    await positionCompactChatWindow({ show: true });
+    await emit("compact-chat:open", payload);
+    setChatBurst(true);
+    window.setTimeout(() => setChatBurst(false), 360);
+  }, [positionCompactChatWindow]);
+
+  useEffect(() => {
+    const config = mediaConfig[petState] ?? DEFAULT_MEDIA_CONFIG[petState];
+    const activeSources = getPetFrameSources(config, userFrames[petState], userGifs[petState]);
+    const iconPath = activeSources.find((path) => !isGifAsset(path)) ?? DEFAULT_MEDIA_CONFIG.idle.defaultAssets[0];
+    invoke("set_app_icon", { path: iconPath }).catch((e) => console.warn("Failed to set app icon:", e));
+  }, [mediaConfig, petState, userFrames, userGifs]);
+
   useEffect(() => {
     const unlisten = listen<{ conversationId: number | null }>("compact-chat:conversation", ({ payload }) => {
       compactConversationIdRef.current = payload.conversationId ?? null;
+      if (dialogOpen && !compactDismissedRef.current && !isCompactChatDismissed()) {
+        positionCompactChatWindow({ show: false }).catch(() => {});
+      }
     });
     return () => { unlisten.then((fn) => fn()); };
-  }, []);
+  }, [dialogOpen, positionCompactChatWindow]);
+
+  useEffect(() => {
+    const unlisten = listen("compact-chat:collapsed", () => {
+      compactDismissedRef.current = true;
+      setCompactVisible(false);
+      localStorage.setItem(COMPACT_CHAT_DISMISSED_KEY, "1");
+      closeChat();
+      invoke("hide_compact_chat_window").catch(() => {});
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [closeChat]);
 
   useEffect(() => {
     compactConversationIdRef.current = chatConversationId;
     if (!dialogOpen) {
+      invoke("hide_compact_chat_window").catch(() => {});
+      return;
+    }
+    if (compactDismissedRef.current || isCompactChatDismissed()) {
       invoke("hide_compact_chat_window").catch(() => {});
       return;
     }
@@ -281,11 +412,23 @@ function PetWindow() {
 
   useEffect(() => {
     if (!dialogOpen) return;
+    if (compactDismissedRef.current || isCompactChatDismissed()) return;
     positionCompactChatWindow({ show: false }).catch(() => {});
   }, [settings.dialogWidth, settings.compactChatFontSize, dialogOpen, positionCompactChatWindow]);
 
   useEffect(() => {
-    requestLayout({ dialogOpen: false, contextMenuOpen }).catch(() => {});
+    const unlisten = listen<{ mode: 'new' | 'history'; conversationId: number | null }>("pet:force-open-chat", ({ payload }) => {
+      compactDismissedRef.current = false;
+      setCompactVisible(true);
+      localStorage.removeItem(COMPACT_CHAT_DISMISSED_KEY);
+      openChat(payload.mode, payload.conversationId ?? null);
+      forceShowCompactChat(payload.mode, payload.conversationId ?? null).catch((e) => console.warn("Failed to force open compact chat:", e));
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [forceShowCompactChat, openChat]);
+
+  useEffect(() => {
+    requestLayout({ contextMenuOpen }).catch(() => {});
   }, [contextMenuOpen, requestLayout]);
 
   useEffect(() => {
@@ -298,7 +441,7 @@ function PetWindow() {
       movedTimerRef.current = window.setTimeout(() => {
         setDragging(false);
         requestLayout();
-        if (dialogOpen) positionCompactChatWindow({ show: false }).catch(() => {});
+        if (dialogOpen && !compactDismissedRef.current && !isCompactChatDismissed()) positionCompactChatWindow({ show: false }).catch(() => {});
       }, 220);
     });
     return () => {
@@ -387,6 +530,8 @@ function PetWindow() {
             } catch (e) {
               console.warn('Failed to play wake sound:', e);
             }
+
+            if (compactDismissedRef.current || isCompactChatDismissed()) return;
 
             // Open chat
             invoke('show_compact_chat_window', { x: 0, y: 0, w: 300, h: 400 })
@@ -499,10 +644,14 @@ function PetWindow() {
         startScreenY: point.screenY,
         startWindowLeft: position.x / scale,
         startWindowTop: position.y / scale,
-        minWindowLeft: safeLeft,
-        maxWindowLeft: Math.max(safeLeft, safeRight - layout.windowWidth),
-        minWindowTop: safeTop,
-        maxWindowTop: Math.max(safeTop, safeBottom - layout.windowHeight),
+        minWindowLeft: safeLeft - layout.petLeft,
+        maxWindowLeft: Math.max(safeLeft - layout.petLeft, safeRight - petImageWidth - layout.petLeft),
+        minWindowTop: safeTop - layout.petTop,
+        maxWindowTop: Math.max(safeTop - layout.petTop, safeBottom - petImageHeight - layout.petTop),
+      };
+      lastDragPositionRef.current = {
+        left: position.x / scale,
+        top: position.y / scale,
       };
     } catch (e) {
       console.warn("Failed to start bounded pet drag:", e);
@@ -527,9 +676,12 @@ function PetWindow() {
         session.minWindowTop,
         session.maxWindowTop,
       );
+      const last = lastDragPositionRef.current;
+      if (last && Math.abs(last.left - nextLeft) < 0.5 && Math.abs(last.top - nextTop) < 0.5) return;
+      lastDragPositionRef.current = { left: nextLeft, top: nextTop };
       suppressMovedUntilRef.current = Date.now() + 180;
       getCurrentWindow().setPosition(new LogicalPosition(nextLeft, nextTop)).catch(() => {});
-      if (dialogOpen) {
+      if (dialogOpen && !compactDismissedRef.current && !isCompactChatDismissed()) {
         positionCompactChatWindow({ show: false, windowLeft: nextLeft, windowTop: nextTop }).catch(() => {});
       }
     });
@@ -538,6 +690,7 @@ function PetWindow() {
   const handleBoundedDragEnd = () => {
     dragSessionRef.current = null;
     pendingDragPointRef.current = null;
+    lastDragPositionRef.current = null;
     suppressMovedUntilRef.current = Date.now() + 800;
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
     setDragging(false);
@@ -548,35 +701,34 @@ function PetWindow() {
       const [latest] = await getConversations();
       if (latest) {
         openChat('history', latest.id);
+        await forceShowCompactChat('history', latest.id);
+        setCompactVisible(true);
         return;
       }
     } catch (e) {
       console.warn('Failed to open latest chat:', e);
     }
     openChat('new');
+    await forceShowCompactChat('new', null);
+    setCompactVisible(true);
   };
 
-  const expandToStandaloneChat = async () => {
-    const id = compactConversationIdRef.current ?? getChatConversationIdForHandoff(chatConversationId);
-    if (id) {
-      localStorage.setItem(CHAT_HANDOFF_KEY, String(id));
-    } else {
-      localStorage.removeItem(CHAT_HANDOFF_KEY);
-    }
-    closeChat();
-    try {
-      await invoke("show_chat_window");
-      await emit("chat:open-conversation", { conversationId: id });
-    } catch (e) {
-      console.warn("Failed to expand chat window:", e);
-    }
-  };
+  const refreshCompactVisibility = useCallback(() => {
+    invoke<boolean>("is_compact_chat_visible")
+      .then(setCompactVisible)
+      .catch(() => setCompactVisible(false));
+  }, []);
 
   return (
     <TooltipProvider>
       <div className="fixed inset-0 overflow-hidden" style={{ background: 'transparent' }}>
         <div
-          className="absolute flex flex-col items-start"
+          className="group absolute flex flex-col items-start"
+          onMouseEnter={() => {
+            setPetHovering(true);
+            refreshCompactVisibility();
+          }}
+          onMouseLeave={() => setPetHovering(false)}
           style={{
             left: 0,
             top: 0,
@@ -611,28 +763,14 @@ function PetWindow() {
             <FloatingToolButton
               muted
               opacity={settings.petOpacity}
-              title={dialogOpen ? "收起对话" : "展开对话"}
+              visible={petHovering && !compactVisible}
+              title="打开对话"
               onClick={() => {
-                if (dialogOpen) {
-                  closeChat();
-                } else openLatestChat();
+                openLatestChat();
               }}
             >
-              {dialogOpen ? <ChevronLeft className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              <MessageCircle className={`h-3.5 w-3.5 ${chatBurst ? "animate-chat-pop" : ""}`} />
             </FloatingToolButton>
-            {dialogOpen && (
-              <>
-                <FloatingToolButton muted opacity={settings.petOpacity} title="图片输入" onClick={() => emit("compact-chat:image").catch(() => {})}>
-                  <ImagePlus className="h-3.5 w-3.5" />
-                </FloatingToolButton>
-                <FloatingToolButton muted opacity={settings.petOpacity} title="语音输入" onClick={() => emit("compact-chat:voice").catch(() => {})}>
-                  <Mic className="h-3.5 w-3.5" />
-                </FloatingToolButton>
-                <FloatingToolButton muted opacity={settings.petOpacity} title="放大" onClick={expandToStandaloneChat}>
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </FloatingToolButton>
-              </>
-            )}
           </div>
 
         </div>
@@ -644,12 +782,14 @@ function PetWindow() {
 function FloatingToolButton({
   muted = false,
   opacity = 1,
+  visible = false,
   title,
   onClick,
   children,
 }: {
   muted?: boolean;
   opacity?: number;
+  visible?: boolean;
   title: string;
   onClick?: () => void;
   children: React.ReactNode;
@@ -665,13 +805,34 @@ function FloatingToolButton({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`h-7 w-7 rounded-[8px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] p-0 text-[var(--color-chat-muted)] shadow-none transition-all hover:bg-[color-mix(in_srgb,var(--color-chat-text)_8%,transparent)] hover:text-[var(--color-chat-text)] ${
+      className={`h-5 w-5 rounded-full border border-border/70 bg-background/95 p-0 text-muted-foreground shadow-sm transition-all hover:text-foreground ${
         muted ? "saturate-0 hover:saturate-100" : ""
       }`}
-      style={{ opacity: muted && !hovered ? opacity * 0.42 : opacity }}
+      style={{ opacity: visible || hovered ? opacity : 0, transform: visible || hovered ? 'scale(1)' : 'scale(0.86)' }}
     >
       {children}
     </Button>
+  );
+}
+
+function MacControlButton({
+  title,
+  onClick,
+  children,
+}: {
+  title: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/80 bg-background/95 text-muted-foreground shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:scale-110 hover:bg-muted hover:text-foreground active:translate-y-0 active:scale-95"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -696,11 +857,6 @@ function readCompactChatSession(): { mode: 'new' | 'history'; conversationId: nu
   } catch {
     return { mode: 'new', conversationId: null };
   }
-}
-
-function getChatConversationIdForHandoff(storeConversationId: number | null): number | null {
-  const current = useChatStore.getState().currentConversationId ?? usePetStore.getState().chatConversationId ?? storeConversationId;
-  return current && current > 0 ? current : null;
 }
 
 interface PetWindowLayout {
@@ -729,6 +885,7 @@ interface BoundedDragSession {
 
 async function getCompactChatGeometry({
   requestedDialogWidth,
+  compact,
   petImageWidth,
   petImageHeight,
   layout,
@@ -736,6 +893,7 @@ async function getCompactChatGeometry({
   windowTop,
 }: {
   requestedDialogWidth: number;
+  compact?: boolean;
   petImageWidth: number;
   petImageHeight: number;
   layout: PetWindowLayout;
@@ -762,31 +920,35 @@ async function getCompactChatGeometry({
   const baseWindowTop = windowTop ?? (position ? position.y / scale : safeTop);
   const petX = baseWindowLeft + layout.petLeft;
   const petY = baseWindowTop + layout.petTop;
-  const width = clamp(requestedDialogWidth, MIN_DIALOG_WIDTH, Math.max(MIN_DIALOG_WIDTH, safeRight - safeLeft));
+  const contentWidth = clamp(requestedDialogWidth, MIN_DIALOG_WIDTH, Math.max(MIN_DIALOG_WIDTH, safeRight - safeLeft - COMPACT_CHAT_SIDE_CHROME * 2));
+  const outerWidth = contentWidth + COMPACT_CHAT_SIDE_CHROME * 2;
   const availableBelow = safeBottom - (petY + petImageHeight + 12);
-  const belowHeight = Math.min(width, Math.max(0, availableBelow));
+  const outerChromeY = COMPACT_CHAT_TOP_CHROME + COMPACT_CHAT_BOTTOM_CHROME;
+  const preferredContentHeight = compact ? 128 : COMPACT_CHAT_PREFERRED_HEIGHT;
+  const preferredOuterHeight = preferredContentHeight + outerChromeY;
+  const belowHeight = Math.min(preferredOuterHeight, Math.max(0, availableBelow));
 
-  if (belowHeight >= MIN_DIALOG_HEIGHT) {
+  if (belowHeight >= MIN_DIALOG_HEIGHT + outerChromeY) {
     return {
-      x: clamp(petX, safeLeft, Math.max(safeLeft, safeRight - width)),
+      x: clamp(petX - COMPACT_CHAT_SIDE_CHROME, safeLeft, Math.max(safeLeft, safeRight - outerWidth)),
       y: petY + petImageHeight + 12,
-      w: width,
-      h: Math.max(MIN_DIALOG_HEIGHT, belowHeight),
+      w: outerWidth,
+      h: Math.max(MIN_DIALOG_HEIGHT + outerChromeY, belowHeight),
     };
   }
 
   const height = Math.max(
-    MIN_DIALOG_HEIGHT,
-    Math.min(width, Math.max(MIN_DIALOG_HEIGHT, safeBottom - safeTop)),
+    MIN_DIALOG_HEIGHT + outerChromeY,
+    Math.min(preferredOuterHeight, Math.max(MIN_DIALOG_HEIGHT + outerChromeY, safeBottom - safeTop)),
   );
-  const canPlaceRight = petX + petImageWidth + 12 + width <= safeRight;
+  const canPlaceRight = petX + petImageWidth + 12 + outerWidth <= safeRight;
   const x = canPlaceRight
     ? petX + petImageWidth + 12
-    : petX - width - 12;
+    : petX - outerWidth - 12;
   return {
-    x: clamp(x, safeLeft, Math.max(safeLeft, safeRight - width)),
+    x: clamp(x, safeLeft, Math.max(safeLeft, safeRight - outerWidth)),
     y: clamp(petY, safeTop, Math.max(safeTop, safeBottom - height)),
-    w: width,
+    w: outerWidth,
     h: height,
   };
 }
@@ -808,13 +970,13 @@ function createDefaultPetWindowLayout(width: number, height: number): PetWindowL
 
 async function applyPetWindowLayout({
   dialogOpen,
+  contextMenuOpen,
   requestedDialogWidth,
   petImageWidth,
   petImageHeight,
   toolRowWidth,
   collapsedWidth,
   collapsedHeight,
-  contextMenuOpen,
   previousLayout,
   applyLayout,
 }: {
@@ -825,9 +987,9 @@ async function applyPetWindowLayout({
   toolRowWidth: number;
   collapsedWidth: number;
   collapsedHeight: number;
-  contextMenuOpen: boolean;
   previousLayout: PetWindowLayout;
   applyLayout: (layout: PetWindowLayout) => void;
+  contextMenuOpen: boolean;
 }) {
   try {
     const win = getCurrentWindow();
@@ -865,53 +1027,40 @@ async function applyPetWindowLayout({
     );
 
     let layout: PetWindowLayout;
-    if (!dialogOpen && !contextMenuOpen) {
+    if (!dialogOpen) {
+      const menuWindowWidth = contextMenuOpen
+        ? Math.min(
+            maxWindowWidth,
+            Math.max(
+              collapsedWidth,
+              petImageWidth + 8 + CONTEXT_MENU_WIDTH + CONTEXT_SUBMENU_WIDTH + PET_CONTENT_MARGIN * 2,
+            ),
+          )
+        : collapsedWidth;
+      const menuWindowHeight = contextMenuOpen
+        ? Math.min(
+            maxWindowHeight,
+            Math.max(collapsedHeight, petImageHeight + PET_CONTENT_MARGIN * 2, CONTEXT_MENU_HEIGHT + PET_CONTENT_MARGIN * 2),
+          )
+        : collapsedHeight;
+      const petNearRightEdge = contextMenuOpen && safePetX > safeLeft + (safeRight - safeLeft) * PET_RIGHT_EDGE_MENU_THRESHOLD;
+      const petLeft = petNearRightEdge
+        ? Math.max(PET_CONTENT_MARGIN, menuWindowWidth - petImageWidth - PET_CONTENT_MARGIN)
+        : PET_CONTENT_MARGIN;
+      const toolsFitRight = petLeft + petImageWidth + 8 + toolRowWidth <= menuWindowWidth - PET_CONTENT_MARGIN;
       layout = {
-        windowWidth: collapsedWidth,
-        windowHeight: collapsedHeight,
-        petLeft: PET_CONTENT_MARGIN,
+        windowWidth: menuWindowWidth,
+        windowHeight: menuWindowHeight,
+        petLeft,
         petTop: PET_CONTENT_MARGIN,
         dialogLeft: PET_CONTENT_MARGIN,
         dialogTop: PET_CONTENT_MARGIN,
         dialogWidth: requestedDialogWidth,
         dialogMaxHeight: requestedDialogWidth,
-        toolsLeft: PET_CONTENT_MARGIN + petImageWidth + 8,
-        toolsTop: PET_CONTENT_MARGIN + petImageHeight - 28,
-      };
-    } else if (!dialogOpen && contextMenuOpen) {
-      const menuWindowWidth = Math.min(
-        maxWindowWidth,
-        Math.max(
-          collapsedWidth,
-          petImageWidth + 8 + CONTEXT_MENU_WIDTH + CONTEXT_SUBMENU_WIDTH + PET_CONTENT_MARGIN * 2,
-        ),
-      );
-      const menuWindowHeight = Math.min(
-        maxWindowHeight,
-        Math.max(collapsedHeight, petImageHeight + PET_CONTENT_MARGIN * 2, CONTEXT_MENU_HEIGHT + PET_CONTENT_MARGIN * 2),
-      );
-      const placeRight = safePetX - PET_CONTENT_MARGIN + menuWindowWidth <= safeRight;
-      const placeBelow = safePetY - PET_CONTENT_MARGIN + menuWindowHeight <= safeBottom;
-      const petLeft = placeRight
-        ? PET_CONTENT_MARGIN
-        : Math.max(PET_CONTENT_MARGIN, menuWindowWidth - petImageWidth - PET_CONTENT_MARGIN);
-      const petTop = placeBelow
-        ? PET_CONTENT_MARGIN
-        : Math.max(PET_CONTENT_MARGIN, menuWindowHeight - petImageHeight - PET_CONTENT_MARGIN);
-
-      layout = {
-        windowWidth: menuWindowWidth,
-        windowHeight: menuWindowHeight,
-        petLeft,
-        petTop,
-        dialogLeft: PET_CONTENT_MARGIN,
-        dialogTop: PET_CONTENT_MARGIN,
-        dialogWidth: requestedDialogWidth,
-        dialogMaxHeight: requestedDialogWidth,
-        toolsLeft: placeRight
+        toolsLeft: toolsFitRight
           ? petLeft + petImageWidth + 8
           : Math.max(PET_CONTENT_MARGIN, petLeft - toolRowWidth - 8),
-        toolsTop: petTop + petImageHeight - 28,
+        toolsTop: PET_CONTENT_MARGIN + petImageHeight - 28,
       };
     } else {
       const maxDialogWidth = Math.max(MIN_DIALOG_WIDTH, maxWindowWidth - PET_CONTENT_MARGIN * 2);

@@ -1,40 +1,105 @@
-import Database from '@tauri-apps/plugin-sql';
+type ApiConfigRow = {
+  id: number;
+  provider: string;
+  base_url: string;
+  model: string;
+  keyring_ref: string | null;
+  is_default: number;
+  last_used_at: string | null;
+  usage_count: number;
+  created_at: string;
+  name: string | null;
+  provider_id: string | null;
+  api_key: string | null;
+};
 
-let db: Database | null = null;
+type ConversationRow = {
+  id: number;
+  title: string | null;
+  model_id: number | null;
+  started_at: string;
+  updated_at: string;
+};
 
-async function getDb(): Promise<Database> {
-  if (!db) {
-    db = await Database.load('sqlite:desksprite.db');
+type MessageRow = {
+  id: number;
+  conversation_id: number;
+  role: string;
+  content: string;
+  image_path: string | null;
+  tokens_used: number | null;
+  timestamp: string;
+};
+
+type Store = {
+  apiConfigs: ApiConfigRow[];
+  systemPrompt: string;
+  conversations: ConversationRow[];
+  messages: MessageRow[];
+  settings: Record<string, string>;
+  usageLogs: Array<Record<string, unknown>>;
+  nextIds: {
+    apiConfig: number;
+    conversation: number;
+    message: number;
+    usageLog: number;
+  };
+};
+
+const STORE_KEY = 'desksprite:electron-db:v1';
+
+function now() {
+  return new Date().toISOString();
+}
+
+function createStore(): Store {
+  return {
+    apiConfigs: [],
+    systemPrompt: '',
+    conversations: [],
+    messages: [],
+    settings: {},
+    usageLogs: [],
+    nextIds: {
+      apiConfig: 1,
+      conversation: 1,
+      message: 1,
+      usageLog: 1,
+    },
+  };
+}
+
+function loadStore(): Store {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return createStore();
+    return { ...createStore(), ...JSON.parse(raw) };
+  } catch {
+    return createStore();
   }
-  return db;
 }
 
-export async function query<T>(sql: string, values?: unknown[]): Promise<T[]> {
-  const database = await getDb();
-  return database.select<T[]>(sql, values ?? []);
+function saveStore(store: Store) {
+  localStorage.setItem(STORE_KEY, JSON.stringify(store));
 }
 
-export async function execute(sql: string, values?: unknown[]): Promise<void> {
-  const database = await getDb();
-  await database.execute(sql, values ?? []);
+function mutate<T>(fn: (store: Store) => T): T {
+  const store = loadStore();
+  const result = fn(store);
+  saveStore(store);
+  return result;
 }
 
-// api_configs
+export async function query<T>(_sql: string, _values?: unknown[]): Promise<T[]> {
+  throw new Error('Raw SQL query is not available in the Electron storage adapter.');
+}
+
+export async function execute(_sql: string, _values?: unknown[]): Promise<void> {
+  throw new Error('Raw SQL execute is not available in the Electron storage adapter.');
+}
+
 export async function getApiConfigs() {
-  return query<{
-    id: number;
-    provider: string;
-    base_url: string;
-    model: string;
-    keyring_ref: string | null;
-    is_default: number;
-    last_used_at: string | null;
-    usage_count: number;
-    created_at: string;
-    name: string | null;
-    provider_id: string | null;
-    api_key: string | null;
-  }>('SELECT * FROM api_configs ORDER BY created_at DESC');
+  return loadStore().apiConfigs.slice().sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export async function insertApiConfig(
@@ -45,12 +110,26 @@ export async function insertApiConfig(
   isDefault = 0,
   name?: string,
   providerId?: string,
-  apiKey?: string | null
+  apiKey?: string | null,
 ) {
-  return execute(
-    'INSERT INTO api_configs (provider, base_url, model, keyring_ref, is_default, name, provider_id, api_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [provider, baseUrl, model, keyringRef, isDefault, name ?? null, providerId ?? null, apiKey ?? null]
-  );
+  mutate((store) => {
+    if (isDefault) store.apiConfigs.forEach((config) => { config.is_default = 0; });
+    store.apiConfigs.push({
+      id: store.nextIds.apiConfig,
+      provider,
+      base_url: baseUrl,
+      model,
+      keyring_ref: keyringRef,
+      is_default: isDefault,
+      last_used_at: null,
+      usage_count: 0,
+      created_at: now(),
+      name: name ?? null,
+      provider_id: providerId ?? null,
+      api_key: apiKey ?? null,
+    });
+    store.nextIds.apiConfig += 1;
+  });
 }
 
 export async function updateApiConfig(
@@ -61,78 +140,74 @@ export async function updateApiConfig(
   name: string,
   providerId: string,
   keyringRef: string | null,
-  apiKey?: string | null
+  apiKey?: string | null,
 ) {
-  if (apiKey === undefined) {
-    return execute(
-      'UPDATE api_configs SET provider = ?, base_url = ?, model = ?, name = ?, provider_id = ?, keyring_ref = ? WHERE id = ?',
-      [provider, baseUrl, model, name, providerId, keyringRef, id]
-    );
-  }
-  return execute(
-    'UPDATE api_configs SET provider = ?, base_url = ?, model = ?, name = ?, provider_id = ?, keyring_ref = ?, api_key = ? WHERE id = ?',
-    [provider, baseUrl, model, name, providerId, keyringRef, apiKey, id]
-  );
+  mutate((store) => {
+    const config = store.apiConfigs.find((item) => item.id === id);
+    if (!config) return;
+    config.provider = provider;
+    config.base_url = baseUrl;
+    config.model = model;
+    config.name = name;
+    config.provider_id = providerId;
+    config.keyring_ref = keyringRef;
+    if (apiKey !== undefined) config.api_key = apiKey;
+  });
 }
 
 export async function deleteApiConfig(id: number) {
-  return execute('DELETE FROM api_configs WHERE id = ?', [id]);
+  mutate((store) => {
+    store.apiConfigs = store.apiConfigs.filter((config) => config.id !== id);
+  });
 }
 
 export async function setDefaultApiConfig(id: number) {
-  await execute('UPDATE api_configs SET is_default = 0');
-  return execute('UPDATE api_configs SET is_default = 1 WHERE id = ?', [id]);
+  mutate((store) => {
+    store.apiConfigs.forEach((config) => {
+      config.is_default = config.id === id ? 1 : 0;
+    });
+  });
 }
 
-// system_prompts
 export async function getSystemPrompt() {
-  const rows = await query<{ prompt_text: string }>(
-    'SELECT prompt_text FROM system_prompts WHERE id = 1'
-  );
-  return rows[0]?.prompt_text ?? '';
+  return loadStore().systemPrompt;
 }
 
 export async function updateSystemPrompt(text: string) {
-  return execute(
-    'UPDATE system_prompts SET prompt_text = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 1',
-    [text]
-  );
+  mutate((store) => {
+    store.systemPrompt = text;
+  });
 }
 
-// conversations
 export async function getConversations() {
-  return query<{
-    id: number;
-    title: string | null;
-    model_id: number | null;
-    started_at: string;
-    updated_at: string;
-  }>('SELECT * FROM conversations ORDER BY updated_at DESC');
+  return loadStore().conversations.slice().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
 
 export async function createConversation(title?: string, modelId?: number) {
-  return execute(
-    'INSERT INTO conversations (title, model_id) VALUES (?, ?)',
-    [title ?? null, modelId ?? null]
-  );
+  mutate((store) => {
+    const createdAt = now();
+    store.conversations.push({
+      id: store.nextIds.conversation,
+      title: title ?? null,
+      model_id: modelId ?? null,
+      started_at: createdAt,
+      updated_at: createdAt,
+    });
+    store.nextIds.conversation += 1;
+  });
 }
 
 export async function deleteConversation(id: number) {
-  await execute('DELETE FROM messages WHERE conversation_id = ?', [id]);
-  return execute('DELETE FROM conversations WHERE id = ?', [id]);
+  mutate((store) => {
+    store.messages = store.messages.filter((message) => message.conversation_id !== id);
+    store.conversations = store.conversations.filter((conversation) => conversation.id !== id);
+  });
 }
 
-// messages
 export async function getMessages(conversationId: number) {
-  return query<{
-    id: number;
-    conversation_id: number;
-    role: string;
-    content: string;
-    image_path: string | null;
-    tokens_used: number | null;
-    timestamp: string;
-  }>('SELECT * FROM messages WHERE conversation_id = ? ORDER BY timestamp ASC', [conversationId]);
+  return loadStore().messages
+    .filter((message) => message.conversation_id === conversationId)
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 }
 
 export async function insertMessage(
@@ -140,19 +215,25 @@ export async function insertMessage(
   role: string,
   content: string,
   imagePath?: string,
-  tokensUsed?: number
+  tokensUsed?: number,
 ) {
-  await execute(
-    'INSERT INTO messages (conversation_id, role, content, image_path, tokens_used) VALUES (?, ?, ?, ?, ?)',
-    [conversationId, role, content, imagePath ?? null, tokensUsed ?? null]
-  );
-  return execute(
-    'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [conversationId]
-  );
+  mutate((store) => {
+    const timestamp = now();
+    store.messages.push({
+      id: store.nextIds.message,
+      conversation_id: conversationId,
+      role,
+      content,
+      image_path: imagePath ?? null,
+      tokens_used: tokensUsed ?? null,
+      timestamp,
+    });
+    store.nextIds.message += 1;
+    const conversation = store.conversations.find((item) => item.id === conversationId);
+    if (conversation) conversation.updated_at = timestamp;
+  });
 }
 
-// ai_usage_logs
 export async function insertUsageLog(
   configId: number | null,
   conversationId: number | null,
@@ -161,30 +242,36 @@ export async function insertUsageLog(
   model: string,
   inputTokens: number,
   outputTokens: number,
-  costEstimate: number
+  costEstimate: number,
 ) {
-  return execute(
-    'INSERT INTO ai_usage_logs (config_id, conversation_id, message_id, type, model, input_tokens, output_tokens, cost_estimate) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [configId, conversationId, messageId, type, model, inputTokens, outputTokens, costEstimate]
-  );
+  mutate((store) => {
+    store.usageLogs.push({
+      id: store.nextIds.usageLog,
+      config_id: configId,
+      conversation_id: conversationId,
+      message_id: messageId,
+      type,
+      model,
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cost_estimate: costEstimate,
+      created_at: now(),
+    });
+    store.nextIds.usageLog += 1;
+  });
 }
 
-// settings
 export async function getSetting(key: string): Promise<string | null> {
-  const rows = await query<{ value: string }>(
-    'SELECT value FROM settings WHERE key = ?',
-    [key]
-  );
-  return rows[0]?.value ?? null;
+  return loadStore().settings[key] ?? null;
 }
 
 export async function setSetting(key: string, value: string) {
-  return execute(
-    'INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)',
-    [key, value]
-  );
+  mutate((store) => {
+    store.settings[key] = value;
+  });
 }
 
 export async function getAllSettings() {
-  return query<{ key: string; value: string }>('SELECT key, value FROM settings');
+  const settings = loadStore().settings;
+  return Object.entries(settings).map(([key, value]) => ({ key, value }));
 }

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { PetState, PetMediaConfig, PetStateMediaConfig } from './animations';
-import { DEFAULT_MEDIA_CONFIG } from './animations';
+import { DEFAULT_MEDIA_CONFIG, isGifAsset } from './animations';
 
 interface PetStore {
   petState: PetState;
@@ -11,6 +11,11 @@ interface PetStore {
   chatConversationId: number | null;
   mediaConfig: PetMediaConfig;
   userFrames: {
+    idle: string[];
+    thinking: string[];
+    sleeping: string[];
+  };
+  userGifs: {
     idle: string[];
     thinking: string[];
     sleeping: string[];
@@ -27,7 +32,9 @@ interface PetStore {
   resetMediaConfig: () => void;
   loadUserFrames: () => Promise<void>;
   addUserFrame: (state: PetState, path: string) => void;
+  addUserGif: (state: PetState, path: string) => void;
   removeUserFrame: (state: PetState, path: string) => void;
+  removeUserGif: (state: PetState, path: string) => void;
 }
 
 export const usePetStore = create<PetStore>((set) => ({
@@ -39,6 +46,11 @@ export const usePetStore = create<PetStore>((set) => ({
   chatConversationId: null,
   mediaConfig: DEFAULT_MEDIA_CONFIG,
   userFrames: {
+    idle: [],
+    thinking: [],
+    sleeping: [],
+  },
+  userGifs: {
     idle: [],
     thinking: [],
     sleeping: [],
@@ -68,12 +80,14 @@ export const usePetStore = create<PetStore>((set) => ({
       })
     );
     const userFrames: Record<PetState, string[]> = { idle: [], thinking: [], sleeping: [] };
+    const userGifs: Record<PetState, string[]> = { idle: [], thinking: [], sleeping: [] };
     for (const result of results) {
       if (result.status === 'fulfilled') {
-        userFrames[result.value.state] = result.value.paths;
+        userFrames[result.value.state] = result.value.paths.filter((path) => !isGifAsset(path));
+        userGifs[result.value.state] = result.value.paths.filter(isGifAsset);
       }
     }
-    set({ userFrames });
+    set({ userFrames, userGifs });
   },
   addUserFrame: (state, path) =>
     set((s) => ({
@@ -82,11 +96,25 @@ export const usePetStore = create<PetStore>((set) => ({
         [state]: [...s.userFrames[state], path],
       },
     })),
+  addUserGif: (state, path) =>
+    set((s) => ({
+      userGifs: {
+        ...s.userGifs,
+        [state]: [...s.userGifs[state], path],
+      },
+    })),
   removeUserFrame: (state, path) =>
     set((s) => ({
       userFrames: {
         ...s.userFrames,
         [state]: s.userFrames[state].filter((p) => p !== path),
+      },
+    })),
+  removeUserGif: (state, path) =>
+    set((s) => ({
+      userGifs: {
+        ...s.userGifs,
+        [state]: s.userGifs[state].filter((p) => p !== path),
       },
     })),
 }));

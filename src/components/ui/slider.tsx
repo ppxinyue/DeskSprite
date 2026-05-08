@@ -1,5 +1,4 @@
 import * as React from "react"
-import { Slider as SliderPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
@@ -9,52 +8,46 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  step = 1,
+  disabled,
+  onValueChange,
   ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const _values = React.useMemo(
-    () =>
-      Array.isArray(value)
-        ? value
-        : Array.isArray(defaultValue)
-          ? defaultValue
-          : [min, max],
-    [value, defaultValue, min, max]
-  )
+}: Omit<React.ComponentProps<"input">, "defaultValue" | "onChange" | "type" | "value"> & {
+  defaultValue?: number[];
+  value?: number[];
+  min?: number;
+  max?: number;
+  step?: number;
+  disabled?: boolean;
+  onValueChange?: (value: number[]) => void;
+}) {
+  const currentValue = Array.isArray(value)
+    ? value[0]
+    : Array.isArray(defaultValue)
+      ? defaultValue[0]
+      : min;
+  const percent = ((Number(currentValue) - Number(min)) / (Number(max) - Number(min))) * 100;
 
   return (
-    <SliderPrimitive.Root
+    <input
+      type="range"
       data-slot="slider"
-      defaultValue={defaultValue}
-      value={value}
+      defaultValue={Array.isArray(defaultValue) ? defaultValue[0] : undefined}
+      value={currentValue}
       min={min}
       max={max}
+      step={step}
+      disabled={disabled}
       className={cn(
-        "relative flex w-full touch-none items-center select-none data-[disabled]:opacity-50 data-[orientation=vertical]:h-full data-[orientation=vertical]:min-h-44 data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col",
+        "desk-slider h-7 w-full min-w-0 cursor-pointer appearance-none bg-transparent disabled:cursor-not-allowed disabled:opacity-45",
         className
       )}
+      style={{
+        '--slider-percent': `${Math.max(0, Math.min(100, percent))}%`,
+      } as React.CSSProperties}
+      onChange={(event) => onValueChange?.([Number(event.target.value)])}
       {...props}
-    >
-      <SliderPrimitive.Track
-        data-slot="slider-track"
-        className={cn(
-          "relative grow overflow-hidden rounded-full bg-muted data-[orientation=horizontal]:h-1.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-1.5"
-        )}
-      >
-        <SliderPrimitive.Range
-          data-slot="slider-range"
-          className={cn(
-            "absolute bg-primary data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full"
-          )}
-        />
-      </SliderPrimitive.Track>
-      {Array.from({ length: _values.length }, (_, index) => (
-        <SliderPrimitive.Thumb
-          data-slot="slider-thumb"
-          key={index}
-          className="block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
-        />
-      ))}
-    </SliderPrimitive.Root>
+    />
   )
 }
 

@@ -839,3 +839,15 @@
 - 涉及文件：`src/features/settings/settingsStore.ts`, `src/features/voice/voiceService.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `docs/voice-stt-tts-plan.md`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Chat、STT、TTS 虽然都走 OpenAI-compatible 接口，但模型、权限和性能特征不同，设置层不能强行共用一个“默认模型”抽象。
 - 是否需更新技术文档：是。
+
+## ISSUE-072
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Electron 重构 / 灵宠形象 / 桌面窗口交互
+- 严重程度：严重
+- 问题现象：Electron 重构后，灵宠窗口、Dock 图标、任务栏图标、设置窗口、右键菜单、小聊天框尺寸和拖拽边界出现多轮不稳定；切到 GIF 默认形象后，用户本地 `pnpm electron:dev` 只启动了 Vite，没有真正拉起 Electron 进程，导致桌面、Dock 和任务栏都看不到应用。
+- 原因分析：1) Electron dev 脚本等待 `http://localhost:5173`，但本机 Vite 实际监听在 `127.0.0.1:5173`，`wait-on` 卡住后 Electron 未启动；2) GIF 不能继续走 canvas 绘制，否则只会显示静态首帧；3) 自定义协议下内置资源 URL 需要用当前页面 URL 解析，不能依赖单一根路径假设；4) 右键菜单如果常驻预留窗口空间，会压缩 pet 右侧可移动范围；5) 菜单全局 capture 监听会抢在菜单项点击前关闭菜单，导致设置入口偶发失效。
+- 解决方案：1) `pnpm electron:dev` 改为固定 `vite --host 127.0.0.1`，并用 `wait-on tcp:127.0.0.1:5173` 等端口；Electron dev URL 同步改成 `http://127.0.0.1:5173`；2) 新增 GIF 形象方案，默认 `mediaMode=gif`，用户可在设置中切换 GIF / 图片两套入口；3) GIF 渲染改为 `<img>`，静态图片继续走 canvas；4) 内置资源 URL 改为基于 `window.location.href` 生成；5) pet 拖拽边界按可见形象计算，右键时才临时扩展菜单空间，并在靠近右侧阈值后把菜单放到 pet 左侧；6) 移除菜单点击前的全局 pointer capture，补齐右键“退出”入口。
+- 涉及文件：`electron/main.cjs`, `electron/preload.cjs`, `package.json`, `vite.config.ts`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/pet/animations.ts`, `src/features/pet/petStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Electron dev 脚本必须和 Vite 实际监听地址完全一致，不能假设 `localhost` 一定等价于 `127.0.0.1`；桌面透明窗口的交互边界应以用户可见对象为锚点，而不是以内部透明窗口矩形为准；GIF/图片/视频应该在渲染层分流处理，不能统一塞进 canvas。
+- 是否需更新技术文档：是。

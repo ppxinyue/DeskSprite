@@ -2,10 +2,10 @@
 
 ## 总体状态
 - 开始时间：2026-04-30
-- 当前阶段：P0（集成调试 + 拖拽稳定性修复）
-- 完成任务：11 / 11 (A-K) + 动画系统重构 + 对话/拖拽迭代修复
+- 当前阶段：P0（Electron 重构 + GIF 形象体系 + 桌面交互打磨）
+- 完成任务：11 / 11 (A-K) + 动画系统重构 + Electron 重构 + 对话/拖拽迭代修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：待提交：redesign compact chat interface
+- 最新提交：待提交：electron rewrite, GIF avatars, UI and window interaction fixes
 
 ## 任务进度
 
@@ -569,3 +569,15 @@
 - 调用：小窗、大窗和 Hover 输入都会按 Chat 模型模式选择默认或自定义；云端 STT/TTS 会按各自配置调用，失败仍回退系统能力。
 - 验证：`pnpm build`、`cargo check --manifest-path src-tauri/Cargo.toml` 通过。
 - 文件：settingsStore.ts, voiceService.ts, SettingsPanel.tsx, ChatDialog.tsx, HoverInputBar.tsx, voice-stt-tts-plan.md
+
+### R67. Electron 重构、GIF 默认形象与桌面交互收尾（2026-05-09）
+- Electron：新增 `electron/main.cjs`、`electron/preload.cjs` 和 Tauri API shim，前端继续复用现有 React/状态/数据库接口；`pnpm electron:dev` 固定使用 `127.0.0.1`，解决只启动 Vite、没有 Electron/Dock/任务栏进程的问题。
+- 窗口：实现 pet、compact-chat、settings、chat 多窗口；pet/compact-chat 使用 macOS fullscreen Space 置顶策略和 topmost guard；settings/chat 顶部可拖拽区和内容留白按桌面应用体验调整。
+- Dock/任务栏：根据当前灵宠形象更新 app 图标；为非正方形图片生成透明补边的正方形 Dock 图标，避免拉伸；GIF 形象下图标回退使用 PNG 默认图，保证 Dock/任务栏稳定显示。
+- 交互：小聊天框和大聊天框互斥；小聊天框按内容动态高度增长，hover 框按聊天框尺寸计算；收起后不会被拖动、设置、窗口移动等副作用自动弹出；pet 右侧 chat button 只在小聊天未弹出时 hover 显示。
+- 右键菜单：菜单默认收起历史二级菜单，hover 展开；点击外部关闭；靠近屏幕右侧时菜单出现在 pet 左侧；新增“退出”选项并调用 Electron `app.quit()`。
+- 拖拽：拖动边界改为按可见 pet 图像计算，超限直接硬限制，不做回弹；拖动中避免重复 `setPosition` 造成边缘抖动。
+- GIF 形象：新增 `mediaMode: gif | image`，默认使用 `public/assets/GIF/blink.GIF`；设置页提供 GIF / 图片两套入口，GIF 上传只接受 `.gif`，图片入口保留 PNG/JPG/JPEG/WEBP/BMP；GIF 渲染走 `<img>`，静态图片继续走 canvas。
+- UI：设置、大聊天、小聊天和基础控件重做为更克制的黑白灰、轻磨砂、弱边界风格；滑块、输入框、按钮、菜单、对话布局和字号层级进行多轮收敛。
+- 验证：`pnpm build` 多次通过；`pnpm electron:dev` 验证 Electron 能在 `127.0.0.1:5173` dev server 后正常启动。
+- 文件：electron/main.cjs, electron/preload.cjs, package.json, vite.config.ts, src/App.tsx, src/electron-shims/*, src/features/pet/*, src/features/settings/SettingsPanel.tsx, src/features/chat/*, src/index.css

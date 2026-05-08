@@ -56,6 +56,7 @@ export function ChatDialog({
   initialConversationId,
   initialMode,
   maxHeight,
+  onContentHeightChange,
   onConversationChange,
   standalone = false,
 }: {
@@ -65,6 +66,7 @@ export function ChatDialog({
   initialMode: 'new' | 'history';
   maxHeight: number;
   onClose?: () => void;
+  onContentHeightChange?: (height: number) => void;
   onConversationChange?: (conversationId: number | null) => void;
   standalone?: boolean;
 }) {
@@ -73,8 +75,11 @@ export function ChatDialog({
   const [isListening, setIsListening] = useState(false);
   const [mode, setMode] = useState<'chat' | 'history'>(initialMode === 'history' ? 'history' : 'chat');
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
+  const [composerError, setComposerError] = useState<string | null>(null);
+  const [composerShakeKey, setComposerShakeKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const {
     messages,
@@ -120,6 +125,16 @@ export function ChatDialog({
     resizeInput();
   }, [input]);
 
+  useEffect(() => {
+    if (standalone || !onContentHeightChange) return;
+    const frame = window.requestAnimationFrame(() => {
+      const root = rootRef.current;
+      if (!root) return;
+      onContentHeightChange(Math.ceil(root.scrollHeight));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [standalone, onContentHeightChange, mode, messages, input, selectedImage, isStreaming, streamingContent, composerError, compactFontSize, historyItems.length]);
+
   async function loadConversation(conversationId: number) {
     try {
       const msgs = await getMessages(conversationId);
@@ -147,7 +162,12 @@ export function ChatDialog({
 
   async function handleSend() {
     const text = input.trim();
-    if ((!text && !selectedImage) || isStreaming) return;
+    if (isStreaming) return;
+    if (!text && !selectedImage) {
+      setComposerError('先写点内容，或添加一张图片。');
+      setComposerShakeKey((value) => value + 1);
+      return;
+    }
     const messageText = text || '请分析这张图片。';
 
     const defaultConfig = settings.chatModelMode === 'custom' ? getDefaultConfig() : undefined;
@@ -160,7 +180,8 @@ export function ChatDialog({
 
     const imageForMessage = selectedImage;
     if (imageForMessage && !supportsImageOrFileInput(apiConfig)) {
-      showUnsupportedAttachmentAlert(apiConfig);
+      setComposerError(`${apiConfig.model} 暂不支持图片输入，请切换到支持视觉的模型。`);
+      setComposerShakeKey((value) => value + 1);
       return;
     }
 
@@ -172,6 +193,7 @@ export function ChatDialog({
     addMessage(createMessage('assistant', '...'));
     setInput('');
     setSelectedImage(null);
+    setComposerError(null);
 
     let convoId = currentConversationId;
     if (!convoId) {
@@ -240,11 +262,15 @@ export function ChatDialog({
 
   async function handlePickImage() {
     const image = await pickImage();
-    if (image) setSelectedImage(image);
+    if (image) {
+      setSelectedImage(image);
+      setComposerError(null);
+    }
   }
 
   function handlePasteImage(image: SelectedImage) {
     setSelectedImage(image);
+    setComposerError(null);
   }
 
   function handleVoiceInput() {
@@ -288,12 +314,16 @@ export function ChatDialog({
 
   return (
     <div
-      className="chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] font-sans text-[14px] text-[var(--color-chat-text)] shadow-none"
+      ref={rootRef}
+      className={`chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] font-sans text-[14px] text-[var(--color-chat-text)] ${standalone ? 'glass-panel' : 'border border-[var(--color-chat-border)] bg-[var(--surface-flat)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]'}`}
       style={{
         maxHeight: standalone ? undefined : maxHeight,
         height: standalone ? '100%' : undefined,
         opacity: standalone ? 1 : dialogOpacity,
         fontSize: standalone ? undefined : compactFontSize,
+        background: standalone ? undefined : 'color-mix(in srgb, var(--surface-flat) 68%, transparent)',
+        backdropFilter: standalone ? undefined : 'blur(10px)',
+        WebkitBackdropFilter: standalone ? undefined : 'blur(10px)',
       }}
     >
       {mode === 'history' && (
@@ -303,7 +333,7 @@ export function ChatDialog({
           ) : historyItems.map((item) => (
             <button
               key={item.id}
-              className="block w-full rounded-[8px] px-2.5 py-1.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-chat-text)_8%,transparent)]"
+              className="block w-full rounded-[12px] px-3 py-2 text-left transition-all duration-200 hover:bg-background/52"
               onClick={() => loadConversation(item.id)}
             >
               <div className="truncate leading-[1.45]" style={{ fontSize: compactFontSize }}>{item.title || `对话 ${item.id}`}</div>
@@ -316,10 +346,10 @@ export function ChatDialog({
       {mode === 'chat' && messages.length > 0 && (
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
           style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 60) }}
         >
-          <div className="space-y-1 py-2.5">
+          <div className="space-y-2.5 py-4">
             {messages.map((msg) => (
               <MessageBubble
                 key={msg.id}
@@ -333,6 +363,10 @@ export function ChatDialog({
             ))}
           </div>
         </div>
+      )}
+
+      {mode === 'chat' && messages.length === 0 && (
+        <div className="min-h-0" />
       )}
 
       {mode === 'chat' && (
@@ -350,6 +384,8 @@ export function ChatDialog({
           compact
           compactFontSize={compactFontSize}
           isListening={isListening}
+          error={composerError}
+          shakeKey={composerShakeKey}
         />
       )}
     </div>
@@ -521,7 +557,14 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
 
     const imageForMessage = panel.selectedImage;
     if (imageForMessage && !supportsImageOrFileInput(resolved.config)) {
-      showUnsupportedAttachmentAlert(resolved.config);
+      const modelName = resolved.config.model;
+      updatePanel(panelId, (current) => ({
+        ...current,
+        messages: [
+          ...current.messages,
+          createMessage('assistant', `当前模型 ${modelName} 暂不支持图片输入，请切换到支持视觉的模型。`),
+        ],
+      }));
       return;
     }
 
@@ -597,10 +640,11 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
     : panels;
 
   return (
-    <div className="grid h-full grid-cols-[240px_minmax(0,1fr)] bg-[var(--bg-primary)] text-[var(--text-primary)]">
-      <aside className="flex min-h-0 flex-col border-r border-[var(--border-color)] bg-[var(--bg-secondary)]">
-        <div className="shrink-0 p-3">
-          <button className="flex h-9 w-full items-center gap-2 rounded-[8px] px-3 text-left text-[14px] leading-[1.5] transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" onClick={() => {
+    <div className="relative grid h-full grid-cols-[260px_minmax(0,1fr)] bg-background pt-14 text-[var(--text-primary)]">
+      <div className="app-drag-region fixed inset-x-0 top-0 z-50 h-14" />
+      <aside className="glass-panel flex min-h-0 flex-col rounded-none border-y-0 border-l-0">
+        <div className="app-no-drag shrink-0 p-3">
+          <button className="flex h-10 w-full items-center gap-2 rounded-[12px] px-3 text-left text-[14px] font-medium leading-[1.5] transition-all duration-200 hover:bg-background/55" onClick={() => {
             const next = createPanel();
             setPanels([next]);
             setActivePanelId(next.id);
@@ -610,9 +654,9 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
             新建对话
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+        <div className="app-no-drag min-h-0 flex-1 overflow-y-auto px-2 pb-3">
           {historyItems.map((item) => (
-            <button key={item.id} className="block w-full rounded-[8px] px-3 py-2 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" onClick={() => loadConversationIntoPanel(item.id)}>
+            <button key={item.id} className="block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52" onClick={() => loadConversationIntoPanel(item.id)}>
               <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
               <div className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] leading-[1.5] text-[var(--text-secondary)]">
                 <span>{formatConversationTime(item.updatedAt)}</span>
@@ -622,8 +666,8 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
           ))}
         </div>
       </aside>
-      <main className="flex min-h-0 flex-col bg-[var(--bg-primary)]">
-        <div className="flex h-12 shrink-0 items-center justify-end border-b border-[var(--border-color)] px-4">
+      <main className="flex min-h-0 flex-col bg-background">
+        <div className="app-no-drag flex h-11 shrink-0 items-center justify-end border-b border-border/55 px-4">
           <div className="flex items-center gap-1">
             <LayoutButton title="单窗口" active={layout === 'single'} onClick={() => setLayout('single')}><PanelRight className="h-4 w-4" /></LayoutButton>
             <LayoutButton title="横向并排" active={layout === 'columns'} onClick={() => setLayout('columns')}><Columns3 className="h-4 w-4" /></LayoutButton>
@@ -634,8 +678,8 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
             </Button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <div className="grid h-full gap-px bg-[var(--border-color)]" style={layoutGridStyle(layout, visiblePanels.length)}>
+        <div className="app-no-drag min-h-0 flex-1 overflow-hidden p-3">
+          <div className="grid h-full gap-3" style={layoutGridStyle(layout, visiblePanels.length)}>
             {visiblePanels.map((panel) => (
               <StandaloneChatPanel
                 key={panel.id}
@@ -834,10 +878,6 @@ function supportsImageOrFileInput(config: ApiConfig) {
   return /gpt-4o|gpt-4\.1|gpt-4-turbo|gpt-5|o3|o4|vision|vl|image|visual|omni|gemini|claude|qwen.*vl|glm-4v/.test(model);
 }
 
-function showUnsupportedAttachmentAlert(config: ApiConfig) {
-  window.alert(`当前模型 ${config.model} 不支持图片或文件输入。请切换到支持视觉的模型，例如 gpt-4o、gpt-4o-mini、Claude 3/4、Gemini，或名称包含 vision/VL 的模型。`);
-}
-
 async function startSpeechInput(
   onText: (text: string) => void,
   setListening: (listening: boolean) => void,
@@ -1012,10 +1052,10 @@ function StandaloneChatPanel({
 
   return (
     <section
-      className={`flex min-h-0 flex-col overflow-hidden bg-[var(--bg-primary)] ${active ? 'outline outline-1 outline-[var(--border-color)]' : ''}`}
+      className={`quiet-card flex min-h-0 flex-col overflow-hidden rounded-[12px] transition-all duration-200 ${active ? 'ring-2 ring-ring/16' : ''}`}
       onMouseDown={onActivate}
     >
-      <div className="flex h-12 shrink-0 items-start gap-2 px-3 pt-2">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/45 px-3">
         <ModelControl
           configs={configs}
           locked={panel.modelLocked}
@@ -1024,15 +1064,15 @@ function StandaloneChatPanel({
           onChange={onModelChange}
         />
         {canClose && (
-          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)]" onClick={onClose} title="关闭">
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onClose} title="关闭">
             <X className="h-4 w-4" />
           </Button>
         )}
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4">
-        <div className="mx-auto w-full max-w-none space-y-1.5 py-4">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5">
+        <div className="mx-auto w-full max-w-none space-y-3 py-5">
           {panel.messages.length === 0 ? (
-            <div className="pt-12 text-center text-[14px] leading-[1.5] text-[var(--text-secondary)]">开始一次新的对话</div>
+            <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">开始一次新的对话</div>
           ) : panel.messages.map((msg) => (
             <MessageBubble
               key={msg.id}
@@ -1046,7 +1086,7 @@ function StandaloneChatPanel({
           ))}
         </div>
       </div>
-      <div className="shrink-0 px-4 pb-4">
+      <div className="shrink-0 px-2 pb-2">
         <div className="mx-auto w-full max-w-none">
           <Composer
             input={panel.input}
@@ -1122,7 +1162,7 @@ function ModelControl({
   if (locked) {
     return (
       <div
-        className="min-w-0 max-w-[180px] bg-white text-[11px] leading-[1.4] text-neutral-500"
+        className="min-w-0 max-w-[180px] rounded-[10px] bg-background/52 px-2 py-1 text-[11px] leading-[1.4] text-muted-foreground"
         title={modelLabel}
       >
         <span className="block truncate">{modelLabel}</span>
@@ -1134,7 +1174,7 @@ function ModelControl({
     <div ref={menuRef} className="relative flex w-[220px] max-w-full min-w-0">
       <button
         type="button"
-        className="flex h-10 w-full min-w-0 items-center justify-between gap-2 rounded-[10px] bg-[color-mix(in_srgb,var(--bg-secondary)_82%,var(--bg-primary))] px-3 text-left text-[12px] leading-[1.5] text-[var(--text-primary)] outline-none transition-colors hover:bg-[var(--bg-secondary)] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--text-secondary)_28%,transparent)]"
+        className="flex h-10 w-full min-w-0 items-center justify-between gap-2 rounded-[12px] border border-border/70 bg-background/55 px-3 text-left text-[12px] leading-[1.5] text-[var(--text-primary)] outline-none transition-all hover:bg-background/72 focus-visible:ring-2 focus-visible:ring-ring/20"
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -1148,7 +1188,7 @@ function ModelControl({
 
       {open && (
         <div
-          className="absolute left-0 top-11 z-50 w-[min(320px,calc(100vw-32px))] overflow-hidden rounded-[14px] bg-[var(--bg-primary)] py-1.5 shadow-[0_10px_34px_rgba(0,0,0,0.16)] ring-1 ring-[color-mix(in_srgb,var(--border-color)_75%,transparent)] dark:shadow-[0_14px_38px_rgba(0,0,0,0.42)]"
+          className="glass-panel-strong absolute left-0 top-11 z-50 w-[min(320px,calc(100vw-32px))] overflow-hidden rounded-[10px] py-1.5"
           role="listbox"
         >
           <div className="px-3 pb-1.5 pt-1 text-[11px] leading-[1.5] text-[var(--text-secondary)]">选择模型</div>
@@ -1196,6 +1236,8 @@ function Composer({
   textareaRef,
   compact = false,
   compactFontSize = 13,
+  error = null,
+  shakeKey = 0,
 }: {
   input: string;
   isStreaming: boolean;
@@ -1210,6 +1252,8 @@ function Composer({
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   compact?: boolean;
   compactFontSize?: number;
+  error?: string | null;
+  shakeKey?: number;
 }) {
   async function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
     if (!clipboardHasImage(event)) return;
@@ -1220,46 +1264,51 @@ function Composer({
   }
 
   return (
-    <div className={compact ? "p-2.5 pt-1.5" : ""}>
+    <div className={compact ? "p-1.5 pt-1" : "p-2.5"}>
       {selectedImage && (
-        <div className="mb-2 flex items-center gap-2 rounded-[8px] border border-[var(--color-chat-border)] px-2 py-1.5 text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
-          <img src={selectedImage.dataUrl} alt="" className="h-8 w-8 rounded-[6px] object-cover" />
+        <div className={`mb-1.5 flex items-center gap-1.5 rounded-[7px] border px-2 py-1 text-[12px] leading-[1.5] text-[var(--color-chat-muted)] ${error ? 'animate-input-shake border-destructive/45 bg-destructive/5' : 'border-[var(--color-chat-border)] bg-background'}`}>
+          <img src={selectedImage.dataUrl} alt="" className="h-9 w-9 rounded-[9px] object-cover shadow-sm" />
           <span className="min-w-0 flex-1 truncate">{selectedImage.name}</span>
         </div>
       )}
       <form
-        className={`${compact ? 'rounded-[9px]' : 'rounded-[10px]'} flex w-full items-end gap-1 border border-[var(--color-chat-border)] bg-[var(--color-chat-input-bg)] p-0 shadow-none transition-[border-color,box-shadow] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_18%,transparent)]`}
+        key={shakeKey}
+        className={`${compact ? 'rounded-[7px]' : 'rounded-[9px]'} ${error ? 'animate-input-shake border-destructive/55' : 'border-[var(--color-chat-border)]'} flex w-full items-end gap-0.5 border bg-[var(--surface-flat)] p-0.5 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset,0_6px_18px_rgba(42,38,31,0.06)] transition-[border-color,box-shadow,background] hover:border-[var(--color-chat-accent)] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_13%,transparent)] dark:bg-[var(--surface-flat)]`}
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit();
         }}
       >
-        {!compact && (
-          <>
-            <Button variant="ghost" size="sm" type="button" className="ml-1 h-9 w-8 p-0 text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]" title="上传图片" aria-label="上传图片" onClick={onImagePick}>
-              <ImagePlus className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" type="button" className={`h-9 w-8 p-0 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${isListening ? 'animate-pulse text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
-              <Mic className="h-4 w-4" />
-            </Button>
-          </>
-        )}
+        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'ml-0.5 h-7 w-7 rounded-[6px]'} p-0 text-[var(--text-secondary)] transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]`} title="上传图片" aria-label="上传图片" onClick={onImagePick}>
+          <ImagePlus className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'}`} />
+        </Button>
+        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'h-7 w-7 rounded-[6px]'} p-0 transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${isListening ? 'animate-pulse text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
+          <Mic className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'}`} />
+        </Button>
         <Textarea
           ref={textareaRef}
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={onKeyDown}
           onPaste={handlePaste}
+          onMouseDown={() => {
+            if (compact) invoke('focus_compact_chat_window').catch(() => {});
+          }}
           placeholder="输入消息..."
-          className={`${compact ? 'min-h-[34px] px-2.5 py-2 leading-[1.45]' : 'min-h-[40px] px-3 py-2.5 text-[14px] leading-[1.5]'} max-h-[132px] flex-1 resize-none overflow-y-auto border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
+          className={`${compact ? 'min-h-[28px] px-1.5 py-1.5 leading-[1.35] overflow-hidden' : 'min-h-[34px] px-2 py-1.5 text-[14px] leading-[1.45] overflow-y-auto'} max-h-[112px] flex-1 resize-none border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
           style={{ fontSize: compact ? compactFontSize : undefined }}
           rows={1}
           disabled={isStreaming}
         />
-        <Button size="sm" type="submit" disabled={(!input.trim() && !selectedImage) || isStreaming} className={`${compact ? 'm-0.5 h-7 rounded-[7px] px-2.5 text-[11px]' : 'm-1 h-8 rounded-[8px] px-3 text-[12px]'} shrink-0`}>
+        <Button size="sm" type="submit" disabled={isStreaming} className={`${compact ? 'h-6 rounded-[5px] px-2 text-[10px]' : 'h-7 rounded-[6px] px-2.5 text-[11px]'} shrink-0 ${(!input.trim() && !selectedImage) ? 'opacity-55' : ''}`}>
           发送
         </Button>
       </form>
+      {error && (
+        <p className="mt-2 px-1 text-[11px] leading-5 text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -1301,19 +1350,19 @@ function MessageBubble({
     }
   };
 
-  const actionButtonClass = "flex h-6 w-6 items-center justify-center rounded-[6px] border border-[var(--color-chat-border)] bg-[var(--color-chat-bg)] text-[var(--color-chat-muted)] hover:text-[var(--color-chat-text)]";
+  const actionButtonClass = "flex h-7 w-7 items-center justify-center rounded-[9px] border border-[var(--color-chat-border)] bg-background/72 text-[var(--color-chat-muted)] shadow-sm backdrop-blur hover:text-[var(--color-chat-text)]";
 
   return (
     <div className={`group flex w-full flex-col animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'items-end' : 'items-start'}`}>
       <div
-        className={`relative border border-[var(--color-chat-bubble-border)] leading-[1.45] text-[var(--color-chat-text)] shadow-none transition-colors ${
-          compact ? 'rounded-[9px] px-2.5 py-1.5' : 'rounded-[10px] px-3 py-2 text-[14px] leading-[1.5]'
+        className={`relative border leading-[1.55] text-[var(--color-chat-text)] transition-all duration-200 ${
+          compact ? 'rounded-[7px] px-2.5 py-1.5' : 'rounded-[9px] px-3 py-2 text-[14px] leading-[1.55]'
         } ${
           fullWidth ? 'max-w-full' : 'max-w-[84%]'
         } ${
           isUser
-            ? 'bg-[var(--color-chat-user-bubble)] text-right'
-            : 'bg-[var(--color-chat-assistant-bubble)] text-left'
+            ? 'border-[var(--color-chat-bubble-border)] bg-[var(--surface-flat)] text-right shadow-[0_1px_0_rgba(255,255,255,0.55)_inset]'
+            : compact ? 'border-[var(--color-chat-bubble-border)] bg-[var(--surface-flat)] text-left shadow-[0_1px_0_rgba(255,255,255,0.45)_inset]' : 'border-transparent bg-transparent text-left shadow-none'
         }`}
         style={{ fontSize: compact ? compactFontSize : undefined }}
       >

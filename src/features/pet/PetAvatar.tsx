@@ -1,18 +1,21 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
 import { usePetStore } from './petStore';
 import { getConversations } from '@/lib/db';
 import {
   getNextFrameIndex,
   getPetFrameSources,
   getRandomFrameSwitchDelay,
+  getBuiltinAssetUrl,
+  isGifAsset,
   isBuiltinAsset,
 } from './animations';
 import { stopPetStateEngine } from './petStateEngine';
 import type { PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
 
 function toSrc(path: string): string {
-  return isBuiltinAsset(path) ? `/${path}` : convertFileSrc(path);
+  return isBuiltinAsset(path) ? getBuiltinAssetUrl(path) : convertFileSrc(path);
 }
 
 const MOTION_NAMES: PetMotionName[] = ['petJump', 'petWobble', 'petBreathe'];
@@ -24,9 +27,10 @@ const MOTION_BASE_DURATION: Record<PetMotionName, number> = {
 const PET_DRAW_PADDING = 2;
 const SOURCE_EDGE_INSET_RATIO = 0.004;
 const MENU_WIDTH = 112;
-const MENU_HEIGHT = 172;
+const MENU_HEIGHT = 196;
 const SUBMENU_WIDTH = 170;
 const MENU_MARGIN = 8;
+const MENU_LEFT_SIDE_THRESHOLD = 0.62;
 
 function pickNextMotion(motions: PetMotionSettings, current: PetMotionName | null): PetMotionName | null {
   const enabled = MOTION_NAMES.filter((name) => motions[name]?.enabled);
@@ -56,9 +60,9 @@ export function PetAvatar({
   onDragEnd?: () => void;
   onMenuOpenChange?: (open: boolean) => void;
 }) {
-  const { petState, mediaConfig, userFrames, openChat, dialogOpen, loadUserFrames } = usePetStore();
+  const { petState, mediaConfig, userFrames, userGifs, openChat, dialogOpen, loadUserFrames } = usePetStore();
   const config = mediaConfig[petState];
-  const frameSources = getPetFrameSources(config, userFrames[petState]);
+  const frameSources = getPetFrameSources(config, userFrames[petState], userGifs[petState]);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [imgError, setImgError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -112,13 +116,16 @@ export function PetAvatar({
       setMenuOpen(false);
       onMenuOpenChange?.(false);
     };
-    window.addEventListener('mousedown', close);
-    window.addEventListener('wheel', close);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('wheel', close, true);
     window.addEventListener('blur', close);
+    window.addEventListener('keydown', closeOnEscape, true);
     return () => {
-      window.removeEventListener('mousedown', close);
-      window.removeEventListener('wheel', close);
+      window.removeEventListener('wheel', close, true);
       window.removeEventListener('blur', close);
+      window.removeEventListener('keydown', closeOnEscape, true);
     };
   }, [menuOpen, onMenuOpenChange]);
 
@@ -172,15 +179,20 @@ export function PetAvatar({
     switch (action) {
       case 'new-chat':
         openChat('new');
+        emit('pet:force-open-chat', { mode: 'new', conversationId: null }).catch(() => {});
         break;
       case 'history-chat':
         openChat('history');
+        emit('pet:force-open-chat', { mode: 'history', conversationId: null }).catch(() => {});
         break;
       case 'settings':
         try { await invoke('show_settings_cmd'); } catch (e) { console.error(e); }
         break;
       case 'hide':
         try { await invoke('hide_pet_window'); } catch (e) { console.error(e); }
+        break;
+      case 'quit':
+        try { await invoke('quit_app'); } catch (e) { console.error(e); }
         break;
     }
   };
@@ -194,8 +206,20 @@ export function PetAvatar({
     window.setTimeout(() => {
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
-      const x = clamp(clientX, MENU_MARGIN, Math.max(MENU_MARGIN, windowWidth - MENU_WIDTH - MENU_MARGIN));
-      const y = clamp(clientY, MENU_MARGIN, Math.max(MENU_MARGIN, windowHeight - MENU_HEIGHT - MENU_MARGIN));
+      const petRect = petRootRef.current?.getBoundingClientRect();
+      const shouldOpenLeft = petRect
+        ? petRect.right + MENU_WIDTH + MENU_MARGIN > windowWidth || petRect.left > windowWidth * MENU_LEFT_SIDE_THRESHOLD
+        : clientX + MENU_WIDTH + MENU_MARGIN > windowWidth || clientX > windowWidth * MENU_LEFT_SIDE_THRESHOLD;
+      const rawX = petRect
+        ? shouldOpenLeft
+          ? petRect.left - MENU_WIDTH - MENU_MARGIN
+          : petRect.right + MENU_MARGIN
+        : shouldOpenLeft
+          ? clientX - MENU_WIDTH - MENU_MARGIN
+          : clientX;
+      const rawY = petRect ? petRect.top + Math.min(24, petRect.height / 4) : clientY;
+      const x = clamp(rawX, MENU_MARGIN, Math.max(MENU_MARGIN, windowWidth - MENU_WIDTH - MENU_MARGIN));
+      const y = clamp(rawY, MENU_MARGIN, Math.max(MENU_MARGIN, windowHeight - MENU_HEIGHT - MENU_MARGIN));
       const canOpenRight = x + MENU_WIDTH + SUBMENU_WIDTH + MENU_MARGIN <= windowWidth;
       const canOpenLeft = x - SUBMENU_WIDTH - MENU_MARGIN >= 0;
       setSubmenuSide(canOpenRight || !canOpenLeft ? 'right' : 'left');
@@ -209,21 +233,22 @@ export function PetAvatar({
 
   let src: string;
   let localImagePath: string | null = null;
-  let kind: 'img' | 'video' = 'img';
+  let kind: 'img' | 'gif' | 'video' = 'img';
   if (config.userAnimatedPath) {
     localImagePath = isBuiltinAsset(config.userAnimatedPath) ? null : config.userAnimatedPath;
-    src = isBuiltinAsset(config.userAnimatedPath) ? `/${config.userAnimatedPath}` : convertFileSrc(config.userAnimatedPath);
-    kind = config.userAnimatedType === 'video' ? 'video' : 'img';
+    src = isBuiltinAsset(config.userAnimatedPath) ? getBuiltinAssetUrl(config.userAnimatedPath) : convertFileSrc(config.userAnimatedPath);
+    kind = config.userAnimatedType === 'video' ? 'video' : isGifAsset(config.userAnimatedPath) ? 'gif' : 'img';
   } else {
     const framePath = frameSources[currentFrame % frameSources.length] ?? frameSources[0];
     localImagePath = framePath && !isBuiltinAsset(framePath) ? framePath : null;
     src = toSrc(framePath);
+    kind = isGifAsset(framePath) ? 'gif' : 'img';
   }
   const [resolvedSrc, setResolvedSrc] = useState(src);
 
   useEffect(() => {
     let cancelled = false;
-    if (kind !== 'img' || !localImagePath) {
+    if ((kind !== 'img' && kind !== 'gif') || !localImagePath) {
       setResolvedSrc(src);
       return;
     }
@@ -329,19 +354,36 @@ export function PetAvatar({
   };
 
   const menu = menuOpen && (
-    <div
-      className="fixed z-50 w-[112px] rounded-md border border-border/60 bg-popover/80 px-1 py-1 text-popover-foreground shadow-xl backdrop-blur-xl"
-      style={{ left: menuPos.x, top: menuPos.y }}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">对话</div>
-      <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('new-chat')}>新对话</button>
-      <div className="group relative">
-        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('history-chat')}>历史对话</button>
-        <div
-          className={`absolute top-0 hidden w-[170px] rounded-md border border-border/60 bg-popover/90 px-1 py-1 shadow-xl backdrop-blur-xl group-hover:block ${
-            submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
-          }`}
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-transparent"
+        onPointerDown={(event) => {
+          event.stopPropagation();
+          setMenuOpen(false);
+          onMenuOpenChange?.(false);
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setMenuOpen(false);
+          onMenuOpenChange?.(false);
+        }}
+      />
+      <div
+        className="fixed z-50 w-[112px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 text-popover-foreground shadow-xl dark:bg-[#1c1b18]"
+        style={{ left: menuPos.x, top: menuPos.y }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
+      >
+        <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">对话</div>
+        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('new-chat')}>新对话</button>
+        <div className="group/history relative">
+          <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">历史对话</button>
+          <div
+            className={`absolute top-0 hidden w-[170px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/history:block dark:bg-[#1c1b18] ${
+              submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
+            }`}
         >
           {recentConversations.length === 0 ? (
             <div className="px-2 py-1 text-xs text-muted-foreground">暂无历史</div>
@@ -353,17 +395,20 @@ export function PetAvatar({
                 setMenuOpen(false);
                 onMenuOpenChange?.(false);
                 openChat('history', item.id);
+                emit('pet:force-open-chat', { mode: 'history', conversationId: item.id }).catch(() => {});
               }}
             >
               {item.title || `对话 ${item.id}`}
             </button>
           ))}
+          </div>
         </div>
+        <div className="my-1 h-px bg-border/60" />
+        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
+        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
+        <button className="block w-full rounded px-2 py-1 text-left text-xs text-destructive hover:bg-destructive/10" onClick={() => handleContextMenu('quit')}>退出</button>
       </div>
-      <div className="my-1 h-px bg-border/60" />
-      <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
-      <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
-    </div>
+    </>
   );
 
   if (imgError) {
@@ -409,6 +454,25 @@ export function PetAvatar({
           <video ref={videoRef} key={resolvedSrc} src={resolvedSrc} autoPlay={!animationsPaused} loop={!animationsPaused} muted playsInline draggable={false} width={w} height={h}
             style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', pointerEvents: 'none', ...motionStyle }}
             onError={() => setImgError(true)} />
+        ) : kind === 'gif' ? (
+          <img
+            key={resolvedSrc}
+            src={resolvedSrc}
+            alt="灵宠"
+            draggable={false}
+            width={w}
+            height={h}
+            className="block"
+            style={{
+              width: w,
+              height: h,
+              objectFit: 'contain',
+              opacity,
+              pointerEvents: 'none',
+              ...motionStyle,
+            }}
+            onError={() => setImgError(true)}
+          />
         ) : (
           <canvas
             key={resolvedSrc}

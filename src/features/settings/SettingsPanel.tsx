@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, ChevronDown, Loader2, Plus, Trash2, Pencil, ExternalLink } from 'lucide-react';
+import { Bot, Check, ChevronDown, Clock3, ExternalLink, Keyboard, Loader2, Palette, PawPrint, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,22 +18,23 @@ import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from 
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getMessages, getSystemPrompt, setSetting, updateSystemPrompt } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
-import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, isBuiltinAsset, type PetStateMediaConfig } from '@/features/pet/animations';
-import { invoke } from '@tauri-apps/api/core';
+import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, isBuiltinAsset, normalizePetMediaConfig, type PetStateMediaConfig } from '@/features/pet/animations';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
-import { convertFileSrc } from '@tauri-apps/api/core';
 import type { ReactNode } from 'react';
 
 type SettingsSection = 'appearance' | 'ai' | 'history' | 'shortcuts' | 'privacy';
-const ALLOWED_PET_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
+const ALLOWED_STATIC_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp']);
+const ALLOWED_GIF_EXTENSIONS = new Set(['gif']);
 const MASKED_API_KEY = '••••••••';
 
-const SECTIONS: { id: SettingsSection; label: string }[] = [
-  { id: 'appearance', label: '外观' },
-  { id: 'ai', label: 'AI 对话' },
-  { id: 'history', label: '历史对话' },
-  { id: 'shortcuts', label: '快捷键' },
-  { id: 'privacy', label: '隐私与数据' },
+const SECTIONS: { id: SettingsSection; label: string; icon: typeof Palette }[] = [
+  { id: 'appearance', label: '外观', icon: Palette },
+  { id: 'ai', label: 'AI 对话', icon: Bot },
+  { id: 'history', label: '历史对话', icon: Clock3 },
+  { id: 'shortcuts', label: '快捷键', icon: Keyboard },
+  { id: 'privacy', label: '隐私与数据', icon: Shield },
 ];
 
 export function SettingsPanel() {
@@ -56,19 +57,23 @@ export function SettingsPanel() {
 
   const sidebar = (
     <>
-      {SECTIONS.map((s) => (
+      {SECTIONS.map((s) => {
+        const Icon = s.icon;
+        return (
         <button
           key={s.id}
-          className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+          className={`group flex h-9 w-full items-center gap-2 rounded-[9px] px-2.5 text-left text-[13px] font-medium transition-all duration-200 ${
             activeSection === s.id
-              ? 'bg-background/80 text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground hover:bg-background/45'
+              ? 'bg-background/72 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.72)_inset,0_8px_22px_rgba(42,38,31,0.06)]'
+              : 'text-muted-foreground hover:bg-background/42 hover:text-foreground'
           }`}
           onClick={() => setActiveSection(s.id)}
         >
-          {s.label}
+          <Icon className={`h-[17px] w-[17px] transition-transform duration-200 ${activeSection === s.id ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground group-hover:scale-105'}`} />
+          <span>{s.label}</span>
         </button>
-      ))}
+      );
+      })}
     </>
   );
 
@@ -122,33 +127,37 @@ export function SettingsPanel() {
 }
 
 function SectionTitle({ children }: { children: ReactNode }) {
-  return <h2 className="text-base font-semibold text-foreground mb-1">{children}</h2>;
-}
-
-function SectionDesc({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-muted-foreground mb-5">{children}</p>;
+  return <h2 className="mb-2 text-[18px] font-semibold tracking-[-0.018em] text-foreground">{children}</h2>;
 }
 
 function SettingRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-border/40 last:border-0">
-      <div>
-        <span className="text-sm text-foreground">{label}</span>
-        {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+    <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-border/45 px-0 py-2 last:border-0">
+      <div className="min-w-0">
+        <span className="text-[13px] font-medium leading-5 text-foreground">{label}</span>
+        {hint && <p className="mt-1 max-w-[420px] text-[11px] leading-5 text-muted-foreground">{hint}</p>}
       </div>
-      <div className="flex items-center gap-2 ml-4 shrink-0">{children}</div>
+      <div className="flex shrink-0 items-center gap-2">{children}</div>
     </div>
   );
 }
 
 function AppearanceRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[120px_minmax(280px,420px)] items-center py-3 border-b border-border/40 last:border-0">
-      <div>
-        <span className="text-sm text-foreground">{label}</span>
-        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+    <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-border/45 px-0 py-2 last:border-0">
+      <div className="min-w-0">
+        <span className="text-[13px] font-medium leading-5 text-foreground">{label}</span>
+        {hint && <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{hint}</p>}
       </div>
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0 shrink-0">{children}</div>
+    </div>
+  );
+}
+
+function SettingsGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={`quiet-card mb-6 overflow-hidden rounded-[9px] ${className}`}>
+      {children}
     </div>
   );
 }
@@ -190,70 +199,76 @@ function AppearanceSection({
 
   return (
     <>
-      <SectionTitle>外观设置</SectionTitle>
+      <div className="mb-5">
+        <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.018em] text-foreground">外观设置</h1>
+      </div>
 
-      <AppearanceRow label="主题">
-        <ThemeSelect
-          value={draft.theme}
-          onChange={(theme) => update('theme', theme)}
-        />
-      </AppearanceRow>
-      <AppearanceRow label="灵宠透明度">
-        <div className="flex items-center gap-3">
-          <span className="w-12 text-right text-xs text-muted-foreground">{draft.petOpacity.toFixed(1)}</span>
-          <Slider
-            value={[draft.petOpacity]}
-            onValueChange={([v]) => update('petOpacity', v)}
-            min={0.6} max={1} step={0.05} className="w-48"
+      <SettingsGroup>
+        <AppearanceRow label="主题">
+          <ThemeSelect
+            value={draft.theme}
+            onChange={(theme) => update('theme', theme)}
           />
-        </div>
-      </AppearanceRow>
-      <AppearanceRow label="灵宠大小">
-        <div className="flex items-center gap-3">
-          <span className="w-12 text-right text-xs text-muted-foreground">{draft.petScale.toFixed(1)}</span>
-          <Slider
-            value={[draft.petScale]}
-            onValueChange={([v]) => update('petScale', v)}
-            min={0.5} max={2} step={0.1} className="w-48"
+        </AppearanceRow>
+        <AppearanceRow label="灵宠透明度">
+          <div className="flex max-w-[320px] items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.petOpacity.toFixed(1)}</span>
+            <Slider
+              value={[draft.petOpacity]}
+              onValueChange={([v]) => update('petOpacity', v)}
+              min={0.6} max={1} step={0.05} className="w-52"
+            />
+          </div>
+        </AppearanceRow>
+        <AppearanceRow label="灵宠大小">
+          <div className="flex max-w-[320px] items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.petScale.toFixed(1)}</span>
+            <Slider
+              value={[draft.petScale]}
+              onValueChange={([v]) => update('petScale', v)}
+              min={0.5} max={2} step={0.1} className="w-52"
+            />
+          </div>
+        </AppearanceRow>
+        <AppearanceRow label="对话框宽度">
+          <div className="flex max-w-[320px] items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.dialogWidth}px</span>
+            <Slider
+              value={[draft.dialogWidth]}
+              onValueChange={([v]) => update('dialogWidth', v)}
+              min={200} max={600} step={10} className="w-52"
+            />
+          </div>
+        </AppearanceRow>
+        <AppearanceRow label="对话字号">
+          <div className="flex max-w-[320px] items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.compactChatFontSize}px</span>
+            <Slider
+              value={[draft.compactChatFontSize]}
+              onValueChange={([v]) => update('compactChatFontSize', v)}
+              min={11} max={15} step={1} className="w-52"
+            />
+          </div>
+        </AppearanceRow>
+        <AppearanceRow label="始终置顶显示" hint="穿越全屏应用">
+          <Switch
+            checked={draft.alwaysOnTop}
+            onCheckedChange={(v) => update('alwaysOnTop', v)}
           />
-        </div>
-      </AppearanceRow>
-      <AppearanceRow label="对话框宽度">
-        <div className="flex items-center gap-3">
-          <span className="w-12 text-right text-xs text-muted-foreground">{draft.dialogWidth}px</span>
-          <Slider
-            value={[draft.dialogWidth]}
-            onValueChange={([v]) => update('dialogWidth', v)}
-            min={200} max={600} step={10} className="w-48"
-          />
-        </div>
-      </AppearanceRow>
-      <AppearanceRow label="对话字号">
-        <div className="flex items-center gap-3">
-          <span className="w-12 text-right text-xs text-muted-foreground">{draft.compactChatFontSize}px</span>
-          <Slider
-            value={[draft.compactChatFontSize]}
-            onValueChange={([v]) => update('compactChatFontSize', v)}
-            min={11} max={15} step={1} className="w-48"
-          />
-        </div>
-      </AppearanceRow>
-      <AppearanceRow label="灵宠动作">
-        <PetMotionControls
-          value={draft.petMotions}
-          onChange={(petMotions) => update('petMotions', petMotions)}
-        />
-      </AppearanceRow>
-      <AppearanceRow label="始终置顶显示" hint="穿越全屏应用">
-        <Switch
-          checked={draft.alwaysOnTop}
-          onCheckedChange={(v) => update('alwaysOnTop', v)}
-        />
-      </AppearanceRow>
+        </AppearanceRow>
+      </SettingsGroup>
 
-      <Separator className="my-6" />
+      <SectionTitle>灵宠动作</SectionTitle>
+      <SettingsGroup>
+        <div className="px-4 py-4">
+          <PetMotionControls
+            value={draft.petMotions}
+            onChange={(petMotions) => update('petMotions', petMotions)}
+          />
+        </div>
+      </SettingsGroup>
+
       <SectionTitle>形象自定义</SectionTitle>
-      <SectionDesc>为每种状态上传一组 PNG，系统会随机间隔 1-5 分钟切换，上传立即生效。</SectionDesc>
       <ImageSection />
 
     </>
@@ -332,14 +347,14 @@ function PetMotionControls({
   };
 
   return (
-    <div className="w-[360px] space-y-3">
+    <div className="grid gap-3 sm:grid-cols-3">
       {PET_MOTION_OPTIONS.map((option) => {
         const motion = value[option.id];
         return (
-          <div key={option.id} className="rounded-[10px] border border-border/60 bg-background px-3 py-2.5">
+          <div key={option.id} className="rounded-[10px] border border-border/60 bg-transparent px-3.5 py-3 transition-all duration-200 hover:border-border">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[13px] leading-[1.35] text-foreground">{option.title}</div>
+                <div className="text-[13px] font-medium leading-[1.35] text-foreground">{option.title}</div>
                 <div className="text-[11px] leading-[1.35] text-muted-foreground">{option.desc}</div>
               </div>
               <Switch
@@ -348,7 +363,7 @@ function PetMotionControls({
                 aria-label={`${option.title}动作`}
               />
             </div>
-            <div className={`mt-2.5 space-y-2 ${motion.enabled ? '' : 'opacity-45'}`}>
+            <div className={`mt-3 space-y-2.5 ${motion.enabled ? '' : 'opacity-45'}`}>
               <div className="grid grid-cols-[44px_1fr_48px] items-center gap-2">
                 <span className="text-[11px] text-muted-foreground">{option.amplitudeLabel}</span>
                 <Slider
@@ -379,9 +394,6 @@ function PetMotionControls({
           </div>
         );
       })}
-      <p className="text-[11px] leading-[1.5] text-muted-foreground">
-        开启多个动作时，灵宠会在每次形象切换时随机选择其中一个动作。
-      </p>
     </div>
   );
 }
@@ -427,7 +439,7 @@ function ThemeSelect({
     <div ref={menuRef} className="relative w-[220px]">
       <button
         type="button"
-        className="flex h-10 w-full items-center justify-between gap-2 rounded-[10px] bg-[color-mix(in_srgb,var(--color-muted)_82%,var(--color-background))] px-3 text-left text-[13px] text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/20"
+        className="flex h-10 w-full items-center justify-between gap-2 rounded-[12px] border border-border/70 bg-transparent px-3 text-left text-[13px] text-foreground outline-none transition-all hover:border-border focus-visible:ring-2 focus-visible:ring-ring/20"
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -438,7 +450,7 @@ function ThemeSelect({
 
       {open && (
         <div
-          className="absolute left-0 top-11 z-50 w-[260px] overflow-hidden rounded-[14px] bg-background py-1.5 shadow-[0_10px_34px_rgba(0,0,0,0.16)] ring-1 ring-border/75 dark:shadow-[0_14px_38px_rgba(0,0,0,0.42)]"
+          className="glass-panel-strong absolute left-0 top-11 z-50 w-[260px] overflow-hidden rounded-[10px] py-1.5"
           role="listbox"
         >
           <div className="px-3 pb-1.5 pt-1 text-[11px] leading-[1.5] text-muted-foreground">选择主题</div>
@@ -450,8 +462,8 @@ function ThemeSelect({
                 type="button"
                 role="option"
                 aria-selected={selected}
-                className={`flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left transition-colors hover:bg-muted ${
-                  selected ? 'bg-muted/80' : ''
+                className={`flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left transition-colors hover:bg-muted/70 ${
+                  selected ? 'bg-muted/72' : ''
                 }`}
                 onClick={() => {
                   onChange(option.id);
@@ -472,12 +484,111 @@ function ThemeSelect({
   );
 }
 
+interface ImageTileProps {
+  path: string;
+  source: 'default' | 'user';
+  src: string;
+  enabled: boolean;
+  hasError: boolean;
+  isLoading: boolean;
+  isDeleting: boolean;
+  onToggleUse: () => void;
+  onDelete: () => void;
+  onImageError: () => void;
+}
+
+function ImageTile({
+  path,
+  source,
+  src,
+  enabled,
+  hasError,
+  isLoading,
+  isDeleting,
+  onToggleUse,
+  onDelete,
+  onImageError,
+}: ImageTileProps) {
+  return (
+    <div
+      data-path={path}
+      className={`group relative aspect-square overflow-hidden rounded-[10px] border transition-all duration-200 hover:-translate-y-0.5 ${
+        enabled ? 'border-border/70 bg-transparent' : 'border-border/40 bg-transparent opacity-70'
+      }`}
+    >
+      {isLoading ? (
+        <PawLoading />
+      ) : !hasError && src ? (
+        <img
+          src={src}
+          alt=""
+          className="h-full w-full object-contain p-2"
+          draggable={false}
+          onError={onImageError}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center px-3 text-center text-[11px] leading-snug text-muted-foreground">
+          {hasError ? '图片无法预览' : '加载中'}
+        </div>
+      )}
+      <span className="absolute left-1.5 top-1.5 rounded bg-background/85 px-1.5 py-0.5 text-[11px] text-muted-foreground shadow-sm">
+        {source === 'default' ? '默认' : '上传'}
+      </span>
+      <div className="absolute inset-x-1.5 bottom-1.5 z-20 flex gap-1 opacity-0 transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100">
+        <button
+          onClick={onToggleUse}
+          className="min-w-0 flex-1 rounded-[10px] bg-background/90 px-2 py-1 text-[11px] font-medium text-foreground shadow-sm backdrop-blur hover:bg-background"
+        >
+          {enabled ? '不使用' : '使用'}
+        </button>
+        <button
+          onClick={onDelete}
+          disabled={source === 'default' || isDeleting}
+          className="flex h-7 w-7 items-center justify-center rounded-[10px] bg-background/90 text-destructive shadow-sm backdrop-blur hover:bg-background disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-55"
+          title={source === 'default' ? '系统默认图片不可删除' : '删除'}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {!enabled && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/50 text-[11px] text-muted-foreground backdrop-blur-[2px]">
+          未使用
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PawLoading() {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-muted-foreground">
+      <PawPrint className="h-5 w-5 opacity-70" />
+      <div className="flex gap-1">
+        <span className="paw-dot h-1.5 w-1.5 rounded-full bg-current" />
+        <span className="paw-dot h-1.5 w-1.5 rounded-full bg-current [animation-delay:120ms]" />
+        <span className="paw-dot h-1.5 w-1.5 rounded-full bg-current [animation-delay:240ms]" />
+      </div>
+    </div>
+  );
+}
+
 function ImageSection() {
-  const { userFrames, loadUserFrames, addUserFrame, removeUserFrame, setStateMediaConfig, resetMediaConfig } = usePetStore();
+  const {
+    userFrames,
+    userGifs,
+    loadUserFrames,
+    addUserFrame,
+    addUserGif,
+    removeUserFrame,
+    removeUserGif,
+    setStateMediaConfig,
+    resetMediaConfig,
+  } = usePetStore();
   const [selectedState, setSelectedState] = useState<PetState>('idle');
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
   const [previewErrors, setPreviewErrors] = useState<Record<string, string>>({});
+  const [previewLoading, setPreviewLoading] = useState<Set<string>>(() => new Set());
   const mediaConfig = usePetStore((s) => s.mediaConfig);
 
   useEffect(() => {
@@ -485,38 +596,69 @@ function ImageSection() {
   }, [loadUserFrames]);
 
   const persistMediaConfig = async (state: PetState, nextConfig: PetStateMediaConfig) => {
-    setStateMediaConfig(state, nextConfig);
-    await setSetting(`petMedia_${state}`, JSON.stringify(nextConfig));
+    const normalized = normalizePetMediaConfig(state, nextConfig);
+    setStateMediaConfig(state, normalized);
+    await setSetting(`petMedia_${state}`, JSON.stringify(normalized));
+    await emit('pet-media:changed', { state });
   };
 
   const handleAddImages = async () => {
+    const scheme = config.mediaMode;
     const result = await open({
       multiple: true,
       filters: [
-        { name: '常见图片格式', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }
+        scheme === 'gif'
+          ? { name: 'GIF 动图', extensions: ['gif'] }
+          : { name: '常见图片格式', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }
       ],
     });
     if (!result || result.length === 0) return;
     const files = Array.isArray(result) ? result : [result];
-    const imageFiles = files.filter(isAllowedPetImagePath);
-    const rejectedCount = files.length - imageFiles.length;
+    const acceptedFiles = files.filter((path) => scheme === 'gif' ? isAllowedPetGifPath(path) : isAllowedStaticPetImagePath(path));
+    const rejectedCount = files.length - acceptedFiles.length;
     if (rejectedCount > 0) {
-      alert('只能上传图片，请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 格式。');
+      alert(scheme === 'gif' ? 'GIF 方案只能上传 .gif 动图。' : '图片方案只能上传 PNG、JPG、JPEG、WEBP 或 BMP。');
     }
-    if (imageFiles.length === 0) return;
+    if (acceptedFiles.length === 0) return;
     const { invoke } = await import('@tauri-apps/api/core');
-    for (const file of imageFiles) {
+    for (const file of acceptedFiles) {
       try {
         const importedPath = await invoke<string>('import_pet_image', {
           srcPath: file,
           state: selectedState,
         });
-        addUserFrame(selectedState, importedPath);
+        setPreviewLoading((current) => new Set(current).add(importedPath));
+        if (scheme === 'gif') addUserGif(selectedState, importedPath);
+        else addUserFrame(selectedState, importedPath);
+        loadPetPreviewDataUrl(importedPath)
+          .then((dataUrl) => {
+            setPreviewUrls((current) => ({ ...current, [importedPath]: dataUrl }));
+            setPreviewErrors((current) => {
+              const next = { ...current };
+              delete next[importedPath];
+              return next;
+            });
+          })
+          .catch((e) => {
+            const message = e instanceof Error ? e.message : String(e);
+            setPreviewErrors((current) => ({ ...current, [importedPath]: message }));
+          })
+          .finally(() => {
+            setPreviewLoading((current) => {
+              const next = new Set(current);
+              next.delete(importedPath);
+              return next;
+            });
+          });
         const nextConfig = {
           ...mediaConfig[selectedState],
-          disabledFrames: (mediaConfig[selectedState].disabledFrames ?? []).filter((p) => p !== importedPath),
+          mediaMode: scheme,
+          ...(scheme === 'gif'
+            ? { disabledGifs: (mediaConfig[selectedState].disabledGifs ?? []).filter((p) => p !== importedPath) }
+            : { disabledFrames: (mediaConfig[selectedState].disabledFrames ?? []).filter((p) => p !== importedPath) }),
         };
         await persistMediaConfig(selectedState, nextConfig);
+        await loadUserFrames();
       } catch (e) {
         console.error('Failed to import image:', e);
         alert(e instanceof Error ? e.message : String(e));
@@ -526,17 +668,22 @@ function ImageSection() {
 
   const handleDeleteImage = async (path: string) => {
     setIsDeleting(path);
-    const confirmed = confirm('确定要删除这张图片吗？');
+    const scheme = config.mediaMode;
+    const confirmed = confirm(scheme === 'gif' ? '确定要删除这个 GIF 吗？' : '确定要删除这张图片吗？');
     if (confirmed) {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
         await invoke('delete_pet_image', { filePath: path });
-        removeUserFrame(selectedState, path);
+        if (scheme === 'gif') removeUserGif(selectedState, path);
+        else removeUserFrame(selectedState, path);
         const nextConfig = {
           ...mediaConfig[selectedState],
-          disabledFrames: (mediaConfig[selectedState].disabledFrames ?? []).filter((p) => p !== path),
+          ...(scheme === 'gif'
+            ? { disabledGifs: (mediaConfig[selectedState].disabledGifs ?? []).filter((p) => p !== path) }
+            : { disabledFrames: (mediaConfig[selectedState].disabledFrames ?? []).filter((p) => p !== path) }),
         };
         await persistMediaConfig(selectedState, nextConfig);
+        await emit('pet-media:changed', { state: selectedState });
       } catch (e) {
         console.error('Failed to delete image:', e);
       }
@@ -549,7 +696,7 @@ function ImageSection() {
     if (confirmed) {
       const { invoke } = await import('@tauri-apps/api/core');
       for (const state of ALL_PET_STATES) {
-        for (const path of userFrames[state]) {
+        for (const path of [...userFrames[state], ...userGifs[state]]) {
           try {
             await invoke('delete_pet_image', { filePath: path });
           } catch (e) {
@@ -562,20 +709,23 @@ function ImageSection() {
         await setSetting(`petMedia_${state}`, JSON.stringify(DEFAULT_MEDIA_CONFIG[state]));
       }
       await loadUserFrames();
+      await emit('pet-media:changed', {});
     }
   };
 
-  const currentStateFrames = userFrames[selectedState] || [];
   const config = mediaConfig[selectedState];
-  const defaultFrames = config.defaultAssets;
+  const scheme = config.mediaMode;
+  const isGifScheme = scheme === 'gif';
+  const currentStateFrames = isGifScheme ? userGifs[selectedState] || [] : userFrames[selectedState] || [];
+  const defaultFrames = isGifScheme ? config.defaultGifAssets : config.defaultAssets;
   const allFrames = [...defaultFrames, ...currentStateFrames];
-  const disabledFrames = new Set(config.disabledFrames ?? []);
+  const disabledFrames = new Set(isGifScheme ? config.disabledGifs ?? [] : config.disabledFrames ?? []);
   const enabledCount = allFrames.filter((path) => !disabledFrames.has(path)).length;
   const previewKey = allFrames.join('|');
   const toPreviewSrc = (path: string) => {
     if (previewUrls[path]) return previewUrls[path];
     if (isBuiltinAsset(path)) return getBuiltinAssetUrl(path);
-    return convertFileSrc(path);
+    return '';
   };
 
   useEffect(() => {
@@ -605,98 +755,75 @@ function ImageSection() {
   }, [previewKey]);
 
   const handleToggleUse = async (path: string) => {
-    const disabled = new Set(config.disabledFrames ?? []);
+    const disabled = new Set(isGifScheme ? config.disabledGifs ?? [] : config.disabledFrames ?? []);
     const isEnabled = !disabled.has(path);
     if (isEnabled && enabledCount <= 1) {
-      alert('至少需要保留一张正在使用的灵宠图片。');
+      alert(isGifScheme ? '至少需要保留一个正在使用的灵宠 GIF。' : '至少需要保留一张正在使用的灵宠图片。');
       return;
     }
     if (isEnabled) disabled.add(path);
     else disabled.delete(path);
     await persistMediaConfig(selectedState, {
       ...config,
-      disabledFrames: Array.from(disabled),
+      ...(isGifScheme ? { disabledGifs: Array.from(disabled) } : { disabledFrames: Array.from(disabled) }),
     });
   };
 
-  const ImageTile = ({ path, source }: { path: string; source: 'default' | 'user' }) => {
-    const enabled = !disabledFrames.has(path);
-    const src = toPreviewSrc(path);
-    const hasError = Boolean(previewErrors[path]);
-    return (
-      <div
-        key={`${source}-${path}`}
-        className={`relative group aspect-square rounded-lg overflow-hidden border ${
-          enabled ? 'border-border/70 bg-muted/20' : 'border-border/40 bg-muted/10 opacity-70'
-        }`}
-      >
-        {!hasError ? (
-          <img
-            src={src}
-            alt=""
-            className="h-full w-full object-contain p-2"
-            draggable={false}
-            onError={() => {
-              setPreviewErrors((current) => ({ ...current, [path]: '图片无法预览' }));
-            }}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center px-3 text-center text-[11px] leading-snug text-muted-foreground">
-            图片无法预览
-          </div>
-        )}
-        <span className="absolute left-1.5 top-1.5 rounded bg-background/85 px-1.5 py-0.5 text-[10px] text-muted-foreground shadow-sm">
-          {source === 'default' ? '默认' : '上传'}
-        </span>
-        <div className="absolute inset-x-1.5 bottom-1.5 z-20 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            onClick={() => handleToggleUse(path)}
-            className="min-w-0 flex-1 rounded-md bg-background/90 px-2 py-1 text-[11px] text-foreground shadow-sm hover:bg-background"
-          >
-            {enabled ? '不使用' : '使用'}
-          </button>
-          <button
-            onClick={() => source === 'user' && handleDeleteImage(path)}
-            disabled={source === 'default' || isDeleting === path}
-            className="flex h-7 w-7 items-center justify-center rounded-md bg-background/90 text-destructive shadow-sm hover:bg-background disabled:cursor-not-allowed disabled:text-muted-foreground disabled:opacity-55"
-            title={source === 'default' ? '系统默认图片不可删除' : '删除'}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-        {!enabled && (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/45 text-xs text-muted-foreground">
-            未使用
-          </div>
-        )}
-      </div>
-    );
+  const handleSchemeChange = async (nextMode: 'gif' | 'image') => {
+    if (nextMode === config.mediaMode) return;
+    await persistMediaConfig(selectedState, {
+      ...config,
+      mediaMode: nextMode,
+    });
   };
 
   return (
-    <div className="space-y-4">
+    <div className="quiet-card space-y-4 rounded-[11px] p-4">
       {/* State Tabs */}
-      <div className="flex gap-2 border-b border-border/60">
+      <div className="flex gap-1 rounded-[9px] bg-muted/42 p-1">
         {ALL_PET_STATES.map((state) => {
           const meta = STATE_META[state];
           const isActive = selectedState === state;
-          const count = userFrames[state]?.length ?? 0;
-          const defaultCount = mediaConfig[state].defaultAssets.length;
+          const stateConfig = mediaConfig[state];
+          const stateIsGif = stateConfig.mediaMode === 'gif';
+          const count = stateIsGif ? userGifs[state]?.length ?? 0 : userFrames[state]?.length ?? 0;
+          const defaultCount = stateIsGif ? stateConfig.defaultGifAssets.length : stateConfig.defaultAssets.length;
           return (
             <button
               key={state}
-              className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+              className={`relative rounded-[11px] px-4 py-2 text-[13px] font-medium transition-all duration-200 ${
                 isActive
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground'
+                  ? 'bg-background/78 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.70)_inset,0_6px_16px_rgba(42,38,31,0.06)]'
+                  : 'text-muted-foreground hover:bg-background/42 hover:text-foreground'
               }`}
               onClick={() => setSelectedState(state)}
             >
               {meta.label}
-              <span className="ml-1.5 text-xs text-muted-foreground">({defaultCount + count})</span>
-              {isActive && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground" />
-              )}
+              <span className="ml-1.5 text-[11px] text-muted-foreground">({defaultCount + count})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 rounded-[10px] border border-border/55 bg-transparent p-1">
+        {([
+          { id: 'gif' as const, label: 'GIF 动图', detail: `${config.defaultGifAssets.length + userGifs[selectedState].length} 个` },
+          { id: 'image' as const, label: '图片', detail: `${config.defaultAssets.length + userFrames[selectedState].length} 张` },
+        ]).map((option) => {
+          const active = scheme === option.id;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              className={`rounded-[9px] px-3 py-2 text-left transition-all duration-200 ${
+                active
+                  ? 'bg-background/78 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.70)_inset,0_6px_16px_rgba(42,38,31,0.06)]'
+                  : 'text-muted-foreground hover:bg-background/42 hover:text-foreground'
+              }`}
+              onClick={() => handleSchemeChange(option.id)}
+            >
+              <span className="block text-[13px] font-medium">{option.label}</span>
+              <span className="block text-[11px] text-muted-foreground">{option.detail}</span>
             </button>
           );
         })}
@@ -704,25 +831,53 @@ function ImageSection() {
 
       {/* Image Grid */}
       <div className="grid grid-cols-4 gap-3">
-        {defaultFrames.map((path) => <ImageTile key={`default-${path}`} path={path} source="default" />)}
-        {currentStateFrames.map((path) => <ImageTile key={`user-${path}`} path={path} source="user" />)}
+        {defaultFrames.map((path) => (
+          <ImageTile
+            key={`default-${path}`}
+            path={path}
+            source="default"
+            src={toPreviewSrc(path)}
+            enabled={!disabledFrames.has(path)}
+            hasError={Boolean(previewErrors[path])}
+            isLoading={previewLoading.has(path)}
+            isDeleting={isDeleting === path}
+            onToggleUse={() => handleToggleUse(path)}
+            onDelete={() => {}}
+            onImageError={() => setPreviewErrors((current) => ({ ...current, [path]: '图片无法预览' }))}
+          />
+        ))}
+        {currentStateFrames.map((path) => (
+          <ImageTile
+            key={`user-${path}`}
+            path={path}
+            source="user"
+            src={toPreviewSrc(path)}
+            enabled={!disabledFrames.has(path)}
+            hasError={Boolean(previewErrors[path])}
+            isLoading={previewLoading.has(path)}
+            isDeleting={isDeleting === path}
+            onToggleUse={() => handleToggleUse(path)}
+            onDelete={() => handleDeleteImage(path)}
+            onImageError={() => setPreviewErrors((current) => ({ ...current, [path]: '图片无法预览' }))}
+          />
+        ))}
         <button
           onClick={handleAddImages}
-          className="aspect-square rounded-lg border-2 border-dashed border-border/60 hover:border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+          className="flex aspect-square items-center justify-center rounded-[10px] border border-dashed border-border/70 bg-background/36 text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-background/62 hover:text-foreground"
         >
           <Plus className="h-6 w-6" />
         </button>
       </div>
 
       {/* Current config info */}
-      <p className="text-xs text-muted-foreground">
+      <p className="px-1 text-[11px] text-muted-foreground">
         {config.userAnimatedPath
           ? `当前使用：${config.userAnimatedPath}`
-          : `当前使用 ${enabledCount} / ${allFrames.length} 张图片`}
+          : `当前使用 ${enabledCount} / ${allFrames.length} ${isGifScheme ? '个 GIF' : '张图片'}`}
       </p>
 
       {/* Reset All */}
-      <div className="pt-2 border-t border-border/40">
+      <div className="border-t border-border/45 pt-3">
         <Button variant="outline" size="sm" onClick={handleResetAll}>
           恢复全部默认
         </Button>
@@ -731,34 +886,24 @@ function ImageSection() {
   );
 }
 
-function isAllowedPetImagePath(path: string) {
+function getFileExtension(path: string) {
   const cleanPath = path.split(/[?#]/)[0] ?? path;
-  const ext = cleanPath.split('.').pop()?.toLowerCase() ?? '';
-  return ALLOWED_PET_IMAGE_EXTENSIONS.has(ext);
+  return cleanPath.split('.').pop()?.toLowerCase() ?? '';
 }
 
-function getBuiltinAssetUrl(path: string) {
-  return new URL(path.replace(/^\/+/, ''), window.location.href).href;
+function isAllowedStaticPetImagePath(path: string) {
+  return ALLOWED_STATIC_IMAGE_EXTENSIONS.has(getFileExtension(path));
+}
+
+function isAllowedPetGifPath(path: string) {
+  return ALLOWED_GIF_EXTENSIONS.has(getFileExtension(path));
 }
 
 async function loadPetPreviewDataUrl(path: string) {
   if (isBuiltinAsset(path)) {
-    const response = await fetch(getBuiltinAssetUrl(path), { cache: 'no-store' });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch builtin asset: ${response.status}`);
-    }
-    return blobToDataUrl(await response.blob());
+    return getBuiltinAssetUrl(path);
   }
   return invoke<string>('read_pet_image_data_url', { filePath: path });
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read image preview'));
-    reader.readAsDataURL(blob);
-  });
 }
 
 async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; message: string; latency?: number }> {
@@ -834,12 +979,12 @@ function AISection({
       <div className="border border-border rounded-lg p-3 mb-6 bg-muted/40">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <span className="font-medium text-sm">CloseAI 默认服务</span>
-            <span className="text-xs text-muted-foreground ml-2">Key: 内置隐藏</span>
+            <span className="font-medium text-[13px]">CloseAI 默认服务</span>
+            <span className="text-[11px] text-muted-foreground ml-2">Key: 内置隐藏</span>
           </div>
-          <span className="text-xs bg-secondary text-secondary-foreground px-2 py-1 rounded">本机额度</span>
+          <span className="text-[11px] bg-secondary text-secondary-foreground px-2 py-1 rounded">本机额度</span>
         </div>
-        <div className="grid gap-1 text-xs text-muted-foreground">
+        <div className="grid gap-1 text-[11px] text-muted-foreground">
           <div>Chat: {BUILTIN_CLOSEAI_CONFIG.model}</div>
           <div>STT: {BUILTIN_STT_MODEL}</div>
           <div>TTS: {BUILTIN_TTS_MODEL}</div>
@@ -867,7 +1012,7 @@ function AISection({
       <SectionTitle>Chat 模型</SectionTitle>
       <SettingRow label="Chat 使用">
         <select
-          className="bg-input border border-border rounded px-2 py-1 text-sm"
+          className="bg-input border border-border rounded px-2 py-1 text-[13px]"
           value={settings.chatModelMode}
           onChange={(e) => updateSetting('chatModelMode', e.target.value as ModelMode)}
         >
@@ -876,7 +1021,7 @@ function AISection({
         </select>
       </SettingRow>
       {settings.chatModelMode === 'custom' && (
-        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
           Chat 自定义会使用下方 API 配置中标记为“默认”的模型；也可以在大聊天窗口中为单个面板临时选择其他模型。
         </div>
       )}
@@ -899,18 +1044,18 @@ function AISection({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-sm">{getProviderName(c.providerId || c.provider)}</span>
+                    <span className="font-medium text-[13px]">{getProviderName(c.providerId || c.provider)}</span>
                     {c.isDefault && (
-                      <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded shrink-0">默认</span>
+                      <span className="text-[11px] bg-primary text-primary-foreground px-2 py-0.5 rounded shrink-0">默认</span>
                     )}
                   </div>
-                  <div className="text-xs text-muted-foreground mb-1">
+                  <div className="text-[11px] text-muted-foreground mb-1">
                     {c.providerId || c.provider} · {c.model}
                   </div>
-                  <div className="text-xs text-muted-foreground truncate">{c.baseUrl}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{describeApiKey(c.apiKey)}</div>
+                  <div className="text-[11px] text-muted-foreground truncate">{c.baseUrl}</div>
+                  <div className="text-[11px] text-muted-foreground mt-1">{describeApiKey(c.apiKey)}</div>
                   {testResult && (
-                    <div className={`text-xs mt-1 ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                    <div className={`text-[11px] mt-1 ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
                       {testResult.message}
                       {testResult.latency !== undefined && ` (${testResult.latency}ms)`}
                     </div>
@@ -937,7 +1082,7 @@ function AISection({
           );
         })}
         {configs.length === 0 && (
-          <div className="text-sm text-muted-foreground border border-border rounded-lg p-4">
+          <div className="text-[13px] text-muted-foreground border border-border rounded-lg p-4">
             暂无 API 配置，点击"添加配置"按钮添加
           </div>
         )}
@@ -945,7 +1090,7 @@ function AISection({
 
       <Separator className="my-6" />
       <SectionTitle>System Prompt</SectionTitle>
-      <Textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={6} className="font-mono text-sm" />
+      <Textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={6} className="font-mono text-[13px]" />
       <div className="flex gap-2 mt-3">
         <Button onClick={() => updateSystemPrompt(systemPrompt)}>保存</Button>
         <Button variant="outline" onClick={() => setSystemPrompt(DEFAULT_SYSTEM_PROMPT)}>重置为默认</Button>
@@ -954,7 +1099,7 @@ function AISection({
       <Separator className="my-6" />
       <SectionTitle>模型参数</SectionTitle>
       <SettingRow label="温度">
-        <span className="text-xs text-muted-foreground w-8">{settings.temperature.toFixed(1)}</span>
+        <span className="text-[11px] text-muted-foreground w-8">{settings.temperature.toFixed(1)}</span>
         <Slider value={[settings.temperature]} onValueChange={([v]) => updateSetting('temperature', v)} min={0} max={2} step={0.1} className="w-32" />
       </SettingRow>
       <SettingRow label="最大 Token">
@@ -968,7 +1113,7 @@ function AISection({
       <SectionTitle>STT 模型</SectionTitle>
       <SettingRow label="STT 使用" hint="默认和自定义都会在失败时回退到系统输入">
         <select
-          className="bg-input border border-border rounded px-2 py-1 text-sm"
+          className="bg-input border border-border rounded px-2 py-1 text-[13px]"
           value={settings.voiceInputProvider}
           onChange={(e) => updateSetting('voiceInputProvider', e.target.value as VoiceProviderMode)}
         >
@@ -1007,7 +1152,7 @@ function AISection({
         </div>
       )}
       <SettingRow label="语音输入语言">
-        <select className="bg-input border border-border rounded px-2 py-1 text-sm"
+        <select className="bg-input border border-border rounded px-2 py-1 text-[13px]"
           value={settings.voiceInputLang} onChange={(e) => updateSetting('voiceInputLang', e.target.value)}>
           <option value="system">跟随系统</option>
           <option value="zh-CN">简体中文</option>
@@ -1022,7 +1167,7 @@ function AISection({
       </SettingRow>
       <SettingRow label="TTS 使用" hint="默认和自定义都会在失败时回退到系统朗读">
         <select
-          className="bg-input border border-border rounded px-2 py-1 text-sm"
+          className="bg-input border border-border rounded px-2 py-1 text-[13px]"
           value={settings.voiceOutputProvider}
           onChange={(e) => updateSetting('voiceOutputProvider', e.target.value as VoiceProviderMode)}
         >
@@ -1081,7 +1226,7 @@ function AISection({
       </SettingRow>
       <SettingRow label="朗读语速">
         <div className="flex items-center gap-3">
-          <span className="w-12 text-right text-xs text-muted-foreground">{settings.speakRate.toFixed(1)}x</span>
+          <span className="w-12 text-right text-[11px] text-muted-foreground">{settings.speakRate.toFixed(1)}x</span>
           <Slider
             value={[settings.speakRate]}
             onValueChange={([v]) => updateSetting('speakRate', v)}
@@ -1102,7 +1247,7 @@ function UsageMeter({ label, value, detail }: { label: string; value: number; de
   const percent = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
   return (
     <div className="rounded-md border border-border/70 bg-background/70 px-2.5 py-2">
-      <div className="flex items-center justify-between gap-2 text-xs">
+      <div className="flex items-center justify-between gap-2 text-[11px]">
         <span className="font-medium">{label}</span>
         <span className="text-muted-foreground">{percent}%</span>
       </div>
@@ -1179,7 +1324,7 @@ function HistorySection() {
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <SectionTitle>{selected.title || `对话 ${selected.id}`}</SectionTitle>
-            <p className="text-xs text-muted-foreground">{selected.updatedAt}</p>
+            <p className="text-[11px] text-muted-foreground">{selected.updatedAt}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setSelected(null)}>返回</Button>
         </div>
@@ -1187,8 +1332,8 @@ function HistorySection() {
           {selected.messages.map((msg) => (
             <div key={msg.id} className="border border-border rounded-lg p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground">{msg.role}</span>
-                <span className="text-xs text-muted-foreground">{msg.timestamp}</span>
+                <span className="text-[11px] font-medium text-muted-foreground">{msg.role}</span>
+                <span className="text-[11px] text-muted-foreground">{msg.timestamp}</span>
               </div>
               {(msg.imageDataUrl || msg.imageUrl) && (
                 <img
@@ -1197,7 +1342,7 @@ function HistorySection() {
                   className="mb-2 max-h-64 rounded-md object-contain"
                 />
               )}
-              <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+              <div className="text-[13px] whitespace-pre-wrap leading-relaxed">{msg.content}</div>
             </div>
           ))}
         </div>
@@ -1224,10 +1369,9 @@ function HistorySection() {
   return (
     <>
       <SectionTitle>历史对话</SectionTitle>
-      <SectionDesc>本地保存的对话记录。</SectionDesc>
       <div className="space-y-3">
         {items.length === 0 && (
-          <div className="text-sm text-muted-foreground border border-border rounded-lg p-4">
+          <div className="text-[13px] text-muted-foreground border border-border rounded-lg p-4">
             暂无历史对话
           </div>
         )}
@@ -1238,10 +1382,10 @@ function HistorySection() {
             onClick={() => openConversation(item)}
           >
             <div className="flex items-center justify-between gap-3 mb-2">
-              <span className="text-sm font-medium truncate">{item.title || `对话 ${item.id}`}</span>
-              <span className="text-xs text-muted-foreground shrink-0">{item.updatedAt}</span>
+              <span className="text-[13px] font-medium truncate">{item.title || `对话 ${item.id}`}</span>
+              <span className="text-[11px] text-muted-foreground shrink-0">{item.updatedAt}</span>
             </div>
-            <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-4">
+            <p className="text-[11px] text-muted-foreground whitespace-pre-wrap line-clamp-4">
               {item.preview || '空对话'}
             </p>
           </button>
@@ -1375,9 +1519,9 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <label className="text-sm font-medium">服务提供商</label>
+            <label className="text-[13px] font-medium">服务提供商</label>
             <select
-              className="w-full bg-input border border-border rounded-md px-3 py-2 text-sm"
+              className="w-full bg-input border border-border rounded-md px-3 py-2 text-[13px]"
               value={form.providerId}
               onChange={(e) => handleProviderChange(e.target.value)}
             >
@@ -1388,7 +1532,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Base URL</label>
+            <label className="text-[13px] font-medium">Base URL</label>
             <Input
               readOnly={selectedProvider.id !== 'custom'}
               placeholder="https://api.example.com/v1"
@@ -1399,7 +1543,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">模型名称</label>
+            <label className="text-[13px] font-medium">模型名称</label>
             <Input
               placeholder="请填写模型名称，例如：gpt-4o-mini"
               value={form.model}
@@ -1408,7 +1552,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">API Key</label>
+            <label className="text-[13px] font-medium">API Key</label>
             <Input
               type="password"
               placeholder={hasSavedApiKey(editingConfig) ? '已保存，留空则不修改' : selectedProvider.apiKeyHint}
@@ -1420,7 +1564,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
               }}
               onChange={(e) => setForm({ ...form, apiKey: e.target.value })}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground">
               {editingConfig
                 ? `${describeApiKey(editingConfig.apiKey)}。留空保存则不修改，重新粘贴会覆盖。`
                 : '保存后会显示长度、尾号和指纹，方便确认测试时使用的是同一把 Key。'}
@@ -1428,7 +1572,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           </div>
 
           {selectedProvider.docsUrl && (
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <span>获取 API Key：</span>
               <button
                 type="button"

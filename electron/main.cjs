@@ -1,0 +1,803 @@
+const {
+  app,
+  BrowserWindow,
+  desktopCapturer,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  nativeImage,
+  protocol,
+  screen,
+  shell,
+  Tray,
+} = require('electron');
+const fs = require('node:fs');
+const fsp = require('node:fs/promises');
+const path = require('node:path');
+const zlib = require('node:zlib');
+
+const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
+const windows = new Map();
+let topmostGuard = null;
+let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'idle.png');
+let tray = null;
+let currentAppIcon = null;
+const floatingConfiguredWindows = new WeakSet();
+
+app.setName('DeskSprite');
+if (process.platform === 'darwin') app.setActivationPolicy('regular');
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'desksprite-app',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+  {
+    scheme: 'desksprite-file',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+]);
+
+function preload(label) {
+  return {
+    preload: path.join(__dirname, 'preload.cjs'),
+    additionalArguments: [`--desksprite-label=${label}`],
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: false,
+  };
+}
+
+function rendererUrl(label) {
+  if (isDev) return `${devUrl}/#${label}`;
+  return `desksprite-app://localhost/index.html#${label}`;
+}
+
+function send(win, channel, payload) {
+  if (!win || win.isDestroyed()) return;
+  win.webContents.send(`desksprite:event:${channel}`, payload);
+}
+
+function broadcast(channel, payload) {
+  for (const win of windows.values()) send(win, channel, payload);
+}
+
+function applyFloatingFullscreenBehavior(win, options = {}) {
+  if (!win || win.isDestroyed()) return;
+  const force = Boolean(options.force);
+  if (process.platform === 'darwin') {
+    if (!force && floatingConfiguredWindows.has(win) && win.isAlwaysOnTop()) return;
+    if (app.dock) app.dock.show();
+    win.setSkipTaskbar(false);
+    win.setVisibleOnAllWorkspaces(true, {
+      visibleOnFullScreen: true,
+      skipTransformProcessType: true,
+    });
+    win.setFullScreenable(false);
+    win.setAlwaysOnTop(true, 'screen-saver', 1);
+    floatingConfiguredWindows.add(win);
+    if (force) win.moveTop();
+  } else {
+    if (!force && floatingConfiguredWindows.has(win) && win.isAlwaysOnTop()) return;
+    win.setAlwaysOnTop(true, 'normal');
+    win.setSkipTaskbar(true);
+    floatingConfiguredWindows.add(win);
+  }
+}
+
+function makeSquareIcon(iconPath, size = 512) {
+  if (!fs.existsSync(iconPath)) return nativeImage.createEmpty();
+  const source = nativeImage.createFromPath(iconPath);
+  if (source.isEmpty()) return source;
+  const sourceSize = source.getSize();
+  if (!sourceSize.width || !sourceSize.height) return source;
+  const ratio = Math.min(size / sourceSize.width, size / sourceSize.height);
+  const drawWidth = Math.round(sourceSize.width * ratio);
+  const drawHeight = Math.round(sourceSize.height * ratio);
+  const x = Math.round((size - drawWidth) / 2);
+  const y = Math.round((size - drawHeight) / 2);
+  const resized = source.resize({ width: drawWidth, height: drawHeight });
+  const bitmap = resized.toBitmap();
+  const rgba = Buffer.alloc(size * size * 4);
+
+  for (let row = 0; row < drawHeight; row += 1) {
+    for (let col = 0; col < drawWidth; col += 1) {
+      const sourceOffset = (row * drawWidth + col) * 4;
+      const targetOffset = ((y + row) * size + x + col) * 4;
+      rgba[targetOffset] = bitmap[sourceOffset + 2];
+      rgba[targetOffset + 1] = bitmap[sourceOffset + 1];
+      rgba[targetOffset + 2] = bitmap[sourceOffset];
+      rgba[targetOffset + 3] = bitmap[sourceOffset + 3];
+    }
+  }
+
+  return nativeImage.createFromBuffer(encodePngRgba(size, size, rgba));
+}
+
+function crc32(buffer) {
+  let crc = 0xffffffff;
+  for (const byte of buffer) {
+    crc ^= byte;
+    for (let i = 0; i < 8; i += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type, data) {
+  const typeBuffer = Buffer.from(type, 'ascii');
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length, 0);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([typeBuffer, data])), 0);
+  return Buffer.concat([length, typeBuffer, data, crc]);
+}
+
+function encodePngRgba(width, height, rgba) {
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  ihdr[10] = 0;
+  ihdr[11] = 0;
+  ihdr[12] = 0;
+
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  for (let row = 0; row < height; row += 1) {
+    const rawOffset = row * (width * 4 + 1);
+    raw[rawOffset] = 0;
+    rgba.copy(raw, rawOffset + 1, row * width * 4, (row + 1) * width * 4);
+  }
+
+  return Buffer.concat([
+    signature,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', zlib.deflateSync(raw)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+function makeProportionalIcon(iconPath, height = 512) {
+  if (!fs.existsSync(iconPath)) return nativeImage.createEmpty();
+  const image = nativeImage.createFromPath(iconPath);
+  if (image.isEmpty()) return image;
+  return image.resize({ height });
+}
+
+function makeIconImage(iconPath, size = 24) {
+  const image = makeProportionalIcon(iconPath, size);
+  if (image.isEmpty()) return image;
+  image.setTemplateImage(false);
+  return image;
+}
+
+function centerBounds(widthRatio, heightRatio = widthRatio) {
+  const display = screen.getPrimaryDisplay();
+  const work = display.workArea;
+  const width = Math.round(work.width * widthRatio);
+  const height = Math.round(work.height * heightRatio);
+  return {
+    width,
+    height,
+    x: Math.round(work.x + (work.width - width) / 2),
+    y: Math.round(work.y + (work.height - height) / 2),
+  };
+}
+
+function createWindow(label, options) {
+  const existing = windows.get(label);
+  if (existing && !existing.isDestroyed()) return existing;
+
+  const win = new BrowserWindow({
+    show: false,
+    backgroundColor: '#00000000',
+    icon: currentAppIconPath,
+    ...options,
+    webPreferences: preload(label),
+  });
+  windows.set(label, win);
+  win.loadURL(rendererUrl(label));
+  win.setTitle('');
+  win.on('move', () => send(win, 'window:moved', null));
+  win.on('closed', () => windows.delete(label));
+  return win;
+}
+
+function resolveAppIconPath(iconPath) {
+  if (!iconPath || typeof iconPath !== 'string') return currentAppIconPath;
+  if (iconPath.startsWith('assets/')) {
+    return path.join(app.getAppPath(), 'public', iconPath);
+  }
+  return iconPath;
+}
+
+function setAppIcon(iconPath) {
+  const resolved = resolveAppIconPath(iconPath);
+  if (!fs.existsSync(resolved)) return false;
+  currentAppIconPath = resolved;
+  const image = makeProportionalIcon(resolved, 512);
+  if (image.isEmpty()) return false;
+  currentAppIcon = image;
+  if (process.platform === 'darwin' && app.dock) {
+    const dockImage = makeSquareIcon(resolved, 512);
+    app.dock.show();
+    app.dock.setIcon(dockImage.isEmpty() ? image : dockImage);
+  }
+  const trayImage = makeIconImage(resolved, 18);
+  if (!trayImage.isEmpty()) {
+    if (!tray) {
+      tray = new Tray(trayImage);
+      tray.setToolTip('DeskSprite');
+      updateTrayMenu();
+      tray.on('right-click', updateTrayMenu);
+      tray.on('click', updateTrayMenu);
+    } else {
+      tray.setImage(trayImage);
+      updateTrayMenu();
+    }
+  }
+  for (const win of windows.values()) {
+    if (!win || win.isDestroyed()) continue;
+    win.setIcon(image);
+  }
+  return true;
+}
+
+function isPetVisible() {
+  const win = windows.get('pet');
+  return Boolean(win && !win.isDestroyed() && win.isVisible());
+}
+
+function showPetWindow() {
+  const win = windows.get('pet') || createPetWindow();
+  applyFloatingFullscreenBehavior(win, { force: true });
+  win.showInactive();
+  applyFloatingFullscreenBehavior(win, { force: true });
+  win.moveTop();
+}
+
+function hidePetWindow() {
+  windows.get('pet')?.hide();
+  windows.get('compact-chat')?.hide();
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const petVisible = isPetVisible();
+  tray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: petVisible ? '隐藏灵宠' : '显示灵宠',
+      click: () => {
+        if (isPetVisible()) hidePetWindow();
+        else showPetWindow();
+        updateTrayMenu();
+      },
+    },
+    { type: 'separator' },
+    { label: '打开设置', click: () => showSettingsWindow() },
+    { label: '打开聊天', click: () => showChatWindow() },
+    { type: 'separator' },
+    { label: '退出', click: () => app.quit() },
+  ]));
+}
+
+function ensureTopmostGuard() {
+  if (topmostGuard) return;
+  topmostGuard = setInterval(() => {
+    for (const label of ['pet', 'compact-chat']) {
+      const win = windows.get(label);
+      if (win?.isVisible()) applyFloatingFullscreenBehavior(win);
+    }
+  }, 500);
+}
+
+function createPetWindow() {
+  const display = screen.getPrimaryDisplay();
+  const work = display.workArea;
+  const win = createWindow('pet', {
+    width: 220,
+    height: 220,
+    x: Math.round(work.x + work.width - 260),
+    y: Math.round(work.y + work.height - 260),
+    transparent: true,
+    type: process.platform === 'darwin' ? 'panel' : undefined,
+    frame: false,
+    focusable: false,
+    resizable: false,
+    movable: false,
+    skipTaskbar: process.platform !== 'darwin',
+    hasShadow: false,
+    alwaysOnTop: true,
+  });
+  applyFloatingFullscreenBehavior(win, { force: true });
+  win.setIgnoreMouseEvents(false, { forward: true });
+  const showPetInactive = () => {
+    if (win.isDestroyed() || win.isVisible()) return;
+    applyFloatingFullscreenBehavior(win, { force: true });
+    win.showInactive();
+    applyFloatingFullscreenBehavior(win, { force: true });
+  };
+  win.once('ready-to-show', showPetInactive);
+  win.webContents.once('did-finish-load', () => {
+    setTimeout(showPetInactive, 80);
+  });
+  win.on('show', updateTrayMenu);
+  win.on('hide', updateTrayMenu);
+  return win;
+}
+
+function showSettingsWindow() {
+  windows.get('compact-chat')?.hide();
+  broadcast('compact-chat:collapsed', {});
+  const bounds = centerBounds(0.62, 0.7);
+  const win = createWindow('settings', {
+    ...bounds,
+    title: '',
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
+    resizable: true,
+    frame: true,
+    transparent: false,
+    alwaysOnTop: false,
+    backgroundColor: '#f7f3ed',
+  });
+  win.setBounds(bounds);
+  win.show();
+  win.focus();
+}
+
+function showChatWindow() {
+  windows.get('compact-chat')?.hide();
+  const bounds = centerBounds(0.8);
+  const win = createWindow('chat', {
+    ...bounds,
+    title: '',
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' } : {}),
+    resizable: true,
+    frame: true,
+    transparent: false,
+    alwaysOnTop: false,
+    backgroundColor: '#f7f3ed',
+  });
+  win.setBounds(bounds);
+  win.show();
+  win.focus();
+}
+
+function showCompactChatWindow({ x, y, w, h }, show = true) {
+  const win = createWindow('compact-chat', {
+    width: Math.round(w),
+    height: Math.round(h),
+    x: Math.round(x),
+    y: Math.round(y),
+    transparent: true,
+    type: process.platform === 'darwin' ? 'panel' : undefined,
+    frame: false,
+    resizable: false,
+    movable: false,
+    skipTaskbar: process.platform !== 'darwin',
+    hasShadow: false,
+    alwaysOnTop: true,
+  });
+  win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) });
+  applyFloatingFullscreenBehavior(win, { force: show });
+  if (show) {
+    win.showInactive();
+    applyFloatingFullscreenBehavior(win, { force: true });
+    win.moveTop();
+  }
+}
+
+function getAssetsDir(state) {
+  const dir = path.join(app.getPath('userData'), 'assets', state);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function ensureUserAsset(filePath) {
+  const base = path.join(app.getPath('userData'), 'assets');
+  const resolved = path.resolve(filePath);
+  const resolvedBase = path.resolve(base);
+  if (!resolved.startsWith(resolvedBase + path.sep) && resolved !== resolvedBase) {
+    throw new Error('File path is not in allowed assets directory');
+  }
+}
+
+function imageMime(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.gif') return 'image/gif';
+  if (ext === '.bmp') return 'image/bmp';
+  return 'image/png';
+}
+
+function contentType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.html') return 'text/html; charset=utf-8';
+  if (ext === '.js' || ext === '.mjs') return 'text/javascript; charset=utf-8';
+  if (ext === '.css') return 'text/css; charset=utf-8';
+  if (ext === '.json') return 'application/json; charset=utf-8';
+  if (ext === '.svg') return 'image/svg+xml';
+  if (ext === '.png') return 'image/png';
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  if (ext === '.webp') return 'image/webp';
+  if (ext === '.gif') return 'image/gif';
+  if (ext === '.ico') return 'image/x-icon';
+  return 'application/octet-stream';
+}
+
+async function importPetImage({ srcPath, state }) {
+  if (!['idle', 'thinking', 'sleeping'].includes(state)) throw new Error(`Invalid state: ${state}`);
+  const source = path.resolve(srcPath);
+  const ext = path.extname(source).toLowerCase();
+  if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'].includes(ext)) {
+    throw new Error('请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 图片');
+  }
+  const dir = getAssetsDir(state);
+  const stem = path.basename(source, ext).replace(/[^a-zA-Z0-9._-]+/g, '-') || 'image';
+  let dest = path.join(dir, `${stem}${ext}`);
+  let counter = 1;
+  while (fs.existsSync(dest)) {
+    dest = path.join(dir, `${stem}_${counter}${ext}`);
+    counter += 1;
+  }
+  await fsp.copyFile(source, dest);
+  return dest;
+}
+
+async function listPetImages({ state }) {
+  if (!['idle', 'thinking', 'sleeping'].includes(state)) throw new Error(`Invalid state: ${state}`);
+  const dir = getAssetsDir(state);
+  const entries = await fsp.readdir(dir, { withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile() && ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'].includes(path.extname(entry.name).toLowerCase()))
+    .map((entry) => path.join(dir, entry.name))
+    .sort();
+}
+
+async function readPetImageDataUrl({ filePath }) {
+  ensureUserAsset(filePath);
+  const bytes = await fsp.readFile(filePath);
+  return `data:${imageMime(filePath)};base64,${bytes.toString('base64')}`;
+}
+
+async function captureScreenRegion(args) {
+  const sources = await desktopCapturer.getSources({
+    types: ['screen'],
+    thumbnailSize: {
+      width: Math.max(1, Math.round(Number(args.width) + Number(args.x))),
+      height: Math.max(1, Math.round(Number(args.height) + Number(args.y))),
+    },
+  });
+  const image = sources[0]?.thumbnail;
+  if (!image || image.isEmpty()) throw new Error('无法获取屏幕截图');
+  const crop = image.crop({
+    x: Math.max(0, Math.round(Number(args.x))),
+    y: Math.max(0, Math.round(Number(args.y))),
+    width: Math.max(1, Math.round(Number(args.width))),
+    height: Math.max(1, Math.round(Number(args.height))),
+  });
+  return crop.toPNG().toString('base64');
+}
+
+function normalizeApiKey(value) {
+  return String(value ?? '').trim().replace(/^Bearer\s+/i, '').replace(/\s+/g, '');
+}
+
+function normalizeBaseUrl(value) {
+  const baseUrl = String(value ?? '').trim().replace(/\/+$/, '');
+  if (!/^https?:\/\//.test(baseUrl)) throw new Error('Base URL 必须以 http:// 或 https:// 开头。');
+  return baseUrl;
+}
+
+function extractApiErrorMessage(text) {
+  try {
+    const data = JSON.parse(text);
+    return data?.error?.message || data?.message || text;
+  } catch {
+    return text || null;
+  }
+}
+
+function buildChatBody(provider, model, messages) {
+  if (provider === 'anthropic') {
+    const system = messages.find((message) => message.role === 'system')?.content ?? '';
+    return {
+      model,
+      system,
+      max_tokens: 2048,
+      messages: messages
+        .filter((message) => message.role !== 'system')
+        .map((message) => {
+          if (!message.imageDataUrl) return { role: message.role, content: message.content };
+          const [header, data] = String(message.imageDataUrl).split(',');
+          const mimeType = header?.match(/^data:([^;]+)/)?.[1] || 'image/png';
+          return {
+            role: message.role,
+            content: [
+              { type: 'image', source: { type: 'base64', media_type: mimeType, data: data || message.imageDataUrl } },
+              { type: 'text', text: message.content || '请分析这张图片。' },
+            ],
+          };
+        }),
+    };
+  }
+  return {
+    model,
+    stream: false,
+    messages: messages.map((message) => {
+      if (!message.imageDataUrl) return { role: message.role, content: message.content };
+      return {
+        role: message.role,
+        content: [
+          { type: 'text', text: message.content || '请分析这张图片。' },
+          { type: 'image_url', image_url: { url: message.imageDataUrl } },
+        ],
+      };
+    }),
+  };
+}
+
+function parseChatResponse(text, provider) {
+  const data = JSON.parse(text);
+  if (provider === 'anthropic') {
+    return (data.content || []).map((item) => item.text || '').join('');
+  }
+  const content = data.choices?.[0]?.message?.content;
+  return Array.isArray(content) ? content.map((item) => item.text || '').join('') : String(content || '');
+}
+
+async function chatCompletion({ request }) {
+  const apiKey = normalizeApiKey(request.apiKey);
+  if (!apiKey) throw new Error('API Key 为空。');
+  const provider = String(request.provider || '').toLowerCase();
+  const baseUrl = normalizeBaseUrl(request.baseUrl);
+  const endpoint = provider === 'anthropic' ? `${baseUrl}/messages` : `${baseUrl}/chat/completions`;
+  const headers = { 'content-type': 'application/json' };
+  if (provider === 'anthropic') {
+    headers['x-api-key'] = apiKey;
+    headers['anthropic-version'] = '2023-06-01';
+  } else {
+    headers.authorization = `Bearer ${apiKey}`;
+  }
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(buildChatBody(provider, request.model, request.messages || [])),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText}`);
+  const content = parseChatResponse(text, provider);
+  if (!content) throw new Error('模型返回内容为空。');
+  return content;
+}
+
+async function testAiConnection({ request }) {
+  const started = Date.now();
+  try {
+    await chatCompletion({
+      request: {
+        ...request,
+        messages: [{ role: 'user', content: 'ping' }],
+      },
+    });
+    return { success: true, message: '测试通过', latency: Date.now() - started };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : String(error), latency: Date.now() - started };
+  }
+}
+
+async function transcribeAudio({ request }) {
+  const apiKey = normalizeApiKey(request.apiKey);
+  if (!apiKey) throw new Error('API Key 为空。');
+  const form = new FormData();
+  const bytes = Buffer.from(String(request.audioBase64 || '').split(',').pop() || '', 'base64');
+  form.append('model', request.model);
+  if (request.language) form.append('language', String(request.language).split(/[-_]/)[0].toLowerCase());
+  form.append('file', new Blob([bytes], { type: request.mimeType || 'audio/webm' }), request.fileName || 'recording.webm');
+  const response = await fetch(`${normalizeBaseUrl(request.baseUrl)}/audio/transcriptions`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText}`);
+  return JSON.parse(text).text?.trim() || '';
+}
+
+async function synthesizeSpeech({ request }) {
+  const apiKey = normalizeApiKey(request.apiKey);
+  if (!apiKey) throw new Error('API Key 为空。');
+  const format = request.format || 'mp3';
+  const response = await fetch(`${normalizeBaseUrl(request.baseUrl)}/audio/speech`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: request.model,
+      input: request.input,
+      voice: request.voice || 'alloy',
+      response_format: format,
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText}`);
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  const mimeType = format === 'opus' ? 'audio/ogg' : format === 'wav' ? 'audio/wav' : 'audio/mpeg';
+  return { dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`, mimeType };
+}
+
+const keyStore = new Map();
+
+const handlers = {
+  show_settings_cmd: () => showSettingsWindow(),
+  show_chat_window: () => showChatWindow(),
+  show_compact_chat_window: (args) => showCompactChatWindow(args, true),
+  position_compact_chat_window: (args) => showCompactChatWindow(args, false),
+  hide_compact_chat_window: () => windows.get('compact-chat')?.hide(),
+  is_compact_chat_visible: () => {
+    const win = windows.get('compact-chat');
+    return Boolean(win && !win.isDestroyed() && win.isVisible());
+  },
+  focus_compact_chat_window: () => {
+    const win = windows.get('compact-chat');
+    if (win && !win.isDestroyed()) {
+      applyFloatingFullscreenBehavior(win, { force: true });
+      win.show();
+      win.moveTop();
+      win.focus();
+    }
+  },
+  focus_compact_chat_input: () => broadcast('compact-chat:focus-input', {}),
+  show_pet_window: () => showPetWindow(),
+  hide_pet_window: () => hidePetWindow(),
+  quit_app: () => app.quit(),
+  pin_pet_above_fullscreen_cmd: () => applyFloatingFullscreenBehavior(windows.get('pet'), { force: true }),
+  unpin_pet_from_fullscreen_cmd: () => windows.get('pet')?.setAlwaysOnTop(false),
+  start_topmost_guard: () => {
+    ensureTopmostGuard();
+  },
+  stop_topmost_guard: () => {
+    if (topmostGuard) clearInterval(topmostGuard);
+    topmostGuard = null;
+  },
+  import_pet_image: importPetImage,
+  list_pet_images: listPetImages,
+  delete_pet_image: async ({ filePath }) => {
+    ensureUserAsset(filePath);
+    await fsp.unlink(filePath);
+  },
+  read_pet_image_data_url: readPetImageDataUrl,
+  resize_compact_chat_window: ({ height }) => {
+    const win = windows.get('compact-chat');
+    if (!win || win.isDestroyed()) return;
+    const [width, currentHeight] = win.getSize();
+    const nextHeight = Math.max(1, Math.round(Number(height) || currentHeight));
+    if (Math.abs(currentHeight - nextHeight) <= 1) return;
+    win.setSize(width, nextHeight);
+    applyFloatingFullscreenBehavior(win);
+  },
+  capture_screen_region: captureScreenRegion,
+  open_external_url: ({ url }) => shell.openExternal(url),
+  chat_completion: chatCompletion,
+  test_ai_connection: testAiConnection,
+  transcribe_audio: transcribeAudio,
+  synthesize_speech: synthesizeSpeech,
+  can_start_speech_recognition: () => true,
+  set_app_icon: ({ path: iconPath }) => setAppIcon(iconPath),
+  save_api_key: ({ keyringRef, key }) => {
+    keyStore.set(keyringRef, key);
+  },
+  get_api_key: ({ keyringRef }) => keyStore.get(keyringRef) || '',
+  delete_api_key: ({ keyringRef }) => {
+    keyStore.delete(keyringRef);
+  },
+};
+
+ipcMain.handle('desksprite:invoke', async (_event, command, args) => {
+  const handler = handlers[command];
+  if (!handler) throw new Error(`Unknown command: ${command}`);
+  return handler(args || {});
+});
+
+ipcMain.handle('desksprite:emit', (_event, channel, payload) => {
+  broadcast(channel, payload);
+});
+
+ipcMain.handle('desksprite:window', (event, action, value) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) return null;
+  if (action === 'outerPosition') {
+    const [x, y] = win.getPosition();
+    return { x, y };
+  }
+  if (action === 'outerSize') {
+    const [width, height] = win.getSize();
+    return { width, height };
+  }
+  if (action === 'setPosition') {
+    win.setPosition(Math.round(value.x), Math.round(value.y));
+    return null;
+  }
+  if (action === 'setSize') {
+    win.setSize(Math.round(value.width), Math.round(value.height));
+    return null;
+  }
+  return null;
+});
+
+ipcMain.handle('desksprite:current-monitor', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const bounds = win?.getBounds() || screen.getPrimaryDisplay().bounds;
+  const display = screen.getDisplayMatching(bounds);
+  return {
+    scaleFactor: 1,
+    workArea: {
+      position: { x: display.workArea.x, y: display.workArea.y },
+      size: { width: display.workArea.width, height: display.workArea.height },
+    },
+  };
+});
+
+ipcMain.handle('desksprite:open-dialog', async (event, options) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const result = await dialog.showOpenDialog(win || undefined, {
+    properties: options.multiple ? ['openFile', 'multiSelections'] : ['openFile'],
+    filters: options.filters || [],
+  });
+  if (result.canceled) return null;
+  return options.multiple ? result.filePaths : result.filePaths[0] || null;
+});
+
+function registerProtocols() {
+  protocol.handle('desksprite-app', async (request) => {
+    const url = new URL(request.url);
+    const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+    const filePath = path.join(app.getAppPath(), 'dist', pathname.replace(/^\/+/, ''));
+    return new Response(await fsp.readFile(filePath), {
+      headers: { 'content-type': contentType(filePath) },
+    });
+  });
+  protocol.handle('desksprite-file', async (request) => {
+    const filePath = decodeURIComponent(new URL(request.url).pathname.replace(/^\/+/, ''));
+    return new Response(await fsp.readFile(filePath), {
+      headers: { 'content-type': contentType(filePath) },
+    });
+  });
+}
+
+app.whenReady().then(() => {
+  registerProtocols();
+  setAppIcon('assets/idle/idle.png');
+  createPetWindow();
+  ensureTopmostGuard();
+  globalShortcut.register('CommandOrControl+Shift+Space', () => broadcast('shortcut:chat-focus', {}));
+  app.on('activate', () => {
+    if (!windows.get('pet')) createPetWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  // Keep the menu-bar style utility process alive after auxiliary windows close.
+});
+
+app.on('before-quit', () => {
+  if (topmostGuard) clearInterval(topmostGuard);
+  globalShortcut.unregisterAll();
+});

@@ -8,20 +8,17 @@ interface SettingsLayoutProps {
 
 export function SettingsLayout({ children, sidebar }: SettingsLayoutProps) {
   return (
-    <div className="flex h-screen w-screen bg-[#f5f5f7] text-foreground antialiased dark:bg-background">
-      <aside className="w-48 shrink-0 border-r border-black/10 flex flex-col bg-[#ededf0]/90 dark:border-border/60 dark:bg-muted/50">
-        <div className="px-4 pb-3 pt-8">
-          <h1 className="text-[19px] font-semibold tracking-[-0.01em] text-foreground">
-            DeskSprite
-          </h1>
-        </div>
-        <nav className="flex-1 px-2.5 pb-4 space-y-1">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-background text-foreground antialiased">
+      <div className="app-drag-region fixed left-0 right-0 top-0 z-[9999] h-14" />
+      <aside className="glass-panel flex w-[218px] shrink-0 flex-col rounded-none border-y-0 border-l-0">
+        <div className="h-14 shrink-0" />
+        <nav className="app-no-drag flex-1 space-y-1 px-2 pb-4">
           {sidebar}
         </nav>
       </aside>
-      <main className="flex-1 min-w-0">
+      <main className="min-w-0 flex-1">
         <ScrollArea className="h-full">
-          <div className="px-10 py-9 max-w-[760px]">
+          <div className="app-no-drag mt-14 max-w-[840px] px-6 pb-6">
             {children}
           </div>
         </ScrollArea>

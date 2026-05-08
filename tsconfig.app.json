@@ -18,7 +18,11 @@
     /* Path alias */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@tauri-apps/api/core": ["./src/electron-shims/core.ts"],
+      "@tauri-apps/api/event": ["./src/electron-shims/event.ts"],
+      "@tauri-apps/api/window": ["./src/electron-shims/window.ts"],
+      "@tauri-apps/plugin-dialog": ["./src/electron-shims/dialog.ts"]
     },
     "ignoreDeprecations": "6.0",
 

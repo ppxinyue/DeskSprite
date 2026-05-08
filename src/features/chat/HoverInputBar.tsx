@@ -16,6 +16,8 @@ interface HoverInputBarProps {
 
 export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarProps) {
   const [input, setInput] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [shakeKey, setShakeKey] = useState(0);
   const { getDefaultConfig } = useApiConfigStore();
   const { settings } = useSettingsStore();
   const hasApiKey = true;
@@ -28,7 +30,11 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text) return;
+    if (!text) {
+      setError('先写点内容再发送。');
+      setShakeKey((value) => value + 1);
+      return;
+    }
 
     const defaultConfig = settings.chatModelMode === 'custom' ? getDefaultConfig() : undefined;
     const resolved = await resolveChatConfig(defaultConfig);
@@ -40,6 +46,7 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
 
     addMessage(createMessage('user', text));
     setInput('');
+    setError(null);
     onExpand();
 
     let convoId = currentConversationId;
@@ -96,11 +103,11 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
       style={{ width: `${Math.max(dialogWidth, 240)}px` }}
     >
       <div
-        className="rounded-xl border border-white/20 shadow-xl overflow-hidden"
-        style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(20px)' }}
+        key={shakeKey}
+        className={`glass-panel overflow-hidden rounded-[11px] transition-all ${error ? 'animate-input-shake border-destructive/50' : ''}`}
       >
         {!hasApiKey ? (
-          <div className="px-4 py-3 text-xs text-white/70 text-center">
+          <div className="px-3 py-2.5 text-xs text-white/70 text-center">
             请先在{' '}
             <button
               className="underline text-white/90 hover:text-white"
@@ -117,18 +124,20 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
           <div className="flex items-center gap-2 px-3 py-2">
             <textarea
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (error) setError(null);
+              }}
               onKeyDown={handleKeyDown}
               placeholder={`和 ${petName} 说点什么...`}
               rows={1}
-              className="flex-1 bg-transparent text-sm text-white placeholder-white/50 resize-none outline-none leading-5"
+              className="flex-1 resize-none bg-transparent text-sm leading-5 text-foreground outline-none placeholder:text-muted-foreground"
               style={{ minHeight: '20px', maxHeight: '80px' }}
             />
             {input.trim() && (
               <button
                 onClick={handleSend}
-                className="text-white/80 hover:text-white text-xs px-2 py-1 rounded-md transition-colors"
-                style={{ background: 'rgba(255,255,255,0.2)' }}
+                className="rounded-[10px] bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 active:scale-[0.98]"
               >
                 发送
               </button>
@@ -136,6 +145,9 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
           </div>
         )}
       </div>
+      {error && (
+        <p className="mt-1.5 px-2 text-[11px] text-destructive">{error}</p>
+      )}
     </div>
   );
 }
