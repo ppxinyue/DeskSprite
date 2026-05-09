@@ -406,6 +406,10 @@
   animation: orbRadialWave 3.6s ease-out infinite;
 }
 
+.orb-avatar--work .orb-avatar__shell::before {
+  animation-name: orbRadialWaveIn;
+}
+
 .orb-avatar__shell::after {
   content: "";
   position: absolute;
@@ -516,6 +520,7 @@
   border-radius: inherit;
   pointer-events: none;
   animation: orbWorkOrbit 16s linear infinite;
+  animation-delay: calc(var(--stack-index) * -4s);
 }
 
 .orb-avatar__work-letter {
@@ -594,6 +599,13 @@
   100% { opacity: 0; transform: scale(1.18); }
 }
 
+@keyframes orbRadialWaveIn {
+  0% { opacity: 0; transform: scale(1.18); }
+  18% { opacity: 0.58; }
+  72% { opacity: 0.26; }
+  100% { opacity: 0; transform: scale(0.42); }
+}
+
 @keyframes orbIdleSatellite {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -605,8 +617,8 @@
 }
 
 @keyframes orbWorkOrbit {
-  from { transform: rotate(var(--orbit-angle)); }
-  to { transform: rotate(calc(var(--orbit-angle) + 360deg)); }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @keyframes orbCenterPulse {

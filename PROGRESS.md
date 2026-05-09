@@ -823,3 +823,10 @@
 - 吸附：字母仍按倒计时逐个从四角吸入，最终落在同一半径轨道上。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R102. Orb Work 内向波纹与稳定 90 度相位（2026-05-09）
+- Work 波纹：为 work 状态单独使用 `orbRadialWaveIn`，让灰阶波纹从外向内收缩，匹配“被吸附到中心”的语义。
+- Work 公转：移除 keyframes 中的角度变量插值，恢复同一轨道动画 + `-4s` 相位差，避免 90/270 度位置在浏览器插值中塌缩。
+- 结果：`W/O/R/K` 吸附完成后应稳定分布在四象限，彼此相隔 90 度。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

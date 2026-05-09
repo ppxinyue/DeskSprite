@@ -624,7 +624,6 @@ function OrbAvatar({
                   key={`${letter}-${index}`}
                   className="orb-avatar__work-orbit"
                   style={{
-                    '--orbit-angle': `${index * 90}deg`,
                     '--stack-index': String(index),
                   } as CSSProperties & Record<string, string>}
                 >

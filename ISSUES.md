@@ -1259,3 +1259,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：需要严格几何关系时，应使用显式角度变量，而不是依赖动画延迟制造相位差。
 - 是否需更新技术文档：否。
+
+## ISSUE-107
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb Work 吸附语义修正
+- 严重程度：重要
+- 问题现象：Work 表示字母被吸附到中心，波纹不应向外扩散而应向内扩散；四个 work 字母仍两两重叠，只表现出 0 和 180 度。
+- 原因分析：全局 `orbRadialWave` 只有向外扩散方向，不适合 work；同时 `@keyframes` 内使用 `var(--orbit-angle)` 和 `calc(var(--orbit-angle) + 360deg)` 做角度插值，在实际渲染中可能导致 90/270 度相位不稳定。
+- 解决方案：为 `.orb-avatar--work` 单独指定向内收缩的 `orbRadialWaveIn`；work 公转恢复为同一 360 度 keyframes，并通过 `animation-delay: index * -4s` 产生稳定四等分相位。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：CSS 变量参与 keyframes 角度插值时跨浏览器稳定性不如固定 keyframes + 负延迟相位；状态语义也应反映在背景波纹方向上。
+- 是否需更新技术文档：否。
