@@ -914,3 +914,10 @@
 - 颜色：倒计时文本改为统一深灰 `#4d4a45`，避免接近纯黑。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R115. 删除休息倒计时 Pop-in 动效（2026-05-09）
+- 动效：移除 `AnimatedCountdown` 逐字符 pop-in，休息倒计时恢复为稳定纯文本。
+- CSS：删除 `t-digit-pop-in`、`.t-digit-group`、`.t-digit` 等专用动画样式。
+- 保留：倒计时 18px、深灰色和提前结束按钮 14px 的视觉尺寸。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, index.css, ISSUES.md, PROGRESS.md

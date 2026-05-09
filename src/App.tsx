@@ -1155,7 +1155,7 @@ function PetWindow() {
             {restEndAt ? (
               <div className="mt-2 flex flex-col items-center gap-2">
                 <div className="pointer-events-none text-center text-[18px] font-semibold leading-none tabular-nums text-[#4d4a45] drop-shadow-[0_2px_12px_rgba(32,28,22,0.12)]">
-                  <AnimatedCountdown value={formatCountdown(Math.max(0, restEndAt - now))} />
+                  {formatCountdown(Math.max(0, restEndAt - now))}
                 </div>
                 <button
                   type="button"
@@ -1231,29 +1231,6 @@ function FloatingToolButton({
     >
       {children}
     </Button>
-  );
-}
-
-function AnimatedCountdown({ value }: { value: string }) {
-  let digitIndex = 0;
-  return (
-    <span key={value} className="t-digit-group is-animating" aria-label={value}>
-      {value.split('').map((char, index) => {
-        const isDigit = /\d/.test(char);
-        const stagger = digitIndex;
-        if (isDigit) digitIndex += 1;
-        return (
-          <span
-            key={`${char}-${index}`}
-            className={isDigit ? 't-digit' : 't-digit-static'}
-            aria-hidden="true"
-            style={isDigit ? { animationDelay: `calc(var(--digit-stagger) * ${stagger})` } : undefined}
-          >
-            {char}
-          </span>
-        );
-      })}
-    </span>
   );
 }
 
