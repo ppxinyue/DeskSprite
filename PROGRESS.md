@@ -949,3 +949,10 @@
 - 保留：普通休息提醒忽略仍回到 idle；分心提示忽略仍回到当前 work。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R120. 重新读取默认 Pet 素材（2026-05-09）
+- 素材：纳入 `public/assets` 中更新后的默认形象资源，包含更新的 idle blink 和新增 rest GIF。
+- 渲染：休息状态默认 GIF 池改为 `rest.GIF`、`idle_raw_1.GIF`、`drinking_raw.GIF`。
+- 兼容：normalize 阶段清理旧的 `playing_clean_3.GIF` 引用，并自动补齐当前休息 GIF 池。
+- 验证：`pnpm build` 通过。
+- 文件：animations.ts, public/assets, ISSUES.md, PROGRESS.md

@@ -1475,3 +1475,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：同样是“忽略”，语义要按提示来源区分；专注完成提示属于专注循环，不应复用普通休息提醒的 idle 收尾。
 - 是否需更新技术文档：否。
+
+## ISSUE-125
+- 发现时间：2026-05-09
+- 发现者：用户素材更新
+- 相关任务：重新读取默认 Pet 素材
+- 严重程度：重要
+- 问题现象：`public/assets/rest/gif/playing_clean_3.GIF` 已从默认素材目录删除，但休息状态默认 GIF 配置仍引用该文件，新增的 `rest.GIF` 和 `idle_raw_1.GIF` 尚未进入默认渲染池。
+- 原因分析：素材目录更新后，`DEFAULT_MEDIA_CONFIG.rest.defaultGifAssets` 和兼容归一化逻辑没有同步更新，可能导致休息状态加载失效或漏用新素材。
+- 解决方案：将休息状态默认 GIF 池更新为 `rest.GIF`、`idle_raw_1.GIF`、`drinking_raw.GIF`；normalize 旧配置时移除 `playing_clean_3.GIF` 并补齐当前默认休息素材。
+- 涉及文件：`src/features/pet/animations.ts`, `public/assets`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：素材文件名变化时，需要同时更新默认配置和旧配置归一化，否则已保存配置会继续引用不存在的文件。
+- 是否需更新技术文档：否。
