@@ -610,15 +610,26 @@ function OrbAvatar({
         {orbState === 'work' && (
           <div className="orb-avatar__work-field" aria-label={meta.label}>
             {letters.map((letter, index) => {
+              const startPoints = [
+                { x: -0.30, y: -0.30, rotate: -150 },
+                { x: 0.30, y: -0.30, rotate: 150 },
+                { x: 0.30, y: 0.30, rotate: -210 },
+                { x: -0.30, y: 0.30, rotate: 210 },
+              ];
+              const startPoint = startPoints[index] ?? startPoints[0];
               const localProgress = fallEase(clamp(focusProgress * letters.length - index, 0, 1));
+              const remaining = 1 - localProgress;
               return (
                 <span
                   key={`${letter}-${index}`}
                   className="orb-avatar__work-letter"
                   style={{
-                    '--fall-progress': String(localProgress),
+                    '--attract-progress': String(localProgress),
+                    '--work-x': `${startPoint.x * size * remaining}px`,
+                    '--work-y': `${startPoint.y * size * remaining}px`,
+                    '--work-rotate': `${startPoint.rotate * remaining}deg`,
+                    '--work-scale': String(0.92 + localProgress * 0.16),
                     '--stack-index': String(index),
-                    '--letter-x': `${(index - (letters.length - 1) / 2) * 8}%`,
                   } as CSSProperties & Record<string, string>}
                 >
                   {letter}

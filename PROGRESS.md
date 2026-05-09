@@ -802,3 +802,10 @@
 - 约束：只调整容器视觉层，idle/work/rest 字母与状态逻辑保持不变。
 - 验证：`pnpm build` 通过。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R99. Orb Work 四角吸附倒计时（2026-05-09）
+- Work：倒计时动效从“字母落到底部堆叠”改为 `W/O/R/K` 分别从四个边角旋转着被吸向中心。
+- 顺序：继续用 `focusProgress * letters.length - index` 计算局部进度，保证字母按倒计时一个接一个被吸过去。
+- 动效：每个字母由 TS 计算位移、旋转和缩放变量，CSS 负责平滑过渡；吸到中心后保留轻微亮度脉冲。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
