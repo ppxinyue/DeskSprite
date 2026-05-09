@@ -170,13 +170,36 @@ function SettingsGroup({ children, className = '' }: { children: ReactNode; clas
 
 function ProfileSection() {
   const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey(getLocalDateKey()));
   const [stats, setStats] = useState<FocusStatsDay[]>([]);
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getFocusStatsDays(14, selectedDate)
       .then(setStats)
       .catch(() => setStats([]));
   }, [selectedDate]);
+
+  useEffect(() => {
+    setCalendarMonth(getMonthKey(selectedDate));
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!calendarRef.current?.contains(event.target as Node)) setCalendarOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCalendarOpen(false);
+    };
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [calendarOpen]);
 
   const selectedStats = stats[stats.length - 1] ?? { date: selectedDate, focusMs: 0, focusSessions: 0, distractions: 0 };
   const maxFocusMs = Math.max(1, ...stats.map((day) => day.focusMs));
@@ -189,7 +212,7 @@ function ProfileSection() {
     <>
       <div className="mb-5 flex items-center justify-between gap-3">
         <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.018em] text-foreground">个人档案</h1>
-        <div className="flex items-center gap-1.5 rounded-[9px] border border-border/60 bg-transparent p-1">
+        <div ref={calendarRef} className="relative flex items-center gap-1.5 rounded-[9px] border border-border/60 bg-transparent p-1">
           <button
             type="button"
             className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
@@ -198,10 +221,16 @@ function ProfileSection() {
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
-          <div className="flex min-w-[128px] items-center justify-center gap-1.5 px-2 text-[12px] font-medium text-foreground">
+          <button
+            type="button"
+            className="flex min-w-[128px] items-center justify-center gap-1.5 rounded-[7px] px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-background/70"
+            onClick={() => setCalendarOpen((open) => !open)}
+            aria-haspopup="dialog"
+            aria-expanded={calendarOpen}
+          >
             <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
             {formatDateHeading(selectedDate)}
-          </div>
+          </button>
           <button
             type="button"
             className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
@@ -211,6 +240,18 @@ function ProfileSection() {
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>
+          {calendarOpen && (
+            <ProfileCalendar
+              month={calendarMonth}
+              selectedDate={selectedDate}
+              todayKey={todayKey}
+              onMonthChange={setCalendarMonth}
+              onSelect={(date) => {
+                setSelectedDate(date);
+                setCalendarOpen(false);
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -285,6 +326,82 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
     <div className="rounded-[8px] border border-border/50 px-3 py-2">
       <div className="text-[11px] text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-[13px] font-semibold text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function ProfileCalendar({
+  month,
+  selectedDate,
+  todayKey,
+  onMonthChange,
+  onSelect,
+}: {
+  month: string;
+  selectedDate: string;
+  todayKey: string;
+  onMonthChange: (month: string) => void;
+  onSelect: (date: string) => void;
+}) {
+  const days = getCalendarMonthDays(month);
+  const canGoNext = shiftMonthKey(month, 1) <= getMonthKey(todayKey);
+  return (
+    <div
+      className="glass-panel-strong absolute right-0 top-10 z-50 w-[268px] rounded-[11px] p-3 shadow-[0_18px_46px_rgba(42,38,31,0.16)]"
+      role="dialog"
+      aria-label="选择统计日期"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          type="button"
+          className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+          onClick={() => onMonthChange(shiftMonthKey(month, -1))}
+          aria-label="上个月"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
+        <div className="text-[13px] font-semibold text-foreground">{formatMonthHeading(month)}</div>
+        <button
+          type="button"
+          className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
+          onClick={() => onMonthChange(shiftMonthKey(month, 1))}
+          disabled={!canGoNext}
+          aria-label="下个月"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-medium text-muted-foreground">
+        {['日', '一', '二', '三', '四', '五', '六'].map((day) => (
+          <div key={day} className="py-1">{day}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {days.map((day, index) => {
+          const disabled = day.outsideMonth || day.date > todayKey;
+          const selected = day.date === selectedDate;
+          const today = day.date === todayKey;
+          return (
+            <button
+              key={`${day.date}-${index}`}
+              type="button"
+              disabled={disabled}
+              className={`flex h-8 items-center justify-center rounded-[8px] text-[12px] transition-all ${
+                selected
+                  ? 'bg-foreground text-background shadow-sm'
+                  : today
+                    ? 'border border-border/70 text-foreground hover:bg-background/70'
+                    : 'text-foreground hover:bg-background/70'
+              } ${day.outsideMonth ? 'text-muted-foreground/45' : ''} disabled:pointer-events-none disabled:opacity-30`}
+              onClick={() => onSelect(day.date)}
+            >
+              {Number(day.date.slice(-2))}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -699,10 +816,32 @@ function getLocalDateKey(date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+function getMonthKey(dateKey: string): string {
+  return dateKey.slice(0, 7);
+}
+
+function shiftMonthKey(monthKey: string, offset: number): string {
+  const date = new Date(`${monthKey}-01T00:00:00`);
+  date.setMonth(date.getMonth() + offset);
+  return getMonthKey(getLocalDateKey(date));
+}
+
 function shiftDateKey(dateKey: string, offset: number): string {
   const date = new Date(`${dateKey}T00:00:00`);
   date.setDate(date.getDate() + offset);
   return getLocalDateKey(date);
+}
+
+function getCalendarMonthDays(monthKey: string): Array<{ date: string; outsideMonth: boolean }> {
+  const first = new Date(`${monthKey}-01T00:00:00`);
+  const start = new Date(first);
+  start.setDate(first.getDate() - first.getDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+    const date = getLocalDateKey(day);
+    return { date, outsideMonth: getMonthKey(date) !== monthKey };
+  });
 }
 
 function formatDateHeading(dateKey: string): string {
@@ -711,6 +850,10 @@ function formatDateHeading(dateKey: string): string {
   if (dateKey === today) return '今天';
   if (dateKey === shiftDateKey(today, -1)) return '昨天';
   return date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+}
+
+function formatMonthHeading(monthKey: string): string {
+  return new Date(`${monthKey}-01T00:00:00`).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' });
 }
 
 function formatWeekdayShort(dateKey: string): string {
