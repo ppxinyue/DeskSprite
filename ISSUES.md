@@ -1139,3 +1139,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：复现参考效果时要保留产品状态逻辑，但视觉层应尽量贴近参考的运动层次，而不是只实现文字位置。
 - 是否需更新技术文档：否。
+
+## ISSUE-097
+- 发现时间：2026-05-09
+- 发现者：用户设计规格
+- 相关任务：Orb 三态交互语义强化
+- 严重程度：改进
+- 问题现象：Orb 三态需要更明确的交互语义：idle 要有低功耗监听和 hover 聚焦，work 要有重力沉积和 hover 加速，rest 要有高速涡轮和 hover 静态网格对齐。
+- 原因分析：上一版已接近参考视觉，但 hover 反馈仍偏弱；work 的字母下落缺少触底重量感，rest 的旋转速度和静止反差不够强。
+- 解决方案：idle hover 锁定四象限并收缩轨道半径；work hover 加快下落流并为堆叠字母增加微震/回弹；rest 高速旋转带轻微 blur，hover 时停止并使用 TS 传入的行列变量排成 4x4 网格。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：抽象动效不只是“动起来”，需要让 hover 的物理反馈和状态语义一致；CSS 不适合做复杂行列运算，稳定布局参数应从 TS 传入。
+- 是否需更新技术文档：否。

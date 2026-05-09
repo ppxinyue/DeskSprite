@@ -754,3 +754,10 @@
 - 质感：增加中心柔灰 nucleus 脉冲，边框、文字和背景全部使用低透明灰阶，接近用户提供 demo 的克制黑白灰气质。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R92. Orb 三态交互语义强化（2026-05-09）
+- idle：hover 时停止自由绕行，字母被弹性吸引到固定四象限，轨道半径收缩，表达“聚焦用户”。
+- work：hover 时下落字母流进入 time-lapse 加速；底部堆叠字母增加微震动和触底回弹，强化重力沉积感。
+- rest：高速旋转周期缩短并增加轻微 blur，hover 时立即停转并按 4x4 网格静态对齐，形成动静落差。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

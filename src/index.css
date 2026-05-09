@@ -367,6 +367,10 @@
   transition: transform 220ms ease, opacity 220ms ease;
 }
 
+.orb-avatar--idle.is-hovering {
+  animation-duration: 7.2s;
+}
+
 .orb-avatar__shell {
   position: relative;
   width: 100%;
@@ -416,6 +420,11 @@
 
 .orb-avatar__idle-ring {
   inset: -26%;
+  transition: inset 520ms cubic-bezier(.2,.9,.2,1);
+}
+
+.orb-avatar--idle.is-hovering .orb-avatar__idle-ring {
+  inset: -12%;
 }
 
 .orb-avatar__idle-orbit,
@@ -431,6 +440,12 @@
 .orb-avatar__idle-orbit {
   animation: orbIdleSatellite 15s linear infinite;
   animation-delay: calc(var(--letter-index) * -0.25s);
+  transition: transform 520ms cubic-bezier(.2,.9,.2,1);
+}
+
+.orb-avatar--idle.is-hovering .orb-avatar__idle-orbit {
+  animation: none;
+  transform: rotate(calc(360deg / var(--letter-count) * var(--letter-index)));
 }
 
 .orb-avatar__idle-letter,
@@ -482,6 +497,10 @@
   animation-delay: calc(var(--drop-index) * -0.35s);
 }
 
+.orb-avatar--work.is-hovering .orb-avatar__work-drop {
+  animation-duration: 2.2s;
+}
+
 .orb-avatar__work-letter {
   position: absolute;
   left: calc(50% + var(--letter-x));
@@ -496,9 +515,30 @@
   transition: top 950ms linear, opacity 950ms linear;
 }
 
+.orb-avatar--work .orb-avatar__work-letter {
+  animation: orbPileTremor 1.8s ease-in-out infinite;
+  animation-delay: calc(var(--stack-index) * -0.18s);
+}
+
 .orb-avatar__rest-ring {
   inset: -22%;
-  animation: orbRestLetters 4s linear infinite;
+  animation: orbRestLetters 1.35s linear infinite;
+  filter: blur(0.35px);
+  transition: filter 180ms ease, transform 260ms ease;
+}
+
+.orb-avatar--rest.is-hovering .orb-avatar__rest-ring {
+  animation: none;
+  filter: blur(0);
+  transform: rotate(0deg);
+}
+
+.orb-avatar--rest.is-hovering .orb-avatar__rest-spoke {
+  transform:
+    translate(
+      calc(var(--grid-col) * var(--orb-size) * 0.18),
+      calc(var(--grid-row) * var(--orb-size) * 0.18)
+    );
 }
 
 .orb-avatar__rest-spoke {
@@ -562,10 +602,18 @@
   0% { opacity: 0; transform: translate(-50%, -60%) translateX(0); }
   14% { opacity: 0.55; }
   72% { opacity: 0.55; transform: translate(-50%, calc(var(--orb-size) * 0.78)) translateX(var(--drop-drift)); }
+  76% { transform: translate(-50%, calc(var(--orb-size) * 0.79)) translateX(var(--drop-drift)) scaleY(1); }
+  82% { transform: translate(-50%, calc(var(--orb-size) * 0.75)) translateX(var(--drop-drift)) scaleY(0.92); }
   100% { opacity: 0; transform: translate(-50%, calc(var(--orb-size) * 0.95)) translateX(var(--drop-drift)); }
 }
 
 @keyframes orbNucleusPulse {
   0%, 100% { opacity: 0.14; transform: translate(-50%, -50%) scale(0.92); }
   50% { opacity: 0.34; transform: translate(-50%, -50%) scale(1.18); }
+}
+
+@keyframes orbPileTremor {
+  0%, 100% { margin-left: 0; margin-top: 0; }
+  42% { margin-left: 0.5px; margin-top: -0.6px; }
+  58% { margin-left: -0.4px; margin-top: 0.3px; }
 }

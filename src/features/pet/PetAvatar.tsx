@@ -655,6 +655,8 @@ function OrbAvatar({
                 style={{
                   '--letter-index': String(index),
                   '--letter-count': String(restSpokes.length),
+                  '--grid-col': String((index % 4) - 1.5),
+                  '--grid-row': String(Math.floor(index / 4) - 1.5),
                 } as CSSProperties & Record<string, string>}
               >
                 <span className="orb-avatar__rest-word">rest</span>
