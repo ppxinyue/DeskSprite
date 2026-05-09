@@ -771,9 +771,36 @@ function extractCodexTextFromValue(value) {
       .trim();
   }
   if (value && typeof value === 'object') {
-    return extractCodexTextFromValue(value.text ?? value.content ?? value.output_text ?? value.summary_text);
+    return extractCodexTextFromValue(
+      value.text
+      ?? value.content
+      ?? value.output_text
+      ?? value.summary_text
+      ?? value.message
+      ?? value.error
+      ?? value.detail
+      ?? value.reason
+      ?? value.cause,
+    );
   }
   return '';
+}
+
+function formatCodexNotice(method, params = {}) {
+  const direct = extractCodexTextFromValue(params.message)
+    || extractCodexTextFromValue(params.error)
+    || extractCodexTextFromValue(params.detail)
+    || extractCodexTextFromValue(params.reason)
+    || extractCodexTextFromValue(params.cause);
+  const code = extractCodexTextFromValue(params.code) || extractCodexTextFromValue(params.error?.code);
+  const label = method === 'error' ? 'Codex error' : method;
+  if (direct && code) return `${label} ${code}: ${direct}`;
+  if (direct) return `${label}: ${direct}`;
+  try {
+    return `${label}: ${JSON.stringify(params)}`;
+  } catch {
+    return label;
+  }
 }
 
 function extractCodexEventText(event) {
@@ -974,14 +1001,18 @@ function handleCodexAppServerNotification(message) {
     return;
   }
   if (method === 'error' || method === 'warning' || method === 'guardianWarning') {
-    const messageText = extractCodexTextFromValue(params.message) || extractCodexTextFromValue(params) || method;
-    if (/Reconnecting|Falling back/i.test(messageText)) return;
+    const messageText = formatCodexNotice(method, params);
+    const isTransient = /Reconnecting|Falling back|retrying sampling request/i.test(messageText);
     if (method === 'error' || method === 'guardianWarning') {
-      if (codexAppServer.activeTurn) codexAppServer.activeTurn.hasError = true;
-      codingState.running = null;
-      codingState.status = CODEX_STATUS.NEEDS_INPUT;
+      if (isTransient) {
+        codingState.status = CODEX_STATUS.WORKING;
+      } else {
+        if (codexAppServer.activeTurn) codexAppServer.activeTurn.hasError = true;
+        codingState.running = null;
+        codingState.status = CODEX_STATUS.NEEDS_INPUT;
+      }
     }
-    pushCodingMessage(method === 'error' ? 'error' : 'system', messageText);
+    pushCodingMessage(method === 'error' && !isTransient ? 'error' : 'system', messageText);
     publishCodingState();
   }
 }
@@ -1028,6 +1059,12 @@ function ensureCodexAppServer() {
     });
     child.stderr.on('data', (chunk) => {
       const text = chunk.toString();
+      const lines = text
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .filter((line) => /Reconnecting|Falling back|retrying sampling request|error|failed|permission|approval|authorize|confirm|login/i.test(line));
+      for (const line of lines) pushCodingMessage('system', line);
       if (/approval|permission|authorize|confirm|login/i.test(text)) {
         codingState.status = CODEX_STATUS.NEEDS_INPUT;
         publishCodingState();

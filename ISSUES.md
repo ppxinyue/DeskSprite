@@ -1703,3 +1703,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：状态灯应由错误事件优先驱动，不能只依赖最终 turn status。
 - 是否需更新技术文档：否。
+
+## ISSUE-144
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Coding 错误详情完整展示
+- 严重程度：中等
+- 问题现象：小聊天框只输出 `error`，用户看不到 reconnect、retry 或具体失败原因。
+- 原因分析：上一版主动过滤了 `Reconnecting` / `Falling back` 过程事件；同时文本提取只看 `params.message`，当 app-server 把原因放在 `error/detail/reason/cause` 等字段时会退化成 method 名。
+- 解决方案：新增 Codex notice 格式化逻辑，按常见错误字段展开详情；保留 reconnect/retry 为 system 过程消息；stderr 中关键诊断行也同步展示。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：调试桥接型功能时，过程性错误比简化状态更重要，UI 应保留足够诊断上下文。
+- 是否需更新技术文档：否。

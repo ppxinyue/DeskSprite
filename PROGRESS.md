@@ -1087,3 +1087,11 @@
 - 完成态：turn 完成时会检查当前 turn 是否曾收到 error，收到过则保持红色而不是误判为完成。
 - 验证：`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R139. Coding 错误详情完整展示（2026-05-10）
+- 主进程：Codex app-server 的 error/warning notification 不再只显示 `error`，会展开 `message`、`error`、`detail`、`reason`、`cause`、`code` 等字段。
+- 过程信息：`Reconnecting...`、`Falling back...`、`retrying sampling request...` 这类瞬时连接状态会作为 system 消息显示，而不是被过滤掉。
+- 状态灯：瞬时 reconnect/retry 保持黄色工作态；真正 error/guardianWarning 才切红。
+- stderr：从 app-server stderr 中筛出 reconnect、retry、error、permission 等关键行展示到小聊天框，方便定位慢或失败的真实原因。
+- 验证：`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md
