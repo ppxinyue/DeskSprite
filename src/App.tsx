@@ -27,7 +27,7 @@ const COMPACT_CHAT_BOTTOM_CHROME = 10;
 const COMPACT_CHAT_PREFERRED_HEIGHT = 340;
 const CONTEXT_MENU_WIDTH = 112;
 const CONTEXT_SUBMENU_WIDTH = 170;
-const CONTEXT_MENU_HEIGHT = 204;
+const CONTEXT_MENU_HEIGHT = 226;
 const PET_RIGHT_EDGE_MENU_THRESHOLD = 0.62;
 const PET_BUBBLE_TOP_SPACE = 78;
 const PET_PROMPT_BUBBLE_WIDTH = 196;
@@ -417,7 +417,7 @@ function codingRoleLabel(role: CodingMessage['role']) {
 }
 
 function PetWindow() {
-  const { settings } = useSettingsStore();
+  const { settings, updateSetting } = useSettingsStore();
   const { dialogOpen, chatMode, chatConversationId, openChat, closeChat, setPetState, petState, mediaConfig, userFrames, userGifs } = usePetStore();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [chatBurst, setChatBurst] = useState(false);
@@ -1384,6 +1384,12 @@ function PetWindow() {
               onDragEnd={handleBoundedDragEnd}
               onMenuOpenChange={setContextMenuOpen}
               onFocusToggle={toggleFocus}
+              codingModeEnabled={settings.codingModeEnabled}
+              onCodingModeToggle={() => {
+                updateSetting('codingModeEnabled', !settings.codingModeEnabled).catch((e) => {
+                  console.warn("Failed to toggle coding mode:", e);
+                });
+              }}
             />
             {restEndAt && (orbMode || !restPresentationActive) ? (
               <div className="mt-2 flex flex-col items-center gap-2">

@@ -1013,3 +1013,10 @@
 - Pet 窗口：Coding 模式下右侧 chat 按钮始终显示，并按 mac 窗口按钮颜色显示状态：红色需要输入/授权，黄色正在工作，绿色完成。
 - 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, main.cjs, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
+
+### R129. Coding 模式入口补充（2026-05-09）
+- 设置：将 Coding 模式从“模型参数”移动到 AI 对话页顶部，独立成更醒目的设置组。
+- 右键菜单：灵宠右键菜单新增 Coding 模式开关，开启后显示“退出 Coding”，关闭时显示“Coding 模式”。
+- 布局：同步右键菜单高度估算，避免新增菜单项后靠近屏幕边缘时定位不准。
+- 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, PetAvatar.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

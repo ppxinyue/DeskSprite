@@ -1583,3 +1583,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：外部 agent 接入需要把“执行桥接、状态广播、输入面板、入口状态灯”作为一套完整闭环实现。
 - 是否需更新技术文档：否。
+
+## ISSUE-134
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Coding 模式入口补充
+- 严重程度：重要
+- 问题现象：用户在设置中不容易找到 Coding 模式开关，灵宠右键菜单也缺少直接切换 Coding 模式的入口。
+- 原因分析：上一版将开关放在 AI 对话页较靠后的“模型参数”区，入口层级太深；右键菜单只覆盖对话、专注、设置、隐藏、退出，没有接入新的模式状态。
+- 解决方案：把 Coding 模式独立移动到 AI 对话页顶部；给右键菜单新增 Coding 模式/退出 Coding 切换项，并同步菜单高度估算。
+- 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：模式级功能应该提供设置页入口和就地快捷入口，不能只藏在某个参数分组里。
+- 是否需更新技术文档：否。

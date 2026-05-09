@@ -1568,6 +1568,16 @@ function AISection({
 
   return (
     <>
+      <SectionTitle>Coding 模式</SectionTitle>
+      <SettingsGroup>
+        <div className="px-4">
+          <SettingRow label="接入 Codex" hint="开启后，灵宠右侧小对话框会显示 Codex 输出，并可直接向 Codex 发送输入">
+            <Switch checked={settings.codingModeEnabled} onCheckedChange={(v) => updateSetting('codingModeEnabled', v)} />
+          </SettingRow>
+        </div>
+      </SettingsGroup>
+
+      <Separator className="my-6" />
       <SectionTitle>身份设置</SectionTitle>
       <SettingsGroup>
         {orbMode ? (
@@ -1721,9 +1731,6 @@ function AISection({
 
       <Separator className="my-6" />
       <SectionTitle>模型参数</SectionTitle>
-      <SettingRow label="Coding 模式" hint="接入本机 Codex，把 Codex 输出显示到灵宠右侧小对话框">
-        <Switch checked={settings.codingModeEnabled} onCheckedChange={(v) => updateSetting('codingModeEnabled', v)} />
-      </SettingRow>
       <SettingRow label="温度">
         <span className="text-[11px] text-muted-foreground w-8">{settings.temperature.toFixed(1)}</span>
         <Slider value={[settings.temperature]} onValueChange={([v]) => updateSetting('temperature', v)} min={0} max={2} step={0.1} className="w-32" />
