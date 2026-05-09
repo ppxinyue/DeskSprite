@@ -799,8 +799,6 @@ async function sendCodingMessage({ prompt }) {
     '--json',
     '--color',
     'never',
-    '--ask-for-approval',
-    'on-request',
     '--sandbox',
     'workspace-write',
     '--cd',

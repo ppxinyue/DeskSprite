@@ -1027,3 +1027,9 @@
 - 发送：向 Codex 发送消息失败时复用同一套错误解释，避免用户误判是 Codex 输出错误。
 - 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R131. Codex Exec 参数兼容修复（2026-05-09）
+- 主进程：移除 `codex exec` 已不支持的 `--ask-for-approval on-request` 参数。
+- 兼容：保留 `--json`、`--color never`、`--sandbox workspace-write`、`--cd` 和 prompt，匹配当前本机 Codex CLI help。
+- 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md

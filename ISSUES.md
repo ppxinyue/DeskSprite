@@ -1607,3 +1607,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：新增 Electron IPC 时，前端错误提示要区分“主进程未加载接口”和“后端工具不可用”，否则排障方向会错。
 - 是否需更新技术文档：否。
+
+## ISSUE-136
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Codex Exec 参数兼容修复
+- 严重程度：重要
+- 问题现象：Coding 模式发送消息后返回 `error: unexpected argument '--ask-for-approval' found`，Codex 没有执行用户输入。
+- 原因分析：当前本机 Codex CLI 的 `codex exec` 已不支持 `--ask-for-approval` 参数，上一版桥接仍按旧参数调用。
+- 解决方案：根据本机 `codex exec --help` 移除 `--ask-for-approval on-request`，保留当前可用的 `--json`、`--color never`、`--sandbox workspace-write`、`--cd` 参数。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：外部 CLI 版本变化时，桥接层应严格以本机 `--help` 为准，不要沿用旧版本参数。
+- 是否需更新技术文档：否。
