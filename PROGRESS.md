@@ -1203,3 +1203,9 @@
 - 结果：agent 工作中即使已有旧的 green/done 输出，也不会把 chat button 或小窗内容抢成绿色。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R154. Coding 过程气泡去重（2026-05-10）
+- 主进程：继承 session 解析过程消息时按归一化文本去重，避免同一条中间输出同时来自 `event_msg` 和 `response_item` 时显示两遍。
+- 行为：重复过程消息只更新时间，不新增气泡；不同过程消息仍按出现顺序保留最近 8 条。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md

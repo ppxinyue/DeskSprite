@@ -1883,3 +1883,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：过程消息数组只是数据层能力，状态优先级和前端 session 选择也必须同步按 working 优先，UI 才会真实展示过程。
 - 是否需更新技术文档：否。
+
+## ISSUE-159
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Coding 过程气泡去重
+- 严重程度：中等
+- 问题现象：黄色状态下，同一条 agent 中间输出会在小窗里显示两遍。
+- 原因分析：Codex session JSONL 中同一段过程文本可能同时记录为 `event_msg agent_message` 和 `response_item message`，解析器把两个事件都加入了 `progressMessages`。
+- 解决方案：新增过程消息归一化 key，按文本去重；重复事件只更新时间，不新增气泡。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：读取外部 append-only 日志时，同一语义事件可能有多个投影格式，进入 UI 前要按内容或 call id 做去重。
+- 是否需更新技术文档：否。

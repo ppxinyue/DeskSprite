@@ -1267,6 +1267,21 @@ function isFinalCodexSessionOutput(payload) {
     || Boolean(payload.last_agent_message);
 }
 
+function normalizeCodexProgressKey(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function pushCodexProgressMessage(progressMessages, message, createdAt) {
+  const key = normalizeCodexProgressKey(message);
+  if (!key) return;
+  const existing = progressMessages.find((item) => item.key === key);
+  if (existing) {
+    existing.createdAt = Math.max(existing.createdAt, createdAt);
+    return;
+  }
+  progressMessages.push({ key, content: message, createdAt });
+}
+
 function parseCodexSessionFile(filePath, text, mtimeMs) {
   const session = {
     id: path.basename(filePath, '.jsonl').split('-').slice(-5).join('-'),
@@ -1322,7 +1337,7 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
         } else if (message) {
           lastWorkAt = Math.max(lastWorkAt, eventAt);
           lastProgress = message;
-          progressMessages.push({ content: message, createdAt: eventAt });
+          pushCodexProgressMessage(progressMessages, message, eventAt);
         } else {
           lastWorkAt = Math.max(lastWorkAt, eventAt);
         }
@@ -1345,7 +1360,7 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
         } else if (message) {
           lastWorkAt = Math.max(lastWorkAt, eventAt);
           lastProgress = message;
-          progressMessages.push({ content: message, createdAt: eventAt });
+          pushCodexProgressMessage(progressMessages, message, eventAt);
         }
       }
       if (/function_call|tool|command|exec/i.test(String(payload.type || ''))) {
