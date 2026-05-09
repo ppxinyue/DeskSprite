@@ -630,3 +630,9 @@
 - 逻辑：最近 14 天会自动补齐无数据日期，柱状图可点击切换具体日期，整体展示接近屏幕使用时间的按日浏览逻辑。
 - 验证：`pnpm build` 通过。
 - 文件：db.ts, App.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R75. 喝水 GIF 合并进旧休息配置（2026-05-09）
+- 修复：`rest` 默认配置已包含 `playing_clean_3.GIF` 和 `drinking_raw.GIF`，但用户本地旧 `petMedia_rest` 可能只保存休息图；现在归一化旧配置时会强制合并喝水 GIF。
+- 效果：休息倒计时进入 `rest` 状态时，旧配置和新配置都会在休息/喝水两张 GIF 中随机轮换。
+- 验证：`pnpm build` 通过。
+- 文件：animations.ts, ISSUES.md, PROGRESS.md

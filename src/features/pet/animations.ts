@@ -126,6 +126,9 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
   const defaultGifAssets = raw.defaultGifAssets?.length
     ? raw.defaultGifAssets.filter((path) => !path.startsWith('assets/GIF/'))
     : defaults.defaultGifAssets;
+  const mergedDefaultGifAssets = state === 'rest'
+    ? Array.from(new Set([...defaultGifAssets, 'assets/rest/gif/drinking_raw.GIF']))
+    : defaultGifAssets;
   const defaultAssets = raw.defaultAssets?.length
     ? raw.defaultAssets.filter((path) => !/^assets\/(idle|thinking|sleeping)\//.test(path))
     : defaults.defaultAssets;
@@ -134,7 +137,7 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
     ...raw,
     mediaMode: hasExplicitMode ? raw.mediaMode! : defaults.mediaMode,
     defaultAssets: defaultAssets.length ? defaultAssets : defaults.defaultAssets,
-    defaultGifAssets: defaultGifAssets.length ? defaultGifAssets : defaults.defaultGifAssets,
+    defaultGifAssets: mergedDefaultGifAssets.length ? mergedDefaultGifAssets : defaults.defaultGifAssets,
     userFrames: raw.userFrames ?? defaults.userFrames,
     userGifs: raw.userGifs ?? defaults.userGifs,
     disabledFrames: (raw.disabledFrames ?? defaults.disabledFrames)?.filter((path) => !/^assets\/(idle|thinking|sleeping)\//.test(path)),

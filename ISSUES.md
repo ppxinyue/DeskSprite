@@ -935,3 +935,15 @@
 - 涉及文件：`src/lib/db.ts`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：统计类功能要在事件发生点记录，而不是从 UI 状态倒推；趋势展示要补齐空日期，避免没有数据的日期在图表中消失。
 - 是否需更新技术文档：否。
+
+## ISSUE-080
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：休息形象 / GIF 资源兼容
+- 严重程度：中等
+- 问题现象：喝水 GIF 需要出现在休息形象池里；代码默认值已包含喝水图，但旧的本地 `petMedia_rest` 配置可能仍只保存休息图，覆盖掉新的默认列表。
+- 原因分析：`normalizePetMediaConfig()` 对已保存的 `defaultGifAssets` 采用“用户配置优先”，没有把新增的 `assets/rest/gif/drinking_raw.GIF` 合并进旧配置。
+- 解决方案：归一化 `rest` 状态时强制把 `assets/rest/gif/drinking_raw.GIF` 合并进默认 GIF 池，保证旧配置升级后也能在休息中随机出现喝水动画。
+- 涉及文件：`src/features/pet/animations.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：默认资源池新增素材时，要同时处理已持久化配置，否则用户本地旧配置会遮住新默认值。
+- 是否需更新技术文档：否。
