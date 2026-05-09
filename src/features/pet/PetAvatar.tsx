@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { useState, useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { usePetStore } from './petStore';
@@ -12,7 +12,8 @@ import {
   isBuiltinAsset,
 } from './animations';
 import { stopPetStateEngine } from './petStateEngine';
-import type { PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
+import type { AvatarRenderMode, PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
+import type { PetState } from './animations';
 
 function toSrc(path: string): string {
   return isBuiltinAsset(path) ? getBuiltinAssetUrl(path) : convertFileSrc(path);
@@ -44,6 +45,7 @@ function pickNextMotion(motions: PetMotionSettings, current: PetMotionName | nul
 export function PetAvatar({
   opacity = 1,
   scale = 1,
+  renderMode = 'pet',
   motions,
   dragging = false,
   focusActive = false,
@@ -55,6 +57,7 @@ export function PetAvatar({
 }: {
   opacity?: number;
   scale?: number;
+  renderMode?: AvatarRenderMode;
   motions: PetMotionSettings;
   dragging?: boolean;
   focusActive?: boolean;
@@ -79,7 +82,8 @@ export function PetAvatar({
   const petRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const w = Math.round(120 * scale);
+  const orbMode = renderMode === 'orb';
+  const w = Math.round((orbMode ? 150 : 120) * scale);
   const h = Math.round(150 * scale);
   const animationsPaused = dragging;
 
@@ -422,6 +426,31 @@ export function PetAvatar({
     </>
   );
 
+  if (orbMode) {
+    return (
+      <>
+        <div
+          ref={petRootRef}
+          className="cursor-pointer select-none"
+          style={{
+            width: w,
+            height: h,
+            background: 'transparent',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            lineHeight: 0,
+            transition: 'width 120ms linear, height 120ms linear',
+          }}
+          {...interactiveProps}
+        >
+          <OrbAvatar state={petState} opacity={opacity} size={Math.min(w, h)} dragging={dragging} />
+        </div>
+        {menu}
+      </>
+    );
+  }
+
   if (imgError) {
     return (
       <>
@@ -508,4 +537,84 @@ export function PetAvatar({
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+const ORB_STATE_META: Record<Extract<PetState, 'idle' | 'work' | 'rest'>, { label: string; accent: string; lightAccent: string }> = {
+  idle: { label: 'IDLE', accent: '#ffffff', lightAccent: '#1c1c1e' },
+  work: { label: 'WORK', accent: '#3b82f6', lightAccent: '#3b82f6' },
+  rest: { label: 'REST', accent: '#10b981', lightAccent: '#10b981' },
+};
+
+function OrbAvatar({
+  state,
+  opacity,
+  size,
+  dragging,
+}: {
+  state: PetState;
+  opacity: number;
+  size: number;
+  dragging: boolean;
+}) {
+  const orbState = state === 'work' || state === 'rest' ? state : 'idle';
+  const meta = ORB_STATE_META[orbState];
+  const [hovering, setHovering] = useState(false);
+  const [pointer, setPointer] = useState({ x: 0.5, y: 0.5 });
+  const letters = meta.label.split('');
+  const fontSize = Math.max(28, Math.round(size * 0.28));
+
+  const idleWeights = useMemo(() => {
+    if (orbState !== 'idle') return [];
+    return letters.map((_, index) => {
+      const letterX = (index + 0.5) / letters.length;
+      const dx = pointer.x - letterX;
+      const dy = pointer.y - 0.5;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const influence = clamp(1 - distance / 0.62, 0, 1);
+      return Math.round(120 + influence * 760);
+    });
+  }, [letters, orbState, pointer]);
+
+  return (
+    <div
+      className={`orb-avatar orb-avatar--${orbState} ${hovering ? 'is-hovering' : ''} ${dragging ? 'is-dragging' : ''}`}
+      style={{
+        '--orb-size': `${size}px`,
+        '--orb-opacity': String(opacity),
+        '--orb-dark-accent': meta.accent,
+        '--orb-light-accent': meta.lightAccent,
+        '--orb-font-size': `${fontSize}px`,
+      } as CSSProperties & Record<string, string>}
+      onPointerMove={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        setPointer({
+          x: clamp((event.clientX - rect.left) / Math.max(1, rect.width), 0, 1),
+          y: clamp((event.clientY - rect.top) / Math.max(1, rect.height), 0, 1),
+        });
+      }}
+      onPointerEnter={() => setHovering(true)}
+      onPointerLeave={() => {
+        setHovering(false);
+        setPointer({ x: 0.5, y: 0.5 });
+      }}
+    >
+      <div className="orb-avatar__glow" />
+      <div className="orb-avatar__ring" />
+      <div className={`orb-avatar__text orb-avatar__text--${orbState}`} aria-label={meta.label}>
+        {letters.map((letter, index) => (
+          <span
+            key={`${orbState}-${letter}-${index}`}
+            className="orb-avatar__letter"
+            style={{
+              '--letter-index': String(index),
+              '--letter-weight': String(idleWeights[index] ?? 520),
+            } as CSSProperties & Record<string, string>}
+          >
+            <span className="orb-avatar__letter-face">{letter}</span>
+            {orbState === 'work' && <span className="orb-avatar__letter-face orb-avatar__letter-face--back">{letter}</span>}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }

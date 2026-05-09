@@ -959,3 +959,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：趋势图的日期浏览适合箭头，历史回看则需要直接选择日期，两者应并存。
 - 是否需更新技术文档：否。
+
+## ISSUE-082
+- 发现时间：2026-05-09
+- 发现者：用户需求
+- 相关任务：形象渲染模式 / Orb 模式
+- 严重程度：新增功能
+- 问题现象：现有灵宠三状态只能通过 PNG/GIF 呈现，用户希望增加独立的 Orb 模式，在不改变聊天、右键、拖拽、专注、休息等功能的前提下，仅替换灵宠本体渲染。
+- 原因分析：PetAvatar 过去把“形象渲染”和“桌面交互外壳”耦合在同一个图片/GIF 渲染流程中；需要在保留外壳事件和窗口几何的同时，提供代码动效渲染分支。
+- 解决方案：新增 `avatarRenderMode: pet | orb` 设置；pet 模式保留原 PNG/GIF，orb 模式根据 idle/work/rest 状态渲染代码球体。idle 使用鼠标距离驱动字重，work 使用 hover 字母翻牌，rest 使用慢旋转和自主呼吸字重；大小复用现有灵宠大小参数和休息 80% 屏幕放大逻辑。
+- 涉及文件：`src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/pet/PetAvatar.tsx`, `src/App.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：视觉模式应只替换渲染内核，桌面宠物的交互边界、菜单和窗口定位要继续复用同一套外壳，避免两套模式行为分叉。
+- 是否需更新技术文档：否。

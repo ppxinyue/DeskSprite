@@ -301,8 +301,9 @@ function PetWindow() {
   const visualPetScaleRef = useRef(settings.petScale);
   const restPresentationActiveRef = useRef(false);
 
+  const orbMode = settings.avatarRenderMode === 'orb';
   const petSize = Math.round(150 * visualPetScale);
-  const petImageWidth = Math.round(120 * visualPetScale);
+  const petImageWidth = Math.round((orbMode ? 150 : 120) * visualPetScale);
   const petImageHeight = Math.round(150 * visualPetScale);
   const toolButtonSize = 28;
   const toolGap = 4;
@@ -511,10 +512,10 @@ function PetWindow() {
       };
 
       const targetScale = Math.min(
-        (workWidth * REST_PRESENTATION_SCREEN_RATIO) / 120,
+        (workWidth * REST_PRESENTATION_SCREEN_RATIO) / (orbMode ? 150 : 120),
         ((workHeight * REST_PRESENTATION_SCREEN_RATIO) - REST_COUNTDOWN_SPACE) / 150,
       );
-      const targetPetWidth = Math.round(120 * targetScale);
+      const targetPetWidth = Math.round((orbMode ? 150 : 120) * targetScale);
       const targetPetHeight = Math.round(150 * targetScale);
       const targetWindowWidth = Math.min(workWidth, targetPetWidth + PET_CONTENT_MARGIN * 2);
       const targetWindowHeight = Math.min(workHeight, targetPetHeight + PET_CONTENT_MARGIN * 2 + REST_COUNTDOWN_SPACE);
@@ -543,7 +544,7 @@ function PetWindow() {
     } catch (e) {
       console.warn("Failed to expand pet for rest:", e);
     }
-  }, [animateRestPresentation, toolButtonSize]);
+  }, [animateRestPresentation, orbMode, toolButtonSize]);
 
   const restorePetAfterRest = useCallback(async () => {
     const snapshot = restPresentationSnapshotRef.current;
@@ -1107,6 +1108,7 @@ function PetWindow() {
             <PetAvatar
               opacity={settings.petOpacity}
               scale={visualPetScale}
+              renderMode={settings.avatarRenderMode}
               motions={settings.petMotions}
               dragging={dragging}
               focusActive={Boolean(focusEndAt)}

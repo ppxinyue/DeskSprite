@@ -6,6 +6,7 @@ export type Theme = 'light' | 'dark' | 'system';
 export type PetMotionName = 'petJump' | 'petWobble' | 'petBreathe';
 export type VoiceProviderMode = 'system' | 'cloud-auto' | 'user-cloud';
 export type ModelMode = 'default' | 'custom';
+export type AvatarRenderMode = 'pet' | 'orb';
 
 export interface PetMotionSetting {
   enabled: boolean;
@@ -19,6 +20,7 @@ export interface AppSettings {
   theme: Theme;
   petOpacity: number;
   petScale: number;
+  avatarRenderMode: AvatarRenderMode;
   dialogWidth: number;
   compactChatFontSize: number;
   petMotions: PetMotionSettings;
@@ -59,6 +61,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   petOpacity: 1.0,
   petScale: 1.0,
+  avatarRenderMode: 'pet',
   dialogWidth: 300,
   compactChatFontSize: 13,
   petMotions: {
@@ -154,6 +157,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
                 ? 'system'
                 : key === 'chatModelMode' && !isModelMode(parsed)
                   ? 'default'
+                : key === 'avatarRenderMode' && !isAvatarRenderMode(parsed)
+                  ? 'pet'
                 : (key === 'voiceInputProvider' || key === 'voiceOutputProvider') && !isVoiceProviderMode(parsed)
                   ? 'system'
                 : key === 'dialogWidth' && typeof parsed === 'number'
@@ -215,6 +220,10 @@ function isVoiceProviderMode(value: unknown): value is VoiceProviderMode {
 
 function isModelMode(value: unknown): value is ModelMode {
   return value === 'default' || value === 'custom';
+}
+
+function isAvatarRenderMode(value: unknown): value is AvatarRenderMode {
+  return value === 'pet' || value === 'orb';
 }
 
 function normalizeStringList(value: unknown, fallback: string[]): string[] {

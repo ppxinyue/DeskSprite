@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SettingsLayout } from '@/components/layouts/SettingsLayout';
-import { useSettingsStore, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
+import { useSettingsStore, type AvatarRenderMode, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG, getBuiltinUsageStats } from '@/features/ai/defaultModel';
@@ -416,6 +416,7 @@ function AppearanceSection({
   const [draft, setDraft] = useState({
     petOpacity: settings.petOpacity,
     petScale: settings.petScale,
+    avatarRenderMode: settings.avatarRenderMode,
     dialogWidth: settings.dialogWidth,
     compactChatFontSize: settings.compactChatFontSize,
     theme: settings.theme,
@@ -433,13 +434,14 @@ function AppearanceSection({
     setDraft({
       petOpacity: settings.petOpacity,
       petScale: settings.petScale,
+      avatarRenderMode: settings.avatarRenderMode,
       dialogWidth: settings.dialogWidth,
       compactChatFontSize: settings.compactChatFontSize,
       theme: settings.theme,
       petMotions: settings.petMotions,
       alwaysOnTop: settings.alwaysOnTop,
     });
-  }, [settings.petOpacity, settings.petScale, settings.dialogWidth, settings.compactChatFontSize, settings.theme, settings.petMotions, settings.alwaysOnTop]);
+  }, [settings.petOpacity, settings.petScale, settings.avatarRenderMode, settings.dialogWidth, settings.compactChatFontSize, settings.theme, settings.petMotions, settings.alwaysOnTop]);
 
   return (
     <>
@@ -452,6 +454,12 @@ function AppearanceSection({
           <ThemeSelect
             value={draft.theme}
             onChange={(theme) => update('theme', theme)}
+          />
+        </AppearanceRow>
+        <AppearanceRow label="形象模式">
+          <AvatarModeSelect
+            value={draft.avatarRenderMode}
+            onChange={(avatarRenderMode) => update('avatarRenderMode', avatarRenderMode)}
           />
         </AppearanceRow>
         <AppearanceRow label="灵宠透明度">
@@ -946,6 +954,37 @@ function ThemeSelect({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function AvatarModeSelect({
+  value,
+  onChange,
+}: {
+  value: AvatarRenderMode;
+  onChange: (mode: AvatarRenderMode) => void;
+}) {
+  const options: Array<{ id: AvatarRenderMode; label: string }> = [
+    { id: 'pet', label: 'Pet' },
+    { id: 'orb', label: 'Orb' },
+  ];
+  return (
+    <div className="flex rounded-[9px] border border-border/60 bg-transparent p-1">
+      {options.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          className={`h-8 rounded-[7px] px-3 text-[12px] font-medium transition-all ${
+            value === option.id
+              ? 'bg-background/78 text-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-background/48 hover:text-foreground'
+          }`}
+          onClick={() => onChange(option.id)}
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   );
 }

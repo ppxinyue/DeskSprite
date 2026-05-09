@@ -643,3 +643,11 @@
 - 联动：选择日期后关闭弹层，并刷新当日概览和最近 14 天趋势图。
 - 验证：`pnpm build` 通过。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R77. Orb 形象渲染模式（2026-05-09）
+- 设置：新增 `avatarRenderMode: pet | orb`，外观设置中增加“形象模式”切换；默认仍为 Pet，避免改变现有用户体验。
+- 渲染：PetAvatar 保留原 PNG/GIF 渲染分支；Orb 模式复用同一套拖拽、右键菜单、聊天按钮和窗口布局，只替换灵宠本体为 CSS/React 代码动效球体。
+- 三态：idle 使用鼠标邻近字重变化，work 在 hover 时做字母翻牌，rest 自动慢旋转并让文字字重呼吸；状态 accent 色跟随 idle/work/rest 切换。
+- 尺寸：Orb 常驻尺寸复用“灵宠大小”设置；休息放大仍复用屏幕 80% 展示逻辑，并针对 Orb 使用正圆几何计算。
+- 验证：`pnpm build` 通过。
+- 文件：settingsStore.ts, SettingsPanel.tsx, PetAvatar.tsx, App.tsx, index.css, ISSUES.md, PROGRESS.md
