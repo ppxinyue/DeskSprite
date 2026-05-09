@@ -907,3 +907,10 @@
 - CSS：加入 `t-digit-pop-in` keyframes、stagger 变量和 reduced-motion 兜底。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R114. 休息倒计时数字动效微调（2026-05-09）
+- 动效：`AnimatedCountdown` 只给数字字符应用 pop-in，单位 `s` 等非数字字符保持静态。
+- 尺寸：倒计时字号降为 18px，提前结束按钮字号降为 14px。
+- 颜色：倒计时文本改为统一深灰 `#4d4a45`，避免接近纯黑。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, index.css, ISSUES.md, PROGRESS.md

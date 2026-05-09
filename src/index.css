@@ -710,6 +710,10 @@
   will-change: transform, opacity, filter;
 }
 
+.t-digit-static {
+  display: inline-block;
+}
+
 .t-digit-group.is-animating .t-digit {
   animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
 }

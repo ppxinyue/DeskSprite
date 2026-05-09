@@ -1154,12 +1154,12 @@ function PetWindow() {
             />
             {restEndAt ? (
               <div className="mt-2 flex flex-col items-center gap-2">
-                <div className="pointer-events-none text-center text-[24px] font-semibold leading-none tabular-nums text-foreground drop-shadow-[0_2px_12px_rgba(32,28,22,0.18)]">
+                <div className="pointer-events-none text-center text-[18px] font-semibold leading-none tabular-nums text-[#4d4a45] drop-shadow-[0_2px_12px_rgba(32,28,22,0.12)]">
                   <AnimatedCountdown value={formatCountdown(Math.max(0, restEndAt - now))} />
                 </div>
                 <button
                   type="button"
-                  className="rounded-[10px] border border-border/65 bg-background/90 px-5 py-1.5 text-[17px] font-medium leading-none text-muted-foreground shadow-[0_10px_28px_rgba(32,28,22,0.14)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:text-foreground active:translate-y-0"
+                  className="rounded-[9px] border border-border/65 bg-background/90 px-4 py-1.5 text-[14px] font-medium leading-none text-muted-foreground shadow-[0_8px_22px_rgba(32,28,22,0.12)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:text-foreground active:translate-y-0"
                   onClick={() => finishRest().catch(() => {})}
                 >
                   提前结束
@@ -1235,18 +1235,24 @@ function FloatingToolButton({
 }
 
 function AnimatedCountdown({ value }: { value: string }) {
+  let digitIndex = 0;
   return (
     <span key={value} className="t-digit-group is-animating" aria-label={value}>
-      {value.split('').map((char, index) => (
-        <span
-          key={`${char}-${index}`}
-          className="t-digit"
-          aria-hidden="true"
-          style={{ animationDelay: `calc(var(--digit-stagger) * ${index})` }}
-        >
-          {char}
-        </span>
-      ))}
+      {value.split('').map((char, index) => {
+        const isDigit = /\d/.test(char);
+        const stagger = digitIndex;
+        if (isDigit) digitIndex += 1;
+        return (
+          <span
+            key={`${char}-${index}`}
+            className={isDigit ? 't-digit' : 't-digit-static'}
+            aria-hidden="true"
+            style={isDigit ? { animationDelay: `calc(var(--digit-stagger) * ${stagger})` } : undefined}
+          >
+            {char}
+          </span>
+        );
+      })}
     </span>
   );
 }
