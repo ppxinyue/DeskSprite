@@ -177,7 +177,7 @@ interface CompactChatSession {
   version: number;
 }
 
-type CodingStatus = 'needs-input' | 'working' | 'done';
+type CodingStatus = 'idle' | 'needs-input' | 'working' | 'done';
 
 interface CodingMessage {
   id: string;
@@ -566,7 +566,7 @@ function CodingDialog({
                 <div className="mx-auto w-full max-w-none space-y-3 py-5">
                   {visibleMessages.length === 0 ? (
                     <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">
-                      {inherited ? 'Codex 正在工作中' : state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
+                      {inherited ? (state.status === 'idle' ? '没有新的 Codex 通知' : 'Codex 正在工作中') : state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
                     </div>
                   ) : visibleMessages.map((message) => (
                     <MessageBubble key={message.id} message={message} />
@@ -627,7 +627,7 @@ function CodingDialog({
         <div className="space-y-2.5 py-4">
           {visibleMessages.length === 0 ? (
             <div className="py-8 text-center text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
-              {inherited ? 'Codex 正在工作中' : state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
+              {inherited ? (state.status === 'idle' ? '没有新的 Codex 通知' : 'Codex 正在工作中') : state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
             </div>
           ) : visibleMessages.map((message) => (
             <MessageBubble
@@ -768,12 +768,14 @@ async function persistCodingMessages(messages: CodingMessage[]) {
 }
 
 function codingStatusDotClass(status: CodingStatus) {
+  if (status === 'idle') return 'bg-[#8e8e93]';
   if (status === 'working') return 'bg-[#ffbd2e]';
   if (status === 'needs-input') return 'bg-[#ff5f57]';
   return 'bg-[#28c840]';
 }
 
 function codingStatusColor(status: CodingStatus) {
+  if (status === 'idle') return '#8e8e93';
   if (status === 'working') return '#ffbd2e';
   if (status === 'needs-input') return '#ff5f57';
   return '#28c840';

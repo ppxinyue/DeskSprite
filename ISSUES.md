@@ -1811,3 +1811,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Codex 的 assistant 文本不一定等于最终回答，状态灯必须基于 turn 完成语义，而不是“出现文本”这个弱信号。
 - 是否需更新技术文档：否。
+
+## ISSUE-153
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：继承通知清空后进入灰色空闲态
+- 严重程度：中等
+- 问题现象：继承模式下绿色完成通知被清空后，chat button 自动变成黄色，但实际没有新的 Codex 工作在进行。
+- 原因分析：清空后所有已完成 session 被 ack 掉，聚合逻辑会回退到最近的 working session；而这些 working session 可能只是旧日志推导出的非终态，并不代表当前仍在运行。
+- 解决方案：新增 `idle` 灰色状态；只有最近 90 秒内仍有活动的 working session 才聚合为黄色，否则在无未读通知时返回灰色空闲。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：继承外部日志时，working 必须带时间窗口，否则旧的非终态日志会让 UI 永远误以为 Codex 正在工作。
+- 是否需更新技术文档：否。

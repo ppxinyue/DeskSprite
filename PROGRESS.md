@@ -1158,3 +1158,10 @@
 - 体验：Codex 规划、说明、执行工具期间 chat button 保持黄色；只有完整回复出现后才变绿色。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R148. 继承通知清空后进入灰色空闲态（2026-05-10）
+- 状态：Coding 状态新增 `idle`，用于表达继承模式下没有未读红/绿通知、也没有近期活跃 Codex 工作。
+- 主进程：继承扫描只把 90 秒内仍有活动的 working session 聚合为黄色；清空绿色通知后若无新活动则返回灰色 idle。
+- UI：chat button 和状态点支持 macOS 风格灰色，并把空状态文案改为“没有新的 Codex 通知”。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md

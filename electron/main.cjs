@@ -28,6 +28,7 @@ let currentAppIcon = null;
 const floatingConfiguredWindows = new WeakSet();
 const IGNORED_DISTRACTION_APPS = ['DeskSprite', 'PawPal', 'Electron'];
 const CODEX_STATUS = {
+  IDLE: 'idle',
   NEEDS_INPUT: 'needs-input',
   WORKING: 'working',
   DONE: 'done',
@@ -42,6 +43,7 @@ const codingState = {
   threadId: CURRENT_CODEX_THREAD_ID,
 };
 const CODEX_INHERIT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
 const inheritedCodingAcknowledged = new Map();
 const codexAppServer = {
   child: null,
@@ -1400,12 +1402,18 @@ async function getInheritedCodingState() {
     || inheritedCodingAcknowledged.get(session.id) !== session.ackKey
   ));
   const actionable = unacknowledged.filter((session) => session.status !== CODEX_STATUS.WORKING);
+  const activeWorking = unacknowledged.filter((session) => (
+    session.status === CODEX_STATUS.WORKING
+    && nowMs - session.updatedAt <= CODEX_INHERIT_ACTIVE_MS
+  ));
   const status = actionable.some((session) => session.status === CODEX_STATUS.NEEDS_INPUT)
     ? CODEX_STATUS.NEEDS_INPUT
     : actionable.some((session) => session.status === CODEX_STATUS.DONE)
       ? CODEX_STATUS.DONE
-      : CODEX_STATUS.WORKING;
-  const selected = actionable.length > 0 ? actionable : unacknowledged.slice(0, 3);
+      : activeWorking.length > 0
+        ? CODEX_STATUS.WORKING
+        : CODEX_STATUS.IDLE;
+  const selected = actionable.length > 0 ? actionable : activeWorking.slice(0, 3);
   const messages = selected.slice(0, 5).map((session) => ({
     id: `inherit-${session.id}-${Math.round(session.updatedAt)}`,
     role: session.status === CODEX_STATUS.NEEDS_INPUT ? 'error' : session.status === CODEX_STATUS.DONE ? 'codex' : 'system',
@@ -1416,7 +1424,7 @@ async function getInheritedCodingState() {
     messages.push({
       id: 'inherit-empty',
       role: 'system',
-      content: '没有检测到最近活跃的 Codex session。',
+      content: status === CODEX_STATUS.IDLE ? '没有新的 Codex 通知。' : '没有检测到最近活跃的 Codex session。',
       createdAt: Date.now(),
     });
   } else if (status === CODEX_STATUS.WORKING) {
