@@ -1056,3 +1056,11 @@
 - UI：小聊天框空状态改为显示是否已连接当前 Codex 对话。
 - 验证：`git diff --check`、`pnpm build` 通过；未向真实当前 Codex thread 发送测试消息，避免污染当前对话。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R135. Coding 自动启动灵宠 Codex 会话（2026-05-09）
+- 主进程：没有 `DESKSPRITE_CODEX_THREAD_ID` / `CODEX_THREAD_ID` 时，不再报错，而是自动使用 `codex exec ... -` 启动新的 Codex thread。
+- 会话：监听 `thread.started` 并保存 thread id，后续消息自动走 `codex exec resume <threadId>`，实现灵宠自己的持续 Codex 对话。
+- UI：空状态改为提示“输入第一条消息后会自动启动新的 Codex 对话”。
+- 语义：如果 Electron 从 Codex 环境启动，可连接当前 Codex thread；如果从普通终端启动，则自动唤起并维护独立 Codex 会话。
+- 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md

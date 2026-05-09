@@ -364,7 +364,7 @@ function CodingCompactDialog({
       <div ref={scrollRef} className="min-h-[120px] flex-1 overflow-y-auto px-3 py-2" style={{ maxHeight: Math.max(120, maxHeight - 92) }}>
         {state.messages.length === 0 ? (
           <div className="py-8 text-center text-[12px] text-muted-foreground">
-            {state.threadId ? '已连接当前 Codex 对话，输入内容会发送到当前 thread。' : '未检测到当前 Codex 对话。'}
+            {state.threadId ? '已连接 Codex 对话，输入内容会发送到当前 thread。' : '输入第一条消息后会自动启动新的 Codex 对话。'}
           </div>
         ) : (
           <div className="space-y-2">

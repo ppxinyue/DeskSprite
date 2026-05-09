@@ -1655,3 +1655,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：如果用户语义是“当前对话”，桥接层必须绑定 thread/session id；新建 exec 只能算同项目新任务。
 - 是否需更新技术文档：否。
+
+## ISSUE-140
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Coding 自动启动灵宠 Codex 会话
+- 严重程度：重要
+- 问题现象：Electron 从普通终端启动时没有 `CODEX_THREAD_ID`，Coding 模式只显示“没有检测到当前 Codex 对话”，导致用户无法在没有现存 Codex 进程的情况下通过灵宠唤起 Codex。
+- 原因分析：上一版只支持绑定外部传入的当前 thread，没有 fallback 到创建并维护灵宠自己的 Codex thread。
+- 解决方案：缺少 thread id 时自动 `codex exec` 新建会话，保存 `thread.started` 返回的 thread id；之后所有消息使用 `codex exec resume` 复用该会话。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Coding 模式应同时支持“接管当前 Codex thread”和“独立唤起 Codex thread”，这样才符合桌面宠物入口的使用预期。
+- 是否需更新技术文档：否。

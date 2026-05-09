@@ -802,11 +802,6 @@ function extractCodexStatusText(event) {
 async function sendCodingMessage({ prompt }) {
   const text = String(prompt || '').trim();
   if (!text) throw new Error('输入为空。');
-  if (!codingState.threadId) {
-    codingState.status = CODEX_STATUS.NEEDS_INPUT;
-    pushCodingMessage('error', '没有检测到当前 Codex 对话。请从 Codex 环境启动应用，或设置 DESKSPRITE_CODEX_THREAD_ID。');
-    return publishCodingState();
-  }
   if (codingState.running) {
     codingState.status = CODEX_STATUS.WORKING;
     pushCodingMessage('system', 'Codex 正在工作，请等这次任务结束后再发送。');
@@ -815,20 +810,31 @@ async function sendCodingMessage({ prompt }) {
 
   codingState.status = CODEX_STATUS.WORKING;
   pushCodingMessage('user', text);
-  pushCodingMessage('system', '已发送到当前 Codex 对话，等待回复。');
+  pushCodingMessage('system', codingState.threadId ? '已发送到 Codex 对话，等待回复。' : '正在启动新的 Codex 对话。');
   publishCodingState();
 
   const outputPath = path.join(os.tmpdir(), `desksprite-codex-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`);
-  const args = [
-    'exec',
-    'resume',
-    '--skip-git-repo-check',
-    codingState.threadId,
-    '--json',
-    '--output-last-message',
-    outputPath,
-    '-',
-  ];
+  const args = codingState.threadId
+    ? [
+        'exec',
+        'resume',
+        '--skip-git-repo-check',
+        codingState.threadId,
+        '--json',
+        '--output-last-message',
+        outputPath,
+        '-',
+      ]
+    : [
+        'exec',
+        '--skip-git-repo-check',
+        '--json',
+        '--cd',
+        process.cwd(),
+        '--output-last-message',
+        outputPath,
+        '-',
+      ];
   const child = spawn(getCodexBinary(), args, {
     cwd: process.cwd(),
     env: { ...process.env, FORCE_COLOR: '0' },
@@ -841,6 +847,11 @@ async function sendCodingMessage({ prompt }) {
   let stderrBuffer = '';
   let lastAgentText = '';
   const handleCodexEvent = (event) => {
+    if (event?.type === 'thread.started' && typeof event.thread_id === 'string') {
+      codingState.threadId = event.thread_id;
+      publishCodingState();
+      return;
+    }
     const agentText = extractCodexAgentText(event);
     if (agentText) {
       lastAgentText = agentText;
