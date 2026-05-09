@@ -376,12 +376,16 @@
   animation-duration: 7.2s;
 }
 
+.orb-avatar:not(.is-hovering) {
+  opacity: var(--orb-opacity);
+}
+
 .orb-avatar--work {
-  --orb-state-core: rgba(143, 192, 255, 0.20);
-  --orb-state-mid: rgba(143, 192, 255, 0.10);
-  --orb-state-edge: rgba(143, 192, 255, 0.028);
-  --orb-wave-strong: rgba(111, 170, 245, 0.070);
-  --orb-wave-soft: rgba(148, 198, 255, 0.030);
+  --orb-state-core: rgba(128, 214, 255, 0.26);
+  --orb-state-mid: rgba(128, 214, 255, 0.14);
+  --orb-state-edge: rgba(128, 214, 255, 0.040);
+  --orb-wave-strong: rgba(82, 194, 255, 0.105);
+  --orb-wave-soft: rgba(166, 229, 255, 0.050);
 }
 
 .orb-avatar--rest {

@@ -858,3 +858,10 @@
 - 约束：状态色只叠在核心渐变和波纹层上，保留整体黑白灰基调。
 - 验证：`pnpm build` 通过。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R107. Orb 透明度绑定与天空蓝 Work（2026-05-09）
+- 透明度：为 `.orb-avatar:not(.is-hovering)` 显式绑定 `--orb-opacity`，确保设置里的透明度参数控制 orb 常态透明度。
+- Hover：保留上一轮 hover 时 `opacity: 1` 的交互规则。
+- Work：将偏灰的浅蓝调为更清新明亮的浅天空蓝，并提高少量波纹亮度。
+- 验证：`pnpm build` 通过。
+- 文件：index.css, ISSUES.md, PROGRESS.md
