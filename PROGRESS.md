@@ -844,3 +844,9 @@
 - 布局：rest 展示时 pet 顶部位置额外下移 bleed 空间，避免两侧和上下外圈字母被窗口边界裁掉。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R105. Orb Hover 完全不透明（2026-05-09）
+- Hover：为 `.orb-avatar.is-hovering` 增加 `opacity: 1`，鼠标悬停时三种状态都完全不透明。
+- 保留：非 hover 状态仍使用设置里的 `petOpacity`，不改变用户的常态透明度偏好。
+- 验证：`pnpm build` 通过。
+- 文件：index.css, ISSUES.md, PROGRESS.md

@@ -428,6 +428,7 @@
 }
 
 .orb-avatar.is-hovering {
+  opacity: 1;
   transform: scale(1.015);
 }
 
