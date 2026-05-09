@@ -360,6 +360,11 @@
   --orb-state-core: color-mix(in srgb, var(--color-pet-dialog-bg) 64%, rgba(28,28,28,0.12));
   --orb-state-mid: color-mix(in srgb, var(--color-pet-dialog-bg) 38%, transparent);
   --orb-state-edge: color-mix(in srgb, var(--color-pet-dialog-bg) 16%, transparent);
+  --orb-base-core: rgba(28,28,28,0.20);
+  --orb-base-mid: rgba(74,74,74,0.14);
+  --orb-base-soft: rgba(128,128,128,0.075);
+  --orb-base-edge: rgba(170,170,170,0.018);
+  --orb-base-clear: rgba(190,190,190,0);
   --orb-hover-fill: color-mix(in srgb, var(--color-pet-dialog-bg) 86%, rgba(255,255,255,0.92));
   --orb-wave-strong: color-mix(in srgb, var(--color-pet-dialog-bg) 46%, rgba(18,18,18,0.040));
   --orb-wave-soft: color-mix(in srgb, var(--color-pet-dialog-bg) 25%, rgba(140,140,140,0.018));
@@ -385,6 +390,11 @@
   --orb-state-core: rgba(112, 219, 255, 0.34);
   --orb-state-mid: rgba(112, 219, 255, 0.19);
   --orb-state-edge: rgba(112, 219, 255, 0.060);
+  --orb-base-core: rgba(255, 252, 244, 0.92);
+  --orb-base-mid: rgba(255, 250, 240, 0.64);
+  --orb-base-soft: rgba(255, 246, 232, 0.34);
+  --orb-base-edge: rgba(255, 244, 226, 0.11);
+  --orb-base-clear: rgba(255, 244, 226, 0);
   --orb-hover-fill: rgba(226, 248, 255, 0.98);
   --orb-wave-strong: rgba(42, 190, 255, 0.150);
   --orb-wave-soft: rgba(156, 232, 255, 0.078);
@@ -394,6 +404,11 @@
   --orb-state-core: rgba(255, 169, 211, 0.32);
   --orb-state-mid: rgba(255, 169, 211, 0.17);
   --orb-state-edge: rgba(255, 169, 211, 0.058);
+  --orb-base-core: rgba(255, 252, 244, 0.92);
+  --orb-base-mid: rgba(255, 250, 240, 0.64);
+  --orb-base-soft: rgba(255, 246, 232, 0.34);
+  --orb-base-edge: rgba(255, 244, 226, 0.11);
+  --orb-base-clear: rgba(255, 244, 226, 0);
   --orb-hover-fill: rgba(255, 236, 246, 0.98);
   --orb-wave-strong: rgba(255, 123, 188, 0.132);
   --orb-wave-soft: rgba(255, 190, 223, 0.070);
@@ -413,11 +428,11 @@
       var(--orb-state-edge) 68%,
       transparent 100%),
     radial-gradient(circle at 50% 50%,
-      rgba(28,28,28,0.20) 0%,
-      rgba(74,74,74,0.14) 34%,
-      rgba(128,128,128,0.075) 62%,
-      rgba(170,170,170,0.018) 82%,
-      rgba(190,190,190,0) 100%);
+      var(--orb-base-core) 0%,
+      var(--orb-base-mid) 34%,
+      var(--orb-base-soft) 62%,
+      var(--orb-base-edge) 82%,
+      var(--orb-base-clear) 100%);
   box-shadow: inset 0 0 38px rgba(20,20,20,0.045);
   animation: orbShellBreath 4.8s ease-in-out infinite;
 }
@@ -484,7 +499,7 @@
   top: 50%;
   z-index: 2;
   transform: translate(-50%, -50%);
-  color: rgba(18,18,18,0.68);
+  color: rgba(18,18,18,0.78);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: var(--orb-font-size);
   font-weight: 500;
@@ -497,7 +512,7 @@
 }
 
 .orb-avatar.is-hovering .orb-avatar__hover-text {
-  opacity: 0.72;
+  opacity: 0.84;
   transform: translate(-50%, -50%) translateY(-1px);
 }
 
@@ -525,7 +540,7 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  color: rgba(18,18,18,0.44);
+  color: rgba(18,18,18,0.58);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: calc(var(--orb-font-size) * 0.78);
   font-weight: 700;
@@ -545,7 +560,7 @@
 }
 
 .orb-avatar--idle.is-hovering .orb-avatar__idle-letter {
-  color: rgba(18,18,18,0.58);
+  color: rgba(18,18,18,0.72);
   transform:
     translate(-50%, -50%)
     rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
@@ -565,7 +580,7 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  color: rgba(18,18,18,0.42);
+  color: rgba(18,18,18,0.58);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: calc(var(--orb-font-size) * 1.05);
   font-weight: 520;
@@ -605,11 +620,11 @@
       calc(var(--grid-row) * var(--orb-size) * 0.15)
     )
     rotate(0deg);
-  opacity: 0.42;
+  opacity: 0.54;
 }
 
 .orb-avatar__rest-letter {
-  opacity: 0.24;
+  opacity: 0.34;
   font-size: calc(var(--orb-font-size) * 0.76);
   font-weight: 800;
   transform:

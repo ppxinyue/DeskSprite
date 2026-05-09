@@ -872,3 +872,10 @@
 - Rest：浅粉进一步提亮，休息态更轻盈明亮。
 - 验证：`pnpm build` 通过。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R109. Orb Work/Rest 奶白底与文字加深（2026-05-09）
+- 底色：新增 orb base 色变量，idle 保持原灰阶/聊天框混色，work/rest 的背景底色改为奶白渐变。
+- 配色：work/rest 的蓝色和粉色不再与原灰底混合，叠在奶白底上更干净。
+- 文字：外圈字母、work 字母和 hover 中央文字整体加深，提高可读性。
+- 验证：`pnpm build` 通过。
+- 文件：index.css, ISSUES.md, PROGRESS.md
