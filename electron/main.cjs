@@ -415,11 +415,16 @@ function ensureTopmostGuard() {
 function createPetWindow() {
   const display = screen.getPrimaryDisplay();
   const work = display.workArea;
+  const initialWidth = 220;
+  const initialHeight = 300;
+  const initialMargin = 40;
+  const initialX = Math.max(work.x + 16, work.x + work.width - initialWidth - initialMargin);
+  const initialY = Math.max(work.y + 16, work.y + work.height - initialHeight - initialMargin);
   const win = createWindow('pet', {
-    width: 220,
-    height: 220,
-    x: Math.round(work.x + work.width - 260),
-    y: Math.round(work.y + work.height - 260),
+    width: initialWidth,
+    height: initialHeight,
+    x: Math.round(initialX),
+    y: Math.round(initialY),
     transparent: true,
     type: process.platform === 'darwin' ? 'panel' : undefined,
     frame: false,

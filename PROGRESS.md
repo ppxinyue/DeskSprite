@@ -1275,3 +1275,10 @@
 - 清空：只有显式新建/清空 Claude Code coding 会话时才重置启动状态和 session id。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R164. 右键二级菜单容错与启动位置修正（2026-05-10）
+- 右键菜单：历史对话与 Coding 模式二级菜单之间增加透明三角过渡区，鼠标从主选项移向二级菜单时不会因短暂离开 hover 区而收起。
+- 启动位置：Electron 初始 pet 窗口高度从 220 调整到 300，并按 40px 安全边距计算右下初始坐标，首次显示时就贴合前端 collapsed 布局。
+- 结果：减少刚启动时 pet/orb 先出现在右下越界位置、随后被布局逻辑拉回的视觉回弹。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, PetAvatar.tsx, ISSUES.md, PROGRESS.md

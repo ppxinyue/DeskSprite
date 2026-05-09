@@ -100,6 +100,14 @@ export function PetAvatar({
   const w = Math.round((orbMode ? 150 : 120) * scale);
   const h = Math.round(150 * scale);
   const animationsPaused = dragging;
+  const submenuBridgeClass = `pointer-events-auto absolute top-0 z-10 h-40 w-6 ${
+    submenuSide === 'left' ? 'right-full -mr-1' : 'left-full -ml-1'
+  }`;
+  const submenuBridgeStyle: CSSProperties = {
+    clipPath: submenuSide === 'left'
+      ? 'polygon(100% 0, 0 16%, 0 84%, 100% 100%)'
+      : 'polygon(0 0, 100% 16%, 100% 84%, 0 100%)',
+  };
 
   useEffect(() => {
     loadUserFrames();
@@ -426,6 +434,7 @@ export function PetAvatar({
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('new-chat')}>新对话</button>
         <div className="group/history relative">
           <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">历史对话</button>
+          <div className={submenuBridgeClass} style={submenuBridgeStyle} />
           <div
               className={`absolute top-0 hidden w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/history:block dark:bg-[#1c1b18] ${
               submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
@@ -460,6 +469,7 @@ export function PetAvatar({
         ) : (
           <div className="group/coding relative">
             <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">Coding 模式</button>
+            <div className={submenuBridgeClass} style={{ ...submenuBridgeStyle, height: 190 }} />
             <div
               className={`absolute top-0 hidden w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/coding:block dark:bg-[#1c1b18] ${
                 submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
