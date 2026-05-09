@@ -541,9 +541,9 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 const ORB_STATE_META: Record<Extract<PetState, 'idle' | 'work' | 'rest'>, { label: string; accent: string; lightAccent: string }> = {
-  idle: { label: 'IDLE', accent: '#ffffff', lightAccent: '#1c1c1e' },
-  work: { label: 'WORK', accent: '#3b82f6', lightAccent: '#3b82f6' },
-  rest: { label: 'REST', accent: '#10b981', lightAccent: '#10b981' },
+  idle: { label: 'idle', accent: '#ffffff', lightAccent: '#1c1c1e' },
+  work: { label: 'work', accent: '#8bbcff', lightAccent: '#5f9fee' },
+  rest: { label: 'rest', accent: '#7be3bd', lightAccent: '#46c99a' },
 };
 
 function OrbAvatar({
@@ -561,7 +561,7 @@ function OrbAvatar({
   const meta = ORB_STATE_META[orbState];
   const [hovering, setHovering] = useState(false);
   const letters = meta.label.split('');
-  const fontSize = Math.max(12, Math.round(size * 0.095));
+  const fontSize = Math.max(10, Math.round(size * 0.07));
 
   return (
     <motion.div
@@ -596,6 +596,7 @@ function OrbAvatar({
           transition={{ duration: 4, repeat: Infinity }}
         />
         <div className="orb-avatar__flow" />
+        <div className="orb-avatar__particles" />
         <div className="orb-avatar__glass" />
         <div className="orb-avatar__noise" />
         <AnimatePresence mode="wait">

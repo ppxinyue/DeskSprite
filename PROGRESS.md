@@ -707,3 +707,10 @@
 - 修复：修正 `orb-avatar__flow` 的 `inset: -24%` 被公共 selector 覆盖的问题，恢复内部流动层的真实运动范围。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R86. Orb 轻量文字与粒子动效（2026-05-09）
+- 文字：Orb 状态文字改为小写 `idle/work/rest`，字号比例从 9.5% 降到 7%，整体更轻。
+- 色彩：降低状态色在 shell、flow、edge bloom 和文字中的混合比例，work/rest 不再过于浓烈。
+- 粒子：新增 `orb-avatar__particles` 内部光尘层，使用多点 radial gradients 和慢速 drift 动画，在球体内部形成细小漂浮粒子。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
