@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, Bot, Check, ChevronDown, Clock3, ExternalLink, Keyboard, Loader2, Palette, PawPrint, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
+import { BarChart3, Bell, Bot, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Keyboard, Loader2, Palette, PawPrint, Pencil, Plus, Shield, Trash2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +16,7 @@ import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/syst
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
 import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
-import { getConversations, getMessages, getSystemPrompt, setSetting, updateSystemPrompt } from '@/lib/db';
+import { getConversations, getFocusStatsDays, getMessages, getSystemPrompt, setSetting, updateSystemPrompt, type FocusStatsDay } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, isBuiltinAsset, normalizePetMediaConfig, type PetStateMediaConfig } from '@/features/pet/animations';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
@@ -24,12 +24,13 @@ import { emit } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { ReactNode } from 'react';
 
-type SettingsSection = 'appearance' | 'reminders' | 'ai' | 'history' | 'shortcuts' | 'privacy';
+type SettingsSection = 'profile' | 'appearance' | 'reminders' | 'ai' | 'history' | 'shortcuts' | 'privacy';
 const ALLOWED_STATIC_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp']);
 const ALLOWED_GIF_EXTENSIONS = new Set(['gif']);
 const MASKED_API_KEY = '••••••••';
 
 const SECTIONS: { id: SettingsSection; label: string; icon: typeof Palette }[] = [
+  { id: 'profile', label: '个人档案', icon: UserRound },
   { id: 'appearance', label: '外观', icon: Palette },
   { id: 'reminders', label: '提醒事项', icon: Bell },
   { id: 'ai', label: 'AI 对话', icon: Bot },
@@ -39,7 +40,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: typeof Palette }[] =
 ];
 
 export function SettingsPanel() {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('appearance');
+  const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
   const { settings, loaded, loadSettings, updateSetting, updateSettings } = useSettingsStore();
   const { configs, loadConfigs, removeConfig, setDefault } = useApiConfigStore();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
@@ -80,6 +81,7 @@ export function SettingsPanel() {
 
   return (
     <SettingsLayout sidebar={sidebar}>
+      {activeSection === 'profile' && <ProfileSection />}
       {activeSection === 'appearance' && (
         <AppearanceSection settings={settings} updateSettings={updateSettings} />
       )}
@@ -162,6 +164,127 @@ function SettingsGroup({ children, className = '' }: { children: ReactNode; clas
   return (
     <div className={`quiet-card mb-6 overflow-hidden rounded-[9px] ${className}`}>
       {children}
+    </div>
+  );
+}
+
+function ProfileSection() {
+  const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
+  const [stats, setStats] = useState<FocusStatsDay[]>([]);
+
+  useEffect(() => {
+    getFocusStatsDays(14, selectedDate)
+      .then(setStats)
+      .catch(() => setStats([]));
+  }, [selectedDate]);
+
+  const selectedStats = stats[stats.length - 1] ?? { date: selectedDate, focusMs: 0, focusSessions: 0, distractions: 0 };
+  const maxFocusMs = Math.max(1, ...stats.map((day) => day.focusMs));
+  const totalFocusMs = stats.reduce((sum, day) => sum + day.focusMs, 0);
+  const totalSessions = stats.reduce((sum, day) => sum + day.focusSessions, 0);
+  const totalDistractions = stats.reduce((sum, day) => sum + day.distractions, 0);
+  const todayKey = getLocalDateKey();
+
+  return (
+    <>
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.018em] text-foreground">个人档案</h1>
+        <div className="flex items-center gap-1.5 rounded-[9px] border border-border/60 bg-transparent p-1">
+          <button
+            type="button"
+            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+            onClick={() => setSelectedDate((date) => shiftDateKey(date, -1))}
+            aria-label="前一天"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <div className="flex min-w-[128px] items-center justify-center gap-1.5 px-2 text-[12px] font-medium text-foreground">
+            <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+            {formatDateHeading(selectedDate)}
+          </div>
+          <button
+            type="button"
+            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
+            onClick={() => setSelectedDate((date) => shiftDateKey(date, 1))}
+            disabled={selectedDate >= todayKey}
+            aria-label="后一天"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+        <StatsCard label="专注时长" value={formatFocusDuration(selectedStats.focusMs)} accent />
+        <StatsCard label="专注次数" value={`${selectedStats.focusSessions} 次`} />
+        <StatsCard label="分心次数" value={`${selectedStats.distractions} 次`} />
+      </div>
+
+      <SettingsGroup className="px-4 py-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              最近 14 天
+            </div>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              共 {formatFocusDuration(totalFocusMs)} · {totalSessions} 次专注 · {totalDistractions} 次分心
+            </div>
+          </div>
+        </div>
+
+        <div className="flex h-48 items-end gap-2 border-b border-border/55 pb-3">
+          {stats.map((day) => {
+            const height = Math.max(day.focusMs > 0 ? 10 : 2, (day.focusMs / maxFocusMs) * 140);
+            const selected = day.date === selectedDate;
+            return (
+              <button
+                key={day.date}
+                type="button"
+                className="group flex min-w-0 flex-1 flex-col items-center justify-end gap-2"
+                onClick={() => setSelectedDate(day.date)}
+                title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
+              >
+                <div className="flex h-[144px] w-full items-end justify-center">
+                  <div
+                    className={`w-full max-w-8 rounded-t-[7px] transition-all duration-200 ${
+                      selected ? 'bg-foreground' : 'bg-foreground/24 group-hover:bg-foreground/42'
+                    }`}
+                    style={{ height }}
+                  />
+                </div>
+                <div className={`text-[10px] leading-none ${selected ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                  {formatWeekdayShort(day.date)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <MiniMetric label="平均每日专注" value={formatFocusDuration(totalFocusMs / Math.max(1, stats.length))} />
+          <MiniMetric label="最高单日专注" value={formatFocusDuration(Math.max(0, ...stats.map((day) => day.focusMs)))} />
+          <MiniMetric label="平均分心次数" value={`${(totalDistractions / Math.max(1, stats.length)).toFixed(1)} 次`} />
+        </div>
+      </SettingsGroup>
+    </>
+  );
+}
+
+function StatsCard({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className={`quiet-card rounded-[9px] px-4 py-3 ${accent ? 'shadow-[0_12px_32px_rgba(42,38,31,0.08)]' : ''}`}>
+      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
+      <div className="mt-1 text-[20px] font-semibold tracking-[-0.02em] text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[8px] border border-border/50 px-3 py-2">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-[13px] font-semibold text-foreground">{value}</div>
     </div>
   );
 }
@@ -567,6 +690,39 @@ function parseRuleTextarea(value: string): string[] {
     .split(/\n|,/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function getLocalDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function shiftDateKey(dateKey: string, offset: number): string {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() + offset);
+  return getLocalDateKey(date);
+}
+
+function formatDateHeading(dateKey: string): string {
+  const date = new Date(`${dateKey}T00:00:00`);
+  const today = getLocalDateKey();
+  if (dateKey === today) return '今天';
+  if (dateKey === shiftDateKey(today, -1)) return '昨天';
+  return date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
+}
+
+function formatWeekdayShort(dateKey: string): string {
+  return new Date(`${dateKey}T00:00:00`).toLocaleDateString('zh-CN', { weekday: 'short' }).replace('周', '');
+}
+
+function formatFocusDuration(ms: number): string {
+  const minutes = Math.max(0, Math.round(ms / 60_000));
+  if (minutes < 60) return `${minutes} 分钟`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
 }
 
 const THEME_OPTIONS: { id: import('./settingsStore').Theme; title: string; description: string }[] = [

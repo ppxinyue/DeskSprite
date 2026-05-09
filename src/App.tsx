@@ -10,7 +10,7 @@ import { ChatDialog } from "@/features/chat/ChatDialog";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore } from "@/features/settings/settingsStore";
-import { getConversations, getSetting } from "@/lib/db";
+import { getConversations, getSetting, recordDistraction, recordFocusSession } from "@/lib/db";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
 import "./index.css";
 
@@ -583,14 +583,21 @@ function PetWindow() {
     setPetPrompt(null);
   }, []);
 
+  const recordCurrentFocusSession = useCallback((endedAt = Date.now()) => {
+    const startedAt = focusStartedAtRef.current;
+    if (!startedAt) return;
+    recordFocusSession(startedAt, endedAt).catch((e) => console.warn("Failed to record focus stats:", e));
+  }, []);
+
   const endFocus = useCallback(() => {
+    recordCurrentFocusSession();
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
     focusWarningAtRef.current = 0;
     autoFocusAfterRestRef.current = false;
     setPetPrompt(null);
     if (!restEndAt) setPetState('idle');
-  }, [restEndAt, setPetState]);
+  }, [recordCurrentFocusSession, restEndAt, setPetState]);
 
   const startFocus = useCallback(() => {
     const duration = Math.max(1, settings.focusDurationMinutes) * 60_000;
@@ -656,11 +663,12 @@ function PetWindow() {
   useEffect(() => {
     if (!focusEndAt) return;
     if (Date.now() < focusEndAt) return;
+    recordCurrentFocusSession(focusEndAt);
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
     setPetState('rest');
     setPetPrompt({ id: 'focus-complete', message: '该休息啦', variant: 'rest' });
-  }, [focusEndAt, now, setPetState]);
+  }, [focusEndAt, now, recordCurrentFocusSession, setPetState]);
 
   useEffect(() => {
     if (!restEndAt) return;
@@ -686,6 +694,7 @@ function PetWindow() {
         if (!result.supported || !result.matchedRule || !focusEndAtRef.current) return;
         if (Date.now() - focusWarningAtRef.current < DISTRACTION_WARNING_COOLDOWN_MS) return;
         focusWarningAtRef.current = Date.now();
+        recordDistraction().catch((e) => console.warn("Failed to record distraction stats:", e));
         const rule = result.matchedRule.replace(/^(app|keyword):/, '');
         setPetState('work');
         setPetPrompt({

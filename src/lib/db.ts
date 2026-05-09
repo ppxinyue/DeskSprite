@@ -31,6 +31,13 @@ type MessageRow = {
   timestamp: string;
 };
 
+export type FocusStatsDay = {
+  date: string;
+  focusMs: number;
+  focusSessions: number;
+  distractions: number;
+};
+
 type Store = {
   apiConfigs: ApiConfigRow[];
   systemPrompt: string;
@@ -38,6 +45,7 @@ type Store = {
   messages: MessageRow[];
   settings: Record<string, string>;
   usageLogs: Array<Record<string, unknown>>;
+  focusStats: Record<string, FocusStatsDay>;
   nextIds: {
     apiConfig: number;
     conversation: number;
@@ -60,6 +68,7 @@ function createStore(): Store {
     messages: [],
     settings: {},
     usageLogs: [],
+    focusStats: {},
     nextIds: {
       apiConfig: 1,
       conversation: 1,
@@ -81,6 +90,27 @@ function loadStore(): Store {
 
 function saveStore(store: Store) {
   localStorage.setItem(STORE_KEY, JSON.stringify(store));
+}
+
+function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(dateKey: string, offset: number) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() + offset);
+  return localDateKey(date);
+}
+
+function ensureFocusStatsDay(store: Store, dateKey: string): FocusStatsDay {
+  const existing = store.focusStats[dateKey];
+  if (existing) return existing;
+  const created = { date: dateKey, focusMs: 0, focusSessions: 0, distractions: 0 };
+  store.focusStats[dateKey] = created;
+  return created;
 }
 
 function mutate<T>(fn: (store: Store) => T): T {
@@ -274,4 +304,31 @@ export async function setSetting(key: string, value: string) {
 export async function getAllSettings() {
   const settings = loadStore().settings;
   return Object.entries(settings).map(([key, value]) => ({ key, value }));
+}
+
+export async function recordFocusSession(startedAt: number, endedAt = Date.now()) {
+  const duration = Math.max(0, endedAt - startedAt);
+  if (duration < 1000) return;
+  mutate((store) => {
+    const day = ensureFocusStatsDay(store, localDateKey(new Date(endedAt)));
+    day.focusMs += duration;
+    day.focusSessions += 1;
+  });
+}
+
+export async function recordDistraction(occurredAt = Date.now()) {
+  mutate((store) => {
+    const day = ensureFocusStatsDay(store, localDateKey(new Date(occurredAt)));
+    day.distractions += 1;
+  });
+}
+
+export async function getFocusStatsDays(days = 14, endDate = localDateKey()): Promise<FocusStatsDay[]> {
+  const store = loadStore();
+  const count = Math.max(1, Math.floor(days));
+  return Array.from({ length: count }, (_, index) => {
+    const date = addDays(endDate, index - count + 1);
+    const day = store.focusStats[date];
+    return day ? { ...day } : { date, focusMs: 0, focusSessions: 0, distractions: 0 };
+  });
 }
