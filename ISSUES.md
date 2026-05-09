@@ -1667,3 +1667,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Coding 模式应同时支持“接管当前 Codex thread”和“独立唤起 Codex thread”，这样才符合桌面宠物入口的使用预期。
 - 是否需更新技术文档：否。
+
+## ISSUE-141
+- 发现时间：2026-05-09
+- 发现者：参考实现复盘
+- 相关任务：Coding 事件解析对齐 cc-connect
+- 严重程度：重要
+- 问题现象：Coding 模式直接把 `item.completed(agent_message)` 作为 Codex 回复显示，并把 `Reconnecting...` 等瞬时事件刷到聊天里，和 Codex CLI 的 turn 语义不完全一致。
+- 原因分析：`cc-connect` 的实现会缓存 agent message，直到 `turn.completed` 才输出最终回复；中途出现 tool use 时才将缓存作为 thinking 输出。上一版没有这个 pending/flush 机制。
+- 解决方案：新增 pending agent message 缓存；`turn.completed` 时 flush 为 Codex 回复；tool item 出现时先 flush 为 system 过程信息；过滤 reconnect/fallback 瞬时事件；扩展文本字段提取。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Codex JSONL 是 turn/event 流，不能把每个事件都当聊天消息，应该按 turn 生命周期汇总后再展示。
+- 是否需更新技术文档：否。

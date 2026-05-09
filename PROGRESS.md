@@ -1064,3 +1064,11 @@
 - 语义：如果 Electron 从 Codex 环境启动，可连接当前 Codex thread；如果从普通终端启动，则自动唤起并维护独立 Codex 会话。
 - 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R136. Coding 事件解析对齐 cc-connect（2026-05-09）
+- 主进程：按 `cc-connect` 的 Codex session 模型调整 JSONL 处理，`agent_message` 先缓存，等 `turn.completed` 再作为最终回复输出。
+- 降噪：`Reconnecting...` / `Falling back...` 不再刷进小聊天框，避免网络重试时消息噪声过大。
+- 工具事件：遇到 command/function/tool item 时，先把暂存 agent 文本作为过程信息吐出，再显示简短工具状态。
+- 兼容：支持 `item.text`、`item.content`、`output_text`、`summary` 等多种 Codex JSONL 文本字段。
+- 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md

@@ -753,29 +753,23 @@ function pushCodingMessage(role, content) {
   publishCodingState();
 }
 
+function extractCodexTextFromValue(value) {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value)) {
+    return value
+      .map((part) => extractCodexTextFromValue(part?.text ?? part?.content ?? part?.output_text ?? part))
+      .filter(Boolean)
+      .join('')
+      .trim();
+  }
+  if (value && typeof value === 'object') {
+    return extractCodexTextFromValue(value.text ?? value.content ?? value.output_text ?? value.summary_text);
+  }
+  return '';
+}
+
 function extractCodexEventText(event) {
   if (!event || typeof event !== 'object') return '';
-  const candidates = [
-    event.message,
-    event.content,
-    event.text,
-    event.delta,
-    event.output,
-    event.item?.text,
-    event.item?.content,
-    event.msg?.content,
-    event.msg?.message,
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim()) return candidate;
-    if (Array.isArray(candidate)) {
-      const joined = candidate
-        .map((part) => typeof part === 'string' ? part : part?.text || part?.content || '')
-        .filter(Boolean)
-        .join('');
-      if (joined.trim()) return joined;
-    }
-  }
   if (event.type && /approval|permission|confirm|input/i.test(String(event.type))) {
     codingState.status = CODEX_STATUS.NEEDS_INPUT;
     return `需要处理：${event.type}`;
@@ -784,18 +778,41 @@ function extractCodexEventText(event) {
   return '';
 }
 
-function extractCodexAgentText(event) {
-  if (!event || typeof event !== 'object') return '';
-  if (event.type === 'item.completed' && event.item?.type === 'agent_message' && typeof event.item.text === 'string') {
-    return event.item.text.trim();
-  }
-  return '';
+function extractCodexItemText(item) {
+  if (!item || typeof item !== 'object') return '';
+  return extractCodexTextFromValue(item.text)
+    || extractCodexTextFromValue(item.content)
+    || extractCodexTextFromValue(item.output_text)
+    || extractCodexTextFromValue(item.summary)
+    || extractCodexTextFromValue(item.summary_text);
 }
 
 function extractCodexStatusText(event) {
   if (!event || typeof event !== 'object') return '';
-  if (event.type === 'error' && typeof event.message === 'string') return event.message.trim();
-  if (event.type === 'turn.started') return 'Codex 已开始处理。';
+  if (event.type === 'error' && typeof event.message === 'string') {
+    const message = event.message.trim();
+    if (/Reconnecting|Falling back/i.test(message)) return '';
+    return message;
+  }
+  if (event.type === 'turn.started') return '';
+  return '';
+}
+
+function summarizeCodexToolItem(item) {
+  if (!item || typeof item !== 'object') return '';
+  const itemType = String(item.type || '');
+  if (itemType === 'command_execution') {
+    const command = String(item.command || '').trim();
+    const status = String(item.status || '').trim();
+    if (command && status) return `命令 ${status}: ${command}`;
+    if (command) return `执行命令: ${command}`;
+  }
+  if (itemType === 'function_call') {
+    const name = String(item.name || '').trim();
+    const status = String(item.status || '').trim();
+    if (name && status) return `工具 ${status}: ${name}`;
+    if (name) return `调用工具: ${name}`;
+  }
   return '';
 }
 
@@ -846,16 +863,54 @@ async function sendCodingMessage({ prompt }) {
   let stdoutBuffer = '';
   let stderrBuffer = '';
   let lastAgentText = '';
+  let pendingAgentTexts = [];
+  const flushPendingAgentText = (role = 'codex') => {
+    const text = pendingAgentTexts.join('\n\n').trim();
+    pendingAgentTexts = [];
+    if (!text) return;
+    lastAgentText = text;
+    pushCodingMessage(role, text);
+  };
   const handleCodexEvent = (event) => {
     if (event?.type === 'thread.started' && typeof event.thread_id === 'string') {
       codingState.threadId = event.thread_id;
       publishCodingState();
       return;
     }
-    const agentText = extractCodexAgentText(event);
-    if (agentText) {
-      lastAgentText = agentText;
-      pushCodingMessage('codex', agentText);
+    if (event?.type === 'turn.started') {
+      pendingAgentTexts = [];
+      return;
+    }
+    if (event?.type === 'turn.completed') {
+      flushPendingAgentText('codex');
+      return;
+    }
+    if (event?.type === 'turn.failed') {
+      flushPendingAgentText('codex');
+      const message = extractCodexTextFromValue(event.error?.message) || 'Codex turn failed.';
+      pushCodingMessage('error', message);
+      return;
+    }
+    if ((event?.type === 'item.started' || event?.type === 'item.completed') && event.item) {
+      const itemType = String(event.item.type || '');
+      if (itemType === 'agent_message' || itemType === 'message') {
+        const text = extractCodexItemText(event.item);
+        if (text) pendingAgentTexts.push(text);
+        return;
+      }
+      if (itemType === 'reasoning') {
+        const text = extractCodexItemText(event.item);
+        if (text) pushCodingMessage('system', text);
+        return;
+      }
+      const toolSummary = summarizeCodexToolItem(event.item);
+      if (toolSummary) {
+        flushPendingAgentText('system');
+        pushCodingMessage('system', toolSummary);
+        return;
+      }
+    }
+    if (event?.type === 'error' && /Reconnecting|Falling back/i.test(String(event.message || ''))) {
       return;
     }
     const statusText = extractCodexStatusText(event);
