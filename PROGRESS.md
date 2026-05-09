@@ -1072,3 +1072,11 @@
 - 兼容：支持 `item.text`、`item.content`、`output_text`、`summary` 等多种 Codex JSONL 文本字段。
 - 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R137. Coding 常驻 Codex app-server 后端（2026-05-09）
+- 主进程：将 Coding 模式从每条消息启动 `codex exec` 改为启动一次 `codex app-server --listen stdio://`，后续通过 JSON-RPC 复用同一常驻连接。
+- 会话：新增 `thread/start`、`thread/resume`、`turn/start` 流程，继续支持外部传入 thread id，也支持普通终端启动时自动创建灵宠自己的 Codex thread。
+- 事件：解析 app-server 的 `item/agentMessage/delta`、`item/completed`、`turn/completed`、`thread/status/changed`，让状态灯在工作中保持黄色，完成后切绿色。
+- 授权：遇到 app-server 主动发起的权限/审批 request 时切红，并在小聊天框提示当前请求类型。
+- 验证：`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md

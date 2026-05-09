@@ -14,7 +14,6 @@ const {
 } = require('electron');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
-const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const { execFile, spawn } = require('node:child_process');
@@ -39,6 +38,15 @@ const codingState = {
   messages: [],
   running: null,
   threadId: CURRENT_CODEX_THREAD_ID,
+};
+const codexAppServer = {
+  child: null,
+  buffer: '',
+  nextId: 1,
+  pending: new Map(),
+  ready: null,
+  loadedThreadId: '',
+  activeTurn: null,
 };
 
 app.setName('DeskSprite');
@@ -801,19 +809,283 @@ function extractCodexStatusText(event) {
 function summarizeCodexToolItem(item) {
   if (!item || typeof item !== 'object') return '';
   const itemType = String(item.type || '');
-  if (itemType === 'command_execution') {
-    const command = String(item.command || '').trim();
+  if (itemType === 'command_execution' || itemType === 'commandExecution') {
+    const command = extractCodexTextFromValue(item.command)
+      || extractCodexTextFromValue(item.parsed_cmd)
+      || extractCodexTextFromValue(item.cmd)
+      || extractCodexTextFromValue(item.arguments);
     const status = String(item.status || '').trim();
     if (command && status) return `命令 ${status}: ${command}`;
     if (command) return `执行命令: ${command}`;
   }
-  if (itemType === 'function_call') {
+  if (itemType === 'function_call' || itemType === 'functionCall' || itemType === 'mcpToolCall') {
     const name = String(item.name || '').trim();
     const status = String(item.status || '').trim();
     if (name && status) return `工具 ${status}: ${name}`;
     if (name) return `调用工具: ${name}`;
   }
   return '';
+}
+
+function codexWrite(message) {
+  const child = codexAppServer.child;
+  if (!child || child.killed || !child.stdin.writable) throw new Error('Codex app-server 未连接。');
+  child.stdin.write(`${JSON.stringify(message)}\n`);
+}
+
+function codexNotify(method, params = {}) {
+  codexWrite({ method, params });
+}
+
+function codexRequest(method, params = {}, timeoutMs = 30000) {
+  const id = codexAppServer.nextId++;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      codexAppServer.pending.delete(id);
+      reject(new Error(`Codex app-server 请求超时：${method}`));
+    }, timeoutMs);
+    codexAppServer.pending.set(id, { resolve, reject, timer, method });
+    try {
+      codexWrite({ id, method, params });
+    } catch (error) {
+      clearTimeout(timer);
+      codexAppServer.pending.delete(id);
+      reject(error);
+    }
+  });
+}
+
+function resetCodexAppServer(error) {
+  for (const pending of codexAppServer.pending.values()) {
+    clearTimeout(pending.timer);
+    pending.reject(error || new Error('Codex app-server 已断开。'));
+  }
+  codexAppServer.pending.clear();
+  codexAppServer.child = null;
+  codexAppServer.ready = null;
+  codexAppServer.loadedThreadId = '';
+  codexAppServer.activeTurn = null;
+}
+
+function flushCodexAppServerAgentText(role = 'codex') {
+  const turn = codexAppServer.activeTurn;
+  if (!turn) return;
+  const deltaTexts = Array.from(turn.deltaByItem.values()).join('');
+  const text = [...turn.pendingAgentTexts, deltaTexts].join('\n\n').trim();
+  turn.pendingAgentTexts = [];
+  turn.deltaByItem.clear();
+  if (!text || text === turn.lastAgentText) return;
+  turn.lastAgentText = text;
+  pushCodingMessage(role, text);
+}
+
+function handleCodexAppServerRequest(message) {
+  const label = String(message.method || 'request');
+  codingState.status = CODEX_STATUS.NEEDS_INPUT;
+  pushCodingMessage('error', `Codex 需要用户处理：${label}`);
+  if (message.id != null) {
+    try {
+      codexWrite({
+        id: message.id,
+        error: {
+          code: -32001,
+          message: 'DeskSprite 目前不能在小聊天框内处理这类 Codex 授权请求。',
+        },
+      });
+    } catch {
+      // The status message above is enough if the app-server already closed.
+    }
+  }
+  publishCodingState();
+}
+
+function handleCodexAppServerNotification(message) {
+  const { method, params = {} } = message;
+  if (method === 'thread/started' && params.thread?.id) {
+    codingState.threadId = params.thread.id;
+    codexAppServer.loadedThreadId = params.thread.id;
+    publishCodingState();
+    return;
+  }
+  if (method === 'thread/status/changed') {
+    if (params.status?.type === 'active') {
+      codingState.status = CODEX_STATUS.WORKING;
+      publishCodingState();
+    }
+    return;
+  }
+  if (method === 'turn/started') {
+    const turnId = params.turn?.id;
+    codexAppServer.activeTurn = {
+      id: turnId,
+      deltaByItem: new Map(),
+      pendingAgentTexts: [],
+      lastAgentText: '',
+    };
+    codingState.running = { type: 'app-server-turn', turnId };
+    codingState.status = CODEX_STATUS.WORKING;
+    publishCodingState();
+    return;
+  }
+  if (method === 'item/agentMessage/delta') {
+    if (!codexAppServer.activeTurn) return;
+    const itemId = String(params.itemId || 'agent');
+    const previous = codexAppServer.activeTurn.deltaByItem.get(itemId) || '';
+    codexAppServer.activeTurn.deltaByItem.set(itemId, previous + String(params.delta || ''));
+    return;
+  }
+  if (method === 'item/completed' && params.item) {
+    const itemType = String(params.item.type || '');
+    if (itemType === 'agentMessage' || itemType === 'agent_message' || itemType === 'message') {
+      const text = extractCodexItemText(params.item);
+      if (text && codexAppServer.activeTurn) {
+        const itemId = String(params.item.id || params.itemId || 'agent');
+        const deltaText = codexAppServer.activeTurn.deltaByItem.get(itemId) || '';
+        if (text !== deltaText.trim()) codexAppServer.activeTurn.pendingAgentTexts.push(text);
+      }
+      return;
+    }
+    if (itemType === 'reasoning') {
+      const text = extractCodexItemText(params.item);
+      if (text) pushCodingMessage('system', text);
+      return;
+    }
+    const toolSummary = summarizeCodexToolItem(params.item);
+    if (toolSummary) {
+      flushCodexAppServerAgentText('system');
+      pushCodingMessage('system', toolSummary);
+    }
+    return;
+  }
+  if (method === 'turn/completed') {
+    flushCodexAppServerAgentText('codex');
+    codingState.running = null;
+    const failed = params.turn?.status === 'failed';
+    codingState.status = failed ? CODEX_STATUS.NEEDS_INPUT : CODEX_STATUS.DONE;
+    if (failed) {
+      const message = extractCodexTextFromValue(params.turn?.error?.message) || 'Codex turn failed.';
+      pushCodingMessage('error', message);
+    } else {
+      pushCodingMessage('system', 'Codex 执行完毕。');
+    }
+    codexAppServer.activeTurn = null;
+    publishCodingState();
+    return;
+  }
+  if (method === 'error' || method === 'warning' || method === 'guardianWarning') {
+    const messageText = extractCodexTextFromValue(params.message) || extractCodexTextFromValue(params) || method;
+    if (/Reconnecting|Falling back/i.test(messageText)) return;
+    pushCodingMessage(method === 'error' ? 'error' : 'system', messageText);
+  }
+}
+
+function handleCodexAppServerMessage(message) {
+  if (Object.prototype.hasOwnProperty.call(message, 'id')) {
+    const pending = codexAppServer.pending.get(message.id);
+    if (pending) {
+      clearTimeout(pending.timer);
+      codexAppServer.pending.delete(message.id);
+      if (message.error) pending.reject(new Error(message.error.message || JSON.stringify(message.error)));
+      else pending.resolve(message.result);
+      return;
+    }
+    if (message.method) handleCodexAppServerRequest(message);
+    return;
+  }
+  if (message.method) handleCodexAppServerNotification(message);
+}
+
+function ensureCodexAppServer() {
+  if (codexAppServer.child && codexAppServer.ready) return codexAppServer.ready;
+  codexAppServer.ready = new Promise((resolve, reject) => {
+    const child = spawn(getCodexBinary(), ['app-server', '--listen', 'stdio://'], {
+      cwd: process.cwd(),
+      env: { ...process.env, FORCE_COLOR: '0' },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    codexAppServer.child = child;
+    codexAppServer.buffer = '';
+    child.stdout.on('data', (chunk) => {
+      codexAppServer.buffer += chunk.toString();
+      const lines = codexAppServer.buffer.split(/\r?\n/);
+      codexAppServer.buffer = lines.pop() || '';
+      for (const line of lines) {
+        const raw = line.trim();
+        if (!raw) continue;
+        try {
+          handleCodexAppServerMessage(JSON.parse(raw));
+        } catch {
+          pushCodingMessage('system', raw);
+        }
+      }
+    });
+    child.stderr.on('data', (chunk) => {
+      const text = chunk.toString();
+      if (/approval|permission|authorize|confirm|login/i.test(text)) {
+        codingState.status = CODEX_STATUS.NEEDS_INPUT;
+        publishCodingState();
+      }
+    });
+    child.on('error', (error) => {
+      resetCodexAppServer(error);
+      reject(error);
+    });
+    child.on('close', (code) => {
+      const error = new Error(`Codex app-server 已退出，状态码 ${code ?? 'unknown'}。`);
+      resetCodexAppServer(error);
+      if (codingState.running) {
+        codingState.running = null;
+        codingState.status = CODEX_STATUS.NEEDS_INPUT;
+        pushCodingMessage('error', error.message);
+        publishCodingState();
+      }
+    });
+    Promise.resolve()
+      .then(() => codexRequest('initialize', {
+        clientInfo: { name: 'desksprite', title: 'DeskSprite', version: app.getVersion?.() || '0.1.0' },
+        capabilities: { experimentalApi: true },
+      }))
+      .then(() => {
+        codexNotify('initialized');
+        resolve(child);
+      })
+      .catch((error) => {
+        resetCodexAppServer(error);
+        reject(error);
+      });
+  });
+  return codexAppServer.ready;
+}
+
+async function ensureCodingThread() {
+  await ensureCodexAppServer();
+  if (codingState.threadId) {
+    if (codexAppServer.loadedThreadId !== codingState.threadId) {
+      const resumed = await codexRequest('thread/resume', {
+        threadId: codingState.threadId,
+        cwd: process.cwd(),
+        approvalPolicy: 'on-request',
+        sandbox: 'workspace-write',
+      });
+      if (resumed?.thread?.id) {
+        codingState.threadId = resumed.thread.id;
+        codexAppServer.loadedThreadId = resumed.thread.id;
+        publishCodingState();
+      }
+    }
+    return codingState.threadId;
+  }
+  const started = await codexRequest('thread/start', {
+    cwd: process.cwd(),
+    approvalPolicy: 'on-request',
+    sandbox: 'workspace-write',
+  });
+  const threadId = started?.thread?.id;
+  if (!threadId) throw new Error('Codex app-server 没有返回 thread id。');
+  codingState.threadId = threadId;
+  codexAppServer.loadedThreadId = threadId;
+  publishCodingState();
+  return threadId;
 }
 
 async function sendCodingMessage({ prompt }) {
@@ -826,156 +1098,34 @@ async function sendCodingMessage({ prompt }) {
   }
 
   codingState.status = CODEX_STATUS.WORKING;
+  codingState.running = { type: 'app-server-starting' };
   pushCodingMessage('user', text);
-  pushCodingMessage('system', codingState.threadId ? '已发送到 Codex 对话，等待回复。' : '正在启动新的 Codex 对话。');
+  pushCodingMessage('system', codingState.threadId ? '已发送到 Codex 常驻连接，等待回复。' : '正在启动 Codex 常驻连接。');
   publishCodingState();
 
-  const outputPath = path.join(os.tmpdir(), `desksprite-codex-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`);
-  const args = codingState.threadId
-    ? [
-        'exec',
-        'resume',
-        '--skip-git-repo-check',
-        codingState.threadId,
-        '--json',
-        '--output-last-message',
-        outputPath,
-        '-',
-      ]
-    : [
-        'exec',
-        '--skip-git-repo-check',
-        '--json',
-        '--cd',
-        process.cwd(),
-        '--output-last-message',
-        outputPath,
-        '-',
-      ];
-  const child = spawn(getCodexBinary(), args, {
-    cwd: process.cwd(),
-    env: { ...process.env, FORCE_COLOR: '0' },
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-  codingState.running = child;
-  child.stdin.end(text);
-
-  let stdoutBuffer = '';
-  let stderrBuffer = '';
-  let lastAgentText = '';
-  let pendingAgentTexts = [];
-  const flushPendingAgentText = (role = 'codex') => {
-    const text = pendingAgentTexts.join('\n\n').trim();
-    pendingAgentTexts = [];
-    if (!text) return;
-    lastAgentText = text;
-    pushCodingMessage(role, text);
-  };
-  const handleCodexEvent = (event) => {
-    if (event?.type === 'thread.started' && typeof event.thread_id === 'string') {
-      codingState.threadId = event.thread_id;
-      publishCodingState();
-      return;
-    }
-    if (event?.type === 'turn.started') {
-      pendingAgentTexts = [];
-      return;
-    }
-    if (event?.type === 'turn.completed') {
-      flushPendingAgentText('codex');
-      return;
-    }
-    if (event?.type === 'turn.failed') {
-      flushPendingAgentText('codex');
-      const message = extractCodexTextFromValue(event.error?.message) || 'Codex turn failed.';
-      pushCodingMessage('error', message);
-      return;
-    }
-    if ((event?.type === 'item.started' || event?.type === 'item.completed') && event.item) {
-      const itemType = String(event.item.type || '');
-      if (itemType === 'agent_message' || itemType === 'message') {
-        const text = extractCodexItemText(event.item);
-        if (text) pendingAgentTexts.push(text);
-        return;
-      }
-      if (itemType === 'reasoning') {
-        const text = extractCodexItemText(event.item);
-        if (text) pushCodingMessage('system', text);
-        return;
-      }
-      const toolSummary = summarizeCodexToolItem(event.item);
-      if (toolSummary) {
-        flushPendingAgentText('system');
-        pushCodingMessage('system', toolSummary);
-        return;
-      }
-    }
-    if (event?.type === 'error' && /Reconnecting|Falling back/i.test(String(event.message || ''))) {
-      return;
-    }
-    const statusText = extractCodexStatusText(event);
-    if (statusText) {
-      pushCodingMessage('system', statusText);
-      return;
-    }
-    const content = extractCodexEventText(event);
-    if (content) pushCodingMessage('codex', content);
-  };
-  child.stdout.on('data', (chunk) => {
-    stdoutBuffer += chunk.toString();
-    const lines = stdoutBuffer.split(/\r?\n/);
-    stdoutBuffer = lines.pop() || '';
-    for (const line of lines) {
-      const raw = line.trim();
-      if (!raw) continue;
-      try {
-        const event = JSON.parse(raw);
-        handleCodexEvent(event);
-      } catch {
-        pushCodingMessage('codex', raw);
-      }
-    }
-  });
-  child.stderr.on('data', (chunk) => {
-    stderrBuffer += chunk.toString();
-    const text = stderrBuffer.trim();
-    if (/approval|permission|authorize|confirm|login/i.test(text)) {
-      codingState.status = CODEX_STATUS.NEEDS_INPUT;
-      publishCodingState();
-    }
-  });
-  child.on('error', (error) => {
+  try {
+    const threadId = await ensureCodingThread();
+    const result = await codexRequest('turn/start', {
+      threadId,
+      input: [{ type: 'text', text, text_elements: [] }],
+      cwd: process.cwd(),
+      approvalPolicy: 'on-request',
+    }, 60000);
+    const turnId = result?.turn?.id;
+    codingState.running = { type: 'app-server-turn', turnId };
+    codexAppServer.activeTurn = {
+      id: turnId,
+      deltaByItem: new Map(),
+      pendingAgentTexts: [],
+      lastAgentText: '',
+    };
+    publishCodingState();
+  } catch (error) {
     codingState.running = null;
     codingState.status = CODEX_STATUS.NEEDS_INPUT;
-    pushCodingMessage('error', `无法启动 Codex：${error.message}`);
-  });
-  child.on('close', async (code) => {
-    if (stdoutBuffer.trim()) {
-      try {
-        const event = JSON.parse(stdoutBuffer.trim());
-        handleCodexEvent(event);
-      } catch {
-        pushCodingMessage('codex', stdoutBuffer.trim());
-      }
-    }
-    try {
-      const finalText = (await fsp.readFile(outputPath, 'utf8')).trim();
-      if (finalText && finalText !== lastAgentText) pushCodingMessage('codex', finalText);
-    } catch {
-      // Best-effort fallback only.
-    } finally {
-      fsp.unlink(outputPath).catch(() => {});
-    }
-    codingState.running = null;
-    if (code === 0) {
-      codingState.status = CODEX_STATUS.DONE;
-      pushCodingMessage('system', 'Codex 执行完毕。');
-    } else {
-      codingState.status = CODEX_STATUS.NEEDS_INPUT;
-      pushCodingMessage('error', stderrBuffer.trim() || `Codex 退出，状态码 ${code}。可能需要用户输入或授权。`);
-    }
+    pushCodingMessage('error', `Codex app-server 连接失败：${error.message}`);
     publishCodingState();
-  });
+  }
 
   return publishCodingState();
 }

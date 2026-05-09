@@ -1679,3 +1679,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Codex JSONL 是 turn/event 流，不能把每个事件都当聊天消息，应该按 turn 生命周期汇总后再展示。
 - 是否需更新技术文档：否。
+
+## ISSUE-142
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Coding 常驻 Codex app-server 后端
+- 严重程度：重要
+- 问题现象：Coding 模式每条消息仍然很慢，会反复经历 Codex 子进程启动、插件/技能加载和网络重试，用户感觉像一直在“首次连接”。
+- 原因分析：`codex exec` 是一次性非交互式命令，每条消息都要重新启动 CLI 进程；即使复用 thread id，也无法复用已经加载好的运行时。
+- 解决方案：改为常驻 `codex app-server --listen stdio://`，使用 `initialize` 后的 JSON-RPC 通道发起 `thread/start` / `thread/resume` / `turn/start`；消息事件通过 app-server notification 聚合到小聊天框。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：桌面侧桥接长期会话时应该优先接入常驻 server，而不是每次 spawn 单次 CLI。
+- 是否需更新技术文档：否。
