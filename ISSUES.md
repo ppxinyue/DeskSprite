@@ -983,3 +983,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Apple 风格的“高级感”更多来自低对比、材质层次、克制运动和精细阴影，而不是更亮的颜色或更强的发光。
 - 是否需更新技术文档：否。
+
+## ISSUE-084
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb 模式前端重做
+- 严重程度：改进
+- 问题现象：上一版 Orb 只是改善了单个球体样式，但没有真正采用参考前端的 Orb Stage 结构，整体仍不像参考项目那种“外环 + 核心球 + 状态文字 + 光晕”的完整前端。
+- 原因分析：初版实现主要用 CSS 在同一个节点上叠效果，缺少独立外环、核心球容器、状态文字进出场以及 motion 驱动的呼吸/旋转层级。
+- 解决方案：重构 OrbAvatar 前端结构，引入 `framer-motion` 的 `motion` 和 `AnimatePresence`；新增外圈仪表环、核心 shell、核心 glow、ambient/glass/ring/aura/noise 层；状态文字按状态 key 独立进出场，核心球呼吸、hover、rest 旋转改由 motion 驱动。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Orb 模式要像一个独立前端组件，而不是把球体材质贴在旧节点上；视觉结构分层比单纯调 CSS 阴影更重要。
+- 是否需更新技术文档：否。

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { usePetStore } from './petStore';
@@ -576,7 +577,7 @@ function OrbAvatar({
   }, [letters, orbState, pointer]);
 
   return (
-    <div
+    <motion.div
       className={`orb-avatar orb-avatar--${orbState} ${hovering ? 'is-hovering' : ''} ${dragging ? 'is-dragging' : ''}`}
       style={{
         '--orb-size': `${size}px`,
@@ -597,27 +598,64 @@ function OrbAvatar({
         setHovering(false);
         setPointer({ x: 0.5, y: 0.5 });
       }}
+      animate={{ scale: hovering ? 1.045 : 1 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
     >
-      <div className="orb-avatar__glow" />
-      <div className="orb-avatar__ambient" />
-      <div className="orb-avatar__glass" />
-      <div className="orb-avatar__ring" />
-      <div className="orb-avatar__aura" />
-      <div className={`orb-avatar__text orb-avatar__text--${orbState}`} aria-label={meta.label}>
-        {letters.map((letter, index) => (
-          <span
-            key={`${orbState}-${letter}-${index}`}
-            className="orb-avatar__letter"
-            style={{
-              '--letter-index': String(index),
-              '--letter-weight': String(idleWeights[index] ?? 520),
-            } as CSSProperties & Record<string, string>}
+      <motion.div
+        className="orb-avatar__outer-ring"
+        animate={{ rotate: 360 }}
+        transition={{ duration: orbState === 'rest' ? 24 : 36, repeat: Infinity, ease: 'linear' }}
+      />
+      <motion.div
+        className="orb-avatar__shell"
+        animate={{
+          rotate: orbState === 'rest' ? 360 : 0,
+          scale: hovering ? 1 : [1, 1.018, 1],
+        }}
+        transition={{
+          rotate: orbState === 'rest' ? { duration: 22, repeat: Infinity, ease: 'linear' } : { duration: 0.8 },
+          scale: hovering ? { duration: 0.2 } : { duration: 4.8, repeat: Infinity, ease: 'easeInOut' },
+        }}
+      >
+        <motion.div
+          className="orb-avatar__glow"
+          animate={{
+            opacity: hovering ? 0.28 : [0.08, 0.16, 0.08],
+            scale: hovering ? 1.14 : 1,
+          }}
+          transition={{ duration: 4, repeat: Infinity }}
+        />
+        <div className="orb-avatar__ambient" />
+        <div className="orb-avatar__glass" />
+        <div className="orb-avatar__ring" />
+        <div className="orb-avatar__aura" />
+        <div className="orb-avatar__noise" />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={orbState}
+            className={`orb-avatar__text orb-avatar__text--${orbState}`}
+            aria-label={meta.label}
+            initial={{ opacity: 0, scale: orbState === 'work' ? 1.08 : orbState === 'rest' ? 0.88 : 0.94, filter: 'blur(6px)' }}
+            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, scale: 0.92, filter: 'blur(6px)' }}
+            transition={{ duration: 0.38, ease: [0.2, 0.8, 0.2, 1] }}
           >
-            <span className="orb-avatar__letter-face">{letter}</span>
-            {orbState === 'work' && <span className="orb-avatar__letter-face orb-avatar__letter-face--back">{letter}</span>}
-          </span>
-        ))}
-      </div>
-    </div>
+            {letters.map((letter, index) => (
+              <span
+                key={`${orbState}-${letter}-${index}`}
+                className="orb-avatar__letter"
+                style={{
+                  '--letter-index': String(index),
+                  '--letter-weight': String(idleWeights[index] ?? 520),
+                } as CSSProperties & Record<string, string>}
+              >
+                <span className="orb-avatar__letter-face">{letter}</span>
+                {orbState === 'work' && <span className="orb-avatar__letter-face orb-avatar__letter-face--back">{letter}</span>}
+              </span>
+            ))}
+          </motion.div>
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
   );
 }

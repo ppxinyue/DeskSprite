@@ -658,3 +658,10 @@
 - 字体：文字字号下调、字距更稳，状态文本更像嵌在玻璃里的系统标记，而不是大号网页标题。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R79. Orb 前端结构重做（2026-05-09）
+- 结构：参考 `aura-ai-floating-orb` 的前端结构，将 Orb 重做为独立 stage：外圈仪表环、核心 shell、核心 glow、ambient/glass/ring/aura/noise 多层、状态文字层。
+- 动效：引入 `framer-motion` 的 `motion` / `AnimatePresence`，核心球呼吸、hover scale、rest 自转和状态文字进出场由 motion 驱动，CSS 负责材质与文字细节。
+- 体验：Orb 不再只是一个 CSS 球体，而是拥有外环慢速旋转、核心状态切换和更清晰的空间层级；仍只替换灵宠本体，不影响聊天、菜单、拖拽、专注和休息流程。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
