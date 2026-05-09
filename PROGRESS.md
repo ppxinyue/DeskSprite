@@ -1173,3 +1173,11 @@
 - 启动：pet 窗口等待设置加载完成后再渲染，避免 orb 模式启动时先闪出默认 pet。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, PetAvatar.tsx, ISSUES.md, PROGRESS.md
+
+### R150. Coding 中间输出与小窗横向滚动修复（2026-05-10）
+- 小窗：普通 chat / Coding chat 的消息容器和气泡补齐 `overflow-x-hidden`、`min-w-0` 和长词换行，避免底部出现无用横向滑动条。
+- Markdown：代码块和 inline code 改为可换行，长 URL、长路径、长命令不会撑出小聊天窗口。
+- 继承模式：非 final 的 `agent_message` / assistant message 仍保持黄色 working，但会作为工作态气泡显示在聊天框里。
+- 完成态：完整 final 输出出现后，过程气泡被最终绿色消息替代，未查看的中间过程不会继续保留成绿色通知。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ChatDialog.tsx, index.css, ISSUES.md, PROGRESS.md

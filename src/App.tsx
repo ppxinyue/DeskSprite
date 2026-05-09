@@ -564,8 +564,8 @@ function CodingDialog({
                   <span>Codex</span>
                 </div>
               </div>
-              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5">
-                <div className="mx-auto w-full max-w-none space-y-3 py-5">
+              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5">
+                <div className="mx-auto w-full max-w-none min-w-0 space-y-3 overflow-x-hidden py-5">
                   {visibleMessages.length === 0 ? (
                     <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">
                       {inherited ? (state.status === 'idle' ? '没有新的 Codex 通知' : 'Codex 正在工作中') : state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
@@ -623,10 +623,10 @@ function CodingDialog({
     >
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4"
         style={{ maxHeight: Math.max(80, maxHeight - 60) }}
       >
-        <div className="space-y-2.5 py-4">
+        <div className="min-w-0 space-y-2.5 overflow-x-hidden py-4">
           {visibleMessages.length === 0 ? (
             <div className="py-8 text-center text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
               {inherited ? (state.status === 'idle' ? '没有新的 Codex 通知' : 'Codex 正在工作中') : state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}

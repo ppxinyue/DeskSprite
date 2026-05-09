@@ -1835,3 +1835,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：模式可以改变内容，但窗口外壳的可见/拖动状态不能只绑定普通 chat store，否则同一窗口在不同模式下会出现行为分叉。
 - 是否需更新技术文档：否。
+
+## ISSUE-155
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Coding 中间输出与小窗横向滚动修复
+- 严重程度：重要
+- 问题现象：小聊天窗口底部偶尔出现无用横向滑动条；继承 Codex session 时，中间阶段输出仍可能短暂变成绿色。
+- 原因分析：Markdown 代码块默认 `overflow-x:auto`，长文本会撑出 compact 容器；继承扫描对非 final agent 文本只记录活动时间，没有把它作为黄色工作态消息展示，且部分 assistant 消息仍可能被误感知为完成。
+- 解决方案：消息容器和气泡统一禁止横向 overflow 并强制长词换行；非 final agent/assistant 文本保存为 `lastProgress`，以黄色 working 气泡显示，最终输出出现后替换为绿色完成消息。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：compact 聊天窗口应优先保持布局稳定，长代码和长 URL 应换行而不是引入横向滚动；agent 过程消息是 working 内容，不是完成信号。
+- 是否需更新技术文档：否。

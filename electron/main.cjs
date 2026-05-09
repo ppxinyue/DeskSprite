@@ -1277,6 +1277,7 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
   };
   let lastUserAt = 0;
   let lastWorkAt = 0;
+  let lastProgress = '';
   let lastAssistantAt = 0;
   let lastAssistant = '';
   let lastProblemAt = 0;
@@ -1312,6 +1313,9 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
         if (message && isFinalCodexSessionOutput(payload)) {
           lastAssistantAt = eventAt;
           lastAssistant = message;
+        } else if (message) {
+          lastWorkAt = Math.max(lastWorkAt, eventAt);
+          lastProgress = message;
         } else {
           lastWorkAt = Math.max(lastWorkAt, eventAt);
         }
@@ -1333,6 +1337,7 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
           lastAssistant = message;
         } else if (message) {
           lastWorkAt = Math.max(lastWorkAt, eventAt);
+          lastProgress = message;
         }
       }
       if (/function_call|tool|command|exec/i.test(String(payload.type || ''))) {
@@ -1359,7 +1364,7 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
     session.eventAt = lastAssistantAt;
   } else {
     session.status = CODEX_STATUS.WORKING;
-    session.message = `${prefix} Codex 正在工作中`;
+    session.message = `${prefix} ${lastProgress || 'Codex 正在工作中'}`;
     session.eventAt = latestActivityAt;
   }
   session.updatedAt = latestActivityAt;
