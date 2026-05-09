@@ -998,3 +998,10 @@
 - 状态机：进入 rest 时最短按 60 秒计算，避免旧 10 秒配置继续生效。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
+
+### R127. Pet Rest 控制区固定顶部（2026-05-09）
+- Pet 模式：rest 时倒计时和提前结束按钮从绕圈组中拆出，固定到屏幕顶部中央。
+- 样式：控制区使用完全不透明背景色块，提升按钮可点击性和可读性。
+- 动效：pet 图片继续快速绕屏，运动半径只按图片尺寸计算。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md

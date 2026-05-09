@@ -529,11 +529,10 @@ function PetWindow() {
       const startScale = visualPetScaleRef.current;
       const orbitPetWidth = Math.round(120 * startScale);
       const orbitPetHeight = Math.round(150 * startScale);
-      const orbitGroupHeight = orbitPetHeight + REST_COUNTDOWN_SPACE;
       const orbitCenterX = workWidth / 2;
       const orbitCenterY = workHeight / 2;
       const radiusX = Math.max(0, (workWidth - orbitPetWidth) / 2 - PET_REST_ORBIT_MARGIN);
-      const radiusY = Math.max(0, (workHeight - orbitGroupHeight) / 2 - PET_REST_ORBIT_MARGIN);
+      const radiusY = Math.max(0, (workHeight - orbitPetHeight) / 2 - PET_REST_ORBIT_MARGIN);
       const orbitRadius = Math.max(0, Math.min(radiusX, radiusY));
       const startedAt = Date.now();
 
@@ -563,7 +562,7 @@ function PetWindow() {
         const progress = (elapsed % PET_REST_ORBIT_LOOP_MS) / PET_REST_ORBIT_LOOP_MS;
         const angle = -Math.PI / 2 + progress * Math.PI * 2;
         const petLeft = orbitCenterX + Math.cos(angle) * orbitRadius - orbitPetWidth / 2;
-        const petTop = orbitCenterY + Math.sin(angle) * orbitRadius - orbitGroupHeight / 2;
+        const petTop = orbitCenterY + Math.sin(angle) * orbitRadius - orbitPetHeight / 2;
         applyLayoutState({
           windowWidth: workWidth,
           windowHeight: workHeight,
@@ -1236,7 +1235,7 @@ function PetWindow() {
               onMenuOpenChange={setContextMenuOpen}
               onFocusToggle={toggleFocus}
             />
-            {restEndAt ? (
+            {restEndAt && (orbMode || !restPresentationActive) ? (
               <div className="mt-2 flex flex-col items-center gap-2">
                 <div className="pointer-events-none text-center text-[18px] font-semibold leading-none tabular-nums text-[#4d4a45] drop-shadow-[0_2px_12px_rgba(32,28,22,0.12)]">
                   {formatCountdown(Math.max(0, restEndAt - now))}
@@ -1275,6 +1274,23 @@ function PetWindow() {
               <MessageCircle className={`h-3.5 w-3.5 ${chatBurst ? "animate-chat-pop" : ""}`} />
             </FloatingToolButton>
           </div>
+
+          {restEndAt && !orbMode && restPresentationActive && (
+            <div className="absolute inset-x-0 top-7 z-50 flex justify-center">
+              <div className="flex flex-col items-center gap-2 rounded-[12px] border border-border/70 bg-background px-4 py-3 text-foreground shadow-[0_12px_32px_rgba(32,28,22,0.16)]">
+                <div className="pointer-events-none text-center text-[18px] font-semibold leading-none tabular-nums text-[#4d4a45]">
+                  {formatCountdown(Math.max(0, restEndAt - now))}
+                </div>
+                <button
+                  type="button"
+                  className="rounded-[9px] border border-border/65 bg-muted px-4 py-1.5 text-[14px] font-medium leading-none text-muted-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-muted/80 hover:text-foreground active:translate-y-0"
+                  onClick={() => finishRest().catch(() => {})}
+                >
+                  提前结束
+                </button>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>
