@@ -607,22 +607,6 @@ function CodingDialog({
       <div className="relative grid h-full grid-cols-[260px_minmax(0,1fr)] bg-background pt-14 text-[var(--text-primary)]">
         <div className="app-drag-region fixed inset-x-0 top-0 z-50 h-14" />
         <aside className="glass-panel flex min-h-0 flex-col rounded-none border-y-0 border-l-0">
-          {!inherited && (
-            <div className="app-no-drag shrink-0 p-3">
-              <button
-                className={`flex h-10 w-full items-center gap-2 rounded-[12px] px-3 text-left text-[14px] font-medium leading-[1.5] transition-all duration-200 hover:bg-background/55 ${!archivedMessages && !activeInheritedSessionId ? 'bg-background/58' : ''}`}
-                onClick={() => {
-                  setArchivedMessages(null);
-                  setActiveArchivedConversationId(null);
-                  setActiveInheritedSessionId(null);
-                  clear();
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                新建对话
-              </button>
-            </div>
-          )}
           <div className="app-no-drag min-h-0 flex-1 overflow-y-auto px-2 pb-3">
             {inherited ? (
               inheritedSessions.length === 0 ? (
@@ -688,6 +672,20 @@ function CodingDialog({
                     </div>
                   </button>
                 ))}
+                <button
+                  className={`mt-1 block w-full rounded-[13px] px-3 py-2 text-left text-[12px] leading-[1.5] text-[var(--text-secondary)] transition-all duration-200 hover:bg-background/52 hover:text-[var(--text-primary)] ${!archivedMessages && !activeInheritedSessionId ? 'bg-background/42' : ''}`}
+                  onClick={() => {
+                    setArchivedMessages(null);
+                    setActiveArchivedConversationId(null);
+                    setActiveInheritedSessionId(null);
+                    clear();
+                  }}
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Plus className="h-3.5 w-3.5" />
+                    新建 session
+                  </span>
+                </button>
                 {inheritedSessions.length === 0 && historyItems.length === 0 && (
                   <div className="px-3 py-6 text-[13px] leading-[1.5] text-[var(--text-secondary)]">暂无 Coding 对话</div>
                 )}

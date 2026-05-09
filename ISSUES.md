@@ -2051,3 +2051,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：compact 通知视角和 standalone 工作台视角不同，前者需要“当前最重要状态”，后者需要“完整可浏览列表”。
 - 是否需更新技术文档：否。
+
+## ISSUE-173
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：历史对话区分普通 Chat 与 Coding
+- 严重程度：中等
+- 问题现象：设置页历史对话混合普通 chat 与 Coding 会话；Coding 大窗左上角“新建对话”入口太显眼，位置也不符合用户希望。
+- 原因分析：历史页直接展示所有 conversations，未过滤 Codex / Claude Code 标题；Coding 大窗复用了普通聊天的左上新建入口。
+- 解决方案：设置页历史对话过滤 Coding 会话，并增加低调 Coding 历史入口跳转到 Coding 大窗；Coding 大窗将新建入口移到新 session 历史列表底部，文案改为“新建 session”。
+- 涉及文件：`src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：普通对话历史和 Coding 工作台是两类信息架构，默认历史页应保持干净，Coding 入口作为次级入口保留。
+- 是否需更新技术文档：否。

@@ -1301,3 +1301,10 @@
 - 历史：Codex / Claude Code 仍按 provider 分离显示，顶部 provider 切换后左侧列表同步切换。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R168. 历史对话区分普通 Chat 与 Coding（2026-05-10）
+- 设置页：历史对话默认过滤 Codex / Claude Code Coding 会话，只展示普通 chat 历史。
+- 设置页入口：历史对话右上角新增低调的“Coding 历史”入口，点击后开启 Coding 模式并直接打开 Coding 大聊天窗口。
+- Coding 大窗：移除左上角“新建对话”，在“新 session 历史”列表底部新增低调的“新建 session”入口。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

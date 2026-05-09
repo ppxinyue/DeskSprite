@@ -1951,6 +1951,7 @@ function ShortcutsSection({
 }
 
 function HistorySection() {
+  const { updateSetting } = useSettingsStore();
   const [items, setItems] = useState<Array<{
     id: number;
     title: string | null;
@@ -1968,7 +1969,7 @@ function HistorySection() {
     let alive = true;
     async function load() {
       const convos = await getConversations();
-      const loaded = await Promise.all(convos.map(async (c) => {
+      const loaded = await Promise.all(convos.filter((c) => !isCodingConversationTitle(c.title)).map(async (c) => {
         const msgs = await getMessages(c.id);
         const preview = msgs.map((m) => `${m.role}: ${m.image_path ? '[图片] ' : ''}${m.content}`).join('\n').slice(0, 240);
         return { id: c.id, title: c.title, updatedAt: c.updated_at, preview };
@@ -2027,9 +2028,25 @@ function HistorySection() {
     });
   };
 
+  const openCodingHistory = async () => {
+    await updateSetting('codingModeEnabled', true);
+    await invoke('show_chat_window').catch((error) => {
+      console.warn('Failed to open coding history:', error);
+    });
+  };
+
   return (
     <>
-      <SectionTitle>历史对话</SectionTitle>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <SectionTitle>历史对话</SectionTitle>
+        <button
+          type="button"
+          className="rounded-[8px] px-2 py-1 text-[12px] text-muted-foreground transition hover:bg-background/60 hover:text-foreground"
+          onClick={openCodingHistory}
+        >
+          Coding 历史
+        </button>
+      </div>
       <div className="space-y-3">
         {items.length === 0 && (
           <div className="text-[13px] text-muted-foreground border border-border rounded-lg p-4">
@@ -2054,6 +2071,10 @@ function HistorySection() {
       </div>
     </>
   );
+}
+
+function isCodingConversationTitle(title: string | null | undefined) {
+  return /^(Codex|Claude Code)(?::|\s+Coding\b|\b)/i.test((title || '').trim());
 }
 
 function historyMessageImageFields(imagePath: string | null | undefined) {
