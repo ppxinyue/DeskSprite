@@ -1847,3 +1847,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：compact 聊天窗口应优先保持布局稳定，长代码和长 URL 应换行而不是引入横向滚动；agent 过程消息是 working 内容，不是完成信号。
 - 是否需更新技术文档：否。
+
+## ISSUE-156
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：聊天纵向滚动不抢焦点
+- 严重程度：中等
+- 问题现象：小聊天框纵向 overflow 有时会自动滑到底部，用户向上查看内容时被打断。
+- 原因分析：普通 chat、Coding chat 和 standalone panel 都在消息刷新时无条件执行 `scrollTop = scrollHeight`；继承 Coding 轮询会频繁触发 render，更容易暴露问题。
+- 解决方案：给消息区增加 `stickToBottom` 状态，只在用户本来接近底部时自动贴底；用户手动上滚后不再抢滚动位置。
+- 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：自动滚动应该服务于“正在看最新消息”的用户，而不能覆盖用户主动查看历史的位置。
+- 是否需更新技术文档：否。

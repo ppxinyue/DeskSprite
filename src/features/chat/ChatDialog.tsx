@@ -78,6 +78,7 @@ export function ChatDialog({
   const [composerError, setComposerError] = useState<string | null>(null);
   const [composerShakeKey, setComposerShakeKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -115,10 +116,15 @@ export function ChatDialog({
     }
   }, []);
 
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 28;
+  }
+
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    if (!stickToBottomRef.current) return;
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, streamingContent]);
 
   useEffect(() => {
@@ -347,6 +353,7 @@ export function ChatDialog({
         <div
           ref={scrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
+          onScroll={handleScroll}
           style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 60) }}
         >
         <div className="min-w-0 space-y-2.5 overflow-x-hidden py-4">
@@ -1030,9 +1037,17 @@ function StandaloneChatPanel({
   onVoiceInput: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 28;
+  }
+
   useEffect(() => {
+    if (!stickToBottomRef.current) return;
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [panel.messages]);
 
@@ -1069,7 +1084,7 @@ function StandaloneChatPanel({
           </Button>
         )}
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5" onScroll={handleScroll}>
         <div className="mx-auto w-full max-w-none space-y-3 py-5">
           {panel.messages.length === 0 ? (
             <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">开始一次新的对话</div>

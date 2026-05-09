@@ -1181,3 +1181,10 @@
 - 完成态：完整 final 输出出现后，过程气泡被最终绿色消息替代，未查看的中间过程不会继续保留成绿色通知。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ChatDialog.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R151. 聊天纵向滚动不抢焦点（2026-05-10）
+- 小窗：普通 chat 和 Coding chat 的消息区不再每次轮询/刷新都无条件滚到底部。
+- 大窗：普通 standalone chat panel 也使用同一套贴底判断，避免用户向上查看历史时被新 render 拉回底部。
+- 逻辑：新增 `stickToBottom` 标记，只有用户本来在底部附近时才自动跟随新消息；用户手动上滚后保持当前位置。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md

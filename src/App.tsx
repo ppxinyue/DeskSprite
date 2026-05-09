@@ -362,6 +362,7 @@ function CodingDialog({
   const [archivedMessages, setArchivedMessages] = useState<ChatMessage[] | null>(null);
   const [activeInheritedSessionId, setActiveInheritedSessionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -404,9 +405,17 @@ function CodingDialog({
     };
   }, [applyCodingState, settings.codingSessionMode]);
 
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 28;
+  }, []);
+
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [state.messages]);
+    if (!stickToBottomRef.current) return;
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [state.messages, activeInheritedSessionId]);
 
   useEffect(() => {
     if (settings.codingSessionMode !== 'new') return;
@@ -564,7 +573,7 @@ function CodingDialog({
                   <span>Codex</span>
                 </div>
               </div>
-              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5">
+              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5" onScroll={handleScroll}>
                 <div className="mx-auto w-full max-w-none min-w-0 space-y-3 overflow-x-hidden py-5">
                   {visibleMessages.length === 0 ? (
                     <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">
@@ -624,6 +633,7 @@ function CodingDialog({
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4"
+        onScroll={handleScroll}
         style={{ maxHeight: Math.max(80, maxHeight - 60) }}
       >
         <div className="min-w-0 space-y-2.5 overflow-x-hidden py-4">
