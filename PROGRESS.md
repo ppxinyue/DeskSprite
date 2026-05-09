@@ -672,3 +672,10 @@
 - 文字：内部状态文字字号缩小到上一版约一半，字体栈改为 `Styrene B / Styrene A / Inter / system`，靠近 Claude 的英文字体气质。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R81. Orb 内部流动与呼吸动效（2026-05-09）
+- 呼吸：Orb 核心球体做自然呼吸缩放，节奏从单次弹性变成 5.6s 的轻微放缩循环。
+- 流动：新增球体内部 `flow` 层，仍被圆形轮廓裁切；idle 状态颜色左右漂移，rest 状态颜色顺时针旋转流动，work 保持低强度斜向漂移。
+- 约束：没有新增外部圆环或方形背景，所有视觉变化都发生在单个球体内部。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

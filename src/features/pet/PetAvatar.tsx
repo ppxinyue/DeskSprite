@@ -581,12 +581,10 @@ function OrbAvatar({
       <motion.div
         className="orb-avatar__shell"
         animate={{
-          rotate: orbState === 'rest' ? 360 : 0,
-          scale: hovering ? 1 : [1, 1.018, 1],
+          scale: hovering ? 1.006 : [1, 1.018, 0.996, 1],
         }}
         transition={{
-          rotate: orbState === 'rest' ? { duration: 22, repeat: Infinity, ease: 'linear' } : { duration: 0.8 },
-          scale: hovering ? { duration: 0.2 } : { duration: 4.8, repeat: Infinity, ease: 'easeInOut' },
+          scale: hovering ? { duration: 0.2 } : { duration: 5.6, repeat: Infinity, ease: 'easeInOut' },
         }}
       >
         <motion.div
@@ -597,6 +595,7 @@ function OrbAvatar({
           }}
           transition={{ duration: 4, repeat: Infinity }}
         />
+        <div className="orb-avatar__flow" />
         <div className="orb-avatar__glass" />
         <div className="orb-avatar__noise" />
         <AnimatePresence mode="wait">
