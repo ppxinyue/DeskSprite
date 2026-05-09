@@ -1165,3 +1165,11 @@
 - UI：chat button 和状态点支持 macOS 风格灰色，并把空状态文案改为“没有新的 Codex 通知”。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R149. 继承 Coding 外壳一致性修复（2026-05-10）
+- 拖动：宠物拖动时，Coding 继承小窗若处于可见状态，也走普通 compact chat 同一套重定位逻辑，避免小窗不跟随。
+- 文案：继承模式大小聊天框底部红字统一改为“请回到 Codex 中回复或处理。”。
+- 右键：Coding 已开启时菜单统一显示“退出 Coding 模式”，不再暴露“· 继承”后缀。
+- 启动：pet 窗口等待设置加载完成后再渲染，避免 orb 模式启动时先闪出默认 pet。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, PetAvatar.tsx, ISSUES.md, PROGRESS.md

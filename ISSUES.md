@@ -1823,3 +1823,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：继承外部日志时，working 必须带时间窗口，否则旧的非终态日志会让 UI 永远误以为 Codex 正在工作。
 - 是否需更新技术文档：否。
+
+## ISSUE-154
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：继承 Coding 外壳一致性修复
+- 严重程度：重要
+- 问题现象：继承 session 时小聊天框不跟随宠物拖动；继承模式红字和右键菜单文案不符合预期；orb 模式新启动会先闪出 pet。
+- 原因分析：Coding 小窗通过单独入口显示，没有设置普通 chat 的 `dialogOpen`，所以拖动重定位条件漏掉了 Coding 可见态；启动时 settings 异步加载前使用默认 `avatarRenderMode=pet` 渲染了一帧。
+- 解决方案：拖动重定位条件扩展为普通对话打开或 Coding 小窗可见；统一继承提示和右键文案；pet 窗口等待 settings loaded 后再渲染头像。
+- 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：模式可以改变内容，但窗口外壳的可见/拖动状态不能只绑定普通 chat store，否则同一窗口在不同模式下会出现行为分叉。
+- 是否需更新技术文档：否。

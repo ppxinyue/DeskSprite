@@ -61,7 +61,6 @@ export function PetAvatar({
   onMenuOpenChange,
   onFocusToggle,
   codingModeEnabled = false,
-  codingSessionMode = 'new',
   onCodingModeToggle,
 }: {
   opacity?: number;
@@ -78,7 +77,6 @@ export function PetAvatar({
   onMenuOpenChange?: (open: boolean) => void;
   onFocusToggle?: () => void;
   codingModeEnabled?: boolean;
-  codingSessionMode?: CodingSessionMode;
   onCodingModeToggle?: (mode?: CodingSessionMode) => void;
 }) {
   const { petState, mediaConfig, userFrames, userGifs, openChat, dialogOpen, loadUserFrames } = usePetStore();
@@ -449,7 +447,7 @@ export function PetAvatar({
         </button>
         {codingModeEnabled ? (
           <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding')}>
-            退出 Coding{codingSessionMode === 'inherit' ? ' · 继承' : ''}
+            退出 Coding 模式
           </button>
         ) : (
           <div className="group/coding relative">

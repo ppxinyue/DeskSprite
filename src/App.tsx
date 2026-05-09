@@ -54,7 +54,7 @@ function isCompactChatDismissed() {
 
 function App() {
   const [windowLabel, setWindowLabel] = useState<string>(() => getCurrentWindow().label);
-  const { settings, loadSettings } = useSettingsStore();
+  const { settings, loaded, loadSettings } = useSettingsStore();
 
   useEffect(() => {
     const label = getCurrentWindow().label;
@@ -167,6 +167,8 @@ function App() {
       </TooltipProvider>
     );
   }
+
+  if (windowLabel === "pet" && !loaded) return null;
 
   return <PetWindow />;
 }
@@ -578,7 +580,7 @@ function CodingDialog({
               </div>
               {inherited ? (
                 <p className="shrink-0 px-5 pb-4 pt-1 text-[12px] leading-5 text-destructive">
-                  继承当前 session 时请回到 Codex 中处理或继续输入。
+                  请回到 Codex 中回复或处理。
                 </p>
               ) : (
                 <div className="shrink-0 px-2 pb-2">
@@ -650,7 +652,7 @@ function CodingDialog({
       </div>
       {inherited ? (
         <p className="px-3 pb-2 pt-1 text-[11px] leading-5 text-destructive">
-          继承当前 session 时请回到 Codex 中处理或继续输入。
+          请回到 Codex 中回复或处理。
         </p>
       ) : (
         <div>
@@ -1441,14 +1443,14 @@ function PetWindow() {
       movedTimerRef.current = window.setTimeout(() => {
         setDragging(false);
         requestLayout();
-        if (dialogOpen && !compactDismissedRef.current && !isCompactChatDismissed()) positionCompactChatWindow({ show: false }).catch(() => {});
+        if ((dialogOpen || (settings.codingModeEnabled && compactVisible)) && !compactDismissedRef.current && !isCompactChatDismissed()) positionCompactChatWindow({ show: false }).catch(() => {});
       }, 220);
     });
     return () => {
       if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
       unlisten.then((fn) => fn());
     };
-  }, [dialogOpen, positionCompactChatWindow, requestLayout]);
+  }, [compactVisible, dialogOpen, positionCompactChatWindow, requestLayout, settings.codingModeEnabled]);
 
   useEffect(() => () => {
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
@@ -1684,7 +1686,7 @@ function PetWindow() {
       lastDragPositionRef.current = { left: nextLeft, top: nextTop };
       suppressMovedUntilRef.current = Date.now() + 180;
       getCurrentWindow().setPosition(new LogicalPosition(nextLeft, nextTop)).catch(() => {});
-      if (dialogOpen && !compactDismissedRef.current && !isCompactChatDismissed()) {
+      if ((dialogOpen || (settings.codingModeEnabled && compactVisible)) && !compactDismissedRef.current && !isCompactChatDismissed()) {
         positionCompactChatWindow({ show: false, windowLeft: nextLeft, windowTop: nextTop }).catch(() => {});
       }
     });
@@ -1782,7 +1784,6 @@ function PetWindow() {
               onMenuOpenChange={setContextMenuOpen}
               onFocusToggle={toggleFocus}
               codingModeEnabled={settings.codingModeEnabled}
-              codingSessionMode={settings.codingSessionMode}
               onCodingModeToggle={(mode) => {
                 const nextEnabled = mode ? true : !settings.codingModeEnabled;
                 const updates = mode
