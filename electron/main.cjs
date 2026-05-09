@@ -33,10 +33,12 @@ const CODEX_STATUS = {
   WORKING: 'working',
   DONE: 'done',
 };
+const CURRENT_CODEX_THREAD_ID = process.env.DESKSPRITE_CODEX_THREAD_ID || process.env.CODEX_THREAD_ID || '';
 const codingState = {
   status: CODEX_STATUS.DONE,
   messages: [],
   running: null,
+  threadId: CURRENT_CODEX_THREAD_ID,
 };
 
 app.setName('DeskSprite');
@@ -800,6 +802,11 @@ function extractCodexStatusText(event) {
 async function sendCodingMessage({ prompt }) {
   const text = String(prompt || '').trim();
   if (!text) throw new Error('输入为空。');
+  if (!codingState.threadId) {
+    codingState.status = CODEX_STATUS.NEEDS_INPUT;
+    pushCodingMessage('error', '没有检测到当前 Codex 对话。请从 Codex 环境启动应用，或设置 DESKSPRITE_CODEX_THREAD_ID。');
+    return publishCodingState();
+  }
   if (codingState.running) {
     codingState.status = CODEX_STATUS.WORKING;
     pushCodingMessage('system', 'Codex 正在工作，请等这次任务结束后再发送。');
@@ -808,29 +815,27 @@ async function sendCodingMessage({ prompt }) {
 
   codingState.status = CODEX_STATUS.WORKING;
   pushCodingMessage('user', text);
-  pushCodingMessage('system', 'Codex 正在工作，首次连接可能需要稍等。');
+  pushCodingMessage('system', '已发送到当前 Codex 对话，等待回复。');
   publishCodingState();
 
   const outputPath = path.join(os.tmpdir(), `desksprite-codex-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`);
   const args = [
     'exec',
+    'resume',
+    '--skip-git-repo-check',
+    codingState.threadId,
     '--json',
-    '--color',
-    'never',
-    '--sandbox',
-    'workspace-write',
-    '--cd',
-    process.cwd(),
     '--output-last-message',
     outputPath,
-    text,
+    '-',
   ];
   const child = spawn(getCodexBinary(), args, {
     cwd: process.cwd(),
     env: { ...process.env, FORCE_COLOR: '0' },
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
   codingState.running = child;
+  child.stdin.end(text);
 
   let stdoutBuffer = '';
   let stderrBuffer = '';

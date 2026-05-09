@@ -1643,3 +1643,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：长耗时 CLI 集成需要持续可见的进度反馈和最终结果兜底，不能只等理想路径的标准输出。
 - 是否需更新技术文档：否。
+
+## ISSUE-139
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Coding 连接当前 Codex Thread
+- 严重程度：重要
+- 问题现象：小聊天框的 Coding 模式每条消息都像新任务，和当前正在进行的 Codex 对话没有直接关系，也会反复出现“首次连接”提示。
+- 原因分析：上一版使用 `codex exec <prompt>`，每次都会启动一个新的非交互式 Codex thread；没有读取当前 Codex 桌面会话暴露的 `CODEX_THREAD_ID`，也没有使用 `codex exec resume`。
+- 解决方案：读取 `DESKSPRITE_CODEX_THREAD_ID` / `CODEX_THREAD_ID`，存在时使用 `codex exec resume <threadId> --json --output-last-message -`，prompt 通过 stdin 传入；缺失 thread id 时显示明确错误，不再自动新建任务。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：如果用户语义是“当前对话”，桥接层必须绑定 thread/session id；新建 exec 只能算同项目新任务。
+- 是否需更新技术文档：否。

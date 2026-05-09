@@ -1048,3 +1048,11 @@
 - 清理：最终消息读取后删除临时输出文件。
 - 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R134. Coding 连接当前 Codex Thread（2026-05-09）
+- 主进程：Coding 模式优先读取 `DESKSPRITE_CODEX_THREAD_ID` 或 `CODEX_THREAD_ID`，将小聊天框输入发送到当前 Codex thread。
+- Codex CLI：从每次 `codex exec` 新建任务改为 `codex exec resume <threadId> --json --output-last-message -`，prompt 通过 stdin 写入。
+- 语义：没有检测到当前 thread 时不再悄悄新开任务，而是明确红色提示需要从 Codex 环境启动应用或设置 thread id。
+- UI：小聊天框空状态改为显示是否已连接当前 Codex 对话。
+- 验证：`git diff --check`、`pnpm build` 通过；未向真实当前 Codex thread 发送测试消息，避免污染当前对话。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
