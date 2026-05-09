@@ -1293,3 +1293,11 @@
 - 右键菜单：在专注模式 / Coding 模式功能区与设置 / 隐藏 / 退出操作区之间增加分割线。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：PetAvatar.tsx, ISSUES.md, PROGRESS.md
+
+### R167. Coding 大窗汇总 New 与继承会话（2026-05-10）
+- 大聊天框：左侧栏在当前工具下同时显示当前 new session、继承 session 列表和 new session 历史，不再受全局 `codingSessionMode` 限制。
+- 继承 session：主进程继承状态新增 `allSessions`，大窗可展示最近继承会话；小窗继续使用原 `sessions` 做红黄绿通知，不受影响。
+- 交互：选择继承 session 时隐藏输入框并提示回到对应工具处理；选择历史或当前 new session 时恢复普通 Coding chat 样式。
+- 历史：Codex / Claude Code 仍按 provider 分离显示，顶部 provider 切换后左侧列表同步切换。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md

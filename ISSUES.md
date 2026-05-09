@@ -2039,3 +2039,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：右键菜单要按操作语义分组，避免高频功能和 destructive/窗口操作粘在一起。
 - 是否需更新技术文档：否。
+
+## ISSUE-172
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Coding 大窗汇总 New 与继承会话
+- 严重程度：重要
+- 问题现象：Coding 大聊天窗口没有汇总所有 Coding 模式对话，只能看到当前模式下的 new session 或继承 session。
+- 原因分析：大窗复用了 compact 的 `codingSessionMode` 分支，导致 new 与 inherit 互斥；继承状态接口也只返回当前可通知的 selected sessions，无法给大窗完整列表。
+- 解决方案：standalone 大窗固定读取当前 provider 的 new state，同时额外轮询 inherited state；继承状态增加 `allSessions` 字段给大窗展示，左侧栏同时渲染继承 sessions 与 new session 历史。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：compact 通知视角和 standalone 工作台视角不同，前者需要“当前最重要状态”，后者需要“完整可浏览列表”。
+- 是否需更新技术文档：否。

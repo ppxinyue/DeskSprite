@@ -206,6 +206,7 @@ interface CodingState {
   provider?: CodingProvider;
   threadId?: string;
   sessions?: CodingInheritedSession[];
+  allSessions?: CodingInheritedSession[];
 }
 
 const DEFAULT_CODING_STATE: CodingState = { status: 'done', messages: [] };
@@ -227,6 +228,14 @@ function codingStateCommand(settings: AppSettings) {
 
 function codingAckCommand(provider: CodingProvider) {
   return provider === 'claude' ? 'coding_ack_claude_inherited_sessions' : 'coding_ack_inherited_sessions';
+}
+
+function codingNewStateCommand(provider: CodingProvider) {
+  return provider === 'claude' ? 'coding_get_claude_state' : 'coding_get_state';
+}
+
+function codingInheritedStateCommand(provider: CodingProvider) {
+  return provider === 'claude' ? 'coding_get_claude_inherited_state' : 'coding_get_inherited_state';
 }
 
 function isCodingConversationTitle(title: string | null | undefined) {
@@ -392,9 +401,11 @@ function CodingDialog({
 }) {
   const { settings } = useSettingsStore();
   const [state, setState] = useState<CodingState>(DEFAULT_CODING_STATE);
+  const [inheritedState, setInheritedState] = useState<CodingState>(DEFAULT_CODING_STATE);
   const [input, setInput] = useState('');
   const [historyItems, setHistoryItems] = useState<Array<{ id: number; title: string | null; updatedAt: string }>>([]);
   const [archivedMessages, setArchivedMessages] = useState<ChatMessage[] | null>(null);
+  const [activeArchivedConversationId, setActiveArchivedConversationId] = useState<number | null>(null);
   const [activeInheritedSessionId, setActiveInheritedSessionId] = useState<string | null>(null);
   const [standaloneProvider, setStandaloneProvider] = useState<CodingProvider>(settings.codingProvider);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -404,8 +415,9 @@ function CodingDialog({
   const activeProvider = standalone ? standaloneProvider : settings.codingProvider;
   const effectiveSettings = useMemo(() => ({ ...settings, codingProvider: activeProvider }), [activeProvider, settings]);
   const codingLabel = codingProviderLabel(activeProvider);
-  const inherited = isInheritedCodingMode(effectiveSettings);
-  const stateCommand = codingStateCommand(effectiveSettings);
+  const inherited = !standalone && isInheritedCodingMode(effectiveSettings);
+  const stateCommand = standalone ? codingNewStateCommand(activeProvider) : codingStateCommand(effectiveSettings);
+  const inheritedStateCommand = codingInheritedStateCommand(activeProvider);
 
   const applyCodingState = useCallback((next: CodingState | null | undefined) => {
     const resolved = next ?? DEFAULT_CODING_STATE;
@@ -447,6 +459,26 @@ function CodingDialog({
     };
   }, [activeProvider, applyCodingState, codingLabel, inherited, stateCommand]);
 
+  useEffect(() => {
+    if (!standalone) return;
+    let alive = true;
+    const loadInherited = () => {
+      invoke<CodingState>(inheritedStateCommand)
+        .then((next) => {
+          if (alive) setInheritedState(next ?? DEFAULT_CODING_STATE);
+        })
+        .catch(() => {
+          if (alive) setInheritedState(DEFAULT_CODING_STATE);
+        });
+    };
+    loadInherited();
+    const timer = window.setInterval(loadInherited, 2500);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [activeProvider, inheritedStateCommand, standalone]);
+
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -487,7 +519,9 @@ function CodingDialog({
 
   useEffect(() => {
     setArchivedMessages(null);
+    setActiveArchivedConversationId(null);
     setActiveInheritedSessionId(null);
+    setInheritedState(DEFAULT_CODING_STATE);
     stickToBottomRef.current = true;
   }, [activeProvider]);
 
@@ -502,6 +536,8 @@ function CodingDialog({
     const prompt = input.trim();
     if (inherited || !prompt || state.status === 'working') return;
     setArchivedMessages(null);
+    setActiveArchivedConversationId(null);
+    setActiveInheritedSessionId(null);
     setInput('');
     await invoke('coding_send_message', { prompt, provider: activeProvider }).catch((e) => {
       setState((current) => ({
@@ -529,6 +565,7 @@ function CodingDialog({
   const loadArchivedConversation = async (conversationId: number) => {
     try {
       const rows = await getMessages(conversationId);
+      setActiveArchivedConversationId(conversationId);
       setArchivedMessages(rows.map((message) => ({
         id: `history-${message.id}`,
         role: message.role === 'user' ? 'user' : message.role === 'assistant' ? 'assistant' : 'system',
@@ -540,11 +577,12 @@ function CodingDialog({
     }
   };
 
-  const isWorking = state.status === 'working';
-  const inheritedSessions = state.sessions || [];
-  const activeInheritedSession = inherited
+  const inheritedSessions = standalone
+    ? (inheritedState.allSessions || inheritedState.sessions || [])
+    : state.sessions || [];
+  const activeInheritedSession = (standalone || inherited)
     ? (standalone
-      ? inheritedSessions.find((session) => session.id === activeInheritedSessionId) ?? inheritedSessions[0]
+      ? inheritedSessions.find((session) => session.id === activeInheritedSessionId) ?? null
       : state.status === 'working'
         ? inheritedSessions.find((session) => session.status === 'working') ?? inheritedSessions[0]
         : inheritedSessions.find((session) => session.status !== 'working') ?? inheritedSessions[0])
@@ -558,7 +596,10 @@ function CodingDialog({
       createdAt: activeInheritedSession.updatedAt,
     }] : state.messages;
   const inheritedMessages = activeInheritedMessages.map(codingMessageToChatMessage);
-  const messages = inherited ? inheritedMessages : state.messages.map(codingMessageToChatMessage);
+  const viewingInherited = Boolean(activeInheritedSession);
+  const displayStatus = activeInheritedSession?.status ?? state.status;
+  const isWorking = displayStatus === 'working';
+  const messages = viewingInherited ? inheritedMessages : state.messages.map(codingMessageToChatMessage);
   const visibleMessages = archivedMessages ?? messages;
 
   if (standalone) {
@@ -568,7 +609,15 @@ function CodingDialog({
         <aside className="glass-panel flex min-h-0 flex-col rounded-none border-y-0 border-l-0">
           {!inherited && (
             <div className="app-no-drag shrink-0 p-3">
-              <button className="flex h-10 w-full items-center gap-2 rounded-[12px] px-3 text-left text-[14px] font-medium leading-[1.5] transition-all duration-200 hover:bg-background/55" onClick={clear}>
+              <button
+                className={`flex h-10 w-full items-center gap-2 rounded-[12px] px-3 text-left text-[14px] font-medium leading-[1.5] transition-all duration-200 hover:bg-background/55 ${!archivedMessages && !activeInheritedSessionId ? 'bg-background/58' : ''}`}
+                onClick={() => {
+                  setArchivedMessages(null);
+                  setActiveArchivedConversationId(null);
+                  setActiveInheritedSessionId(null);
+                  clear();
+                }}
+              >
                 <Plus className="h-4 w-4" />
                 新建对话
               </button>
@@ -583,8 +632,9 @@ function CodingDialog({
                   key={session.id}
                   className={`block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52 ${activeInheritedSession?.id === session.id ? 'bg-background/58' : ''}`}
                   onClick={() => {
-                    setArchivedMessages(null);
-                    setActiveInheritedSessionId(session.id);
+                  setArchivedMessages(null);
+                  setActiveArchivedConversationId(null);
+                  setActiveInheritedSessionId(session.id);
                   }}
                 >
                   <div className="flex items-center gap-2">
@@ -596,25 +646,59 @@ function CodingDialog({
                   </div>
                 </button>
               ))
-            ) : historyItems.map((item) => (
-              <button
-                key={item.id}
-                className="block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52"
-                onClick={() => loadArchivedConversation(item.id)}
-              >
-                <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
-                <div className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] leading-[1.5] text-[var(--text-secondary)]">
-                  <span>{formatAppConversationTime(item.updatedAt)}</span>
-                  <span className="truncate">· {codingLabel}</span>
-                </div>
-              </button>
-            ))}
+            ) : (
+              <>
+                {inheritedSessions.length > 0 && (
+                  <div className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-secondary)]">继承 session</div>
+                )}
+                {inheritedSessions.map((session) => (
+                  <button
+                    key={`inherited-${session.id}`}
+                    className={`block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52 ${activeInheritedSessionId === session.id ? 'bg-background/58' : ''}`}
+                    onClick={() => {
+                      setArchivedMessages(null);
+                      setActiveInheritedSessionId(session.id);
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(session.status)}`} />
+                      <span className="min-w-0 truncate text-[14px] leading-[1.5]">{session.title}</span>
+                    </div>
+                    <div className="mt-0.5 truncate text-[12px] leading-[1.5] text-[var(--text-secondary)]">
+                      {formatCodingTimestamp(session.updatedAt)}
+                    </div>
+                  </button>
+                ))}
+                {historyItems.length > 0 && (
+                  <div className="px-3 pb-1 pt-3 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-secondary)]">新 session 历史</div>
+                )}
+                {historyItems.map((item) => (
+                  <button
+                    key={`history-${item.id}`}
+                    className={`block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52 ${activeArchivedConversationId === item.id ? 'bg-background/58' : ''}`}
+                    onClick={() => {
+                      setActiveInheritedSessionId(null);
+                      loadArchivedConversation(item.id);
+                    }}
+                  >
+                    <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
+                    <div className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] leading-[1.5] text-[var(--text-secondary)]">
+                      <span>{formatAppConversationTime(item.updatedAt)}</span>
+                      <span className="truncate">· {codingLabel}</span>
+                    </div>
+                  </button>
+                ))}
+                {inheritedSessions.length === 0 && historyItems.length === 0 && (
+                  <div className="px-3 py-6 text-[13px] leading-[1.5] text-[var(--text-secondary)]">暂无 Coding 对话</div>
+                )}
+              </>
+            )}
           </div>
         </aside>
         <main className="flex min-h-0 flex-col bg-background">
           <div className="app-no-drag flex h-11 shrink-0 items-center justify-between border-b border-border/55 px-4">
             <div className="flex items-center gap-2 text-[13px] font-medium">
-              <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
+              <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(displayStatus)}`} />
               <span>{codingLabel}</span>
             </div>
             <div className="flex rounded-[10px] border border-border/65 bg-background/45 p-1">
@@ -640,7 +724,7 @@ function CodingDialog({
                 <div className="mx-auto w-full max-w-none min-w-0 space-y-3 overflow-x-hidden py-5 [overflow-wrap:anywhere]">
                   {visibleMessages.length === 0 ? (
                     <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">
-                      {inherited ? (state.status === 'idle' ? `没有新的 ${codingLabel} 通知` : `${codingLabel} 正在工作中`) : state.threadId ? `已连接 ${codingLabel} 对话` : `输入第一条消息后会自动启动 ${codingLabel}`}
+                      {viewingInherited ? `${codingLabel} 继承 session` : state.threadId ? `已连接 ${codingLabel} 对话` : `输入第一条消息后会自动启动 ${codingLabel}`}
                     </div>
                   ) : visibleMessages.map((message) => (
                     <MessageBubble key={message.id} message={message} fullWidth bubble />
@@ -650,7 +734,7 @@ function CodingDialog({
                   )}
                 </div>
               </div>
-              {inherited ? (
+              {viewingInherited ? (
                 <p className="shrink-0 px-5 pb-4 pt-1 text-[12px] leading-5 text-destructive">
                   请回到 {codingLabel} 中回复或处理。
                 </p>
