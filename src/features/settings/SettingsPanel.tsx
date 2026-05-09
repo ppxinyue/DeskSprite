@@ -12,11 +12,11 @@ import { useSettingsStore, type AvatarRenderMode, type ModelMode, type PetMotion
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG, getBuiltinUsageStats } from '@/features/ai/defaultModel';
-import { DEFAULT_SYSTEM_PROMPT, ORB_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
+import { DEFAULT_SYSTEM_PROMPT, ORB_SYSTEM_PROMPT, normalizeOrbSystemPrompt, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
 import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
-import { getConversations, getFocusStatsDays, getMessages, getSystemPrompt, setSetting, updateSystemPrompt, type FocusStatsDay } from '@/lib/db';
+import { getConversations, getFocusStatsDays, getMessages, getSetting, getSystemPrompt, setSetting, updateSystemPrompt, type FocusStatsDay } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, isBuiltinAsset, normalizePetMediaConfig, type PetStateMediaConfig } from '@/features/pet/animations';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
@@ -44,6 +44,7 @@ export function SettingsPanel() {
   const { settings, loaded, loadSettings, updateSetting, updateSettings } = useSettingsStore();
   const { configs, loadConfigs, removeConfig, setDefault } = useApiConfigStore();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
+  const [orbSystemPrompt, setOrbSystemPrompt] = useState(ORB_SYSTEM_PROMPT);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<any>(null);
   const [testingConfigId, setTestingConfigId] = useState<number | null>(null);
@@ -53,6 +54,7 @@ export function SettingsPanel() {
     loadSettings();
     loadConfigs();
     getSystemPrompt().then((prompt) => setSystemPrompt(normalizeSystemPrompt(prompt)));
+    getSetting('orbSystemPrompt').then((prompt) => setOrbSystemPrompt(normalizeOrbSystemPrompt(prompt)));
   }, []);
 
   if (!loaded) return <div className="p-6">加载中...</div>;
@@ -94,6 +96,8 @@ export function SettingsPanel() {
           updateSetting={updateSetting}
           systemPrompt={systemPrompt}
           setSystemPrompt={setSystemPrompt}
+          orbSystemPrompt={orbSystemPrompt}
+          setOrbSystemPrompt={setOrbSystemPrompt}
           configs={configs}
           onAdd={() => {
             setEditingConfig(null);
@@ -168,6 +172,25 @@ function SettingsGroup({ children, className = '' }: { children: ReactNode; clas
   return (
     <div className={`quiet-card mb-6 overflow-hidden rounded-[9px] ${className}`}>
       {children}
+    </div>
+  );
+}
+
+function CollapsedUnavailableSection({ title, reason }: { title: string; reason: string }) {
+  return (
+    <div className="quiet-card mb-6 overflow-hidden rounded-[9px]">
+      <button
+        type="button"
+        disabled
+        className="flex h-11 w-full cursor-not-allowed items-center justify-between gap-3 px-4 text-left"
+        aria-expanded={false}
+      >
+        <div className="min-w-0">
+          <div className="text-[13px] font-medium text-muted-foreground">{title}</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground/70">{reason}</div>
+        </div>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/55" />
+      </button>
     </div>
   );
 }
@@ -515,20 +538,30 @@ function AppearanceSection({
         </AppearanceRow>
       </SettingsGroup>
 
-      <SectionTitle muted={orbMode}>灵宠动作</SectionTitle>
-      <SettingsGroup className={orbMode ? 'pointer-events-none opacity-45 grayscale' : ''}>
-        <div className="px-4 py-4">
-          <PetMotionControls
-            value={draft.petMotions}
-            onChange={(petMotions) => update('petMotions', petMotions)}
-          />
-        </div>
-      </SettingsGroup>
+      {orbMode ? (
+        <CollapsedUnavailableSection title="灵宠动作" reason="Orb 模式使用代码动效，不需要图片动作参数" />
+      ) : (
+        <>
+          <SectionTitle>灵宠动作</SectionTitle>
+          <SettingsGroup>
+            <div className="px-4 py-4">
+              <PetMotionControls
+                value={draft.petMotions}
+                onChange={(petMotions) => update('petMotions', petMotions)}
+              />
+            </div>
+          </SettingsGroup>
+        </>
+      )}
 
-      <SectionTitle muted={orbMode}>形象自定义</SectionTitle>
-      <div className={orbMode ? 'pointer-events-none opacity-45 grayscale' : ''}>
-        <ImageSection />
-      </div>
+      {orbMode ? (
+        <CollapsedUnavailableSection title="形象自定义" reason="Orb 模式由程序绘制，图片与 GIF 设置已收起" />
+      ) : (
+        <>
+          <SectionTitle>形象自定义</SectionTitle>
+          <ImageSection />
+        </>
+      )}
 
     </>
   );
@@ -1442,7 +1475,7 @@ async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; mes
 }
 
 function AISection({
-  settings, updateSetting, systemPrompt, setSystemPrompt,
+  settings, updateSetting, systemPrompt, setSystemPrompt, orbSystemPrompt, setOrbSystemPrompt,
   configs, onAdd, onEdit, onDelete, onSetDefault, onTest, testResults, testingConfigId,
   isModalOpen, setIsModalOpen, editingConfig,
 }: {
@@ -1450,6 +1483,8 @@ function AISection({
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
   systemPrompt: string;
   setSystemPrompt: (v: string) => void;
+  orbSystemPrompt: string;
+  setOrbSystemPrompt: (v: string) => void;
   configs: ApiConfig[];
   onAdd: () => void;
   onEdit: (config: ApiConfig) => void;
@@ -1463,7 +1498,22 @@ function AISection({
   editingConfig: ApiConfig | null;
 }) {
   const orbMode = settings.avatarRenderMode === 'orb';
-  const displayedSystemPrompt = orbMode ? ORB_SYSTEM_PROMPT : systemPrompt;
+  const displayedSystemPrompt = orbMode ? orbSystemPrompt : systemPrompt;
+  const setDisplayedSystemPrompt = orbMode ? setOrbSystemPrompt : setSystemPrompt;
+  const saveDisplayedSystemPrompt = async () => {
+    if (orbMode) {
+      await setSetting('orbSystemPrompt', JSON.stringify(orbSystemPrompt));
+      return;
+    }
+    await updateSystemPrompt(systemPrompt);
+  };
+  const resetDisplayedSystemPrompt = () => {
+    if (orbMode) {
+      setOrbSystemPrompt(ORB_SYSTEM_PROMPT);
+      return;
+    }
+    setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
+  };
 
   const [builtinUsage, setBuiltinUsage] = useState<{
     chat: Awaited<ReturnType<typeof getBuiltinUsageStats>>;
@@ -1610,16 +1660,20 @@ function AISection({
 
       <Separator className="my-6" />
       <SectionTitle>System Prompt</SectionTitle>
+      {orbMode && (
+        <div className="mb-2 text-[11px] leading-5 text-muted-foreground">
+          Orb 模式使用独立的 AI 助手 Prompt，不会覆盖灵宠模式的设定。
+        </div>
+      )}
       <Textarea
         value={displayedSystemPrompt}
-        onChange={(e) => setSystemPrompt(e.target.value)}
-        disabled={orbMode}
+        onChange={(e) => setDisplayedSystemPrompt(e.target.value)}
         rows={6}
-        className="font-mono text-[13px] disabled:cursor-not-allowed disabled:opacity-60"
+        className="font-mono text-[13px]"
       />
       <div className="flex gap-2 mt-3">
-        <Button disabled={orbMode} onClick={() => updateSystemPrompt(systemPrompt)}>保存</Button>
-        <Button disabled={orbMode} variant="outline" onClick={() => setSystemPrompt(DEFAULT_SYSTEM_PROMPT)}>重置为默认</Button>
+        <Button onClick={() => saveDisplayedSystemPrompt()}>保存</Button>
+        <Button variant="outline" onClick={resetDisplayedSystemPrompt}>重置为默认</Button>
       </div>
 
       <Separator className="my-6" />

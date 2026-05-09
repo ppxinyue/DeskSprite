@@ -1439,3 +1439,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/ai/systemPrompt.ts`, `src/components/ui/switch.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：双形象模式不只是渲染分支，设置项、身份设定和运行时 prompt 都需要按模式同步收敛。
 - 是否需更新技术文档：否。
+
+## ISSUE-122
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb 模式设置收起态与 Prompt 编辑
+- 严重程度：改进
+- 问题现象：orb 模式下直接把灵宠动作、形象自定义整块变灰，视觉效果像禁用故障；System Prompt 被锁定不可编辑，不符合用户希望继续定制 orb 助手提示词的需求。
+- 原因分析：上一版用灰化禁用表达不可用内容，缺少明确的信息结构；orb prompt 只用常量返回，没有独立持久化设置。
+- 解决方案：orb 模式下将灵宠动作、形象自定义渲染为收起态不可展开卡片；新增 `orbSystemPrompt` 设置读写，设置页可编辑保存，运行时优先读取保存值。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/ai/systemPrompt.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：不可用功能应从信息架构上收纳，而不是只做视觉降权；模式专属 prompt 需要独立存储，避免污染另一种模式。
+- 是否需更新技术文档：否。

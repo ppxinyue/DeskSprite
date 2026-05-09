@@ -929,3 +929,10 @@
 - 开关：全局 Switch 选中态改为 Vite 蓝 `#2f8fff`。
 - 验证：`pnpm build` 通过。
 - 文件：SettingsPanel.tsx, systemPrompt.ts, switch.tsx, ISSUES.md, PROGRESS.md
+
+### R117. Orb 设置收起态与独立 Prompt 编辑（2026-05-09）
+- 外观：orb 模式下灵宠动作、形象自定义不再整块灰化，改为收起态卡片且不可展开。
+- AI 对话：orb 模式下 System Prompt 改为可编辑，保存到独立 `orbSystemPrompt` 设置，不覆盖灵宠模式 prompt。
+- 运行时：`getActiveSystemPrompt()` 在 orb 模式下读取用户保存的 orb prompt，没有保存时回退到默认 orb prompt。
+- 验证：`pnpm build` 通过。
+- 文件：SettingsPanel.tsx, systemPrompt.ts, ISSUES.md, PROGRESS.md
