@@ -685,3 +685,10 @@
 - 触发：hover 到球体时按字母顺序 stagger 翻转，翻转后自动复位；动效只作用在文字层，不改变单球体结构。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R83. Orb 呼吸与内部流动增强（2026-05-09）
+- 呼吸：将 Orb shell 的循环缩放从轻微 1.8% 提高到约 4%，并加入轻微回落，让球体大小变化能被稳定感知。
+- 流动：增强 `flow` 层的透明度、位移范围和速度；idle 左右流动更明显，rest 顺时针旋转更清晰，work 保留更克制的工作态漂移。
+- 约束：仍只在单个球体内部做动效，没有增加外圈、背景卡片或额外装饰层。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

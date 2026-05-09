@@ -432,28 +432,28 @@
 
 .orb-avatar__flow {
   position: absolute;
-  inset: -18%;
+  inset: -24%;
   z-index: 0;
   border-radius: inherit;
   pointer-events: none;
   background:
-    radial-gradient(circle at 28% 42%, color-mix(in srgb, var(--orb-accent) 24%, transparent), transparent 24%),
-    radial-gradient(circle at 68% 58%, rgba(255,255,255,0.18), transparent 27%),
-    radial-gradient(circle at 48% 78%, color-mix(in srgb, var(--orb-accent) 13%, transparent), transparent 26%);
-  opacity: 0.74;
-  filter: blur(12px);
+    radial-gradient(circle at 24% 40%, color-mix(in srgb, var(--orb-accent) 34%, transparent), transparent 23%),
+    radial-gradient(circle at 72% 54%, rgba(255,255,255,0.24), transparent 28%),
+    radial-gradient(circle at 48% 78%, color-mix(in srgb, var(--orb-accent) 20%, transparent), transparent 27%);
+  opacity: 0.9;
+  filter: blur(9px);
   mix-blend-mode: screen;
-  animation: orbIdleFlow 8.5s ease-in-out infinite;
+  animation: orbIdleFlow 6.8s ease-in-out infinite;
 }
 
 .orb-avatar--work .orb-avatar__flow {
-  opacity: 0.56;
-  animation: orbWorkFlow 7s ease-in-out infinite;
+  opacity: 0.72;
+  animation: orbWorkFlow 5.8s ease-in-out infinite;
 }
 
 .orb-avatar--rest .orb-avatar__flow {
-  opacity: 0.78;
-  animation: orbRestFlow 10s linear infinite;
+  opacity: 0.92;
+  animation: orbRestFlow 7.5s linear infinite;
 }
 
 .orb-avatar.is-hovering .orb-avatar__glow {
@@ -546,18 +546,18 @@
 }
 
 @keyframes orbIdleFlow {
-  0%, 100% { transform: translateX(-8%) scale(1.05); }
-  50% { transform: translateX(8%) scale(1.08); }
+  0%, 100% { transform: translateX(-18%) translateY(1%) scale(1.12); }
+  50% { transform: translateX(18%) translateY(-2%) scale(1.18); }
 }
 
 @keyframes orbWorkFlow {
-  0%, 100% { transform: translateX(-4%) translateY(2%) scale(1.04); }
-  50% { transform: translateX(4%) translateY(-2%) scale(1.06); }
+  0%, 100% { transform: translateX(-12%) translateY(5%) scale(1.10); }
+  50% { transform: translateX(12%) translateY(-5%) scale(1.15); }
 }
 
 @keyframes orbRestFlow {
-  from { transform: rotate(0deg) scale(1.08); }
-  to { transform: rotate(360deg) scale(1.08); }
+  from { transform: rotate(0deg) scale(1.17); }
+  to { transform: rotate(360deg) scale(1.17); }
 }
 
 @keyframes orbLetter3DSwap {
