@@ -1919,3 +1919,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：外部 agent 接入应该抽象成 provider + inherited session source，UI 可以复用，但状态解析必须贴合每个工具自己的日志格式。
 - 是否需更新技术文档：否。
+
+## ISSUE-162
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：右键菜单增加 Claude Code 入口
+- 严重程度：中等
+- 问题现象：Claude Code 已接入设置页，但灵宠右键菜单里没有直接入口，用户需要先去设置切换工具。
+- 原因分析：右键菜单仍按单一 Coding provider 渲染，二级菜单只根据当前设置显示一种工具的入口。
+- 解决方案：将 Coding 二级菜单拆成 Codex / Claude Code 分组；右键选择 Claude Code 时直接同步 provider 与 inherit session mode。
+- 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：高频桌面入口不应依赖设置页状态预配置，provider 选择应该在动作入口处可见可切。
+- 是否需更新技术文档：否。

@@ -1224,3 +1224,10 @@
 - 前端：小窗、大窗、状态提示、空态和错误信息复用同一套 Coding UI，并按工具名显示 Codex 或 Claude Code。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, PetAvatar.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
+
+### R157. 右键菜单增加 Claude Code 入口（2026-05-10）
+- 右键菜单：Coding 模式二级菜单改为 Codex / Claude Code 分组，Codex 保留“继承当前 session / 开启新 session”，Claude Code 增加“继承当前 session”。
+- 状态切换：从右键菜单选择 Claude Code 时同步写入 `codingProvider: claude` 与 `codingSessionMode: inherit`，不再依赖设置页预先选择工具。
+- 视觉：Coding 二级菜单略微加宽，避免 Claude Code 分组和入口显得拥挤。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, PetAvatar.tsx, ISSUES.md, PROGRESS.md

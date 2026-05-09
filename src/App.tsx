@@ -1809,11 +1809,12 @@ function PetWindow() {
               onFocusToggle={toggleFocus}
               codingModeEnabled={settings.codingModeEnabled}
               codingProvider={settings.codingProvider}
-              onCodingModeToggle={(mode) => {
+              onCodingModeToggle={(mode, provider) => {
                 const nextEnabled = mode ? true : !settings.codingModeEnabled;
-                const nextMode = settings.codingProvider === 'claude' ? 'inherit' : mode;
+                const nextProvider = provider ?? settings.codingProvider;
+                const nextMode = nextProvider === 'claude' ? 'inherit' : mode;
                 const updates = mode
-                  ? { codingModeEnabled: nextEnabled, codingSessionMode: nextMode }
+                  ? { codingModeEnabled: nextEnabled, codingProvider: nextProvider, codingSessionMode: nextMode }
                   : { codingModeEnabled: nextEnabled };
                 updateSettings(updates).catch((e) => {
                   console.warn("Failed to toggle coding mode:", e);

@@ -79,7 +79,7 @@ export function PetAvatar({
   onFocusToggle?: () => void;
   codingModeEnabled?: boolean;
   codingProvider?: CodingProvider;
-  onCodingModeToggle?: (mode?: CodingSessionMode) => void;
+  onCodingModeToggle?: (mode?: CodingSessionMode, provider?: CodingProvider) => void;
 }) {
   const { petState, mediaConfig, userFrames, userGifs, openChat, dialogOpen, loadUserFrames } = usePetStore();
   const config = mediaConfig[petState];
@@ -218,10 +218,13 @@ export function PetAvatar({
         onCodingModeToggle?.();
         break;
       case 'coding-new':
-        onCodingModeToggle?.('new');
+        onCodingModeToggle?.('new', 'codex');
         break;
       case 'coding-inherit':
-        onCodingModeToggle?.('inherit');
+        onCodingModeToggle?.('inherit', 'codex');
+        break;
+      case 'coding-claude-inherit':
+        onCodingModeToggle?.('inherit', 'claude');
         break;
       case 'hide':
         try { await invoke('hide_pet_window'); } catch (e) { console.error(e); }
@@ -455,16 +458,20 @@ export function PetAvatar({
           <div className="group/coding relative">
             <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">Coding 模式</button>
             <div
-              className={`absolute top-0 hidden w-[150px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/coding:block dark:bg-[#1c1b18] ${
+              className={`absolute top-0 hidden w-[168px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/coding:block dark:bg-[#1c1b18] ${
                 submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
               }`}
             >
-              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-inherit')}>
-                {codingProvider === 'claude' ? '继承 Claude Code' : '继承当前 session'}
-              </button>
-              {codingProvider === 'codex' && (
-                <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-new')}>开启新 session</button>
-              )}
+              <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                Codex{codingProvider === 'codex' ? ' · 当前' : ''}
+              </div>
+              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-inherit')}>继承当前 session</button>
+              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-new')}>开启新 session</button>
+              <div className="my-1 h-px bg-border/60" />
+              <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                Claude Code{codingProvider === 'claude' ? ' · 当前' : ''}
+              </div>
+              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-inherit')}>继承当前 session</button>
             </div>
           </div>
         )}
