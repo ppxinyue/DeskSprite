@@ -1370,9 +1370,9 @@ export function MessageBubble({
   const actionButtonClass = "flex h-7 w-7 items-center justify-center rounded-[9px] border border-[var(--color-chat-border)] bg-background/72 text-[var(--color-chat-muted)] shadow-sm backdrop-blur hover:text-[var(--color-chat-text)]";
 
   return (
-    <div className={`group flex w-full min-w-0 flex-col overflow-x-hidden animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'items-end' : 'items-start'}`}>
+    <div className={`group flex w-full min-w-0 max-w-full flex-col overflow-x-hidden animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'items-end' : 'items-start'}`}>
       <div
-        className={`relative min-w-0 overflow-hidden border leading-[1.55] text-[var(--color-chat-text)] transition-all duration-200 ${
+        className={`relative min-w-0 max-w-full overflow-hidden border leading-[1.55] text-[var(--color-chat-text)] transition-all duration-200 [overflow-wrap:anywhere] ${
           compact ? 'rounded-[7px] px-2.5 py-1.5' : 'rounded-[9px] px-3 py-2 text-[14px] leading-[1.55]'
         } ${
           fullWidth ? 'max-w-full' : 'max-w-[84%]'
@@ -1389,9 +1389,9 @@ export function MessageBubble({
         {isPending ? (
           <PulseDot className="text-[var(--color-chat-muted)]" />
         ) : isUser ? (
-          <p className="whitespace-pre-wrap break-words">{cleanChatText(message.content)}</p>
+          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{cleanChatText(message.content)}</p>
         ) : (
-          <div className="chat-markdown max-w-full overflow-hidden">
+          <div className="chat-markdown max-w-full overflow-hidden [overflow-wrap:anywhere]">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {cleanChatText(message.content)}
             </ReactMarkdown>

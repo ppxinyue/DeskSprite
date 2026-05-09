@@ -31,9 +31,9 @@ const MOTION_BASE_DURATION: Record<PetMotionName, number> = {
 };
 const PET_DRAW_PADDING = 2;
 const SOURCE_EDGE_INSET_RATIO = 0.004;
-const MENU_WIDTH = 112;
-const MENU_HEIGHT = 242;
-const SUBMENU_WIDTH = 170;
+const MENU_WIDTH = 136;
+const MENU_HEIGHT = 312;
+const SUBMENU_WIDTH = 190;
 const MENU_MARGIN = 8;
 const MENU_LEFT_SIDE_THRESHOLD = 0.62;
 
@@ -427,7 +427,7 @@ export function PetAvatar({
         <div className="group/history relative">
           <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">历史对话</button>
           <div
-            className={`absolute top-0 hidden w-[170px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/history:block dark:bg-[#1c1b18] ${
+              className={`absolute top-0 hidden w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/history:block dark:bg-[#1c1b18] ${
               submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
             }`}
         >
@@ -461,7 +461,7 @@ export function PetAvatar({
           <div className="group/coding relative">
             <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">Coding 模式</button>
             <div
-              className={`absolute top-0 hidden w-[168px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/coding:block dark:bg-[#1c1b18] ${
+              className={`absolute top-0 hidden w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/coding:block dark:bg-[#1c1b18] ${
                 submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
               }`}
             >

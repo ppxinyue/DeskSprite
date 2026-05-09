@@ -1240,3 +1240,10 @@
 - 发送：`coding_send_message` 根据 provider 分发到 Codex app-server 或 Claude Code CLI；Claude Code 新 session 使用同一套代理环境变量。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, PetAvatar.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R159. Claude Code Chat 布局与右键二级菜单修正（2026-05-10）
+- Compact chat：Coding/Claude Code 消息区增加更硬的 `max-width`、`overflow-x-hidden` 与 `overflow-wrap:anywhere`，避免长路径、长命令、JSON 片段撑出横向滚动。
+- 大聊天框：Coding standalone 消息区同步使用同一套强制换行约束，保持和普通 chat 的气泡布局一致。
+- 右键菜单：修正菜单实际宽度常量，二级菜单宽度增至 190px；窗口预留高度提升到 312px，避免 Coding / Claude Code 二级菜单被裁切。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, PetAvatar.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md

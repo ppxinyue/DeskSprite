@@ -1943,3 +1943,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：同一 provider 也可能同时有“继承外部 session”和“应用内新 session”两种控制面，provider 与 session mode 不能绑定死。
 - 是否需更新技术文档：否。
+
+## ISSUE-164
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Claude Code Chat 布局与右键二级菜单修正
+- 严重程度：重要
+- 问题现象：Claude Code 的小窗 UI 仍可能出现横向 overflow、高度和拖动后的布局不稳；右键菜单中 Coding 模式二级菜单显示不全。
+- 原因分析：Claude Code 输出更容易包含长路径、长命令和 JSON 片段，现有气泡虽然限制了大多数 Markdown，但外层容器仍缺少统一的 `max-width` / `overflow-wrap:anywhere` 硬约束；右键菜单新增 Claude Code 入口后，实际菜单高度和宽度超过了旧的预留常量，并且 PetAvatar 内部 `MENU_WIDTH` 仍停留在旧值。
+- 解决方案：消息气泡和 Coding 容器统一补齐强制换行和横向隐藏；把菜单实际宽度常量修正为 136px，二级菜单预留宽度提升到 190px，菜单窗口高度预留提升到 312px。
+- 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：桌面悬浮菜单的 BrowserWindow 尺寸必须按“展开后的最大二级菜单”预留；agent 输出应按最坏情况的无空格长文本处理，不能只依赖 Markdown 默认换行。
+- 是否需更新技术文档：否。

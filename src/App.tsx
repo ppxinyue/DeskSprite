@@ -29,8 +29,8 @@ const COMPACT_CHAT_TOP_CHROME = 20;
 const COMPACT_CHAT_BOTTOM_CHROME = 10;
 const COMPACT_CHAT_PREFERRED_HEIGHT = 340;
 const CONTEXT_MENU_WIDTH = 136;
-const CONTEXT_SUBMENU_WIDTH = 170;
-const CONTEXT_MENU_HEIGHT = 226;
+const CONTEXT_SUBMENU_WIDTH = 190;
+const CONTEXT_MENU_HEIGHT = 312;
 const PET_RIGHT_EDGE_MENU_THRESHOLD = 0.62;
 const PET_BUBBLE_TOP_SPACE = 78;
 const PET_PROMPT_BUBBLE_WIDTH = 196;
@@ -595,8 +595,8 @@ function CodingDialog({
                   <span>{codingLabel}</span>
                 </div>
               </div>
-              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5" onScroll={handleScroll}>
-                <div className="mx-auto w-full max-w-none min-w-0 space-y-3 overflow-x-hidden py-5">
+              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 [overflow-wrap:anywhere]" onScroll={handleScroll}>
+                <div className="mx-auto w-full max-w-none min-w-0 space-y-3 overflow-x-hidden py-5 [overflow-wrap:anywhere]">
                   {visibleMessages.length === 0 ? (
                     <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">
                       {inherited ? (state.status === 'idle' ? `没有新的 ${codingLabel} 通知` : `${codingLabel} 正在工作中`) : state.threadId ? `已连接 ${codingLabel} 对话` : `输入第一条消息后会自动启动 ${codingLabel}`}
@@ -654,11 +654,11 @@ function CodingDialog({
     >
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4"
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 [overflow-wrap:anywhere]"
         onScroll={handleScroll}
         style={{ maxHeight: Math.max(80, maxHeight - 60) }}
       >
-        <div className="min-w-0 space-y-2.5 overflow-x-hidden py-4">
+        <div className="min-w-0 max-w-full space-y-2.5 overflow-x-hidden py-4 [overflow-wrap:anywhere]">
           {visibleMessages.length === 0 ? (
             <div className="py-8 text-center text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
               {inherited ? (state.status === 'idle' ? `没有新的 ${codingLabel} 通知` : `${codingLabel} 正在工作中`) : state.threadId ? `已连接 ${codingLabel} 对话` : `输入第一条消息后会自动启动 ${codingLabel}`}
