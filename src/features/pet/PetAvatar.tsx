@@ -616,14 +616,7 @@ function OrbAvatar({
                 { x: 0.30, y: 0.30, rotate: -210 },
                 { x: -0.30, y: 0.30, rotate: 210 },
               ];
-              const orbitPoints = [
-                { x: 0, y: -0.080 },
-                { x: 0.080, y: 0 },
-                { x: 0, y: 0.080 },
-                { x: -0.080, y: 0 },
-              ];
               const startPoint = startPoints[index] ?? startPoints[0];
-              const orbitPoint = orbitPoints[index] ?? orbitPoints[0];
               const localProgress = fallEase(clamp(focusProgress * letters.length - index, 0, 1));
               const remaining = 1 - localProgress;
               return (
@@ -631,6 +624,7 @@ function OrbAvatar({
                   key={`${letter}-${index}`}
                   className="orb-avatar__work-orbit"
                   style={{
+                    '--orbit-angle': `${index * 90}deg`,
                     '--stack-index': String(index),
                   } as CSSProperties & Record<string, string>}
                 >
@@ -638,8 +632,8 @@ function OrbAvatar({
                     className="orb-avatar__work-letter"
                     style={{
                       '--attract-progress': String(localProgress),
-                      '--work-x': `${(startPoint.x * remaining + orbitPoint.x * localProgress) * size}px`,
-                      '--work-y': `${(startPoint.y * remaining + orbitPoint.y * localProgress) * size}px`,
+                      '--work-x': `${startPoint.x * size * remaining}px`,
+                      '--work-y': `${(startPoint.y * remaining - 0.10 * localProgress) * size}px`,
                       '--work-rotate': `${startPoint.rotate * remaining}deg`,
                       '--work-scale': String(0.92 + localProgress * 0.16),
                       '--stack-index': String(index),

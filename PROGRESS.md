@@ -816,3 +816,10 @@
 - 连续性：保留上一轮四角逐字吸附的倒计时进度映射，只改变吸附完成后的运动方式。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R101. Orb Work 字母 90 度分隔（2026-05-09）
+- Work：四个 orbit 容器改为固定 `0/90/180/270deg` 初始角度，确保 `W/O/R/K` 完全分开。
+- 公转：移除负 delay 错相，改用 keyframes 从各自 `--orbit-angle` 开始同步旋转，保持互相间隔 90 度。
+- 吸附：字母仍按倒计时逐个从四角吸入，最终落在同一半径轨道上。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

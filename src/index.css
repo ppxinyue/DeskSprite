@@ -516,7 +516,6 @@
   border-radius: inherit;
   pointer-events: none;
   animation: orbWorkOrbit 16s linear infinite;
-  animation-delay: calc(var(--stack-index) * -4s);
 }
 
 .orb-avatar__work-letter {
@@ -606,8 +605,8 @@
 }
 
 @keyframes orbWorkOrbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from { transform: rotate(var(--orbit-angle)); }
+  to { transform: rotate(calc(var(--orbit-angle) + 360deg)); }
 }
 
 @keyframes orbCenterPulse {

@@ -1247,3 +1247,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：复合动效应拆成父层轨道运动和子层吸附运动，避免 transform 互相覆盖。
 - 是否需更新技术文档：否。
+
+## ISSUE-106
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb Work 字母公转间距
+- 严重程度：改进
+- 问题现象：Work 的四个字母仍需要完全分开，互相间隔 90 度。
+- 原因分析：上一版使用四个不同终点再叠加 animation delay 错相，最终视觉不够严格，可能出现字母间距不均或靠近。
+- 解决方案：每个 orbit 容器设置固定 `--orbit-angle`，分别为 0/90/180/270 度；移除 animation delay，keyframes 从各自角度同步公转。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：需要严格几何关系时，应使用显式角度变量，而不是依赖动画延迟制造相位差。
+- 是否需更新技术文档：否。
