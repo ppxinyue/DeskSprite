@@ -605,7 +605,6 @@ function OrbAvatar({
                 {letter}
               </span>
             ))}
-            <span className="orb-avatar__satellite-dot" />
           </div>
         )}
         {orbState === 'work' && (

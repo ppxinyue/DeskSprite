@@ -1187,3 +1187,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：当同一状态文本在不同视觉层级中承担不同语义时，应在数据源层明确大小写，而不是完全依赖 CSS 变换。
 - 是否需更新技术文档：否。
+
+## ISSUE-101
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb Idle 视觉精简
+- 严重程度：改进
+- 问题现象：Idle 外圈除了字母还有一个点，用户希望删除，只保留字母。
+- 原因分析：早期 idle 设计中保留了 satellite dot 作为卫星轨道提示，但当前视觉方向已经转向纯字母环，这个点会产生额外噪声。
+- 解决方案：删除 `orb-avatar__satellite-dot` DOM、对应 CSS 和 pulse keyframes。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：极简 Orb 需要严格控制符号数量；如果文字已经承担状态表达，额外装饰点容易分散注意力。
+- 是否需更新技术文档：否。

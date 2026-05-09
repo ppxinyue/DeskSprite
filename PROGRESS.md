@@ -782,3 +782,9 @@
 - 中心：hover 时中央提示仍使用小写 `idle/work/rest`，和用户要求的内外层级区分保持一致。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, ISSUES.md, PROGRESS.md
+
+### R96. Orb Idle 去除卫星点（2026-05-09）
+- idle：删除外圈 satellite dot，IDLE 状态只保留四个大写字母环绕。
+- 清理：移除对应的 dot 样式和 pulse keyframes，减少无用 CSS。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
