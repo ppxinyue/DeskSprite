@@ -1268,3 +1268,10 @@
 - 布局：消息区直接从卡片顶部开始，避免同一屏出现两个 Codex / Claude Code 文案。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R163. Claude Code 启动提示只显示一次（2026-05-10）
+- 主进程：Claude Code new session 的“是否已启动”改为独立布尔状态，不再依赖 `messages.length` 判断。
+- 行为：同一个 Claude Code new session 中，只有首次发送会插入“正在启动 Claude Code 新 session。”；后续发送继续复用同一个 `--session-id`，不再因消息数组刷新误判为新会话。
+- 清空：只有显式新建/清空 Claude Code coding 会话时才重置启动状态和 session id。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md

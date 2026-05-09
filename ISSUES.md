@@ -1991,3 +1991,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：新增全局层级控件后，要清理旧局部标签，避免同一信息在相邻层级重复出现。
 - 是否需更新技术文档：否。
+
+## ISSUE-168
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Claude Code 启动提示只显示一次
+- 严重程度：中等
+- 问题现象：Claude Code new session 中仍会在每次发送前显示“正在启动 Claude Code 新 session。”。
+- 原因分析：首次启动判断依赖 `claudeCodingState.messages.length === 0`；当 UI 或状态刷新路径导致消息数组为空时，会误判为新会话，即使 `threadId` 已经存在。
+- 解决方案：新增主进程级 `claudeCodingSessionStarted` 布尔状态，首次发送后置为 true；只有显式清空 Claude Code coding 会话时重置。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：会话生命周期不能用 UI 消息数组推断，应该使用独立 session 状态源。
+- 是否需更新技术文档：否。

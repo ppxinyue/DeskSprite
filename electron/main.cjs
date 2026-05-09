@@ -49,6 +49,7 @@ const claudeCodingState = {
   running: null,
   threadId: '',
 };
+let claudeCodingSessionStarted = false;
 const CODEX_INHERIT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
 const inheritedCodingAcknowledged = new Map();
@@ -1302,9 +1303,10 @@ async function sendClaudeCodingMessage({ prompt }) {
   }
 
   claudeCodingState.status = CODEX_STATUS.WORKING;
-  const isFirstClaudeMessage = claudeCodingState.messages.length === 0;
+  const isFirstClaudeMessage = !claudeCodingSessionStarted;
   const sessionId = claudeCodingState.threadId || randomUUID();
   claudeCodingState.threadId = sessionId;
+  claudeCodingSessionStarted = true;
   pushClaudeCodingMessage('user', text);
   if (isFirstClaudeMessage) pushClaudeCodingMessage('system', '正在启动 Claude Code 新 session。');
   const child = spawn(getClaudeBinary(), [
@@ -2028,6 +2030,7 @@ const handlers = {
   coding_clear_claude: () => {
     claudeCodingState.messages = [];
     claudeCodingState.threadId = '';
+    claudeCodingSessionStarted = false;
     if (!claudeCodingState.running) claudeCodingState.status = CODEX_STATUS.DONE;
     return publishClaudeCodingState();
   },
