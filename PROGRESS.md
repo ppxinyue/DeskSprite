@@ -1110,3 +1110,11 @@
 - 交互：清空 Coding 对话时同步清理本地 Coding 历史会话绑定，下一轮重新创建历史会话。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md
+
+### R142. Coding 大窗口布局对齐普通聊天（2026-05-10）
+- 大窗：Coding standalone 不再使用单栏专用面板，改为普通大聊天窗口同款左侧历史栏 + 右侧 quiet-card 会话区。
+- 会话：左侧“新建对话”用于清空当前 Codex 会话并创建下一轮新历史会话，符合“作为一个新的会话”的语义。
+- 历史：点击左侧历史记录可以在 Coding 大窗口内加载历史消息查看。
+- 视觉：右侧消息区、面板边框、输入栏间距和普通大聊天窗口保持一致，只把模型控制位置替换为 Codex 状态标识。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, PROGRESS.md, ISSUES.md

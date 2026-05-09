@@ -1739,3 +1739,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：模式切换应尽量复用同一个 UI 与存储模型，否则细节会快速分叉。
 - 是否需更新技术文档：否。
+
+## ISSUE-147
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Coding 大窗口布局对齐普通聊天
+- 严重程度：中等
+- 问题现象：Coding 大对话框虽然能打开，但仍像独立 Codex 面板，没有和普通大聊天窗口保持一致。
+- 原因分析：上一版只让大窗复用 Coding 消息视图，没有复刻普通 `StandaloneChatWorkspace` 的双栏布局、历史栏和会话卡片层级。
+- 解决方案：Coding standalone 改为普通大聊天同款布局；保留 Codex 后端发送逻辑；历史记录可在左侧栏点击查看。
+- 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：用户说“完全一致”时，不能只复用局部组件，窗口级布局也要一致。
+- 是否需更新技术文档：否。

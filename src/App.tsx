@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
-import { Check, MessageCircle, Minus, Maximize2, X } from "lucide-react";
+import { Check, MessageCircle, Minus, Maximize2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
@@ -10,7 +10,7 @@ import { ChatDialog, Composer, MessageBubble } from "@/features/chat/ChatDialog"
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore } from "@/features/settings/settingsStore";
-import { createConversation, getConversations, getSetting, insertMessage, recordDistraction, recordFocusSession } from "@/lib/db";
+import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordDistraction, recordFocusSession } from "@/lib/db";
 import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
 import "./index.css";
@@ -335,6 +335,8 @@ function CodingDialog({
 }) {
   const [state, setState] = useState<CodingState>(DEFAULT_CODING_STATE);
   const [input, setInput] = useState('');
+  const [historyItems, setHistoryItems] = useState<Array<{ id: number; title: string | null; updatedAt: string }>>([]);
+  const [archivedMessages, setArchivedMessages] = useState<ChatMessage[] | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -363,6 +365,13 @@ function CodingDialog({
   }, [state.messages]);
 
   useEffect(() => {
+    if (!standalone) return;
+    getConversations()
+      .then((items) => setHistoryItems(items.map((item) => ({ id: item.id, title: item.title, updatedAt: item.updated_at }))))
+      .catch((error) => console.warn("Failed to load coding history:", error));
+  }, [standalone, state.messages.length]);
+
+  useEffect(() => {
     if (standalone || !onContentHeightChange) return;
     const frame = window.requestAnimationFrame(() => {
       const root = rootRef.current;
@@ -382,6 +391,7 @@ function CodingDialog({
   const send = async () => {
     const prompt = input.trim();
     if (!prompt || state.status === 'working') return;
+    setArchivedMessages(null);
     setInput('');
     await invoke('coding_send_message', { prompt }).catch((e) => {
       setState((current) => ({
@@ -392,72 +402,156 @@ function CodingDialog({
   };
 
   const clear = async () => {
+    setArchivedMessages(null);
     localStorage.removeItem(CODING_CONVERSATION_KEY);
     localStorage.removeItem(CODING_SAVED_MESSAGES_KEY);
     await invoke('coding_clear').catch(() => {});
   };
 
+  const loadArchivedConversation = async (conversationId: number) => {
+    try {
+      const rows = await getMessages(conversationId);
+      setArchivedMessages(rows.map((message) => ({
+        id: `history-${message.id}`,
+        role: message.role === 'user' ? 'user' : message.role === 'assistant' ? 'assistant' : 'system',
+        content: message.content,
+        timestamp: new Date(message.timestamp).getTime(),
+      })));
+    } catch (error) {
+      console.warn("Failed to load coding history item:", error);
+    }
+  };
+
   const messages = state.messages.map(codingMessageToChatMessage);
+  const visibleMessages = archivedMessages ?? messages;
   const isWorking = state.status === 'working';
+
+  if (standalone) {
+    return (
+      <div className="relative grid h-full grid-cols-[260px_minmax(0,1fr)] bg-background pt-14 text-[var(--text-primary)]">
+        <div className="app-drag-region fixed inset-x-0 top-0 z-50 h-14" />
+        <aside className="glass-panel flex min-h-0 flex-col rounded-none border-y-0 border-l-0">
+          <div className="app-no-drag shrink-0 p-3">
+            <button className="flex h-10 w-full items-center gap-2 rounded-[12px] px-3 text-left text-[14px] font-medium leading-[1.5] transition-all duration-200 hover:bg-background/55" onClick={clear}>
+              <Plus className="h-4 w-4" />
+              新建对话
+            </button>
+          </div>
+          <div className="app-no-drag min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            {historyItems.map((item) => (
+              <button
+                key={item.id}
+                className="block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52"
+                onClick={() => loadArchivedConversation(item.id)}
+              >
+                <div className="truncate text-[14px] leading-[1.5]">{item.title || `对话 ${item.id}`}</div>
+                <div className="mt-0.5 flex items-center gap-1.5 truncate text-[12px] leading-[1.5] text-[var(--text-secondary)]">
+                  <span>{formatAppConversationTime(item.updatedAt)}</span>
+                  <span className="truncate">· Codex</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </aside>
+        <main className="flex min-h-0 flex-col bg-background">
+          <div className="app-no-drag flex h-11 shrink-0 items-center justify-between border-b border-border/55 px-4">
+            <div className="flex items-center gap-2 text-[13px] font-medium">
+              <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
+              <span>Codex</span>
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 rounded-[7px] px-2.5 text-[12px]" onClick={clear}>
+              清空
+            </Button>
+          </div>
+          <div className="app-no-drag min-h-0 flex-1 overflow-hidden p-3">
+            <section className="quiet-card flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] ring-2 ring-ring/16">
+              <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/45 px-3">
+                <div className="flex h-8 items-center gap-2 rounded-[9px] border border-[var(--color-chat-border)] bg-background/70 px-2.5 text-[12px] text-[var(--text-secondary)]">
+                  <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(state.status)}`} />
+                  <span>Codex</span>
+                </div>
+              </div>
+              <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5">
+                <div className="mx-auto w-full max-w-none space-y-3 py-5">
+                  {visibleMessages.length === 0 ? (
+                    <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">
+                      {state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
+                    </div>
+                  ) : visibleMessages.map((message) => (
+                    <MessageBubble key={message.id} message={message} />
+                  ))}
+                  {isWorking && !archivedMessages && (
+                    <MessageBubble message={{ id: 'coding-working', role: 'assistant', content: '...', timestamp: Date.now() }} />
+                  )}
+                </div>
+              </div>
+              <div className="shrink-0 px-2 pb-2">
+                <div className="mx-auto w-full max-w-none">
+                  <Composer
+                    input={input}
+                    isStreaming={isWorking}
+                    onInputChange={setInput}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        send();
+                      }
+                    }}
+                    onSubmit={send}
+                    selectedImage={null}
+                    textareaRef={textareaRef}
+                  />
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div
       ref={rootRef}
-      className={`chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] font-sans text-[var(--color-chat-text)] ${
-        standalone
-          ? 'h-full max-w-none rounded-none border-0 bg-background pt-14'
-          : 'border border-[var(--color-chat-border)] bg-[var(--surface-flat)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]'
-      }`}
+      className="chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--surface-flat)] font-sans text-[var(--color-chat-text)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]"
       style={{
-        maxHeight: standalone ? undefined : maxHeight,
-        fontSize: standalone ? undefined : compactFontSize,
-        background: standalone ? undefined : 'color-mix(in srgb, var(--surface-flat) 68%, transparent)',
-        backdropFilter: standalone ? undefined : 'blur(10px)',
-        WebkitBackdropFilter: standalone ? undefined : 'blur(10px)',
+        maxHeight,
+        fontSize: compactFontSize,
+        background: 'color-mix(in srgb, var(--surface-flat) 68%, transparent)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
       }}
     >
-      {standalone && <div className="app-drag-region fixed inset-x-0 top-0 z-50 h-14" />}
-      {standalone && (
-        <div className="app-no-drag flex h-11 shrink-0 items-center justify-between border-b border-border/55 px-4">
-          <div className="flex items-center gap-2 text-[13px] font-medium">
-            <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
-            <span>Codex</span>
-          </div>
-          <Button variant="ghost" size="sm" className="h-8 rounded-[7px] px-2.5 text-[12px]" onClick={clear}>
-            清空
-          </Button>
-        </div>
-      )}
       <div
         ref={scrollRef}
-        className={`${standalone ? 'app-no-drag px-5' : 'px-4'} min-h-0 flex-1 overflow-y-auto overscroll-contain`}
-        style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 60) }}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
+        style={{ maxHeight: Math.max(80, maxHeight - 60) }}
       >
-        <div className={`${standalone ? 'mx-auto max-w-4xl space-y-3 py-5' : 'space-y-2.5 py-4'}`}>
-          {messages.length === 0 ? (
-            <div className={`${standalone ? 'pt-16 text-[14px]' : 'py-8 text-[12px]'} text-center leading-[1.5] text-[var(--color-chat-muted)]`}>
+        <div className="space-y-2.5 py-4">
+          {visibleMessages.length === 0 ? (
+            <div className="py-8 text-center text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
               {state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
             </div>
-          ) : messages.map((message) => (
+          ) : visibleMessages.map((message) => (
             <MessageBubble
               key={message.id}
               message={message}
-              fullWidth={!standalone}
-              compact={!standalone}
+              fullWidth
+              compact
               compactFontSize={compactFontSize}
             />
           ))}
-          {isWorking && (
+          {isWorking && !archivedMessages && (
             <MessageBubble
               message={{ id: 'coding-working', role: 'assistant', content: '...', timestamp: Date.now() }}
-              fullWidth={!standalone}
-              compact={!standalone}
+              fullWidth
+              compact
               compactFontSize={compactFontSize}
             />
           )}
         </div>
       </div>
-      <div className={`${standalone ? 'app-no-drag mx-auto w-full max-w-4xl shrink-0 px-2 pb-3' : ''}`}>
+      <div>
         <Composer
           input={input}
           isStreaming={isWorking}
@@ -471,11 +565,11 @@ function CodingDialog({
           onSubmit={send}
           selectedImage={null}
           textareaRef={textareaRef}
-          compact={!standalone}
+          compact
           compactFontSize={compactFontSize}
         />
       </div>
-      {!standalone && state.messages.length > 0 && (
+      {state.messages.length > 0 && (
         <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1.5 rounded-full border border-[var(--color-chat-border)] bg-background/72 px-1.5 py-1 text-[10px] text-[var(--color-chat-muted)] opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-100">
           <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(state.status)}`} />
           <button className="pointer-events-auto rounded px-1 hover:text-[var(--color-chat-text)]" onClick={clear}>
@@ -517,6 +611,21 @@ function readCodingSavedMessageIds() {
 
 function writeCodingSavedMessageIds(ids: Set<string>) {
   localStorage.setItem(CODING_SAVED_MESSAGES_KEY, JSON.stringify(Array.from(ids).slice(-240)));
+}
+
+function formatAppConversationTime(value: string) {
+  if (!value) return '';
+  const normalized = /[zZ]|[+-]\d{2}:?\d{2}$/.test(value)
+    ? value
+    : `${value.replace(' ', 'T')}Z`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 async function ensureCodingHistoryConversation(messages: CodingMessage[]) {
