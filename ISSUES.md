@@ -1355,3 +1355,15 @@
 - 涉及文件：`src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：状态色的干净程度不仅取决于彩色本身，也取决于底色；浅彩色适合搭配奶白底而不是灰底。
 - 是否需更新技术文档：否。
+
+## ISSUE-115
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb Hover 透明度范围
+- 严重程度：改进
+- 问题现象：Work 和 idle 在 hover 时仍然半透明即可，需要删去这两个状态下 hover 变不透明的设置。
+- 原因分析：上一版将 `opacity: 1` 和不透底 shell 填充绑定到全局 `.orb-avatar.is-hovering`，导致 idle/work/rest 都变成不透明。
+- 解决方案：移除全局 hover opacity 覆盖；将不透底 shell 填充和 `opacity: 1` 收窄到 `.orb-avatar--rest.is-hovering`。
+- 涉及文件：`src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：交互规则需要按状态作用域控制，避免全局 hover 样式覆盖掉各状态的材质语义。
+- 是否需更新技术文档：否。

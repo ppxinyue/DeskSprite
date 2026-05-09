@@ -476,11 +476,14 @@
 }
 
 .orb-avatar.is-hovering {
-  opacity: 1;
   transform: scale(1.015);
 }
 
-.orb-avatar.is-hovering .orb-avatar__shell {
+.orb-avatar--rest.is-hovering {
+  opacity: 1;
+}
+
+.orb-avatar--rest.is-hovering .orb-avatar__shell {
   background:
     radial-gradient(circle at 50% 50%,
       var(--orb-state-core) 0%,

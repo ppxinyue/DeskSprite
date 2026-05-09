@@ -879,3 +879,10 @@
 - 文字：外圈字母、work 字母和 hover 中央文字整体加深，提高可读性。
 - 验证：`pnpm build` 通过。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R110. Orb Idle/Work Hover 保持半透明（2026-05-09）
+- Hover：删除全局 `.orb-avatar.is-hovering` 的 `opacity: 1` 覆盖，idle/work 悬停时继续遵守设置透明度。
+- 填充：不透底的 hover shell 填充从全状态收窄为只对 rest 生效。
+- 保留：hover 放大、边界和中央文字交互仍对所有状态有效。
+- 验证：`pnpm build` 通过。
+- 文件：index.css, ISSUES.md, PROGRESS.md
