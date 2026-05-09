@@ -723,3 +723,11 @@
 - 性能与状态：rest 放大展示时减少原生窗口 resize/move 调用；focus-complete 触发休息时显式保留 `autoFocusAfterRestRef`，休息结束后继续下一轮专注。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R88. Orb 黑白灰彗星模式重做（2026-05-09）
+- 视觉：完全移除液态金属材质，Orb 只保留一层黑色圆形边框，内部不再使用彩色渐变或额外装饰层。
+- 动效：改用 canvas 粒子系统；idle 为单颗彗星在圆内弹跳并掉落尾粒，work 为中心彗星向四周喷散粒子，rest 为多颗彗星高速运动并互相碰撞。
+- 交互：hover 时才显示英文小字；常态只看见黑白灰彗星和粒子。
+- 性能：canvas DPR 在 rest presentation 下限制到 1.25，并设置粒子数量上限，避免大尺寸休息展示时重绘过重。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

@@ -354,7 +354,6 @@
 }
 
 .orb-avatar {
-  --orb-accent: var(--orb-light-accent);
   position: relative;
   width: var(--orb-size);
   height: var(--orb-size);
@@ -364,138 +363,51 @@
   overflow: visible;
   border-radius: 50%;
   transform-origin: center;
-  transition: filter 520ms ease;
-}
-
-.dark .orb-avatar {
-  --orb-accent: var(--orb-dark-accent);
+  transition: transform 220ms ease, opacity 220ms ease;
 }
 
 .orb-avatar__shell {
   position: relative;
-  width: 96%;
-  height: 96%;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  display: grid;
-  place-items: center;
-  isolation: isolate;
-  overflow: visible;
-  border: 0;
-  background:
-    radial-gradient(ellipse 38% 28% at 30% 22%, rgba(255,255,255,0.82), transparent 100%),
-    radial-gradient(ellipse 24% 18% at 74% 80%, rgba(255,255,255,0.28), transparent 100%),
-    radial-gradient(ellipse 70% 60% at 52% 68%, color-mix(in srgb, var(--orb-accent) 55%, transparent), transparent 100%),
-    radial-gradient(ellipse 100% 100% at 50% 50%, rgba(210,208,204,0.18), rgba(30,28,24,0.12));
-  box-shadow:
-    inset 0 2px 18px rgba(255,255,255,0.50),
-    inset 0 -6px 32px rgba(0,0,0,0.18),
-    0 24px 56px color-mix(in srgb, var(--orb-accent) 32%, transparent),
-    0 8px 24px rgba(0,0,0,0.14);
-  transition: box-shadow 420ms ease, filter 420ms ease;
+  overflow: hidden;
+  border: 2px solid #050505;
+  background: transparent;
 }
 
-.dark .orb-avatar__shell {
-  background:
-    radial-gradient(ellipse 38% 28% at 30% 22%, rgba(255,255,255,0.46), transparent 100%),
-    radial-gradient(ellipse 24% 18% at 74% 80%, rgba(255,255,255,0.18), transparent 100%),
-    radial-gradient(ellipse 70% 60% at 52% 68%, color-mix(in srgb, var(--orb-accent) 52%, transparent), transparent 100%),
-    radial-gradient(ellipse 100% 100% at 50% 50%, rgba(120,116,108,0.18), rgba(8,8,10,0.28));
-  box-shadow:
-    inset 0 2px 18px rgba(255,255,255,0.26),
-    inset 0 -6px 34px rgba(0,0,0,0.28),
-    0 24px 56px color-mix(in srgb, var(--orb-accent) 28%, transparent),
-    0 8px 24px rgba(0,0,0,0.24);
+.orb-avatar.is-hovering {
+  transform: scale(1.015);
 }
 
-.orb-avatar.is-hovering .orb-avatar__shell {
-  filter: saturate(1.24) brightness(1.06);
-  box-shadow:
-    inset 0 2px 22px rgba(255,255,255,0.60),
-    inset 0 -6px 32px rgba(0,0,0,0.20),
-    0 36px 72px color-mix(in srgb, var(--orb-accent) 42%, transparent),
-    0 12px 28px rgba(0,0,0,0.18);
-}
-
-.orb-avatar__glow {
+.orb-avatar__canvas {
   position: absolute;
-  inset: 18%;
-  z-index: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
   border-radius: inherit;
-  background: var(--orb-accent);
-  filter: blur(42px);
-  opacity: 0.06;
-  transform: scale(0.88);
-  animation: orbGlow 6s ease-in-out infinite;
-  transition: background-color 1s ease, opacity 300ms ease;
-}
-
-.orb-avatar__flow {
-  position: absolute;
-  inset: -24%;
-  z-index: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 24% 46%, color-mix(in srgb, var(--orb-accent) 46%, transparent), transparent 26%),
-    radial-gradient(ellipse at 74% 54%, rgba(255,255,255,0.20), transparent 30%),
-    conic-gradient(from 120deg, transparent, color-mix(in srgb, var(--orb-accent) 28%, transparent), transparent, rgba(255,255,255,0.14), transparent);
-  opacity: 0;
-  filter: blur(12px);
-  mix-blend-mode: screen;
-  transition: opacity 360ms ease;
-}
-
-.orb-avatar--work .orb-avatar__flow {
-  opacity: 0.72;
-  animation: orbWorkFlow 2.8s ease-in-out infinite;
-}
-
-.orb-avatar--rest .orb-avatar__flow {
-  opacity: 0.62;
-  animation: orbRestFlow 12s linear infinite;
-}
-
-.orb-avatar.is-rest-presentation .orb-avatar__shell {
-  box-shadow:
-    inset 0 2px 18px rgba(255,255,255,0.42),
-    inset 0 -6px 30px rgba(0,0,0,0.16),
-    0 18px 44px color-mix(in srgb, var(--orb-accent) 26%, transparent),
-    0 8px 22px rgba(0,0,0,0.12);
 }
 
 .orb-avatar__text {
-  position: relative;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: color-mix(in srgb, var(--orb-accent) 12%, rgba(255,255,255,0.92));
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  transform: translate(-50%, -50%);
+  color: #111;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: var(--orb-font-size);
-  font-weight: 460;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   line-height: 1;
-  letter-spacing: 0.06em;
-  text-transform: none;
-  text-shadow:
-    0 1px 0 rgba(255,255,255,0.60),
-    0 6px 20px color-mix(in srgb, var(--orb-accent) 40%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  text-transform: lowercase;
+  transition: opacity 160ms ease, transform 160ms ease;
 }
 
-@keyframes orbGlow {
-  0%, 100% { opacity: 0.06; transform: scale(0.88); }
-  50% { opacity: 0.14; transform: scale(1.04); }
-}
-
-@keyframes orbWorkFlow {
-  0%, 100% { transform: translateX(-8%) scale(1.12); filter: blur(14px); }
-  50% { transform: translateX(8%) scale(1.20); filter: blur(8px); }
-}
-
-@keyframes orbRestFlow {
-  from { transform: rotate(0deg) scale(1.18); }
-  to { transform: rotate(360deg) scale(1.18); }
-}
-
-.dark .orb-avatar {
-  --orb-accent: var(--orb-dark-accent);
+.orb-avatar.is-hovering .orb-avatar__text {
+  opacity: 0.82;
+  transform: translate(-50%, -50%) translateY(-1px);
 }

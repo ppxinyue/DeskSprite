@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { usePetStore } from './petStore';
@@ -548,11 +547,29 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-const ORB_STATE_META: Record<Extract<PetState, 'idle' | 'work' | 'rest'>, { label: string; accent: string; lightAccent: string }> = {
-  idle: { label: 'idle', accent: '#a09b93', lightAccent: '#c8c4bc' },
-  work: { label: 'work', accent: '#6aaeff', lightAccent: '#4f8ef7' },
-  rest: { label: 'rest', accent: '#f0b860', lightAccent: '#e8a84a' },
+const ORB_STATE_META: Record<Extract<PetState, 'idle' | 'work' | 'rest'>, { label: string }> = {
+  idle: { label: 'idle' },
+  work: { label: 'work' },
+  rest: { label: 'rest' },
 };
+
+interface OrbComet {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+}
+
+interface OrbParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
+}
 
 function OrbAvatar({
   state,
@@ -570,48 +587,217 @@ function OrbAvatar({
   const orbState = state === 'work' || state === 'rest' ? state : 'idle';
   const meta = ORB_STATE_META[orbState];
   const [hovering, setHovering] = useState(false);
-  const fontSize = Math.max(9, Math.round(size * 0.06));
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fontSize = Math.max(9, Math.round(size * 0.055));
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, restPresentationActive ? 1.25 : 2);
+    const logicalSize = Math.max(1, Math.round(size));
+    canvas.width = Math.round(logicalSize * dpr);
+    canvas.height = Math.round(logicalSize * dpr);
+    canvas.style.width = `${logicalSize}px`;
+    canvas.style.height = `${logicalSize}px`;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const center = logicalSize / 2;
+    const boundary = logicalSize / 2 - 10;
+    const particles: OrbParticle[] = [];
+    const cometRadius = Math.max(3.5, logicalSize * 0.035);
+    const speed = orbState === 'rest' ? logicalSize * 0.012 : logicalSize * 0.0042;
+    const createComet = (angle: number, distance: number, velocityAngle: number): OrbComet => ({
+      x: center + Math.cos(angle) * distance,
+      y: center + Math.sin(angle) * distance,
+      vx: Math.cos(velocityAngle) * speed,
+      vy: Math.sin(velocityAngle) * speed,
+      radius: cometRadius,
+    });
+    const comets: OrbComet[] = orbState === 'rest'
+      ? [
+          createComet(0.2, boundary * 0.42, 2.1),
+          createComet(2.3, boundary * 0.48, -0.25),
+          createComet(4.1, boundary * 0.34, 1.25),
+          createComet(5.2, boundary * 0.55, 3.65),
+        ]
+      : [createComet(-0.7, boundary * 0.42, 1.35)];
+    if (orbState === 'work') {
+      comets[0].x = center;
+      comets[0].y = center;
+      comets[0].vx = 0;
+      comets[0].vy = 0;
+    }
+
+    let frame = 0;
+    let animationFrame = 0;
+    let cancelled = false;
+
+    const emitParticle = (x: number, y: number, vx: number, vy: number, outward = false) => {
+      const cap = restPresentationActive ? 90 : 150;
+      if (particles.length > cap) particles.splice(0, particles.length - cap);
+      const angle = outward ? Math.atan2(y - center, x - center) + (Math.random() - 0.5) * 0.9 : Math.atan2(vy, vx) + Math.PI + (Math.random() - 0.5) * 0.7;
+      const push = logicalSize * (outward ? 0.004 : 0.0022) * (0.55 + Math.random());
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * push + (Math.random() - 0.5) * 0.22,
+        vy: Math.sin(angle) * push + (Math.random() - 0.5) * 0.22,
+        life: 0,
+        maxLife: outward ? 68 + Math.random() * 30 : 42 + Math.random() * 28,
+        size: Math.max(0.8, logicalSize * (outward ? 0.0042 : 0.0032) * (0.7 + Math.random())),
+      });
+    };
+
+    const bounceComet = (comet: OrbComet) => {
+      const dx = comet.x - center;
+      const dy = comet.y - center;
+      const distance = Math.hypot(dx, dy);
+      const maxDistance = boundary - comet.radius;
+      if (distance <= maxDistance) return;
+      const nx = dx / distance;
+      const ny = dy / distance;
+      comet.x = center + nx * maxDistance;
+      comet.y = center + ny * maxDistance;
+      const dot = comet.vx * nx + comet.vy * ny;
+      comet.vx -= 2 * dot * nx;
+      comet.vy -= 2 * dot * ny;
+    };
+
+    const collideComets = () => {
+      if (comets.length < 2) return;
+      for (let i = 0; i < comets.length; i += 1) {
+        for (let j = i + 1; j < comets.length; j += 1) {
+          const a = comets[i];
+          const b = comets[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const distance = Math.hypot(dx, dy);
+          const minDistance = a.radius + b.radius;
+          if (distance === 0 || distance > minDistance) continue;
+          const nx = dx / distance;
+          const ny = dy / distance;
+          const overlap = (minDistance - distance) / 2;
+          a.x -= nx * overlap;
+          a.y -= ny * overlap;
+          b.x += nx * overlap;
+          b.y += ny * overlap;
+          const av = a.vx * nx + a.vy * ny;
+          const bv = b.vx * nx + b.vy * ny;
+          const diff = bv - av;
+          a.vx += diff * nx;
+          a.vy += diff * ny;
+          b.vx -= diff * nx;
+          b.vy -= diff * ny;
+        }
+      }
+    };
+
+    const drawComet = (comet: OrbComet) => {
+      const velocity = Math.hypot(comet.vx, comet.vy) || 1;
+      const tx = -comet.vx / velocity;
+      const ty = -comet.vy / velocity;
+      const tailLength = logicalSize * (orbState === 'rest' ? 0.18 : 0.24);
+      const gradient = ctx.createLinearGradient(comet.x + tx * tailLength, comet.y + ty * tailLength, comet.x, comet.y);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(0.45, 'rgba(80,80,80,0.18)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0.72)');
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = Math.max(2, comet.radius * 1.15);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(comet.x + tx * tailLength, comet.y + ty * tailLength);
+      ctx.lineTo(comet.x, comet.y);
+      ctx.stroke();
+
+      const head = ctx.createRadialGradient(comet.x - comet.radius * 0.35, comet.y - comet.radius * 0.35, 0, comet.x, comet.y, comet.radius * 1.6);
+      head.addColorStop(0, 'rgba(255,255,255,0.95)');
+      head.addColorStop(0.36, 'rgba(80,80,80,0.82)');
+      head.addColorStop(1, 'rgba(0,0,0,0.94)');
+      ctx.fillStyle = head;
+      ctx.beginPath();
+      ctx.arc(comet.x, comet.y, comet.radius, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    const tick = () => {
+      if (cancelled) return;
+      frame += 1;
+      ctx.clearRect(0, 0, logicalSize, logicalSize);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(center, center, boundary, 0, Math.PI * 2);
+      ctx.clip();
+
+      if (orbState === 'work') {
+        const comet = comets[0];
+        comet.x += (center - comet.x) * 0.08;
+        comet.y += (center - comet.y) * 0.08;
+        comet.vx *= 0.88;
+        comet.vy *= 0.88;
+        const emissions = restPresentationActive ? 2 : 4;
+        for (let i = 0; i < emissions; i += 1) {
+          const angle = (frame * 0.11) + (i / emissions) * Math.PI * 2;
+          emitParticle(center + Math.cos(angle) * comet.radius, center + Math.sin(angle) * comet.radius, Math.cos(angle), Math.sin(angle), true);
+        }
+      } else {
+        for (const comet of comets) {
+          comet.x += comet.vx;
+          comet.y += comet.vy;
+          bounceComet(comet);
+          const every = orbState === 'rest' ? 1 : 2;
+          if (frame % every === 0) emitParticle(comet.x, comet.y, comet.vx, comet.vy);
+        }
+        collideComets();
+      }
+
+      for (let i = particles.length - 1; i >= 0; i -= 1) {
+        const particle = particles[i];
+        particle.life += 1;
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        particle.vx *= 0.985;
+        particle.vy *= 0.985;
+        const fade = 1 - particle.life / particle.maxLife;
+        if (fade <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        ctx.fillStyle = `rgba(0,0,0,${0.42 * fade})`;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size * (0.7 + fade), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (const comet of comets) drawComet(comet);
+      ctx.restore();
+      animationFrame = window.requestAnimationFrame(tick);
+    };
+
+    tick();
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, [orbState, restPresentationActive, size]);
 
   return (
-    <motion.div
+    <div
       className={`orb-avatar orb-avatar--${orbState} ${hovering ? 'is-hovering' : ''} ${dragging ? 'is-dragging' : ''} ${restPresentationActive ? 'is-rest-presentation' : ''}`}
       style={{
         '--orb-size': `${size}px`,
         '--orb-opacity': String(opacity),
-        '--orb-dark-accent': meta.accent,
-        '--orb-light-accent': meta.lightAccent,
         '--orb-font-size': `${fontSize}px`,
       } as CSSProperties & Record<string, string>}
       onPointerEnter={() => setHovering(true)}
       onPointerLeave={() => setHovering(false)}
     >
-      <motion.div
-        className="orb-avatar__shell"
-        animate={{
-          scale: hovering ? 1.04 : [1, 1.018, 1],
-          y: hovering ? -2 : 0,
-        }}
-        transition={{
-          scale: hovering ? { type: 'spring', stiffness: 260, damping: 22 } : { duration: 4, repeat: Infinity, ease: 'easeInOut' },
-          y: { type: 'spring', stiffness: 260, damping: 22 },
-        }}
-      >
-        <div className="orb-avatar__glow" />
-        <div className="orb-avatar__flow" />
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={orbState}
-            className={`orb-avatar__text orb-avatar__text--${orbState}`}
-            aria-label={meta.label}
-            initial={{ opacity: 0, scale: orbState === 'work' ? 1.08 : orbState === 'rest' ? 0.88 : 0.94, filter: 'blur(6px)' }}
-            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, scale: 0.92, filter: 'blur(6px)' }}
-            transition={{ duration: 0.38, ease: [0.2, 0.8, 0.2, 1] }}
-          >
-            {meta.label}
-          </motion.div>
-        </AnimatePresence>
-      </motion.div>
-    </motion.div>
+      <div className="orb-avatar__shell">
+        <canvas ref={canvasRef} className="orb-avatar__canvas" aria-label={`${meta.label} orb`} />
+        <div className="orb-avatar__text">{meta.label}</div>
+      </div>
+    </div>
   );
 }
