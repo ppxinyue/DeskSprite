@@ -1080,3 +1080,10 @@
 - 授权：遇到 app-server 主动发起的权限/审批 request 时切红，并在小聊天框提示当前请求类型。
 - 验证：`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R138. Coding 错误状态灯修复（2026-05-10）
+- 主进程：app-server 发出 `error` / `guardianWarning` notification 时，立即清空 running 并将 Coding 状态切到 `needs-input`，让 chat button 变红。
+- 状态机：`thread/status/changed(active)` 只在仍有运行中 turn 且未处于错误态时才允许切回 working，避免错误后被覆盖成黄色。
+- 完成态：turn 完成时会检查当前 turn 是否曾收到 error，收到过则保持红色而不是误判为完成。
+- 验证：`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md

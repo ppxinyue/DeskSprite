@@ -908,7 +908,7 @@ function handleCodexAppServerNotification(message) {
     return;
   }
   if (method === 'thread/status/changed') {
-    if (params.status?.type === 'active') {
+    if (params.status?.type === 'active' && codingState.running && codingState.status !== CODEX_STATUS.NEEDS_INPUT) {
       codingState.status = CODEX_STATUS.WORKING;
       publishCodingState();
     }
@@ -921,6 +921,7 @@ function handleCodexAppServerNotification(message) {
       deltaByItem: new Map(),
       pendingAgentTexts: [],
       lastAgentText: '',
+      hasError: false,
     };
     codingState.running = { type: 'app-server-turn', turnId };
     codingState.status = CODEX_STATUS.WORKING;
@@ -960,7 +961,7 @@ function handleCodexAppServerNotification(message) {
   if (method === 'turn/completed') {
     flushCodexAppServerAgentText('codex');
     codingState.running = null;
-    const failed = params.turn?.status === 'failed';
+    const failed = params.turn?.status === 'failed' || Boolean(codexAppServer.activeTurn?.hasError);
     codingState.status = failed ? CODEX_STATUS.NEEDS_INPUT : CODEX_STATUS.DONE;
     if (failed) {
       const message = extractCodexTextFromValue(params.turn?.error?.message) || 'Codex turn failed.';
@@ -975,7 +976,13 @@ function handleCodexAppServerNotification(message) {
   if (method === 'error' || method === 'warning' || method === 'guardianWarning') {
     const messageText = extractCodexTextFromValue(params.message) || extractCodexTextFromValue(params) || method;
     if (/Reconnecting|Falling back/i.test(messageText)) return;
+    if (method === 'error' || method === 'guardianWarning') {
+      if (codexAppServer.activeTurn) codexAppServer.activeTurn.hasError = true;
+      codingState.running = null;
+      codingState.status = CODEX_STATUS.NEEDS_INPUT;
+    }
     pushCodingMessage(method === 'error' ? 'error' : 'system', messageText);
+    publishCodingState();
   }
 }
 
@@ -1118,6 +1125,7 @@ async function sendCodingMessage({ prompt }) {
       deltaByItem: new Map(),
       pendingAgentTexts: [],
       lastAgentText: '',
+      hasError: false,
     };
     publishCodingState();
   } catch (error) {

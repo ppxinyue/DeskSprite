@@ -1691,3 +1691,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：桌面侧桥接长期会话时应该优先接入常驻 server，而不是每次 spawn 单次 CLI。
 - 是否需更新技术文档：否。
+
+## ISSUE-143
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Coding 错误状态灯修复
+- 严重程度：重要
+- 问题现象：小聊天框输出了 `error`，但灵宠右侧 chat button 仍然保持黄色工作中状态。
+- 原因分析：app-server 的 `error` notification 只被追加为聊天消息，没有同步清空 `running` 或将状态切到 `needs-input`；后续 `thread/status/changed(active)` 还可能覆盖回 working。
+- 解决方案：`error` / `guardianWarning` notification 立即切红并标记当前 turn 出错；只有仍在正常运行且未处于错误态时，active 状态才允许切黄；turn 完成时尊重已收到的错误标记。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：状态灯应由错误事件优先驱动，不能只依赖最终 turn status。
+- 是否需更新技术文档：否。
