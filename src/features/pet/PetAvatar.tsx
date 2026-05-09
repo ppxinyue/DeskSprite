@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
@@ -560,21 +560,8 @@ function OrbAvatar({
   const orbState = state === 'work' || state === 'rest' ? state : 'idle';
   const meta = ORB_STATE_META[orbState];
   const [hovering, setHovering] = useState(false);
-  const [pointer, setPointer] = useState({ x: 0.5, y: 0.5 });
   const letters = meta.label.split('');
-  const fontSize = Math.max(22, Math.round(size * 0.19));
-
-  const idleWeights = useMemo(() => {
-    if (orbState !== 'idle') return [];
-    return letters.map((_, index) => {
-      const letterX = (index + 0.5) / letters.length;
-      const dx = pointer.x - letterX;
-      const dy = pointer.y - 0.5;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const influence = clamp(1 - distance / 0.62, 0, 1);
-      return Math.round(120 + influence * 760);
-    });
-  }, [letters, orbState, pointer]);
+  const fontSize = Math.max(12, Math.round(size * 0.095));
 
   return (
     <motion.div
@@ -586,26 +573,11 @@ function OrbAvatar({
         '--orb-light-accent': meta.lightAccent,
         '--orb-font-size': `${fontSize}px`,
       } as CSSProperties & Record<string, string>}
-      onPointerMove={(event) => {
-        const rect = event.currentTarget.getBoundingClientRect();
-        setPointer({
-          x: clamp((event.clientX - rect.left) / Math.max(1, rect.width), 0, 1),
-          y: clamp((event.clientY - rect.top) / Math.max(1, rect.height), 0, 1),
-        });
-      }}
       onPointerEnter={() => setHovering(true)}
-      onPointerLeave={() => {
-        setHovering(false);
-        setPointer({ x: 0.5, y: 0.5 });
-      }}
-      animate={{ scale: hovering ? 1.045 : 1 }}
+      onPointerLeave={() => setHovering(false)}
+      animate={{ scale: hovering ? 1.025 : 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 24 }}
     >
-      <motion.div
-        className="orb-avatar__outer-ring"
-        animate={{ rotate: 360 }}
-        transition={{ duration: orbState === 'rest' ? 24 : 36, repeat: Infinity, ease: 'linear' }}
-      />
       <motion.div
         className="orb-avatar__shell"
         animate={{
@@ -625,10 +597,7 @@ function OrbAvatar({
           }}
           transition={{ duration: 4, repeat: Infinity }}
         />
-        <div className="orb-avatar__ambient" />
         <div className="orb-avatar__glass" />
-        <div className="orb-avatar__ring" />
-        <div className="orb-avatar__aura" />
         <div className="orb-avatar__noise" />
         <AnimatePresence mode="wait">
           <motion.div
@@ -646,11 +615,10 @@ function OrbAvatar({
                 className="orb-avatar__letter"
                 style={{
                   '--letter-index': String(index),
-                  '--letter-weight': String(idleWeights[index] ?? 520),
+                  '--letter-weight': '520',
                 } as CSSProperties & Record<string, string>}
               >
                 <span className="orb-avatar__letter-face">{letter}</span>
-                {orbState === 'work' && <span className="orb-avatar__letter-face orb-avatar__letter-face--back">{letter}</span>}
               </span>
             ))}
           </motion.div>

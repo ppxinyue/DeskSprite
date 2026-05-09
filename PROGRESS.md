@@ -665,3 +665,10 @@
 - 体验：Orb 不再只是一个 CSS 球体，而是拥有外环慢速旋转、核心状态切换和更清晰的空间层级；仍只替换灵宠本体，不影响聊天、菜单、拖拽、专注和休息流程。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R80. Orb 单球体视觉收敛（2026-05-09）
+- 简化：删除外圈仪表环、内 ring、aura 和文字 hover/呼吸/翻牌动效，Orb 只保留一个球体轮廓和内部玻璃材质。
+- 背景：Orb 根节点改为圆形裁切，去掉外溢环和大阴影导致的方形磨砂背景感。
+- 文字：内部状态文字字号缩小到上一版约一半，字体栈改为 `Styrene B / Styrene A / Inter / system`，靠近 Claude 的英文字体气质。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
