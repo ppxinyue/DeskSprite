@@ -2015,3 +2015,15 @@
 - 涉及文件：`electron/main.cjs`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：悬浮菜单子项不能只靠视觉相邻，交互上也要有连续 hover 区；初始 BrowserWindow 尺寸应匹配前端首屏布局，避免首帧修正造成回弹感。
 - 是否需更新技术文档：否。
+
+## ISSUE-170
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Claude Code New Session 续聊改用 Resume
+- 严重程度：重要
+- 问题现象：Claude Code new session 第一条消息正常，第二条消息报错 `Session ID ... is already in use`，随后状态码 1 退出。
+- 原因分析：实现中每次发送都传 `--session-id <uuid>`；Claude Code 对已存在/活跃的 session id 会加锁，继续对话应使用 `--resume <sessionId>`。
+- 解决方案：首条消息用 `--session-id` 创建固定会话，后续消息切换为 `--resume` 续聊。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：CLI 的“指定 session id”和“恢复 session”语义不同；连续聊天要用 resume，而不是反复指定同一个 session id。
+- 是否需更新技术文档：否。

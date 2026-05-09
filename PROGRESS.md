@@ -1282,3 +1282,9 @@
 - 结果：减少刚启动时 pet/orb 先出现在右下越界位置、随后被布局逻辑拉回的视觉回弹。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, PetAvatar.tsx, ISSUES.md, PROGRESS.md
+
+### R165. Claude Code New Session 续聊改用 Resume（2026-05-10）
+- 主进程：Claude Code new session 首条消息仍用 `--session-id` 创建固定会话，后续消息改用 `--resume <sessionId>` 继续会话。
+- 修复：避免第二条消息再次用 `--session-id` 抢占同一个 Claude Code session，触发 “Session ID ... is already in use”。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md

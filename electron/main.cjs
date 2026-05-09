@@ -1314,13 +1314,15 @@ async function sendClaudeCodingMessage({ prompt }) {
   claudeCodingSessionStarted = true;
   pushClaudeCodingMessage('user', text);
   if (isFirstClaudeMessage) pushClaudeCodingMessage('system', '正在启动 Claude Code 新 session。');
+  const sessionArgs = isFirstClaudeMessage
+    ? ['--session-id', sessionId]
+    : ['--resume', sessionId];
   const child = spawn(getClaudeBinary(), [
     '-p',
     '--output-format',
     'stream-json',
     '--verbose',
-    '--session-id',
-    sessionId,
+    ...sessionArgs,
     '--permission-mode',
     'default',
     text,
