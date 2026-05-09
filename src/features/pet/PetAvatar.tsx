@@ -226,6 +226,9 @@ export function PetAvatar({
       case 'coding-claude-inherit':
         onCodingModeToggle?.('inherit', 'claude');
         break;
+      case 'coding-claude-new':
+        onCodingModeToggle?.('new', 'claude');
+        break;
       case 'hide':
         try { await invoke('hide_pet_window'); } catch (e) { console.error(e); }
         break;
@@ -472,6 +475,7 @@ export function PetAvatar({
                 Claude Code{codingProvider === 'claude' ? ' · 当前' : ''}
               </div>
               <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-inherit')}>继承当前 session</button>
+              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-new')}>开启新 session</button>
             </div>
           </div>
         )}

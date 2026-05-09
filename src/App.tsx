@@ -214,11 +214,13 @@ function codingProviderLabel(provider: CodingProvider) {
 }
 
 function isInheritedCodingMode(settings: AppSettings) {
-  return settings.codingProvider === 'claude' || settings.codingSessionMode === 'inherit';
+  return settings.codingSessionMode === 'inherit';
 }
 
 function codingStateCommand(settings: AppSettings) {
-  if (settings.codingProvider === 'claude') return 'coding_get_claude_inherited_state';
+  if (settings.codingProvider === 'claude') {
+    return settings.codingSessionMode === 'inherit' ? 'coding_get_claude_inherited_state' : 'coding_get_claude_state';
+  }
   return settings.codingSessionMode === 'inherit' ? 'coding_get_inherited_state' : 'coding_get_state';
 }
 
@@ -402,11 +404,11 @@ function CodingDialog({
         status: 'needs-input',
         messages: [{ id: 'coding-error', role: 'error', content: codingConnectionErrorMessage(error, codingLabel), createdAt: Date.now() }],
       }));
-    const unlisten = !inherited ? listen<CodingState>('coding:state', ({ payload }) => {
+    const unlisten = !inherited && settings.codingProvider === 'codex' ? listen<CodingState>('coding:state', ({ payload }) => {
       applyCodingState(payload);
     }) : Promise.resolve(() => {});
     let timer = 0;
-    if (inherited) {
+    if (inherited || settings.codingProvider === 'claude') {
       timer = window.setInterval(() => {
         invoke<CodingState>(stateCommand)
           .then(applyCodingState)
@@ -420,7 +422,7 @@ function CodingDialog({
       if (timer) window.clearInterval(timer);
       unlisten.then((fn) => fn());
     };
-  }, [applyCodingState, codingLabel, inherited, stateCommand]);
+  }, [applyCodingState, codingLabel, inherited, settings.codingProvider, stateCommand]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -436,10 +438,10 @@ function CodingDialog({
 
   useEffect(() => {
     if (inherited) return;
-    persistCodingMessages(state.messages).catch((error) => {
+    persistCodingMessages(state.messages, codingLabel).catch((error) => {
       console.warn("Failed to persist coding messages:", error);
     });
-  }, [inherited, state.messages]);
+  }, [codingLabel, inherited, state.messages]);
 
   useEffect(() => {
     if (!standalone) return;
@@ -470,7 +472,7 @@ function CodingDialog({
     if (inherited || !prompt || state.status === 'working') return;
     setArchivedMessages(null);
     setInput('');
-    await invoke('coding_send_message', { prompt }).catch((e) => {
+    await invoke('coding_send_message', { prompt, provider: settings.codingProvider }).catch((e) => {
       setState((current) => ({
         status: 'needs-input',
         messages: [...current.messages, { id: `local-${Date.now()}`, role: 'error', content: codingConnectionErrorMessage(e, codingLabel), createdAt: Date.now() }],
@@ -490,7 +492,7 @@ function CodingDialog({
     }
     localStorage.removeItem(CODING_CONVERSATION_KEY);
     localStorage.removeItem(CODING_SAVED_MESSAGES_KEY);
-    await invoke('coding_clear').catch(() => {});
+    await invoke(settings.codingProvider === 'claude' ? 'coding_clear_claude' : 'coding_clear').catch(() => {});
   };
 
   const loadArchivedConversation = async (conversationId: number) => {
@@ -766,22 +768,22 @@ function formatCodingTimestamp(value: number) {
   });
 }
 
-async function ensureCodingHistoryConversation(messages: CodingMessage[]) {
+async function ensureCodingHistoryConversation(messages: CodingMessage[], label = 'Codex') {
   const existing = Number(localStorage.getItem(CODING_CONVERSATION_KEY) || 0);
   if (existing > 0) return existing;
   const firstUser = messages.find((message) => message.role === 'user')?.content.trim();
-  await createConversation(firstUser ? `Codex: ${firstUser.slice(0, 42)}` : 'Codex Coding');
+  await createConversation(firstUser ? `${label}: ${firstUser.slice(0, 42)}` : `${label} Coding`);
   const latest = (await getConversations())[0]?.id ?? null;
   if (latest) localStorage.setItem(CODING_CONVERSATION_KEY, String(latest));
   return latest;
 }
 
-async function persistCodingMessages(messages: CodingMessage[]) {
+async function persistCodingMessages(messages: CodingMessage[], label = 'Codex') {
   if (messages.length === 0) return;
   const savedIds = readCodingSavedMessageIds();
   const unsaved = messages.filter((message) => !savedIds.has(message.id));
   if (unsaved.length === 0) return;
-  const conversationId = await ensureCodingHistoryConversation(messages);
+  const conversationId = await ensureCodingHistoryConversation(messages, label);
   if (!conversationId) return;
   for (const message of unsaved) {
     const role = message.role === 'user' ? 'user' : message.role === 'codex' ? 'assistant' : 'system';
@@ -915,11 +917,11 @@ function PetWindow() {
     invoke<CodingState>(command)
       .then((next) => setCodingState(next ?? DEFAULT_CODING_STATE))
       .catch(() => setCodingState({ status: 'needs-input', messages: [] }));
-    const unlisten = !inherited ? listen<CodingState>('coding:state', ({ payload }) => {
+    const unlisten = !inherited && settings.codingProvider === 'codex' ? listen<CodingState>('coding:state', ({ payload }) => {
       setCodingState(payload ?? DEFAULT_CODING_STATE);
     }) : Promise.resolve(() => {});
     let timer = 0;
-    if (inherited) {
+    if (inherited || settings.codingProvider === 'claude') {
       timer = window.setInterval(() => {
         invoke<CodingState>(command)
           .then((next) => setCodingState(next ?? DEFAULT_CODING_STATE))
@@ -1812,7 +1814,7 @@ function PetWindow() {
               onCodingModeToggle={(mode, provider) => {
                 const nextEnabled = mode ? true : !settings.codingModeEnabled;
                 const nextProvider = provider ?? settings.codingProvider;
-                const nextMode = nextProvider === 'claude' ? 'inherit' : mode;
+                const nextMode = mode;
                 const updates = mode
                   ? { codingModeEnabled: nextEnabled, codingProvider: nextProvider, codingSessionMode: nextMode }
                   : { codingModeEnabled: nextEnabled };

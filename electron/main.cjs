@@ -42,6 +42,12 @@ const codingState = {
   running: null,
   threadId: CURRENT_CODEX_THREAD_ID,
 };
+const claudeCodingState = {
+  status: CODEX_STATUS.DONE,
+  messages: [],
+  running: null,
+  threadId: '',
+};
 const CODEX_INHERIT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
 const inheritedCodingAcknowledged = new Map();
@@ -765,8 +771,21 @@ function getCodexEnv() {
   return env;
 }
 
+function getClaudeBinary() {
+  if (process.env.CLAUDE_BIN) return process.env.CLAUDE_BIN;
+  const homebrew = '/opt/homebrew/bin/claude';
+  if (fs.existsSync(homebrew)) return homebrew;
+  return 'claude';
+}
+
 function publishCodingState() {
   const { running, ...safeState } = codingState;
+  broadcast('coding:state', safeState);
+  return safeState;
+}
+
+function publishClaudeCodingState() {
+  const { running, ...safeState } = claudeCodingState;
   broadcast('coding:state', safeState);
   return safeState;
 }
@@ -782,6 +801,19 @@ function pushCodingMessage(role, content) {
   });
   if (codingState.messages.length > 80) codingState.messages.splice(0, codingState.messages.length - 80);
   publishCodingState();
+}
+
+function pushClaudeCodingMessage(role, content) {
+  const text = String(content || '').trim();
+  if (!text) return;
+  claudeCodingState.messages.push({
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    role,
+    content: text,
+    createdAt: Date.now(),
+  });
+  if (claudeCodingState.messages.length > 80) claudeCodingState.messages.splice(0, claudeCodingState.messages.length - 80);
+  publishClaudeCodingState();
 }
 
 function extractCodexTextFromValue(value) {
@@ -1196,6 +1228,148 @@ async function sendCodingMessage({ prompt }) {
   }
 
   return publishCodingState();
+}
+
+function extractClaudePrintContent(content) {
+  if (typeof content === 'string') return content.trim();
+  if (!Array.isArray(content)) return '';
+  return content
+    .map((part) => {
+      if (!part || typeof part !== 'object') return '';
+      if (part.type === 'text') return String(part.text || '').trim();
+      if (part.type === 'tool_use') return summarizeClaudeToolUses([part]);
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+}
+
+function handleClaudePrintEvent(event) {
+  if (!event || typeof event !== 'object') return;
+  if (event.session_id || event.sessionId) {
+    claudeCodingState.threadId = String(event.session_id || event.sessionId);
+  }
+  if (event.type === 'system' && event.subtype === 'init') {
+    if (event.session_id) claudeCodingState.threadId = String(event.session_id);
+    publishClaudeCodingState();
+    return;
+  }
+  if (event.type === 'assistant') {
+    const message = event.message || {};
+    const content = extractClaudePrintContent(message.content ?? event.content);
+    if (content) {
+      const toolOnly = Array.isArray(message.content) && message.content.every((part) => part?.type === 'tool_use');
+      pushClaudeCodingMessage(toolOnly ? 'system' : 'codex', content);
+    }
+    claudeCodingState.status = CODEX_STATUS.WORKING;
+    publishClaudeCodingState();
+    return;
+  }
+  if (event.type === 'result') {
+    claudeCodingState.running = null;
+    const isError = Boolean(event.is_error) || /error|failed/i.test(String(event.subtype || ''));
+    if (isError) {
+      claudeCodingState.status = CODEX_STATUS.NEEDS_INPUT;
+      pushClaudeCodingMessage('error', event.result || event.error || 'Claude Code 执行失败。');
+    } else {
+      claudeCodingState.status = CODEX_STATUS.DONE;
+      const lastMessage = claudeCodingState.messages[claudeCodingState.messages.length - 1];
+      if (event.result && lastMessage?.content !== String(event.result).trim()) pushClaudeCodingMessage('codex', event.result);
+      pushClaudeCodingMessage('system', 'Claude Code 执行完毕。');
+    }
+    publishClaudeCodingState();
+    return;
+  }
+  if (/error|failed/i.test(String(event.type || ''))) {
+    claudeCodingState.running = null;
+    claudeCodingState.status = CODEX_STATUS.NEEDS_INPUT;
+    pushClaudeCodingMessage('error', extractCodexTextFromValue(event) || JSON.stringify(event));
+    publishClaudeCodingState();
+  }
+}
+
+async function sendClaudeCodingMessage({ prompt }) {
+  const text = String(prompt || '').trim();
+  if (!text) throw new Error('输入为空。');
+  if (claudeCodingState.running) {
+    claudeCodingState.status = CODEX_STATUS.WORKING;
+    pushClaudeCodingMessage('system', 'Claude Code 正在工作，请等这次任务结束后再发送。');
+    return publishClaudeCodingState();
+  }
+
+  claudeCodingState.status = CODEX_STATUS.WORKING;
+  pushClaudeCodingMessage('user', text);
+  pushClaudeCodingMessage('system', claudeCodingState.threadId ? '正在启动 Claude Code 新回合。' : '正在启动 Claude Code 新 session。');
+  const child = spawn(getClaudeBinary(), [
+    '-p',
+    '--output-format',
+    'stream-json',
+    '--verbose',
+    '--permission-mode',
+    'default',
+    text,
+  ], {
+    cwd: process.cwd(),
+    env: getCodexEnv(),
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  claudeCodingState.running = { type: 'claude-print', pid: child.pid };
+  let stdoutBuffer = '';
+  child.stdout.on('data', (chunk) => {
+    stdoutBuffer += chunk.toString();
+    const lines = stdoutBuffer.split(/\r?\n/);
+    stdoutBuffer = lines.pop() || '';
+    for (const line of lines) {
+      const raw = line.trim();
+      if (!raw) continue;
+      try {
+        handleClaudePrintEvent(JSON.parse(raw));
+      } catch {
+        pushClaudeCodingMessage('codex', raw);
+      }
+    }
+  });
+  child.stderr.on('data', (chunk) => {
+    const textChunk = chunk.toString();
+    const lines = textChunk.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    for (const line of lines) {
+      if (/permission|approval|authorize|confirm|login|error|failed|reconnect|retry/i.test(line)) {
+        pushClaudeCodingMessage(/error|failed/i.test(line) ? 'error' : 'system', line);
+      }
+    }
+    if (/permission|approval|authorize|confirm|login/i.test(textChunk)) {
+      claudeCodingState.status = CODEX_STATUS.NEEDS_INPUT;
+      publishClaudeCodingState();
+    }
+  });
+  child.on('error', (error) => {
+    claudeCodingState.running = null;
+    claudeCodingState.status = CODEX_STATUS.NEEDS_INPUT;
+    pushClaudeCodingMessage('error', `Claude Code 启动失败：${error.message}`);
+    publishClaudeCodingState();
+  });
+  child.on('close', (code) => {
+    if (stdoutBuffer.trim()) {
+      try {
+        handleClaudePrintEvent(JSON.parse(stdoutBuffer.trim()));
+      } catch {
+        pushClaudeCodingMessage('codex', stdoutBuffer.trim());
+      }
+    }
+    claudeCodingState.running = null;
+    if (claudeCodingState.status === CODEX_STATUS.WORKING) {
+      if (code === 0) {
+        claudeCodingState.status = CODEX_STATUS.DONE;
+        pushClaudeCodingMessage('system', 'Claude Code 执行完毕。');
+      } else {
+        claudeCodingState.status = CODEX_STATUS.NEEDS_INPUT;
+        pushClaudeCodingMessage('error', `Claude Code 已退出，状态码 ${code ?? 'unknown'}。`);
+      }
+    }
+    publishClaudeCodingState();
+  });
+  return publishClaudeCodingState();
 }
 
 async function listCodexSessionFiles(dir, out = []) {
@@ -1830,15 +2004,21 @@ const handlers = {
   can_start_speech_recognition: () => true,
   check_distraction: checkDistraction,
   coding_get_state: () => publishCodingState(),
+  coding_get_claude_state: () => publishClaudeCodingState(),
   coding_get_inherited_state: getInheritedCodingState,
   coding_ack_inherited_sessions: ackInheritedCodingSessions,
   coding_get_claude_inherited_state: getInheritedClaudeCodingState,
   coding_ack_claude_inherited_sessions: ackInheritedClaudeCodingSessions,
-  coding_send_message: sendCodingMessage,
+  coding_send_message: (args) => (args?.provider === 'claude' ? sendClaudeCodingMessage(args) : sendCodingMessage(args)),
   coding_clear: () => {
     codingState.messages = [];
     if (!codingState.running) codingState.status = CODEX_STATUS.DONE;
     return publishCodingState();
+  },
+  coding_clear_claude: () => {
+    claudeCodingState.messages = [];
+    if (!claudeCodingState.running) claudeCodingState.status = CODEX_STATUS.DONE;
+    return publishClaudeCodingState();
   },
   set_app_icon: ({ path: iconPath }) => setAppIcon(iconPath),
   save_api_key: ({ keyringRef, key }) => {

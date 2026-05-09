@@ -1931,3 +1931,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：高频桌面入口不应依赖设置页状态预配置，provider 选择应该在动作入口处可见可切。
 - 是否需更新技术文档：否。
+
+## ISSUE-163
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Claude Code 支持开启新 session
+- 严重程度：重要
+- 问题现象：右键菜单只有 Claude Code 继承 session，不能像 Codex 一样开启新 session 并在小聊天框里直接发送消息。
+- 原因分析：前端把 `codingProvider=claude` 强制视为继承模式；主进程没有 Claude Code 新 session 的状态源和发送链路。
+- 解决方案：取消 Claude Code 强制继承；新增 Claude Code CLI `stream-json` 子进程发送链路和独立状态；右键菜单补充 Claude Code “开启新 session”。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：同一 provider 也可能同时有“继承外部 session”和“应用内新 session”两种控制面，provider 与 session mode 不能绑定死。
+- 是否需更新技术文档：否。

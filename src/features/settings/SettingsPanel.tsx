@@ -1587,7 +1587,6 @@ function AISection({
                   }`}
                   onClick={() => {
                     updateSetting('codingProvider', item.id);
-                    if (item.id === 'claude') updateSetting('codingSessionMode', 'inherit');
                   }}
                 >
                   {item.label}

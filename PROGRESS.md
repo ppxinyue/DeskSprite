@@ -1231,3 +1231,12 @@
 - 视觉：Coding 二级菜单略微加宽，避免 Claude Code 分组和入口显得拥挤。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, PetAvatar.tsx, ISSUES.md, PROGRESS.md
+
+### R158. Claude Code 支持开启新 session（2026-05-10）
+- 右键菜单：Claude Code 分组新增“开启新 session”，可直接从灵宠右键菜单启动 Claude Code 新会话。
+- 前端：Claude Code 不再强制继承模式；`codingProvider=claude` 且 `codingSessionMode=new` 时使用新 session 状态源，并允许在 Coding chat 中输入。
+- 状态刷新：Claude Code 新 session 使用 provider 专属轮询读取，避免被旧 Codex app-server 的 `coding:state` 事件串线覆盖。
+- 主进程：新增 `coding_get_claude_state` 与 Claude Code `-p --output-format stream-json --verbose` 子进程链路，解析 stdout JSON 流并映射到现有红黄绿状态。
+- 发送：`coding_send_message` 根据 provider 分发到 Codex app-server 或 Claude Code CLI；Claude Code 新 session 使用同一套代理环境变量。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, PetAvatar.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
