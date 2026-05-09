@@ -851,3 +851,15 @@
 - 涉及文件：`electron/main.cjs`, `electron/preload.cjs`, `package.json`, `vite.config.ts`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/pet/animations.ts`, `src/features/pet/petStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Electron dev 脚本必须和 Vite 实际监听地址完全一致，不能假设 `localhost` 一定等价于 `127.0.0.1`；桌面透明窗口的交互边界应以用户可见对象为锚点，而不是以内部透明窗口矩形为准；GIF/图片/视频应该在渲染层分流处理，不能统一塞进 canvas。
 - 是否需更新技术文档：是。
+
+## ISSUE-073
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：灵宠提醒/专注模式 / GIF 资源迁移
+- 严重程度：严重
+- 问题现象：新增 `public/assets/idle/gif` 与 `public/assets/idle/png` 后，`work` 和 `rest` 状态 GIF 能显示，但 `idle` GIF 没有加载成功；休息提示和专注分心提示下方只有图标按钮，用户无法判断按钮含义。
+- 原因分析：`idle` 是旧状态，用户本地数据库中可能仍保存旧 `petMedia_idle`，其中的 `defaultGifAssets` 指向已删除的 `assets/GIF/blink.GIF`，或 `defaultAssets/disabled*` 指向旧的 `assets/idle/*.png`；新增的 `work/rest` 没有旧配置覆盖，所以正常。提示按钮只依赖 check/x 图标，缺少文本语义。
+- 解决方案：`normalizePetMediaConfig()` 中过滤旧 `assets/GIF/*` 和旧 `assets/{idle,thinking,sleeping}/*` 默认资源/禁用项，让旧配置自动回退到新的 idle gif/png 默认路径；提示气泡按钮改成“图标 + 文本”，休息提示显示“休息/忽略”，专注警告显示“继续专注/结束”。
+- 涉及文件：`src/features/pet/animations.ts`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：资源目录迁移时，不能只改代码默认值，还要处理用户数据库里已经持久化的旧资源路径；图标按钮用于宠物微交互时也需要短文本兜底，尤其是有多个语义相近的动作时。
+- 是否需更新技术文档：否。

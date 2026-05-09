@@ -177,6 +177,13 @@ function AppearanceSection({
     theme: settings.theme,
     petMotions: settings.petMotions,
     alwaysOnTop: settings.alwaysOnTop,
+    restReminderEnabled: settings.restReminderEnabled,
+    restReminderIntervalMinutes: settings.restReminderIntervalMinutes,
+    focusDurationMinutes: settings.focusDurationMinutes,
+    distractionDetectionEnabled: settings.distractionDetectionEnabled,
+    distractionGraceSeconds: settings.distractionGraceSeconds,
+    distractionBlockedApps: settings.distractionBlockedApps,
+    distractionBlockedKeywords: settings.distractionBlockedKeywords,
   });
 
   const update = <K extends keyof typeof draft>(k: K, v: typeof draft[K]) => {
@@ -194,8 +201,15 @@ function AppearanceSection({
       theme: settings.theme,
       petMotions: settings.petMotions,
       alwaysOnTop: settings.alwaysOnTop,
+      restReminderEnabled: settings.restReminderEnabled,
+      restReminderIntervalMinutes: settings.restReminderIntervalMinutes,
+      focusDurationMinutes: settings.focusDurationMinutes,
+      distractionDetectionEnabled: settings.distractionDetectionEnabled,
+      distractionGraceSeconds: settings.distractionGraceSeconds,
+      distractionBlockedApps: settings.distractionBlockedApps,
+      distractionBlockedKeywords: settings.distractionBlockedKeywords,
     });
-  }, [settings.petOpacity, settings.petScale, settings.dialogWidth, settings.compactChatFontSize, settings.theme, settings.petMotions, settings.alwaysOnTop]);
+  }, [settings.petOpacity, settings.petScale, settings.dialogWidth, settings.compactChatFontSize, settings.theme, settings.petMotions, settings.alwaysOnTop, settings.restReminderEnabled, settings.restReminderIntervalMinutes, settings.focusDurationMinutes, settings.distractionDetectionEnabled, settings.distractionGraceSeconds, settings.distractionBlockedApps, settings.distractionBlockedKeywords]);
 
   return (
     <>
@@ -256,6 +270,76 @@ function AppearanceSection({
             onCheckedChange={(v) => update('alwaysOnTop', v)}
           />
         </AppearanceRow>
+      </SettingsGroup>
+
+      <SectionTitle>提醒事项</SectionTitle>
+      <SettingsGroup>
+        <AppearanceRow label="休息喝水提醒">
+          <Switch
+            checked={draft.restReminderEnabled}
+            onCheckedChange={(v) => update('restReminderEnabled', v)}
+          />
+        </AppearanceRow>
+        <AppearanceRow label="提醒间隔">
+          <div className="flex max-w-[320px] items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.restReminderIntervalMinutes}min</span>
+            <Slider
+              value={[draft.restReminderIntervalMinutes]}
+              onValueChange={([v]) => update('restReminderIntervalMinutes', v)}
+              min={1} max={120} step={1} className="w-52"
+            />
+          </div>
+        </AppearanceRow>
+      </SettingsGroup>
+
+      <SectionTitle>专注模式</SectionTitle>
+      <SettingsGroup>
+        <AppearanceRow label="专注时长">
+          <div className="flex max-w-[320px] items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.focusDurationMinutes}min</span>
+            <Slider
+              value={[draft.focusDurationMinutes]}
+              onValueChange={([v]) => update('focusDurationMinutes', v)}
+              min={1} max={120} step={1} className="w-52"
+            />
+          </div>
+        </AppearanceRow>
+        <AppearanceRow label="分心检测">
+          <Switch
+            checked={draft.distractionDetectionEnabled}
+            onCheckedChange={(v) => update('distractionDetectionEnabled', v)}
+          />
+        </AppearanceRow>
+        <AppearanceRow label="检测宽限期">
+          <div className="flex max-w-[320px] items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.distractionGraceSeconds}s</span>
+            <Slider
+              value={[draft.distractionGraceSeconds]}
+              onValueChange={([v]) => update('distractionGraceSeconds', v)}
+              min={0} max={60} step={1} className="w-52"
+            />
+          </div>
+        </AppearanceRow>
+        <div className="grid gap-3 px-0 py-3 sm:grid-cols-2">
+          <div>
+            <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽应用</div>
+            <Textarea
+              value={draft.distractionBlockedApps.join('\n')}
+              onChange={(e) => update('distractionBlockedApps', parseRuleTextarea(e.target.value))}
+              rows={6}
+              className="min-h-[132px] text-[12px]"
+            />
+          </div>
+          <div>
+            <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽关键词</div>
+            <Textarea
+              value={draft.distractionBlockedKeywords.join('\n')}
+              onChange={(e) => update('distractionBlockedKeywords', parseRuleTextarea(e.target.value))}
+              rows={6}
+              className="min-h-[132px] text-[12px]"
+            />
+          </div>
+        </div>
       </SettingsGroup>
 
       <SectionTitle>灵宠动作</SectionTitle>
@@ -400,6 +484,13 @@ function PetMotionControls({
 
 function formatMotionValue(value: number, unit: string): string {
   return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}${unit}`;
+}
+
+function parseRuleTextarea(value: string): string[] {
+  return value
+    .split(/\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 const THEME_OPTIONS: { id: import('./settingsStore').Theme; title: string; description: string }[] = [

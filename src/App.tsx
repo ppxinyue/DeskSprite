@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
-import { MessageCircle, Minus, Maximize2 } from "lucide-react";
+import { Check, MessageCircle, Minus, Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
@@ -29,6 +29,15 @@ const CONTEXT_MENU_WIDTH = 112;
 const CONTEXT_SUBMENU_WIDTH = 170;
 const CONTEXT_MENU_HEIGHT = 204;
 const PET_RIGHT_EDGE_MENU_THRESHOLD = 0.62;
+const PET_BUBBLE_TOP_SPACE = 78;
+const REST_ACTION_DURATION_MS = 60_000;
+const DISTRACTION_CHECK_INTERVAL_MS = 3000;
+const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
+
+type PetPrompt =
+  | { id: 'rest-reminder'; message: string; variant: 'rest' }
+  | { id: 'focus-complete'; message: string; variant: 'rest' }
+  | { id: 'focus-warning'; message: string; variant: 'warning'; rule?: string };
 
 function isCompactChatDismissed() {
   return localStorage.getItem(COMPACT_CHAT_DISMISSED_KEY) === "1";
@@ -268,11 +277,19 @@ function CompactChatWindow() {
 
 function PetWindow() {
   const { settings } = useSettingsStore();
-  const { dialogOpen, chatMode, chatConversationId, openChat, closeChat, petState, mediaConfig, userFrames, userGifs } = usePetStore();
+  const { dialogOpen, chatMode, chatConversationId, openChat, closeChat, setPetState, petState, mediaConfig, userFrames, userGifs } = usePetStore();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [chatBurst, setChatBurst] = useState(false);
   const [petHovering, setPetHovering] = useState(false);
   const [compactVisible, setCompactVisible] = useState(false);
+  const [petPrompt, setPetPrompt] = useState<PetPrompt | null>(null);
+  const [focusEndAt, setFocusEndAt] = useState<number | null>(null);
+  const [restEndAt, setRestEndAt] = useState<number | null>(null);
+  const [nextRestReminderAt, setNextRestReminderAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const focusEndAtRef = useRef<number | null>(null);
+  const focusStartedAtRef = useRef<number | null>(null);
+  const focusWarningAtRef = useRef(0);
 
   const petSize = Math.round(150 * settings.petScale);
   const petImageWidth = Math.round(120 * settings.petScale);
@@ -285,7 +302,7 @@ function PetWindow() {
     petSize + 70,
     PET_CONTENT_MARGIN + petImageWidth + 8 + toolRowWidth + PET_CONTENT_MARGIN,
   );
-  const collapsedHeight = Math.max(220, petSize + 70);
+  const collapsedHeight = Math.max(220 + PET_BUBBLE_TOP_SPACE, petSize + 70 + PET_BUBBLE_TOP_SPACE);
   const [layout, setLayout] = useState<PetWindowLayout>(() => createDefaultPetWindowLayout(collapsedWidth, collapsedHeight));
   const [dragging, setDragging] = useState(false);
   const layoutRef = useRef(layout);
@@ -306,6 +323,15 @@ function PetWindow() {
   useEffect(() => {
     layoutRef.current = layout;
   }, [layout]);
+
+  useEffect(() => {
+    focusEndAtRef.current = focusEndAt;
+  }, [focusEndAt]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const requestLayout = useCallback(async (overrides: { contextMenuOpen?: boolean } = {}) => {
     const targetDialogOpen = false;
@@ -365,12 +391,123 @@ function PetWindow() {
     window.setTimeout(() => setChatBurst(false), 360);
   }, [positionCompactChatWindow]);
 
+  const startRestAction = useCallback(() => {
+    const endAt = Date.now() + REST_ACTION_DURATION_MS;
+    setPetPrompt(null);
+    setFocusEndAt(null);
+    focusStartedAtRef.current = null;
+    setRestEndAt(endAt);
+    setNextRestReminderAt(Date.now() + Math.max(1, settings.restReminderIntervalMinutes) * 60_000);
+    setPetState('drinking');
+  }, [settings.restReminderIntervalMinutes, setPetState]);
+
+  const dismissPrompt = useCallback(() => {
+    setPetPrompt(null);
+  }, []);
+
+  const endFocus = useCallback(() => {
+    setFocusEndAt(null);
+    focusStartedAtRef.current = null;
+    focusWarningAtRef.current = 0;
+    setPetPrompt(null);
+    if (!restEndAt) setPetState('idle');
+  }, [restEndAt, setPetState]);
+
+  const startFocus = useCallback(() => {
+    const duration = Math.max(1, settings.focusDurationMinutes) * 60_000;
+    const endAt = Date.now() + duration;
+    focusStartedAtRef.current = Date.now();
+    focusWarningAtRef.current = 0;
+    setRestEndAt(null);
+    setPetPrompt(null);
+    setFocusEndAt(endAt);
+    setPetState('work');
+  }, [settings.focusDurationMinutes, setPetState]);
+
   useEffect(() => {
     const config = mediaConfig[petState] ?? DEFAULT_MEDIA_CONFIG[petState];
     const activeSources = getPetFrameSources(config, userFrames[petState], userGifs[petState]);
     const iconPath = activeSources.find((path) => !isGifAsset(path)) ?? DEFAULT_MEDIA_CONFIG.idle.defaultAssets[0];
     invoke("set_app_icon", { path: iconPath }).catch((e) => console.warn("Failed to set app icon:", e));
   }, [mediaConfig, petState, userFrames, userGifs]);
+
+  useEffect(() => {
+    const unlisten = listen("pet:start-focus", () => startFocus());
+    return () => { unlisten.then((fn) => fn()); };
+  }, [startFocus]);
+
+  useEffect(() => {
+    if (!settings.restReminderEnabled) {
+      setNextRestReminderAt(null);
+      return;
+    }
+    setNextRestReminderAt(Date.now() + Math.max(1, settings.restReminderIntervalMinutes) * 60_000);
+  }, [settings.restReminderEnabled, settings.restReminderIntervalMinutes]);
+
+  useEffect(() => {
+    if (!settings.restReminderEnabled || !nextRestReminderAt) return;
+    if (focusEndAt || restEndAt || petPrompt) return;
+    if (now < nextRestReminderAt) return;
+    setPetPrompt({ id: 'rest-reminder', message: '该休息啦', variant: 'rest' });
+    setPetState('rest');
+    setNextRestReminderAt(null);
+  }, [focusEndAt, nextRestReminderAt, now, petPrompt, restEndAt, settings.restReminderEnabled, setPetState]);
+
+  useEffect(() => {
+    if (!focusEndAt) return;
+    if (Date.now() < focusEndAt) return;
+    setFocusEndAt(null);
+    focusStartedAtRef.current = null;
+    setPetState('rest');
+    setPetPrompt({ id: 'focus-complete', message: '该休息啦', variant: 'rest' });
+  }, [focusEndAt, now, setPetState]);
+
+  useEffect(() => {
+    if (!restEndAt) return;
+    if (Date.now() < restEndAt) return;
+    setRestEndAt(null);
+    setPetPrompt(null);
+    setPetState('idle');
+  }, [restEndAt, now, setPetState]);
+
+  useEffect(() => {
+    if (!focusEndAt || !settings.distractionDetectionEnabled) return;
+    if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
+    let disposed = false;
+    const runCheck = async () => {
+      if (disposed || !focusEndAtRef.current) return;
+      const startedAt = focusStartedAtRef.current ?? Date.now();
+      if (Date.now() - startedAt < Math.max(0, settings.distractionGraceSeconds) * 1000) return;
+      try {
+        const result = await invoke<{
+          supported: boolean;
+          appName: string;
+          windowTitle: string;
+          matchedRule: string | null;
+        }>('check_distraction', { settings });
+        if (!result.supported || !result.matchedRule || !focusEndAtRef.current) return;
+        if (Date.now() - focusWarningAtRef.current < DISTRACTION_WARNING_COOLDOWN_MS) return;
+        focusWarningAtRef.current = Date.now();
+        const rule = result.matchedRule.replace(/^(app|keyword):/, '');
+        setPetState('rest');
+        setPetPrompt({
+          id: 'focus-warning',
+          message: `检测到分心：${rule}`,
+          variant: 'warning',
+          rule,
+        });
+      } catch (e) {
+        console.warn('Failed to check distraction:', e);
+      }
+    };
+    const firstTimer = window.setTimeout(runCheck, Math.max(0, settings.distractionGraceSeconds) * 1000);
+    const timer = window.setInterval(runCheck, DISTRACTION_CHECK_INTERVAL_MS);
+    return () => {
+      disposed = true;
+      window.clearTimeout(firstTimer);
+      window.clearInterval(timer);
+    };
+  }, [focusEndAt, settings, setPetState]);
 
   useEffect(() => {
     const unlisten = listen<{ conversationId: number | null }>("compact-chat:conversation", ({ payload }) => {
@@ -741,6 +878,21 @@ function PetWindow() {
             className="absolute"
             style={{ left: layout.petLeft, top: layout.petTop }}
           >
+            {petPrompt && (
+              <PetPromptBubble
+                prompt={petPrompt}
+                onOk={startRestAction}
+                onIgnore={() => {
+                  if (petPrompt.id === 'focus-warning' && focusEndAtRef.current) setPetState('work');
+                  else if (!restEndAt) {
+                    setPetState('idle');
+                    setNextRestReminderAt(Date.now() + Math.max(1, settings.restReminderIntervalMinutes) * 60_000);
+                  }
+                  dismissPrompt();
+                }}
+                onEndFocus={endFocus}
+              />
+            )}
             <PetAvatar
               opacity={settings.petOpacity}
               scale={settings.petScale}
@@ -751,6 +903,11 @@ function PetWindow() {
               onDragEnd={handleBoundedDragEnd}
               onMenuOpenChange={setContextMenuOpen}
             />
+            {(focusEndAt || restEndAt) && (
+              <div className="pointer-events-none mt-1 text-center text-[11px] font-medium tabular-nums text-muted-foreground drop-shadow-sm">
+                {formatCountdown(Math.max(0, (restEndAt ?? focusEndAt ?? Date.now()) - now))}
+              </div>
+            )}
           </div>
 
           <div
@@ -813,6 +970,81 @@ function FloatingToolButton({
       {children}
     </Button>
   );
+}
+
+function PetPromptBubble({
+  prompt,
+  onOk,
+  onIgnore,
+  onEndFocus,
+}: {
+  prompt: PetPrompt;
+  onOk: () => void;
+  onIgnore: () => void;
+  onEndFocus: () => void;
+}) {
+  const isWarning = prompt.id === 'focus-warning';
+  return (
+    <div className="absolute left-1/2 top-[-74px] z-50 w-[196px] -translate-x-1/2 animate-pet-bubble-in rounded-[10px] border border-border/75 bg-background/96 px-2.5 py-2 text-center shadow-[0_12px_34px_rgba(32,28,22,0.16)] backdrop-blur-md">
+      <div className="text-[12px] font-medium leading-snug text-foreground">{prompt.message}</div>
+      <div className="mt-2 flex justify-center gap-1.5">
+        {isWarning ? (
+          <>
+            <MicroActionButton label="继续专注" onClick={onIgnore}>
+              <Check className="h-3 w-3" />
+            </MicroActionButton>
+            <MicroActionButton label="结束" danger onClick={onEndFocus}>
+              <X className="h-3 w-3" />
+            </MicroActionButton>
+          </>
+        ) : (
+          <>
+            <MicroActionButton label="休息" onClick={onOk}>
+              <Check className="h-3 w-3" />
+            </MicroActionButton>
+            <MicroActionButton label="忽略" onClick={onIgnore}>
+              <X className="h-3 w-3" />
+            </MicroActionButton>
+          </>
+        )}
+      </div>
+      <div className="absolute bottom-[-5px] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-border/75 bg-background/96" />
+    </div>
+  );
+}
+
+function MicroActionButton({
+  label,
+  danger = false,
+  onClick,
+  children,
+}: {
+  label: string;
+  danger?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      onClick={onClick}
+      className={`flex h-6 items-center gap-1 rounded-full border border-border/70 bg-background px-2 text-[11px] font-medium text-muted-foreground shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:scale-[1.04] hover:text-foreground active:translate-y-0 active:scale-95 ${
+        danger ? 'hover:border-destructive/40 hover:text-destructive' : 'hover:border-foreground/25'
+      }`}
+    >
+      {children}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function formatCountdown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
 function MacControlButton({
@@ -958,13 +1190,13 @@ function createDefaultPetWindowLayout(width: number, height: number): PetWindowL
     windowWidth: width,
     windowHeight: height,
     petLeft: PET_CONTENT_MARGIN,
-    petTop: PET_CONTENT_MARGIN,
+    petTop: PET_CONTENT_MARGIN + PET_BUBBLE_TOP_SPACE,
     dialogLeft: PET_CONTENT_MARGIN,
     dialogTop: PET_CONTENT_MARGIN,
     dialogWidth: 300,
     dialogMaxHeight: 300,
     toolsLeft: PET_CONTENT_MARGIN + 128,
-    toolsTop: PET_CONTENT_MARGIN + 118,
+    toolsTop: PET_CONTENT_MARGIN + PET_BUBBLE_TOP_SPACE + 118,
   };
 }
 
@@ -1028,6 +1260,7 @@ async function applyPetWindowLayout({
 
     let layout: PetWindowLayout;
     if (!dialogOpen) {
+      const compactPetTop = PET_CONTENT_MARGIN + PET_BUBBLE_TOP_SPACE;
       const menuWindowWidth = contextMenuOpen
         ? Math.min(
             maxWindowWidth,
@@ -1052,7 +1285,7 @@ async function applyPetWindowLayout({
         windowWidth: menuWindowWidth,
         windowHeight: menuWindowHeight,
         petLeft,
-        petTop: PET_CONTENT_MARGIN,
+        petTop: compactPetTop,
         dialogLeft: PET_CONTENT_MARGIN,
         dialogTop: PET_CONTENT_MARGIN,
         dialogWidth: requestedDialogWidth,
@@ -1060,7 +1293,7 @@ async function applyPetWindowLayout({
         toolsLeft: toolsFitRight
           ? petLeft + petImageWidth + 8
           : Math.max(PET_CONTENT_MARGIN, petLeft - toolRowWidth - 8),
-        toolsTop: PET_CONTENT_MARGIN + petImageHeight - 28,
+        toolsTop: compactPetTop + petImageHeight - 28,
       };
     } else {
       const maxDialogWidth = Math.max(MIN_DIALOG_WIDTH, maxWindowWidth - PET_CONTENT_MARGIN * 2);

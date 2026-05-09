@@ -276,6 +276,16 @@
   animation: chatPop 340ms cubic-bezier(.18,.9,.2,1);
 }
 
+@keyframes petBubbleIn {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px) scale(.94); }
+  65% { opacity: 1; transform: translateX(-50%) translateY(-1px) scale(1.03); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+.animate-pet-bubble-in {
+  animation: petBubbleIn 260ms cubic-bezier(.18,.9,.2,1);
+}
+
 @keyframes chatPop {
   0% { transform: scale(.72) translateY(1px); opacity: .55; }
   58% { transform: scale(1.22) translateY(-1px); opacity: 1; }

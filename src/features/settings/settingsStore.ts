@@ -46,6 +46,13 @@ export interface AppSettings {
   speakRate: number;
   globalShortcut: string;
   screenshotShortcut: string;
+  restReminderEnabled: boolean;
+  restReminderIntervalMinutes: number;
+  focusDurationMinutes: number;
+  distractionDetectionEnabled: boolean;
+  distractionGraceSeconds: number;
+  distractionBlockedApps: string[];
+  distractionBlockedKeywords: string[];
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -83,6 +90,42 @@ const DEFAULT_SETTINGS: AppSettings = {
   speakRate: 1.0,
   globalShortcut: 'CommandOrControl+Shift+P',
   screenshotShortcut: 'CommandOrControl+Shift+S',
+  restReminderEnabled: true,
+  restReminderIntervalMinutes: 25,
+  focusDurationMinutes: 25,
+  distractionDetectionEnabled: true,
+  distractionGraceSeconds: 8,
+  distractionBlockedApps: ['Steam', 'Discord', 'Telegram', 'WeChat', 'QQ'],
+  distractionBlockedKeywords: [
+    'youtube',
+    'youtu.be',
+    'twitter',
+    'x.com',
+    'instagram',
+    'reddit',
+    'tiktok',
+    'netflix',
+    'twitch',
+    'facebook',
+    'bilibili',
+    'weibo',
+    'douyin',
+    'xiaohongshu',
+    'zhihu',
+    'douban',
+    'taobao',
+    'jd.com',
+    '小红书',
+    '微博',
+    '抖音',
+    '知乎',
+    '豆瓣',
+    '淘宝',
+    '京东',
+    '哔哩哔哩',
+    '虎扑',
+    '贴吧',
+  ],
 };
 
 export interface SettingsState {
@@ -117,6 +160,14 @@ export const useSettingsStore = create<SettingsState>((set) => ({
                   ? Math.min(600, Math.max(200, parsed))
                 : key === 'compactChatFontSize' && typeof parsed === 'number'
                   ? Math.min(15, Math.max(11, parsed))
+                : key === 'restReminderIntervalMinutes' && typeof parsed === 'number'
+                  ? Math.min(240, Math.max(1, parsed))
+                : key === 'focusDurationMinutes' && typeof parsed === 'number'
+                  ? Math.min(240, Math.max(1, parsed))
+                : key === 'distractionGraceSeconds' && typeof parsed === 'number'
+                  ? Math.min(120, Math.max(0, parsed))
+                : (key === 'distractionBlockedApps' || key === 'distractionBlockedKeywords')
+                  ? normalizeStringList(parsed, DEFAULT_SETTINGS[key])
                 : key === 'petMotions'
                   ? normalizePetMotions(parsed)
                 : parsed;
@@ -164,6 +215,12 @@ function isVoiceProviderMode(value: unknown): value is VoiceProviderMode {
 
 function isModelMode(value: unknown): value is ModelMode {
   return value === 'default' || value === 'custom';
+}
+
+function normalizeStringList(value: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(value)) return fallback;
+  const normalized = value.map((item) => String(item).trim()).filter(Boolean);
+  return normalized.length > 0 ? normalized : fallback;
 }
 
 function normalizePetMotions(value: unknown): PetMotionSettings {

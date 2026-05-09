@@ -581,3 +581,9 @@
 - UI：设置、大聊天、小聊天和基础控件重做为更克制的黑白灰、轻磨砂、弱边界风格；滑块、输入框、按钮、菜单、对话布局和字号层级进行多轮收敛。
 - 验证：`pnpm build` 多次通过；`pnpm electron:dev` 验证 Electron 能在 `127.0.0.1:5173` dev server 后正常启动。
 - 文件：electron/main.cjs, electron/preload.cjs, package.json, vite.config.ts, src/App.tsx, src/electron-shims/*, src/features/pet/*, src/features/settings/SettingsPanel.tsx, src/features/chat/*, src/index.css
+
+### R68. idle GIF 迁移兜底与提示按钮语义修复（2026-05-09）
+- 修复：`idle` GIF 不显示时，优先怀疑旧 `petMedia_idle` 配置仍指向已删除的 `assets/GIF/blink.GIF` 或旧 `assets/idle/*.png`；现在配置归一化会过滤这些旧默认路径并回退到 `assets/idle/gif/*`、`assets/idle/png/*`。
+- 交互：休息提醒和专注分心提示下方按钮从纯图标改成“图标 + 文字”，分别显示“休息 / 忽略”和“继续专注 / 结束”，减少猜测成本。
+- 验证：待本次提交前执行 `pnpm build`。
+- 文件：animations.ts, App.tsx, ISSUES.md, PROGRESS.md

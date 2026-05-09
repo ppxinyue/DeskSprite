@@ -27,7 +27,7 @@ const MOTION_BASE_DURATION: Record<PetMotionName, number> = {
 const PET_DRAW_PADDING = 2;
 const SOURCE_EDGE_INSET_RATIO = 0.004;
 const MENU_WIDTH = 112;
-const MENU_HEIGHT = 196;
+const MENU_HEIGHT = 220;
 const SUBMENU_WIDTH = 170;
 const MENU_MARGIN = 8;
 const MENU_LEFT_SIDE_THRESHOLD = 0.62;
@@ -187,6 +187,9 @@ export function PetAvatar({
         break;
       case 'settings':
         try { await invoke('show_settings_cmd'); } catch (e) { console.error(e); }
+        break;
+      case 'focus':
+        emit('pet:start-focus', {}).catch(() => {});
         break;
       case 'hide':
         try { await invoke('hide_pet_window'); } catch (e) { console.error(e); }
@@ -404,6 +407,7 @@ export function PetAvatar({
           </div>
         </div>
         <div className="my-1 h-px bg-border/60" />
+        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('focus')}>专注模式</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs text-destructive hover:bg-destructive/10" onClick={() => handleContextMenu('quit')}>退出</button>

@@ -1,5 +1,8 @@
 export type PetState =
   | 'idle'
+  | 'rest'
+  | 'work'
+  | 'drinking'
   | 'thinking'
   | 'sleeping';
 
@@ -22,12 +25,48 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   idle: {
     mediaMode: 'gif',
     defaultAssets: [
-      'assets/idle/idle.png',
-      'assets/idle/idle2.png',
-      'assets/idle/idle3.png',
-      'assets/idle/idle4.png',
+      'assets/idle/png/idle.png',
+      'assets/idle/png/idle2.png',
+      'assets/idle/png/idle3.png',
+      'assets/idle/png/sleeping.png',
+      'assets/idle/png/sleeping1.png',
     ],
-    defaultGifAssets: ['assets/GIF/blink.GIF'],
+    defaultGifAssets: [
+      'assets/idle/gif/blink.GIF',
+      'assets/idle/gif/grooming.GIF',
+      'assets/idle/gif/idle_clean_1.GIF',
+      'assets/idle/gif/sleeping_raw_2.GIF',
+    ],
+    userFrames: [],
+    userGifs: [],
+    frameInterval: 150,
+    userAnimatedPath: null,
+    userAnimatedType: null,
+  },
+  rest: {
+    mediaMode: 'gif',
+    defaultAssets: ['assets/idle/png/sleeping.png'],
+    defaultGifAssets: ['assets/rest/gif/playing_clean_3.GIF'],
+    userFrames: [],
+    userGifs: [],
+    frameInterval: 150,
+    userAnimatedPath: null,
+    userAnimatedType: null,
+  },
+  work: {
+    mediaMode: 'gif',
+    defaultAssets: ['assets/idle/png/idle.png'],
+    defaultGifAssets: ['assets/work/gif/working_clean.GIF'],
+    userFrames: [],
+    userGifs: [],
+    frameInterval: 150,
+    userAnimatedPath: null,
+    userAnimatedType: null,
+  },
+  drinking: {
+    mediaMode: 'gif',
+    defaultAssets: ['assets/idle/png/idle2.png'],
+    defaultGifAssets: ['assets/rest/gif/drinking_raw.GIF'],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -36,8 +75,8 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   },
   thinking: {
     mediaMode: 'gif',
-    defaultAssets: ['assets/thinking/thinking.png'],
-    defaultGifAssets: ['assets/GIF/blink.GIF'],
+    defaultAssets: ['assets/idle/png/idle.png'],
+    defaultGifAssets: ['assets/idle/gif/grooming.GIF'],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -46,11 +85,8 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   },
   sleeping: {
     mediaMode: 'gif',
-    defaultAssets: [
-      'assets/sleeping/sleeping.png',
-      'assets/sleeping/sleeping1.png',
-    ],
-    defaultGifAssets: ['assets/GIF/blink.GIF'],
+    defaultAssets: ['assets/idle/png/sleeping.png', 'assets/idle/png/sleeping1.png'],
+    defaultGifAssets: ['assets/idle/gif/sleeping_raw_2.GIF'],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -59,10 +95,13 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   },
 };
 
-export const ALL_PET_STATES: PetState[] = ['idle', 'thinking', 'sleeping'];
+export const ALL_PET_STATES: PetState[] = ['idle', 'rest', 'work', 'drinking'];
 
 export const STATE_META: Record<PetState, { label: string; desc: string }> = {
   idle:     { label: '待机',   desc: '默认状态；会在多张PNG之间随机切换' },
+  rest:     { label: '休息',   desc: '休息提醒状态' },
+  work:     { label: '专注',   desc: '专注模式状态' },
+  drinking: { label: '喝水',   desc: '休息喝水倒计时状态' },
   thinking: { label: '思考中', desc: '等待AI回复期间显示；会在多张PNG之间随机切换' },
   sleeping: { label: '睡眠',   desc: '智能附着等场景显示；会在多张PNG之间随机切换' },
 };
@@ -84,16 +123,22 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
   const defaults = DEFAULT_MEDIA_CONFIG[state];
   if (!raw) return defaults;
   const hasExplicitMode = raw.mediaMode === 'image' || raw.mediaMode === 'gif';
+  const defaultGifAssets = raw.defaultGifAssets?.length
+    ? raw.defaultGifAssets.filter((path) => !path.startsWith('assets/GIF/'))
+    : defaults.defaultGifAssets;
+  const defaultAssets = raw.defaultAssets?.length
+    ? raw.defaultAssets.filter((path) => !/^assets\/(idle|thinking|sleeping)\//.test(path))
+    : defaults.defaultAssets;
   return {
     ...defaults,
     ...raw,
     mediaMode: hasExplicitMode ? raw.mediaMode! : defaults.mediaMode,
-    defaultAssets: raw.defaultAssets?.length ? raw.defaultAssets : defaults.defaultAssets,
-    defaultGifAssets: raw.defaultGifAssets?.length ? raw.defaultGifAssets : defaults.defaultGifAssets,
+    defaultAssets: defaultAssets.length ? defaultAssets : defaults.defaultAssets,
+    defaultGifAssets: defaultGifAssets.length ? defaultGifAssets : defaults.defaultGifAssets,
     userFrames: raw.userFrames ?? defaults.userFrames,
     userGifs: raw.userGifs ?? defaults.userGifs,
-    disabledFrames: raw.disabledFrames ?? defaults.disabledFrames,
-    disabledGifs: raw.disabledGifs ?? defaults.disabledGifs,
+    disabledFrames: (raw.disabledFrames ?? defaults.disabledFrames)?.filter((path) => !/^assets\/(idle|thinking|sleeping)\//.test(path)),
+    disabledGifs: (raw.disabledGifs ?? defaults.disabledGifs)?.filter((path) => !path.startsWith('assets/GIF/')),
   };
 }
 

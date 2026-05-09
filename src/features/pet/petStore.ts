@@ -10,16 +10,8 @@ interface PetStore {
   chatMode: 'new' | 'history';
   chatConversationId: number | null;
   mediaConfig: PetMediaConfig;
-  userFrames: {
-    idle: string[];
-    thinking: string[];
-    sleeping: string[];
-  };
-  userGifs: {
-    idle: string[];
-    thinking: string[];
-    sleeping: string[];
-  };
+  userFrames: Record<PetState, string[]>;
+  userGifs: Record<PetState, string[]>;
 
   setPetState: (state: PetState) => void;
   setPosition: (pos: { x: number; y: number }) => void;
@@ -45,16 +37,8 @@ export const usePetStore = create<PetStore>((set) => ({
   chatMode: 'new',
   chatConversationId: null,
   mediaConfig: DEFAULT_MEDIA_CONFIG,
-  userFrames: {
-    idle: [],
-    thinking: [],
-    sleeping: [],
-  },
-  userGifs: {
-    idle: [],
-    thinking: [],
-    sleeping: [],
-  },
+  userFrames: createEmptyStateRecord(),
+  userGifs: createEmptyStateRecord(),
 
   setPetState: (petState) => set({ petState }),
   setPosition: (position) => set({ position }),
@@ -68,7 +52,7 @@ export const usePetStore = create<PetStore>((set) => ({
   resetMediaConfig: () => set({ mediaConfig: DEFAULT_MEDIA_CONFIG }),
   loadUserFrames: async () => {
     const { invoke } = await import('@tauri-apps/api/core');
-    const states: PetState[] = ['idle', 'thinking', 'sleeping'];
+    const states = Object.keys(DEFAULT_MEDIA_CONFIG) as PetState[];
     const results = await Promise.allSettled(
       states.map(async (state) => {
         try {
@@ -79,8 +63,8 @@ export const usePetStore = create<PetStore>((set) => ({
         }
       })
     );
-    const userFrames: Record<PetState, string[]> = { idle: [], thinking: [], sleeping: [] };
-    const userGifs: Record<PetState, string[]> = { idle: [], thinking: [], sleeping: [] };
+    const userFrames = createEmptyStateRecord();
+    const userGifs = createEmptyStateRecord();
     for (const result of results) {
       if (result.status === 'fulfilled') {
         userFrames[result.value.state] = result.value.paths.filter((path) => !isGifAsset(path));
@@ -118,3 +102,9 @@ export const usePetStore = create<PetStore>((set) => ({
       },
     })),
 }));
+
+function createEmptyStateRecord(): Record<PetState, string[]> {
+  return Object.fromEntries(
+    (Object.keys(DEFAULT_MEDIA_CONFIG) as PetState[]).map((state) => [state, []]),
+  ) as unknown as Record<PetState, string[]>;
+}

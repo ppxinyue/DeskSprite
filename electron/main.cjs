@@ -16,15 +16,17 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const zlib = require('node:zlib');
+const { execFile } = require('node:child_process');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
 const windows = new Map();
 let topmostGuard = null;
-let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'idle.png');
+let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'png', 'idle.png');
 let tray = null;
 let currentAppIcon = null;
 const floatingConfiguredWindows = new WeakSet();
+const IGNORED_DISTRACTION_APPS = ['DeskSprite', 'PawPal', 'Electron'];
 
 app.setName('DeskSprite');
 if (process.platform === 'darwin') app.setActivationPolicy('regular');
@@ -258,6 +260,75 @@ function setAppIcon(iconPath) {
   return true;
 }
 
+function activeWindowScript() {
+  return `
+tell application "System Events"
+  set frontAppProcess to first application process whose frontmost is true
+  set frontApp to name of frontAppProcess
+  set frontWindow to ""
+  try
+    set frontWindow to name of front window of frontAppProcess
+  end try
+end tell
+return frontApp & linefeed & frontWindow
+`;
+}
+
+function readActiveWindow() {
+  if (process.platform !== 'darwin') {
+    return Promise.resolve({ supported: false, appName: '', windowTitle: '', error: 'unsupported' });
+  }
+  return new Promise((resolve) => {
+    execFile('/usr/bin/osascript', ['-e', activeWindowScript()], { timeout: 2500 }, (error, stdout) => {
+      if (error) {
+        resolve({
+          supported: true,
+          appName: '',
+          windowTitle: '',
+          error: error.message || String(error),
+        });
+        return;
+      }
+      const [appName = '', ...titleParts] = String(stdout || '').trimEnd().split('\n');
+      resolve({
+        supported: true,
+        appName: appName.trim(),
+        windowTitle: titleParts.join('\n').trim(),
+        error: null,
+      });
+    });
+  });
+}
+
+function normalizeRuleList(value) {
+  return Array.isArray(value) ? value.map((item) => String(item).trim().toLowerCase()).filter(Boolean) : [];
+}
+
+function classifyDistraction(active, settings) {
+  const appNameLower = String(active.appName || '').toLowerCase();
+  const titleLower = String(active.windowTitle || '').toLowerCase();
+  if (!appNameLower && !titleLower) return null;
+  if (IGNORED_DISTRACTION_APPS.some((ignored) => ignored.toLowerCase() === appNameLower)) return null;
+  const blockedApp = normalizeRuleList(settings?.distractionBlockedApps)
+    .find((rule) => appNameLower.includes(rule));
+  if (blockedApp) return `app:${blockedApp}`;
+  const blockedKeyword = normalizeRuleList(settings?.distractionBlockedKeywords)
+    .find((rule) => titleLower.includes(rule) || appNameLower.includes(rule));
+  return blockedKeyword ? `keyword:${blockedKeyword}` : null;
+}
+
+async function checkDistraction({ settings }) {
+  const active = await readActiveWindow();
+  if (!active.supported || active.error) {
+    return { ...active, matchedRule: null };
+  }
+  return {
+    ...active,
+    matchedRule: classifyDistraction(active, settings || {}),
+    checkedAt: Date.now(),
+  };
+}
+
 function isPetVisible() {
   const win = windows.get('pet');
   return Boolean(win && !win.isDestroyed() && win.isVisible());
@@ -442,7 +513,7 @@ function contentType(filePath) {
 }
 
 async function importPetImage({ srcPath, state }) {
-  if (!['idle', 'thinking', 'sleeping'].includes(state)) throw new Error(`Invalid state: ${state}`);
+  if (!['idle', 'rest', 'work', 'drinking', 'thinking', 'sleeping'].includes(state)) throw new Error(`Invalid state: ${state}`);
   const source = path.resolve(srcPath);
   const ext = path.extname(source).toLowerCase();
   if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'].includes(ext)) {
@@ -461,7 +532,7 @@ async function importPetImage({ srcPath, state }) {
 }
 
 async function listPetImages({ state }) {
-  if (!['idle', 'thinking', 'sleeping'].includes(state)) throw new Error(`Invalid state: ${state}`);
+  if (!['idle', 'rest', 'work', 'drinking', 'thinking', 'sleeping'].includes(state)) throw new Error(`Invalid state: ${state}`);
   const dir = getAssetsDir(state);
   const entries = await fsp.readdir(dir, { withFileTypes: true });
   return entries
@@ -700,6 +771,7 @@ const handlers = {
   transcribe_audio: transcribeAudio,
   synthesize_speech: synthesizeSpeech,
   can_start_speech_recognition: () => true,
+  check_distraction: checkDistraction,
   set_app_icon: ({ path: iconPath }) => setAppIcon(iconPath),
   save_api_key: ({ keyringRef, key }) => {
     keyStore.set(keyringRef, key);
@@ -784,7 +856,7 @@ function registerProtocols() {
 
 app.whenReady().then(() => {
   registerProtocols();
-  setAppIcon('assets/idle/idle.png');
+  setAppIcon('assets/idle/png/idle.png');
   createPetWindow();
   ensureTopmostGuard();
   globalShortcut.register('CommandOrControl+Shift+Space', () => broadcast('shortcut:chat-focus', {}));
