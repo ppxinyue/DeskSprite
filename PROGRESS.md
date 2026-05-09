@@ -956,3 +956,9 @@
 - 兼容：normalize 阶段清理旧的 `playing_clean_3.GIF` 引用，并自动补齐当前休息 GIF 池。
 - 验证：`pnpm build` 通过。
 - 文件：animations.ts, public/assets, ISSUES.md, PROGRESS.md
+
+### R121. GIF 形象不叠加动作（2026-05-09）
+- Pet 模式：动作样式只在静态图片 `img` 渲染路径上生成。
+- GIF/视频：当前状态使用 GIF 动图或 video 时，不再叠加跳动、摇摆、呼吸等额外动作。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, ISSUES.md, PROGRESS.md

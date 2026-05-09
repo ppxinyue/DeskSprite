@@ -476,7 +476,7 @@ export function PetAvatar({
     );
   }
 
-  const motionStyle = !animationsPaused && currentMotion && motions[currentMotion]
+  const motionStyle = kind === 'img' && !animationsPaused && currentMotion && motions[currentMotion]
     ? {
         animation: `${currentMotion} ${MOTION_BASE_DURATION[currentMotion] / motions[currentMotion].speed}s ease-in-out infinite`,
         '--pet-motion-amplitude': String(motions[currentMotion].amplitude),

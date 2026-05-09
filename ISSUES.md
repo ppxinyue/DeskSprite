@@ -1487,3 +1487,15 @@
 - 涉及文件：`src/features/pet/animations.ts`, `public/assets`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：素材文件名变化时，需要同时更新默认配置和旧配置归一化，否则已保存配置会继续引用不存在的文件。
 - 是否需更新技术文档：否。
+
+## ISSUE-126
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Pet 模式动作叠加规则
+- 严重程度：改进
+- 问题现象：Pet 模式下状态使用 GIF 动图时，仍然会叠加灵宠动作设置中的跳动、摇摆、呼吸，导致 GIF 自带动画和外层动作同时生效。
+- 原因分析：`PetAvatar` 的 `motionStyle` 没有区分当前媒体类型，被同时展开到 video、GIF img 和静态 canvas 上。
+- 解决方案：将 `motionStyle` 的生成条件限制为 `kind === 'img'`，只在静态图片渲染路径上叠加动作；GIF 和视频保持素材自身动画。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：素材自带时间轴时不应再叠外层循环动作，动作系统应只增强静态图。
+- 是否需更新技术文档：否。
