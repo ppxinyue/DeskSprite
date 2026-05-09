@@ -1175,3 +1175,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：黑白灰界面里的“高级感”不能等同于过低对比度；小型悬浮组件需要足够的灰阶重量才能在不同桌面背景下稳定可读。
 - 是否需更新技术文档：否。
+
+## ISSUE-100
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb 字母大小写层级
+- 严重程度：改进
+- 问题现象：Orb 外圈字母需要全部使用大写，hover 后内部中央字母需要使用小写。
+- 原因分析：当前 `letters` 和 `restLetters` 直接来自小写状态标签，虽然部分外圈样式有 `text-transform: uppercase`，但 work 下落字母仍依赖原始文本，内外层级不够明确。
+- 解决方案：外圈/下落/旋转字母源统一从大写状态标签生成；中央 hover 文本继续使用小写 `meta.label`。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：当同一状态文本在不同视觉层级中承担不同语义时，应在数据源层明确大小写，而不是完全依赖 CSS 变换。
+- 是否需更新技术文档：否。

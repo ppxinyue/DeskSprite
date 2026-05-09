@@ -776,3 +776,9 @@
 - 克制：只提高对比度和尺寸，没有改变上一轮恢复的字母环动态与 hover 逻辑。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R95. Orb 外圈大写与中心小写（2026-05-09）
+- 外圈：idle/work/rest 的环绕、下落和旋转字母源统一改为大写，增强符号感和可读性。
+- 中心：hover 时中央提示仍使用小写 `idle/work/rest`，和用户要求的内外层级区分保持一致。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, ISSUES.md, PROGRESS.md
