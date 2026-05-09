@@ -1151,3 +1151,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：抽象动效不只是“动起来”，需要让 hover 的物理反馈和状态语义一致；CSS 不适合做复杂行列运算，稳定布局参数应从 TS 传入。
 - 是否需更新技术文档：否。
+
+## ISSUE-098
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb 字母环动态回退
+- 严重程度：改进
+- 问题现象：用户希望 Orb 粒子/运动动态退回 `b16bc57 style: rebuild orb with letter rings` 的字母环版本，但保留当前 hover 动效。
+- 原因分析：参考效果复现和交互语义强化阶段加入了连续 work drop、16 条 REST 轨道、中心 nucleus 等新层，视觉层次更复杂，偏离了 `b16bc57` 那版更干净的字母环动态。
+- 解决方案：移除新增的连续 drop、REST 叶片轨道和 nucleus；恢复 idle 四字母环绕、work 倒计时同步四字母下落、rest 28 字母外圈旋转；保留 idle hover 收缩暂停、work 堆叠微震和 rest hover 静态网格。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：当用户明确指定回退到某个视觉提交时，应优先恢复该提交的结构性动效，再选择性保留之后版本中明确被要求保留的交互反馈。
+- 是否需更新技术文档：否。

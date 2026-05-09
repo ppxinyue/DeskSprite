@@ -761,3 +761,11 @@
 - rest：高速旋转周期缩短并增加轻微 blur，hover 时立即停转并按 4x4 网格静态对齐，形成动静落差。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R93. Orb 字母环动态回退与 Hover 保留（2026-05-09）
+- 回退：按 `b16bc57 style: rebuild orb with letter rings` 的方向移除连续 work drop、16 轨 REST 叶片和中心 nucleus，恢复更克制的三态字母环。
+- idle：恢复 `idle` 四字母整体卫星环绕和单个 satellite dot，hover 时收缩轨道并暂停旋转，保留“聚焦用户”的反馈。
+- work：仅保留和专注进度同步的 `work` 四字母下落堆叠，继续保留底部微震动的 hover/工作态重量感。
+- rest：恢复 28 个 `rest` 字母铺在外圈快速旋转，hover 时停转并排成低透明网格，保留当前动静反差。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

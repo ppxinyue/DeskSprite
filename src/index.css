@@ -420,57 +420,58 @@
 
 .orb-avatar__idle-ring {
   inset: -26%;
+  animation: orbIdleSatellite 18s linear infinite;
   transition: inset 520ms cubic-bezier(.2,.9,.2,1);
 }
 
 .orb-avatar--idle.is-hovering .orb-avatar__idle-ring {
   inset: -12%;
-}
-
-.orb-avatar__idle-orbit,
-.orb-avatar__rest-spoke {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.orb-avatar__idle-orbit {
-  animation: orbIdleSatellite 15s linear infinite;
-  animation-delay: calc(var(--letter-index) * -0.25s);
-  transition: transform 520ms cubic-bezier(.2,.9,.2,1);
-}
-
-.orb-avatar--idle.is-hovering .orb-avatar__idle-orbit {
-  animation: none;
-  transform: rotate(calc(360deg / var(--letter-count) * var(--letter-index)));
+  animation-play-state: paused;
 }
 
 .orb-avatar__idle-letter,
-.orb-avatar__rest-word {
-  color: rgba(20,20,20,0.32);
+.orb-avatar__rest-letter {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  color: rgba(20,20,20,0.30);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: calc(var(--orb-font-size) * 0.78);
   font-weight: 700;
   letter-spacing: 0.18em;
   line-height: 1;
+  pointer-events: none;
   text-transform: uppercase;
 }
 
 .orb-avatar__idle-letter {
-  transform: translateY(calc(var(--orb-size) * -0.018));
+  transform:
+    translate(-50%, -50%)
+    rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
+    translateY(calc(var(--orb-size) * -0.64))
+    rotate(calc(-360deg / var(--letter-count) * var(--letter-index)));
+  transition: color 220ms ease, transform 520ms cubic-bezier(.2,.9,.2,1);
+}
+
+.orb-avatar--idle.is-hovering .orb-avatar__idle-letter {
+  color: rgba(20,20,20,0.40);
+  transform:
+    translate(-50%, -50%)
+    rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
+    translateY(calc(var(--orb-size) * -0.55))
+    rotate(calc(-360deg / var(--letter-count) * var(--letter-index)));
 }
 
 .orb-avatar__satellite-dot {
   position: absolute;
-  top: calc(var(--orb-size) * 0.09);
+  left: 50%;
+  top: 50%;
   width: calc(var(--orb-size) * 0.035);
   height: calc(var(--orb-size) * 0.035);
   border-radius: 999px;
   background: rgba(20,20,20,0.46);
   box-shadow: 0 0 10px rgba(255,255,255,0.65);
+  transform: translate(-50%, -50%) translateY(calc(var(--orb-size) * -0.62));
   animation: orbSatellitePulse 2s ease-in-out infinite;
 }
 
@@ -480,25 +481,6 @@
   border-radius: inherit;
   overflow: hidden;
   pointer-events: none;
-}
-
-.orb-avatar__work-drop {
-  position: absolute;
-  left: calc(50% + var(--drop-x));
-  top: 0;
-  color: rgba(20,20,20,0.32);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
-  font-size: calc(var(--orb-font-size) * 1.05);
-  font-weight: 800;
-  line-height: 1;
-  opacity: 0;
-  transform: translate(-50%, -60%);
-  animation: orbWorkDrop 4.2s cubic-bezier(.4,0,.2,1) infinite;
-  animation-delay: calc(var(--drop-index) * -0.35s);
-}
-
-.orb-avatar--work.is-hovering .orb-avatar__work-drop {
-  animation-duration: 2.2s;
 }
 
 .orb-avatar__work-letter {
@@ -521,8 +503,8 @@
 }
 
 .orb-avatar__rest-ring {
-  inset: -22%;
-  animation: orbRestLetters 1.35s linear infinite;
+  inset: -4%;
+  animation: orbRestLetters 2.2s linear infinite;
   filter: blur(0.35px);
   transition: filter 180ms ease, transform 260ms ease;
 }
@@ -533,44 +515,27 @@
   transform: rotate(0deg);
 }
 
-.orb-avatar--rest.is-hovering .orb-avatar__rest-spoke {
+.orb-avatar--rest.is-hovering .orb-avatar__rest-letter {
   transform:
+    translate(-50%, -50%)
     translate(
-      calc(var(--grid-col) * var(--orb-size) * 0.18),
-      calc(var(--grid-row) * var(--orb-size) * 0.18)
-    );
-}
-
-.orb-avatar__rest-spoke {
-  transform: rotate(calc(360deg / var(--letter-count) * var(--letter-index)));
-}
-
-.orb-avatar__rest-word {
-  opacity: 0.14;
-  transform: rotate(90deg);
-}
-
-.orb-avatar__rest-line {
-  position: absolute;
-  top: calc(var(--orb-size) * 0.08);
-  width: 1px;
-  height: calc(var(--orb-size) * 0.10);
-  background: rgba(20,20,20,0.07);
-}
-
-.orb-avatar__nucleus {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: calc(var(--orb-size) * 0.18);
-  height: calc(var(--orb-size) * 0.18);
-  border-radius: 999px;
-  background: rgba(20,20,20,0.12);
-  filter: blur(10px);
+      calc(var(--grid-col) * var(--orb-size) * 0.105),
+      calc(var(--grid-row) * var(--orb-size) * 0.15)
+    )
+    rotate(0deg);
   opacity: 0.26;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  animation: orbNucleusPulse 4s ease-in-out infinite;
+}
+
+.orb-avatar__rest-letter {
+  opacity: 0.14;
+  font-size: calc(var(--orb-font-size) * 0.70);
+  font-weight: 800;
+  transform:
+    translate(-50%, -50%)
+    rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
+    translateY(calc(var(--orb-size) * -0.56))
+    rotate(90deg);
+  transition: opacity 180ms ease, transform 260ms ease;
 }
 
 @keyframes orbBoundaryBreath {
@@ -594,22 +559,8 @@
 }
 
 @keyframes orbSatellitePulse {
-  0%, 100% { opacity: 0.22; transform: scale(0.92); }
-  50% { opacity: 0.88; transform: scale(1.1); }
-}
-
-@keyframes orbWorkDrop {
-  0% { opacity: 0; transform: translate(-50%, -60%) translateX(0); }
-  14% { opacity: 0.55; }
-  72% { opacity: 0.55; transform: translate(-50%, calc(var(--orb-size) * 0.78)) translateX(var(--drop-drift)); }
-  76% { transform: translate(-50%, calc(var(--orb-size) * 0.79)) translateX(var(--drop-drift)) scaleY(1); }
-  82% { transform: translate(-50%, calc(var(--orb-size) * 0.75)) translateX(var(--drop-drift)) scaleY(0.92); }
-  100% { opacity: 0; transform: translate(-50%, calc(var(--orb-size) * 0.95)) translateX(var(--drop-drift)); }
-}
-
-@keyframes orbNucleusPulse {
-  0%, 100% { opacity: 0.14; transform: translate(-50%, -50%) scale(0.92); }
-  50% { opacity: 0.34; transform: translate(-50%, -50%) scale(1.18); }
+  0%, 100% { opacity: 0.22; transform: translate(-50%, -50%) translateY(calc(var(--orb-size) * -0.62)) scale(0.92); }
+  50% { opacity: 0.88; transform: translate(-50%, -50%) translateY(calc(var(--orb-size) * -0.62)) scale(1.1); }
 }
 
 @keyframes orbPileTremor {
