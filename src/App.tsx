@@ -34,6 +34,7 @@ const REST_ACTION_DURATION_MS = 60_000;
 const REST_PRESENTATION_SCREEN_RATIO = 0.8;
 const REST_PRESENTATION_ANIMATION_MS = 820;
 const REST_COUNTDOWN_SPACE = 58;
+const ORB_REST_VISUAL_BLEED_RATIO = 0.18;
 const DISTRACTION_CHECK_INTERVAL_MS = 3000;
 const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
 
@@ -522,21 +523,27 @@ function PetWindow() {
         visualScale: visualPetScaleRef.current,
       };
 
+      const targetBaseWidth = orbMode ? 150 : 120;
+      const targetBaseHeight = 150;
+      const visualWidthRatio = orbMode ? 1 + ORB_REST_VISUAL_BLEED_RATIO * 2 : 1;
+      const visualHeightRatio = orbMode ? 1 + ORB_REST_VISUAL_BLEED_RATIO * 2 : 1;
       const targetScale = Math.min(
-        (workWidth * REST_PRESENTATION_SCREEN_RATIO) / (orbMode ? 150 : 120),
-        ((workHeight * REST_PRESENTATION_SCREEN_RATIO) - REST_COUNTDOWN_SPACE) / 150,
+        (workWidth * REST_PRESENTATION_SCREEN_RATIO) / (targetBaseWidth * visualWidthRatio),
+        ((workHeight * REST_PRESENTATION_SCREEN_RATIO) - REST_COUNTDOWN_SPACE) / (targetBaseHeight * visualHeightRatio),
       );
-      const targetPetWidth = Math.round((orbMode ? 150 : 120) * targetScale);
-      const targetPetHeight = Math.round(150 * targetScale);
-      const targetWindowWidth = Math.min(workWidth, targetPetWidth + PET_CONTENT_MARGIN * 2);
-      const targetWindowHeight = Math.min(workHeight, targetPetHeight + PET_CONTENT_MARGIN * 2 + REST_COUNTDOWN_SPACE);
+      const targetPetWidth = Math.round(targetBaseWidth * targetScale);
+      const targetPetHeight = Math.round(targetBaseHeight * targetScale);
+      const targetOrbBleedX = orbMode ? Math.ceil(targetPetWidth * ORB_REST_VISUAL_BLEED_RATIO) : 0;
+      const targetOrbBleedY = orbMode ? Math.ceil(targetPetHeight * ORB_REST_VISUAL_BLEED_RATIO) : 0;
+      const targetWindowWidth = Math.min(workWidth, targetPetWidth + (PET_CONTENT_MARGIN + targetOrbBleedX) * 2);
+      const targetWindowHeight = Math.min(workHeight, targetPetHeight + (PET_CONTENT_MARGIN + targetOrbBleedY) * 2 + REST_COUNTDOWN_SPACE);
       const targetWindowLeft = workLeft + (workWidth - targetWindowWidth) / 2;
       const targetWindowTop = workTop + (workHeight - targetWindowHeight) / 2;
       const targetLayout: PetWindowLayout = {
         windowWidth: targetWindowWidth,
         windowHeight: targetWindowHeight,
         petLeft: (targetWindowWidth - targetPetWidth) / 2,
-        petTop: PET_CONTENT_MARGIN,
+        petTop: PET_CONTENT_MARGIN + targetOrbBleedY,
         dialogLeft: PET_CONTENT_MARGIN,
         dialogTop: PET_CONTENT_MARGIN,
         dialogWidth: 300,

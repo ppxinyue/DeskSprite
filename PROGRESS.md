@@ -837,3 +837,10 @@
 - 背景：保留 work 状态的内向波纹，继续表达中心吸附语义。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R104. Orb Rest 展示防裁切（2026-05-09）
+- Rest 展示：为 orb 模式新增 `ORB_REST_VISUAL_BLEED_RATIO`，休息放大时按外圈字母溢出范围预留窗口空间。
+- 缩放：目标 scale 不再只按 orb 本体计算，而是按“本体 + 外圈视觉溢出”一起限制在屏幕 80% 内。
+- 布局：rest 展示时 pet 顶部位置额外下移 bleed 空间，避免两侧和上下外圈字母被窗口边界裁掉。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md
