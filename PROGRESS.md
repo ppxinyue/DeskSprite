@@ -795,3 +795,10 @@
 - 动效：保留原有呼吸、idle/work/rest 字母运动和 hover 文字逻辑，只调整容器材质。
 - 验证：`pnpm build` 通过。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R98. Orb 径向波浪扩散与 Hover 细实线（2026-05-09）
+- 波浪：在 shell 上新增 `::before` 径向波纹层，使用重复径向渐变从中心向外缩放扩散。
+- Hover：外部边界从虚线改为更窄、更浅的 0.8px 实线，常态仍隐藏。
+- 约束：只调整容器视觉层，idle/work/rest 字母与状态逻辑保持不变。
+- 验证：`pnpm build` 通过。
+- 文件：index.css, ISSUES.md, PROGRESS.md
