@@ -42,6 +42,7 @@ const codingState = {
   threadId: CURRENT_CODEX_THREAD_ID,
 };
 const CODEX_INHERIT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+const inheritedCodingAcknowledged = new Map();
 const codexAppServer = {
   child: null,
   buffer: '',
@@ -1220,16 +1221,52 @@ function extractCodexSessionContent(content) {
   return '';
 }
 
+function codexSessionEventText(payload) {
+  return extractCodexSessionContent(
+    payload.message
+    ?? payload.last_agent_message
+    ?? payload.error
+    ?? payload.detail
+    ?? payload.reason
+    ?? payload.cause
+    ?? payload.content
+    ?? payload.text
+    ?? payload.output_text
+    ?? payload.summary,
+  );
+}
+
+function compactCodexSessionMessage(text, fallback) {
+  const normalized = String(text || '').replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (!normalized) return fallback;
+  return normalized.length > 2400 ? `${normalized.slice(0, 2400).trim()}...` : normalized;
+}
+
+function codexSessionTitle(session) {
+  const cwdName = session.cwd ? path.basename(session.cwd) : 'Codex';
+  return `${cwdName} · ${session.id.slice(0, 8)}`;
+}
+
+function isCodexProblemEvent(type, payload, raw) {
+  const haystack = `${type || ''} ${payload?.type || ''} ${payload?.subtype || ''} ${raw || ''}`;
+  return /requestapproval|request_user_input|permission|approval|guardian|denied|blocked|requires_action|needs_input/i.test(haystack)
+    || /\berror\b|failed/i.test(haystack);
+}
+
 function parseCodexSessionFile(filePath, text, mtimeMs) {
   const session = {
     id: path.basename(filePath, '.jsonl').split('-').slice(-5).join('-'),
     cwd: '',
     path: filePath,
     updatedAt: mtimeMs,
+    eventAt: mtimeMs,
+    ackKey: '',
+    title: '',
     status: CODEX_STATUS.WORKING,
     message: '',
   };
   let lastUserAt = 0;
+  let lastWorkAt = 0;
   let lastAssistantAt = 0;
   let lastAssistant = '';
   let lastProblemAt = 0;
@@ -1254,9 +1291,23 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
       lastUserAt = Math.max(lastUserAt, eventAt);
       continue;
     }
-    if (event.type === 'event_msg' && payload.message) {
-      lastUserAt = Math.max(lastUserAt, eventAt);
-      continue;
+    if (event.type === 'event_msg') {
+      const payloadType = String(payload.type || payload.kind || '');
+      if (/user_message|user_input|prompt/i.test(payloadType)) {
+        lastUserAt = Math.max(lastUserAt, eventAt);
+        continue;
+      }
+      if (/agent_message|assistant_message|final_answer|task_complete/i.test(payloadType)) {
+        const message = compactCodexSessionMessage(codexSessionEventText(payload), '');
+        if (message) {
+          lastAssistantAt = eventAt;
+          lastAssistant = message;
+        }
+        continue;
+      }
+      if (/begin|started|running|exec_command|tool|function_call/i.test(payloadType)) {
+        lastWorkAt = Math.max(lastWorkAt, eventAt);
+      }
     }
     if (event.type === 'response_item') {
       if (payload.role === 'user') {
@@ -1264,34 +1315,42 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
         continue;
       }
       if (payload.role === 'assistant' || payload.type === 'message') {
-        const text = extractCodexSessionContent(payload.content);
-        if (text) {
+        const message = compactCodexSessionMessage(codexSessionEventText(payload), '');
+        if (message) {
           lastAssistantAt = eventAt;
-          lastAssistant = text;
+          lastAssistant = message;
         }
       }
-      if (/function_call|tool|command|approval|permission/i.test(String(payload.type || ''))) {
-        lastUserAt = Math.max(lastUserAt, eventAt);
+      if (/function_call|tool|command|exec/i.test(String(payload.type || ''))) {
+        lastWorkAt = Math.max(lastWorkAt, eventAt);
       }
+      continue;
     }
     const raw = line.toLowerCase();
-    if (/requestapproval|request_user_input|permission|approval|guardian|error|failed|denied/.test(raw)) {
+    if (isCodexProblemEvent(event.type, payload, raw)) {
       lastProblemAt = eventAt;
-      lastProblem = extractCodexSessionContent(payload.message ?? payload.error ?? payload.content) || '需要在 Codex 中处理';
+      lastProblem = compactCodexSessionMessage(codexSessionEventText(payload), '需要在 Codex 中处理');
     }
   }
-  const cwdName = session.cwd ? path.basename(session.cwd) : 'Codex';
-  const prefix = `[${session.id.slice(0, 8)} · ${cwdName}]`;
-  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt) {
+  const title = codexSessionTitle(session);
+  const prefix = `[${title}]`;
+  const latestActivityAt = Math.max(lastUserAt, lastWorkAt, lastAssistantAt, lastProblemAt, mtimeMs);
+  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt && lastProblemAt >= lastWorkAt) {
     session.status = CODEX_STATUS.NEEDS_INPUT;
     session.message = `${prefix} ${lastProblem}`;
-  } else if (lastAssistantAt && lastAssistantAt >= lastUserAt) {
+    session.eventAt = lastProblemAt;
+  } else if (lastAssistantAt && lastAssistantAt >= lastUserAt && lastAssistantAt >= lastWorkAt) {
     session.status = CODEX_STATUS.DONE;
     session.message = `${prefix} ${lastAssistant}`;
+    session.eventAt = lastAssistantAt;
   } else {
     session.status = CODEX_STATUS.WORKING;
     session.message = `${prefix} Codex 正在工作中`;
+    session.eventAt = latestActivityAt;
   }
+  session.updatedAt = latestActivityAt;
+  session.title = title;
+  session.ackKey = `${session.id}:${session.status}:${Math.round(session.eventAt)}`;
   return session;
 }
 
@@ -1324,13 +1383,17 @@ async function getInheritedCodingState() {
       // Ignore unreadable sessions.
     }
   }
-  const actionable = sessions.filter((session) => session.status !== CODEX_STATUS.WORKING);
+  const unacknowledged = sessions.filter((session) => (
+    session.status === CODEX_STATUS.WORKING
+    || inheritedCodingAcknowledged.get(session.id) !== session.ackKey
+  ));
+  const actionable = unacknowledged.filter((session) => session.status !== CODEX_STATUS.WORKING);
   const status = actionable.some((session) => session.status === CODEX_STATUS.NEEDS_INPUT)
     ? CODEX_STATUS.NEEDS_INPUT
     : actionable.some((session) => session.status === CODEX_STATUS.DONE)
       ? CODEX_STATUS.DONE
       : CODEX_STATUS.WORKING;
-  const selected = actionable.length > 0 ? actionable : sessions.slice(0, 3);
+  const selected = actionable.length > 0 ? actionable : unacknowledged.slice(0, 3);
   const messages = selected.slice(0, 5).map((session) => ({
     id: `inherit-${session.id}-${Math.round(session.updatedAt)}`,
     role: session.status === CODEX_STATUS.NEEDS_INPUT ? 'error' : session.status === CODEX_STATUS.DONE ? 'codex' : 'system',
@@ -1352,7 +1415,39 @@ async function getInheritedCodingState() {
       createdAt: Date.now(),
     });
   }
-  return { status, messages };
+  return {
+    status,
+    messages,
+    sessions: selected.slice(0, 12).map((session) => ({
+      id: session.id,
+      ackKey: session.ackKey,
+      title: session.title,
+      status: session.status,
+      message: session.message,
+      updatedAt: session.updatedAt,
+      cwd: session.cwd,
+      path: session.path,
+    })),
+  };
+}
+
+async function ackInheritedCodingSessions({ ackKeys } = {}) {
+  if (Array.isArray(ackKeys)) {
+    for (const item of ackKeys) {
+      if (!item || typeof item !== 'object') continue;
+      const id = String(item.id || '');
+      const ackKey = String(item.ackKey || '');
+      if (id && ackKey) inheritedCodingAcknowledged.set(id, ackKey);
+    }
+  } else {
+    const state = await getInheritedCodingState();
+    for (const session of state.sessions || []) {
+      if (session.status !== CODEX_STATUS.WORKING && session.id && session.ackKey) {
+        inheritedCodingAcknowledged.set(session.id, session.ackKey);
+      }
+    }
+  }
+  return getInheritedCodingState();
 }
 
 const keyStore = new Map();
@@ -1415,6 +1510,7 @@ const handlers = {
   check_distraction: checkDistraction,
   coding_get_state: () => publishCodingState(),
   coding_get_inherited_state: getInheritedCodingState,
+  coding_ack_inherited_sessions: ackInheritedCodingSessions,
   coding_send_message: sendCodingMessage,
   coding_clear: () => {
     codingState.messages = [];

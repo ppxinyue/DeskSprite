@@ -1134,3 +1134,12 @@
 - 提示：保留底部红色小字，提醒用户回到 Codex 中处理或继续输入。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R145. 继承 Session 通知与会话列表修复（2026-05-10）
+- 主进程：继承模式扫描 Codex JSONL 时拆出 session 标题、状态、最新通知和 `ackKey`，并支持 `coding_ack_inherited_sessions` 确认已读。
+- 清空：小窗和大窗的“清空”在继承模式下不再清真实 Codex session，而是确认当前红/绿通知，避免同一条消息反复弹回。
+- 小窗：继承模式默认只展示最新一个未读/已完成 session 的回复；所有 session 都没有红绿通知时保持黄色工作中提示。
+- 大窗：继承模式下把不同 Codex session 渲染成左侧不同会话项，右侧继续使用普通 chat 的 quiet-card、气泡和只读提示样式。
+- 状态：聚合规则改为红色优先、绿色其次、无可通知输出时黄色，更贴近“Codex 离开后完成再通知”的使用场景。
+- 验证：`pnpm exec tsc -b --pretty false`、`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md

@@ -186,10 +186,22 @@ interface CodingMessage {
   createdAt: number;
 }
 
+interface CodingInheritedSession {
+  id: string;
+  ackKey: string;
+  title: string;
+  status: CodingStatus;
+  message: string;
+  updatedAt: number;
+  cwd?: string;
+  path?: string;
+}
+
 interface CodingState {
   status: CodingStatus;
   messages: CodingMessage[];
   threadId?: string;
+  sessions?: CodingInheritedSession[];
 }
 
 const DEFAULT_CODING_STATE: CodingState = { status: 'done', messages: [] };
@@ -342,25 +354,38 @@ function CodingDialog({
   const [input, setInput] = useState('');
   const [historyItems, setHistoryItems] = useState<Array<{ id: number; title: string | null; updatedAt: string }>>([]);
   const [archivedMessages, setArchivedMessages] = useState<ChatMessage[] | null>(null);
+  const [activeInheritedSessionId, setActiveInheritedSessionId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
+  const applyCodingState = useCallback((next: CodingState | null | undefined) => {
+    const resolved = next ?? DEFAULT_CODING_STATE;
+    setState(resolved);
+    if (settings.codingSessionMode !== 'inherit') return;
+    setActiveInheritedSessionId((current) => {
+      if (current && resolved.sessions?.some((session) => session.id === current)) return current;
+      return resolved.sessions?.find((session) => session.status !== 'working')?.id
+        ?? resolved.sessions?.[0]?.id
+        ?? null;
+    });
+  }, [settings.codingSessionMode]);
+
   useEffect(() => {
     invoke<CodingState>(codingStateCommand(settings.codingSessionMode))
-      .then((next) => setState(next ?? DEFAULT_CODING_STATE))
+      .then(applyCodingState)
       .catch((error) => setState({
         status: 'needs-input',
         messages: [{ id: 'coding-error', role: 'error', content: codingConnectionErrorMessage(error), createdAt: Date.now() }],
       }));
     const unlisten = settings.codingSessionMode === 'new' ? listen<CodingState>('coding:state', ({ payload }) => {
-      setState(payload ?? DEFAULT_CODING_STATE);
+      applyCodingState(payload);
     }) : Promise.resolve(() => {});
     let timer = 0;
     if (settings.codingSessionMode === 'inherit') {
       timer = window.setInterval(() => {
         invoke<CodingState>('coding_get_inherited_state')
-          .then((next) => setState(next ?? DEFAULT_CODING_STATE))
+          .then(applyCodingState)
           .catch((error) => setState({
             status: 'needs-input',
             messages: [{ id: 'coding-inherit-error', role: 'error', content: codingConnectionErrorMessage(error), createdAt: Date.now() }],
@@ -371,7 +396,7 @@ function CodingDialog({
       if (timer) window.clearInterval(timer);
       unlisten.then((fn) => fn());
     };
-  }, [settings.codingSessionMode]);
+  }, [applyCodingState, settings.codingSessionMode]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -423,6 +448,14 @@ function CodingDialog({
 
   const clear = async () => {
     setArchivedMessages(null);
+    if (settings.codingSessionMode === 'inherit') {
+      const ackKeys = (state.sessions || [])
+        .filter((session) => session.status !== 'working')
+        .map((session) => ({ id: session.id, ackKey: session.ackKey }));
+      const next = await invoke<CodingState>('coding_ack_inherited_sessions', { ackKeys }).catch(() => null);
+      applyCodingState(next);
+      return;
+    }
     localStorage.removeItem(CODING_CONVERSATION_KEY);
     localStorage.removeItem(CODING_SAVED_MESSAGES_KEY);
     await invoke('coding_clear').catch(() => {});
@@ -442,10 +475,22 @@ function CodingDialog({
     }
   };
 
-  const messages = state.messages.map(codingMessageToChatMessage);
-  const visibleMessages = archivedMessages ?? messages;
   const isWorking = state.status === 'working';
   const inherited = settings.codingSessionMode === 'inherit';
+  const inheritedSessions = state.sessions || [];
+  const activeInheritedSession = inherited
+    ? (standalone
+      ? inheritedSessions.find((session) => session.id === activeInheritedSessionId) ?? inheritedSessions[0]
+      : inheritedSessions.find((session) => session.status !== 'working') ?? inheritedSessions[0])
+    : null;
+  const inheritedMessages = activeInheritedSession ? [codingMessageToChatMessage({
+    id: `inherit-panel-${activeInheritedSession.id}-${Math.round(activeInheritedSession.updatedAt)}`,
+    role: activeInheritedSession.status === 'needs-input' ? 'error' : activeInheritedSession.status === 'done' ? 'codex' : 'system',
+    content: activeInheritedSession.message,
+    createdAt: activeInheritedSession.updatedAt,
+  })] : state.messages.map(codingMessageToChatMessage);
+  const messages = inherited ? inheritedMessages : state.messages.map(codingMessageToChatMessage);
+  const visibleMessages = archivedMessages ?? messages;
 
   if (standalone) {
     return (
@@ -455,11 +500,32 @@ function CodingDialog({
           <div className="app-no-drag shrink-0 p-3">
             <button className="flex h-10 w-full items-center gap-2 rounded-[12px] px-3 text-left text-[14px] font-medium leading-[1.5] transition-all duration-200 hover:bg-background/55" onClick={clear}>
               <Plus className="h-4 w-4" />
-              {inherited ? '继承当前 session' : '新建对话'}
+              {inherited ? '清空通知' : '新建对话'}
             </button>
           </div>
           <div className="app-no-drag min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-            {historyItems.map((item) => (
+            {inherited ? (
+              inheritedSessions.length === 0 ? (
+                <div className="px-3 py-6 text-[13px] leading-[1.5] text-[var(--text-secondary)]">暂无最近 Codex session</div>
+              ) : inheritedSessions.map((session) => (
+                <button
+                  key={session.id}
+                  className={`block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52 ${activeInheritedSession?.id === session.id ? 'bg-background/58' : ''}`}
+                  onClick={() => {
+                    setArchivedMessages(null);
+                    setActiveInheritedSessionId(session.id);
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(session.status)}`} />
+                    <span className="min-w-0 truncate text-[14px] leading-[1.5]">{session.title}</span>
+                  </div>
+                  <div className="mt-0.5 truncate text-[12px] leading-[1.5] text-[var(--text-secondary)]">
+                    {formatCodingTimestamp(session.updatedAt)}
+                  </div>
+                </button>
+              ))
+            ) : historyItems.map((item) => (
               <button
                 key={item.id}
                 className="block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52"
@@ -480,7 +546,7 @@ function CodingDialog({
               <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
               <span>Codex</span>
             </div>
-            <Button variant="ghost" size="sm" className="h-8 rounded-[7px] px-2.5 text-[12px]" onClick={clear} disabled={inherited}>
+            <Button variant="ghost" size="sm" className="h-8 rounded-[7px] px-2.5 text-[12px]" onClick={clear}>
               清空
             </Button>
           </div>
@@ -506,25 +572,30 @@ function CodingDialog({
                   )}
                 </div>
               </div>
-              <div className="shrink-0 px-2 pb-2">
-                <div className="mx-auto w-full max-w-none">
-                  <Composer
-                    input={inherited ? '' : input}
-                    isStreaming={isWorking}
-                    onInputChange={setInput}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        send();
-                      }
-                    }}
-                    onSubmit={send}
-                    selectedImage={null}
-                    textareaRef={textareaRef}
-                    error={inherited ? '继承当前 session 时请回到 Codex 中处理或继续输入。' : null}
-                  />
+              {inherited ? (
+                <p className="shrink-0 px-5 pb-4 pt-1 text-[12px] leading-5 text-destructive">
+                  继承当前 session 时请回到 Codex 中处理或继续输入。
+                </p>
+              ) : (
+                <div className="shrink-0 px-2 pb-2">
+                  <div className="mx-auto w-full max-w-none">
+                    <Composer
+                      input={input}
+                      isStreaming={isWorking}
+                      onInputChange={setInput}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                          event.preventDefault();
+                          send();
+                        }
+                      }}
+                      onSubmit={send}
+                      selectedImage={null}
+                      textareaRef={textareaRef}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </section>
           </div>
         </main>
@@ -648,6 +719,17 @@ function formatAppConversationTime(value: string) {
     : `${value.replace(' ', 'T')}Z`;
   const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatCodingTimestamp(value: number) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleString([], {
     month: 'short',
     day: 'numeric',
