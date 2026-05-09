@@ -936,3 +936,10 @@
 - 运行时：`getActiveSystemPrompt()` 在 orb 模式下读取用户保存的 orb prompt，没有保存时回退到默认 orb prompt。
 - 验证：`pnpm build` 通过。
 - 文件：SettingsPanel.tsx, systemPrompt.ts, ISSUES.md, PROGRESS.md
+
+### R118. 外观模式与身份设置重组（2026-05-09）
+- 外观：将 Pet/Orb 形象模式移动到外观页最上方，并独立成单独设置组。
+- AI 对话：将宠物名字与 System Prompt 合并到同一个身份设置组。
+- Orb：orb 模式下宠物名字改为收起态不可展开，System Prompt 保持可编辑。
+- 验证：`pnpm build` 通过。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

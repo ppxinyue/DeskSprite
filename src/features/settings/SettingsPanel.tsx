@@ -195,6 +195,23 @@ function CollapsedUnavailableSection({ title, reason }: { title: string; reason:
   );
 }
 
+function CollapsedUnavailableRow({ title, reason }: { title: string; reason: string }) {
+  return (
+    <button
+      type="button"
+      disabled
+      className="flex min-h-[44px] w-full cursor-not-allowed items-center justify-between gap-3 border-b border-border/45 px-0 py-2 text-left last:border-0"
+      aria-expanded={false}
+    >
+      <div className="min-w-0">
+        <div className="text-[13px] font-medium leading-5 text-muted-foreground">{title}</div>
+        <div className="mt-1 text-[11px] leading-5 text-muted-foreground/70">{reason}</div>
+      </div>
+      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/55" />
+    </button>
+  );
+}
+
 function ProfileSection() {
   const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -478,16 +495,19 @@ function AppearanceSection({
       </div>
 
       <SettingsGroup>
-        <AppearanceRow label="主题">
-          <ThemeSelect
-            value={draft.theme}
-            onChange={(theme) => update('theme', theme)}
-          />
-        </AppearanceRow>
         <AppearanceRow label="形象模式">
           <AvatarModeSelect
             value={draft.avatarRenderMode}
             onChange={(avatarRenderMode) => update('avatarRenderMode', avatarRenderMode)}
+          />
+        </AppearanceRow>
+      </SettingsGroup>
+
+      <SettingsGroup>
+        <AppearanceRow label="主题">
+          <ThemeSelect
+            value={draft.theme}
+            onChange={(theme) => update('theme', theme)}
           />
         </AppearanceRow>
         <AppearanceRow label="灵宠/悬浮球透明度">
@@ -1535,14 +1555,41 @@ function AISection({
   return (
     <>
       <SectionTitle>身份设置</SectionTitle>
-      <SettingRow label="宠物名字" hint={orbMode ? 'Orb 模式使用通用 AI 助手身份' : undefined}>
-        <Input
-          value={settings.petName}
-          onChange={(e) => updateSetting('petName', e.target.value)}
-          disabled={orbMode}
-          className="w-48 disabled:cursor-not-allowed disabled:opacity-45"
-        />
-      </SettingRow>
+      <SettingsGroup>
+        {orbMode ? (
+          <div className="px-4">
+            <CollapsedUnavailableRow title="宠物名字" reason="Orb 模式使用通用 AI 助手身份" />
+          </div>
+        ) : (
+          <div className="px-4">
+            <SettingRow label="宠物名字">
+              <Input
+                value={settings.petName}
+                onChange={(e) => updateSetting('petName', e.target.value)}
+                className="w-48"
+              />
+            </SettingRow>
+          </div>
+        )}
+        <div className="px-4 py-4">
+          <div className="mb-2 text-[13px] font-medium leading-5 text-foreground">System Prompt</div>
+          {orbMode && (
+            <div className="mb-2 text-[11px] leading-5 text-muted-foreground">
+              Orb 模式使用独立的 AI 助手 Prompt，不会覆盖灵宠模式的设定。
+            </div>
+          )}
+          <Textarea
+            value={displayedSystemPrompt}
+            onChange={(e) => setDisplayedSystemPrompt(e.target.value)}
+            rows={6}
+            className="font-mono text-[13px]"
+          />
+          <div className="flex gap-2 mt-3">
+            <Button onClick={() => saveDisplayedSystemPrompt()}>保存</Button>
+            <Button variant="outline" onClick={resetDisplayedSystemPrompt}>重置为默认</Button>
+          </div>
+        </div>
+      </SettingsGroup>
 
       <Separator className="my-6" />
       <SectionTitle>内置额度</SectionTitle>
@@ -1656,24 +1703,6 @@ function AISection({
             暂无 API 配置，点击"添加配置"按钮添加
           </div>
         )}
-      </div>
-
-      <Separator className="my-6" />
-      <SectionTitle>System Prompt</SectionTitle>
-      {orbMode && (
-        <div className="mb-2 text-[11px] leading-5 text-muted-foreground">
-          Orb 模式使用独立的 AI 助手 Prompt，不会覆盖灵宠模式的设定。
-        </div>
-      )}
-      <Textarea
-        value={displayedSystemPrompt}
-        onChange={(e) => setDisplayedSystemPrompt(e.target.value)}
-        rows={6}
-        className="font-mono text-[13px]"
-      />
-      <div className="flex gap-2 mt-3">
-        <Button onClick={() => saveDisplayedSystemPrompt()}>保存</Button>
-        <Button variant="outline" onClick={resetDisplayedSystemPrompt}>重置为默认</Button>
       </div>
 
       <Separator className="my-6" />

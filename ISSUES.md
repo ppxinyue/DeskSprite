@@ -1451,3 +1451,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/ai/systemPrompt.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：不可用功能应从信息架构上收纳，而不是只做视觉降权；模式专属 prompt 需要独立存储，避免污染另一种模式。
 - 是否需更新技术文档：否。
+
+## ISSUE-123
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：外观模式与 AI 身份设置重组
+- 严重程度：改进
+- 问题现象：Pet/Orb 模式切换仍混在外观基础设置中，不够突出；AI 对话中宠物名字与 System Prompt 分散展示；orb 模式下宠物名字只是禁用而不是收起态。
+- 原因分析：上一版按控件类型局部处理，没有按“形象模式”和“身份设置”两个信息层级重新组织页面。
+- 解决方案：把形象模式移动到外观页最上方独立成组；将宠物名字和 System Prompt 合并到同一个身份设置组；orb 模式下宠物名字渲染为收起态不可展开行，prompt 继续可编辑。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：模式开关属于高层配置，应在页面顶端独立呈现；身份相关字段应集中，避免用户在页面中来回寻找。
+- 是否需更新技术文档：否。
