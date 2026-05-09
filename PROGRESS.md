@@ -809,3 +809,10 @@
 - 动效：每个字母由 TS 计算位移、旋转和缩放变量，CSS 负责平滑过渡；吸到中心后保留轻微亮度脉冲。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R100. Orb Work 内核公转（2026-05-09）
+- Work：为每个字母增加 orbit 容器，字母被吸入后落在内核附近的小轨道点上，而不是完全重叠到中心。
+- 公转：orbit 容器以 16s 一圈缓慢旋转，四个字母错开相位围绕内核公转。
+- 连续性：保留上一轮四角逐字吸附的倒计时进度映射，只改变吸附完成后的运动方式。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

@@ -510,6 +510,15 @@
   pointer-events: none;
 }
 
+.orb-avatar__work-orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: orbWorkOrbit 16s linear infinite;
+  animation-delay: calc(var(--stack-index) * -4s);
+}
+
 .orb-avatar__work-letter {
   position: absolute;
   left: 50%;
@@ -592,6 +601,11 @@
 }
 
 @keyframes orbRestLetters {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orbWorkOrbit {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
