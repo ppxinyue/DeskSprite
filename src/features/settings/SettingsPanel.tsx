@@ -682,11 +682,11 @@ function RemindersSection({
         </AppearanceRow>
         <AppearanceRow label="休息时长">
           <div className="flex max-w-[320px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.restDurationSeconds}s</span>
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{Math.round(draft.restDurationSeconds / 60)}min</span>
             <Slider
               value={[draft.restDurationSeconds]}
               onValueChange={([v]) => update('restDurationSeconds', v)}
-              min={10} max={300} step={5} className="w-52"
+              min={60} max={7200} step={60} className="w-52"
             />
           </div>
         </AppearanceRow>

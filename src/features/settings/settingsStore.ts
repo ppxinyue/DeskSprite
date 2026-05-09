@@ -170,7 +170,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
                 : key === 'restReminderIntervalMinutes' && typeof parsed === 'number'
                   ? Math.min(240, Math.max(1, parsed))
                 : key === 'restDurationSeconds' && typeof parsed === 'number'
-                  ? Math.min(600, Math.max(10, parsed))
+                  ? Math.min(7200, Math.max(60, parsed))
                 : key === 'focusDurationMinutes' && typeof parsed === 'number'
                   ? Math.min(240, Math.max(1, parsed))
                 : key === 'distractionGraceSeconds' && typeof parsed === 'number'

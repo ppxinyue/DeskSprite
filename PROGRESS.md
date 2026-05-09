@@ -991,3 +991,10 @@
 - 布局：绕圈半径按整组高度计算，避免按钮贴近屏幕边缘。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R126. 休息时长范围改为 1-120 分钟（2026-05-09）
+- 设置：休息时长滑块改为 1-120min，步进 1min。
+- 存储：继续使用 `restDurationSeconds` 秒值，范围 clamp 为 60-7200 秒。
+- 状态机：进入 rest 时最短按 60 秒计算，避免旧 10 秒配置继续生效。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md

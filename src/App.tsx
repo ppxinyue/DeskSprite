@@ -676,7 +676,7 @@ function PetWindow() {
   }, [animateRestPresentation, applyLayoutState, requestLayout, settings.petScale]);
 
   const startRestAction = useCallback(() => {
-    const endAt = Date.now() + Math.max(10, settings.restDurationSeconds) * 1000;
+    const endAt = Date.now() + Math.max(60, settings.restDurationSeconds) * 1000;
     const shouldStartNextFocus = autoFocusAfterRestRef.current || petPrompt?.id === 'focus-complete';
     setPetPrompt(null);
     setFocusEndAt(null);
