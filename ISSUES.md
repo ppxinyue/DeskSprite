@@ -1511,3 +1511,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/animations.ts`, `public/assets/rest/gif`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：位图/GIF 素材应避免超过原始观感尺度展示，动态呈现可以通过路径运动而不是强制缩放实现。
 - 是否需更新技术文档：否。
+
+## ISSUE-128
+- 发现时间：2026-05-09
+- 发现者：用户素材更新
+- 相关任务：全量纳入 public/assets 新素材
+- 严重程度：重要
+- 问题现象：`public/assets` 下新增了大量 pet 素材，rest 默认目录中的 `IMG_3448.GIF`、`IMG_3449.GIF` 已被替换为 `IMG_3452.GIF` - `IMG_3458.GIF`，但默认渲染配置仍引用旧文件。
+- 原因分析：素材文件批量更新后，静态默认资源列表和旧配置归一化清理规则没有同步刷新。
+- 解决方案：重新扫描 `public/assets`，将非 `.DS_Store` 素材纳入 git；更新 rest 默认 GIF 池为当前真实文件，并在 normalize 阶段清理旧 rest GIF 引用。
+- 涉及文件：`src/features/pet/animations.ts`, `public/assets`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：批量素材替换后需要同时提交文件变更和默认资源清单，否则运行时会继续请求不存在的文件。
+- 是否需更新技术文档：否。

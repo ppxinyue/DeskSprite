@@ -49,8 +49,13 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
     defaultGifAssets: [
       'assets/rest/gif/idle_raw_1.GIF',
       'assets/rest/gif/drinking_raw.GIF',
-      'assets/rest/gif/IMG_3448.GIF',
-      'assets/rest/gif/IMG_3449.GIF',
+      'assets/rest/gif/IMG_3452.GIF',
+      'assets/rest/gif/IMG_3453.GIF',
+      'assets/rest/gif/IMG_3454.GIF',
+      'assets/rest/gif/IMG_3455.GIF',
+      'assets/rest/gif/IMG_3456.GIF',
+      'assets/rest/gif/IMG_3457.GIF',
+      'assets/rest/gif/IMG_3458.GIF',
     ],
     userFrames: [],
     userGifs: [],
@@ -133,11 +138,21 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
     : defaults.defaultGifAssets;
   const mergedDefaultGifAssets = state === 'rest'
     ? Array.from(new Set([
-      ...defaultGifAssets.filter((path) => !['assets/rest/gif/playing_clean_3.GIF', 'assets/rest/gif/rest.GIF'].includes(path)),
+      ...defaultGifAssets.filter((path) => ![
+        'assets/rest/gif/playing_clean_3.GIF',
+        'assets/rest/gif/rest.GIF',
+        'assets/rest/gif/IMG_3448.GIF',
+        'assets/rest/gif/IMG_3449.GIF',
+      ].includes(path)),
       'assets/rest/gif/idle_raw_1.GIF',
       'assets/rest/gif/drinking_raw.GIF',
-      'assets/rest/gif/IMG_3448.GIF',
-      'assets/rest/gif/IMG_3449.GIF',
+      'assets/rest/gif/IMG_3452.GIF',
+      'assets/rest/gif/IMG_3453.GIF',
+      'assets/rest/gif/IMG_3454.GIF',
+      'assets/rest/gif/IMG_3455.GIF',
+      'assets/rest/gif/IMG_3456.GIF',
+      'assets/rest/gif/IMG_3457.GIF',
+      'assets/rest/gif/IMG_3458.GIF',
     ]))
     : defaultGifAssets;
   const defaultAssets = raw.defaultAssets?.length

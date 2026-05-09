@@ -970,3 +970,10 @@
 - 素材：同步当前 rest GIF 池，移除已删除的 `rest.GIF`，加入 `IMG_3448.GIF`、`IMG_3449.GIF`。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, animations.ts, public/assets/rest/gif, ISSUES.md, PROGRESS.md
+
+### R123. 全量纳入 public/assets 新素材（2026-05-09）
+- 素材：重新扫描并纳入 `public/assets` 下新增/更新的运行素材，排除 `.DS_Store`。
+- Rest：默认休息 GIF 池切换到当前目录里的 `IMG_3452.GIF` - `IMG_3458.GIF`，并保留 `idle_raw_1.GIF`、`drinking_raw.GIF`。
+- 兼容：normalize 阶段清理已删除的 `IMG_3448.GIF`、`IMG_3449.GIF`、`rest.GIF`、`playing_clean_3.GIF` 引用。
+- 验证：`pnpm build` 通过。
+- 文件：animations.ts, public/assets, ISSUES.md, PROGRESS.md
