@@ -746,3 +746,11 @@
 - rest：重复的 `rest` 字母铺在圆圈外侧，整圈快速旋转；圆圈和边框都保留柔和透明呼吸。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R91. Orb 参考效果复现增强（2026-05-09）
+- idle：改为多条独立卫星轨道，每个字母在外圈轨道上错峰慢速绕行，首个轨道带柔灰 satellite dot。
+- work：增加连续下落的 `work` 字母流，同时保留按专注进度堆叠到底部的确定性字母。
+- rest：改为 16 条 `REST` 外圈轨道，每条带极淡分隔线，整组快速旋转。
+- 质感：增加中心柔灰 nucleus 脉冲，边框、文字和背景全部使用低透明灰阶，接近用户提供 demo 的克制黑白灰气质。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

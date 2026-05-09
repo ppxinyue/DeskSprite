@@ -576,7 +576,12 @@ function OrbAvatar({
   const [hovering, setHovering] = useState(false);
   const fontSize = Math.max(9, Math.round(size * 0.052));
   const letters = meta.label.split('');
-  const restLetters = Array.from({ length: 28 }, (_, index) => 'rest'[index % 4]);
+  const workDrops = Array.from({ length: 12 }, (_, index) => ({
+    char: 'work'[index % 4],
+    x: ((index * 37) % 70) - 35,
+    drift: ((index * 19) % 18) - 9,
+  }));
+  const restSpokes = Array.from({ length: 16 }, (_, index) => index);
   const fallEase = (value: number) => value * value * (3 - 2 * value);
 
   return (
@@ -596,20 +601,33 @@ function OrbAvatar({
             {letters.map((letter, index) => (
               <span
                 key={`${letter}-${index}`}
-                className="orb-avatar__idle-letter"
+                className="orb-avatar__idle-orbit"
                 style={{
                   '--letter-index': String(index),
                   '--letter-count': String(letters.length),
                 } as CSSProperties & Record<string, string>}
               >
-                {letter}
+                <span className="orb-avatar__idle-letter">{letter}</span>
+                {index === 0 && <span className="orb-avatar__satellite-dot" />}
               </span>
             ))}
-            <span className="orb-avatar__satellite-dot" />
           </div>
         )}
         {orbState === 'work' && (
           <div className="orb-avatar__work-field" aria-label={meta.label}>
+            {workDrops.map((drop, index) => (
+              <span
+                key={`${drop.char}-${index}`}
+                className="orb-avatar__work-drop"
+                style={{
+                  '--drop-index': String(index),
+                  '--drop-x': `${drop.x}%`,
+                  '--drop-drift': `${drop.drift}%`,
+                } as CSSProperties & Record<string, string>}
+              >
+                {drop.char}
+              </span>
+            ))}
             {letters.map((letter, index) => {
               const localProgress = fallEase(clamp(focusProgress * letters.length - index, 0, 1));
               return (
@@ -630,20 +648,22 @@ function OrbAvatar({
         )}
         {orbState === 'rest' && (
           <div className="orb-avatar__rest-ring" aria-label={meta.label}>
-            {restLetters.map((letter, index) => (
+            {restSpokes.map((index) => (
               <span
-                key={`${letter}-${index}`}
-                className="orb-avatar__rest-letter"
+                key={index}
+                className="orb-avatar__rest-spoke"
                 style={{
                   '--letter-index': String(index),
-                  '--letter-count': String(restLetters.length),
+                  '--letter-count': String(restSpokes.length),
                 } as CSSProperties & Record<string, string>}
               >
-                {letter}
+                <span className="orb-avatar__rest-word">rest</span>
+                <span className="orb-avatar__rest-line" />
               </span>
             ))}
           </div>
         )}
+        <div className="orb-avatar__nucleus" />
         <div className="orb-avatar__hover-text">{meta.label}</div>
       </div>
     </div>

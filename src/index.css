@@ -373,8 +373,9 @@
   height: 100%;
   border-radius: 50%;
   overflow: visible;
-  border: 1.5px solid rgba(20,20,20,0.42);
-  background: transparent;
+  border: 1.5px solid rgba(128,128,128,0.18);
+  background: rgba(128,128,128,0.035);
+  box-shadow: inset 0 0 40px rgba(128,128,128,0.05);
   animation: orbShellBreath 4.8s ease-in-out infinite;
 }
 
@@ -414,52 +415,78 @@
 }
 
 .orb-avatar__idle-ring {
-  animation: orbIdleSatellite 18s linear infinite;
+  inset: -26%;
+}
+
+.orb-avatar__idle-orbit,
+.orb-avatar__rest-spoke {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.orb-avatar__idle-orbit {
+  animation: orbIdleSatellite 15s linear infinite;
+  animation-delay: calc(var(--letter-index) * -0.25s);
 }
 
 .orb-avatar__idle-letter,
-.orb-avatar__rest-letter {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  color: rgba(20,20,20,0.42);
+.orb-avatar__rest-word {
+  color: rgba(20,20,20,0.32);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
-  font-size: calc(var(--orb-font-size) * 0.86);
-  font-weight: 480;
+  font-size: calc(var(--orb-font-size) * 0.78);
+  font-weight: 700;
+  letter-spacing: 0.18em;
   line-height: 1;
+  text-transform: uppercase;
 }
 
 .orb-avatar__idle-letter {
-  transform:
-    translate(-50%, -50%)
-    rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
-    translateY(calc(var(--orb-size) * -0.43))
-    rotate(calc(-360deg / var(--letter-count) * var(--letter-index)));
+  transform: translateY(calc(var(--orb-size) * -0.018));
 }
 
 .orb-avatar__satellite-dot {
   position: absolute;
-  left: 50%;
-  top: 50%;
+  top: calc(var(--orb-size) * 0.09);
   width: calc(var(--orb-size) * 0.035);
   height: calc(var(--orb-size) * 0.035);
   border-radius: 999px;
-  background: rgba(20,20,20,0.34);
-  transform: translate(-50%, -50%) translateY(calc(var(--orb-size) * -0.43));
+  background: rgba(20,20,20,0.46);
+  box-shadow: 0 0 10px rgba(255,255,255,0.65);
+  animation: orbSatellitePulse 2s ease-in-out infinite;
 }
 
 .orb-avatar__work-field {
   position: absolute;
   inset: 0;
   border-radius: inherit;
+  overflow: hidden;
   pointer-events: none;
+}
+
+.orb-avatar__work-drop {
+  position: absolute;
+  left: calc(50% + var(--drop-x));
+  top: 0;
+  color: rgba(20,20,20,0.32);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  font-size: calc(var(--orb-font-size) * 1.05);
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0;
+  transform: translate(-50%, -60%);
+  animation: orbWorkDrop 4.2s cubic-bezier(.4,0,.2,1) infinite;
+  animation-delay: calc(var(--drop-index) * -0.35s);
 }
 
 .orb-avatar__work-letter {
   position: absolute;
   left: calc(50% + var(--letter-x));
   top: calc(20% + var(--fall-progress) * (63% - var(--stack-index) * 5%));
-  color: rgba(20,20,20,0.46);
+  color: rgba(20,20,20,0.24);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: calc(var(--orb-font-size) * 1.05);
   font-weight: 520;
@@ -470,18 +497,40 @@
 }
 
 .orb-avatar__rest-ring {
-  inset: -4%;
-  animation: orbRestLetters 2.2s linear infinite;
+  inset: -22%;
+  animation: orbRestLetters 4s linear infinite;
 }
 
-.orb-avatar__rest-letter {
-  font-size: calc(var(--orb-font-size) * 0.72);
-  opacity: 0.38;
-  transform:
-    translate(-50%, -50%)
-    rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
-    translateY(calc(var(--orb-size) * -0.51))
-    rotate(90deg);
+.orb-avatar__rest-spoke {
+  transform: rotate(calc(360deg / var(--letter-count) * var(--letter-index)));
+}
+
+.orb-avatar__rest-word {
+  opacity: 0.14;
+  transform: rotate(90deg);
+}
+
+.orb-avatar__rest-line {
+  position: absolute;
+  top: calc(var(--orb-size) * 0.08);
+  width: 1px;
+  height: calc(var(--orb-size) * 0.10);
+  background: rgba(20,20,20,0.07);
+}
+
+.orb-avatar__nucleus {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--orb-size) * 0.18);
+  height: calc(var(--orb-size) * 0.18);
+  border-radius: 999px;
+  background: rgba(20,20,20,0.12);
+  filter: blur(10px);
+  opacity: 0.26;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: orbNucleusPulse 4s ease-in-out infinite;
 }
 
 @keyframes orbBoundaryBreath {
@@ -490,8 +539,8 @@
 }
 
 @keyframes orbShellBreath {
-  0%, 100% { border-color: rgba(20,20,20,0.34); }
-  50% { border-color: rgba(20,20,20,0.54); }
+  0%, 100% { border-color: rgba(128,128,128,0.12); }
+  50% { border-color: rgba(128,128,128,0.32); }
 }
 
 @keyframes orbIdleSatellite {
@@ -502,4 +551,21 @@
 @keyframes orbRestLetters {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes orbSatellitePulse {
+  0%, 100% { opacity: 0.22; transform: scale(0.92); }
+  50% { opacity: 0.88; transform: scale(1.1); }
+}
+
+@keyframes orbWorkDrop {
+  0% { opacity: 0; transform: translate(-50%, -60%) translateX(0); }
+  14% { opacity: 0.55; }
+  72% { opacity: 0.55; transform: translate(-50%, calc(var(--orb-size) * 0.78)) translateX(var(--drop-drift)); }
+  100% { opacity: 0; transform: translate(-50%, calc(var(--orb-size) * 0.95)) translateX(var(--drop-drift)); }
+}
+
+@keyframes orbNucleusPulse {
+  0%, 100% { opacity: 0.14; transform: translate(-50%, -50%) scale(0.92); }
+  50% { opacity: 0.34; transform: translate(-50%, -50%) scale(1.18); }
 }
