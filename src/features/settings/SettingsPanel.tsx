@@ -12,7 +12,7 @@ import { useSettingsStore, type AvatarRenderMode, type ModelMode, type PetMotion
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG, getBuiltinUsageStats } from '@/features/ai/defaultModel';
-import { DEFAULT_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
+import { DEFAULT_SYSTEM_PROMPT, ORB_SYSTEM_PROMPT, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
 import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
@@ -132,8 +132,12 @@ export function SettingsPanel() {
   );
 }
 
-function SectionTitle({ children }: { children: ReactNode }) {
-  return <h2 className="mb-2 text-[18px] font-semibold tracking-[-0.018em] text-foreground">{children}</h2>;
+function SectionTitle({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
+  return (
+    <h2 className={`mb-2 text-[18px] font-semibold tracking-[-0.018em] ${muted ? 'text-muted-foreground/55' : 'text-foreground'}`}>
+      {children}
+    </h2>
+  );
 }
 
 function SettingRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -428,6 +432,7 @@ function AppearanceSection({
     setDraft((d) => ({ ...d, [k]: v }));
     updateSettings({ [k]: v }).catch(() => {});
   };
+  const orbMode = draft.avatarRenderMode === 'orb';
 
   // Sync draft with settings when they change externally
   useEffect(() => {
@@ -462,7 +467,7 @@ function AppearanceSection({
             onChange={(avatarRenderMode) => update('avatarRenderMode', avatarRenderMode)}
           />
         </AppearanceRow>
-        <AppearanceRow label="灵宠透明度">
+        <AppearanceRow label="灵宠/悬浮球透明度">
           <div className="flex max-w-[320px] items-center gap-3">
             <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.petOpacity.toFixed(1)}</span>
             <Slider
@@ -472,7 +477,7 @@ function AppearanceSection({
             />
           </div>
         </AppearanceRow>
-        <AppearanceRow label="灵宠大小">
+        <AppearanceRow label="灵宠/悬浮球大小">
           <div className="flex max-w-[320px] items-center gap-3">
             <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.petScale.toFixed(1)}</span>
             <Slider
@@ -510,8 +515,8 @@ function AppearanceSection({
         </AppearanceRow>
       </SettingsGroup>
 
-      <SectionTitle>灵宠动作</SectionTitle>
-      <SettingsGroup>
+      <SectionTitle muted={orbMode}>灵宠动作</SectionTitle>
+      <SettingsGroup className={orbMode ? 'pointer-events-none opacity-45 grayscale' : ''}>
         <div className="px-4 py-4">
           <PetMotionControls
             value={draft.petMotions}
@@ -520,8 +525,10 @@ function AppearanceSection({
         </div>
       </SettingsGroup>
 
-      <SectionTitle>形象自定义</SectionTitle>
-      <ImageSection />
+      <SectionTitle muted={orbMode}>形象自定义</SectionTitle>
+      <div className={orbMode ? 'pointer-events-none opacity-45 grayscale' : ''}>
+        <ImageSection />
+      </div>
 
     </>
   );
@@ -1455,6 +1462,9 @@ function AISection({
   setIsModalOpen: (v: boolean) => void;
   editingConfig: ApiConfig | null;
 }) {
+  const orbMode = settings.avatarRenderMode === 'orb';
+  const displayedSystemPrompt = orbMode ? ORB_SYSTEM_PROMPT : systemPrompt;
+
   const [builtinUsage, setBuiltinUsage] = useState<{
     chat: Awaited<ReturnType<typeof getBuiltinUsageStats>>;
     voice: Awaited<ReturnType<typeof getBuiltinVoiceUsageStats>>;
@@ -1474,9 +1484,14 @@ function AISection({
 
   return (
     <>
-      <SectionTitle>宠物身份</SectionTitle>
-      <SettingRow label="宠物名字">
-        <Input value={settings.petName} onChange={(e) => updateSetting('petName', e.target.value)} className="w-48" />
+      <SectionTitle>身份设置</SectionTitle>
+      <SettingRow label="宠物名字" hint={orbMode ? 'Orb 模式使用通用 AI 助手身份' : undefined}>
+        <Input
+          value={settings.petName}
+          onChange={(e) => updateSetting('petName', e.target.value)}
+          disabled={orbMode}
+          className="w-48 disabled:cursor-not-allowed disabled:opacity-45"
+        />
       </SettingRow>
 
       <Separator className="my-6" />
@@ -1595,10 +1610,16 @@ function AISection({
 
       <Separator className="my-6" />
       <SectionTitle>System Prompt</SectionTitle>
-      <Textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} rows={6} className="font-mono text-[13px]" />
+      <Textarea
+        value={displayedSystemPrompt}
+        onChange={(e) => setSystemPrompt(e.target.value)}
+        disabled={orbMode}
+        rows={6}
+        className="font-mono text-[13px] disabled:cursor-not-allowed disabled:opacity-60"
+      />
       <div className="flex gap-2 mt-3">
-        <Button onClick={() => updateSystemPrompt(systemPrompt)}>保存</Button>
-        <Button variant="outline" onClick={() => setSystemPrompt(DEFAULT_SYSTEM_PROMPT)}>重置为默认</Button>
+        <Button disabled={orbMode} onClick={() => updateSystemPrompt(systemPrompt)}>保存</Button>
+        <Button disabled={orbMode} variant="outline" onClick={() => setSystemPrompt(DEFAULT_SYSTEM_PROMPT)}>重置为默认</Button>
       </div>
 
       <Separator className="my-6" />

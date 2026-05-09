@@ -1427,3 +1427,15 @@
 - 涉及文件：`src/App.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：高频变化信息不一定适合动效，尤其是倒计时这种辅助信息，稳定性比表现力更重要。
 - 是否需更新技术文档：否。
+
+## ISSUE-121
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Pet/Orb 双模式设置适配
+- 严重程度：重要
+- 问题现象：新增 orb 模式后，设置-外观和设置-AI 对话中仍有大量只面向灵宠图片的文案和可编辑项；orb 模式下仍可编辑灵宠动作、形象自定义、宠物名字和 pet 身份 System Prompt；开关选中态蓝色与当前 orb/work 视觉色不统一。
+- 原因分析：orb 模式先接入了渲染层，设置页仍按 pet-only 信息架构展示；聊天运行时的系统提示词也只读取通用 pet prompt。
+- 解决方案：将透明度/大小文案改为灵宠/悬浮球；orb 模式下灰化并禁用灵宠动作、形象自定义和宠物名字；新增 `ORB_SYSTEM_PROMPT`，`getActiveSystemPrompt()` 根据 `avatarRenderMode` 自动返回 orb 专用 prompt；Switch 选中态改为 Vite 蓝。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/features/ai/systemPrompt.ts`, `src/components/ui/switch.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：双形象模式不只是渲染分支，设置项、身份设定和运行时 prompt 都需要按模式同步收敛。
+- 是否需更新技术文档：否。

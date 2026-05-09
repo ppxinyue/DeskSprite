@@ -921,3 +921,11 @@
 - 保留：倒计时 18px、深灰色和提前结束按钮 14px 的视觉尺寸。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R116. Pet/Orb 设置文案与 Prompt 分流（2026-05-09）
+- 外观：将灵宠透明度/大小文案扩展为灵宠/悬浮球，适配 pet 与 orb 两种形象模式。
+- Orb 禁用项：orb 模式下灵宠动作、形象自定义整体灰化并禁用交互。
+- AI 对话：orb 模式下宠物名字不可编辑，System Prompt 自动展示并使用 orb 专用 AI 助手 prompt。
+- 开关：全局 Switch 选中态改为 Vite 蓝 `#2f8fff`。
+- 验证：`pnpm build` 通过。
+- 文件：SettingsPanel.tsx, systemPrompt.ts, switch.tsx, ISSUES.md, PROGRESS.md
