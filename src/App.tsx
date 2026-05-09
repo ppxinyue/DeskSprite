@@ -497,7 +497,9 @@ function CodingDialog({
   const activeInheritedSession = inherited
     ? (standalone
       ? inheritedSessions.find((session) => session.id === activeInheritedSessionId) ?? inheritedSessions[0]
-      : inheritedSessions.find((session) => session.status !== 'working') ?? inheritedSessions[0])
+      : state.status === 'working'
+        ? inheritedSessions.find((session) => session.status === 'working') ?? inheritedSessions[0]
+        : inheritedSessions.find((session) => session.status !== 'working') ?? inheritedSessions[0])
     : null;
   const activeInheritedMessages = activeInheritedSession?.status === 'working' && activeInheritedSession.progressMessages?.length
     ? activeInheritedSession.progressMessages

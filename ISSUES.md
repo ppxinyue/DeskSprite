@@ -1871,3 +1871,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：compact 窗口的“定位”和“尺寸”必须解耦；继承外部 agent 时，中间文本应作为工作态日志，而不是覆盖或触发完成态。
 - 是否需更新技术文档：否。
+
+## ISSUE-158
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：继承 Coding 状态优先级修正
+- 严重程度：重要
+- 问题现象：虽然后端返回了 `progressMessages`，但黄色过程气泡没有稳定显示，旧的 done session 仍可能让按钮或小窗短暂变绿。
+- 原因分析：聚合状态仍然是 done 优先于 active working；前端 compact 继承模式也优先选择非 working session，导致 working session 的过程消息数组被跳过。
+- 解决方案：聚合优先级改为 needs-input > working > done > idle；compact 小窗在全局状态为 working 时优先渲染 working session。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：过程消息数组只是数据层能力，状态优先级和前端 session 选择也必须同步按 working 优先，UI 才会真实展示过程。
+- 是否需更新技术文档：否。

@@ -1425,14 +1425,22 @@ async function getInheritedCodingState() {
     session.status === CODEX_STATUS.WORKING
     && nowMs - session.updatedAt <= CODEX_INHERIT_ACTIVE_MS
   ));
-  const status = actionable.some((session) => session.status === CODEX_STATUS.NEEDS_INPUT)
+  const problemSessions = actionable.filter((session) => session.status === CODEX_STATUS.NEEDS_INPUT);
+  const doneSessions = actionable.filter((session) => session.status === CODEX_STATUS.DONE);
+  const status = problemSessions.length > 0
     ? CODEX_STATUS.NEEDS_INPUT
-    : actionable.some((session) => session.status === CODEX_STATUS.DONE)
-      ? CODEX_STATUS.DONE
-      : activeWorking.length > 0
-        ? CODEX_STATUS.WORKING
+    : activeWorking.length > 0
+      ? CODEX_STATUS.WORKING
+      : doneSessions.length > 0
+        ? CODEX_STATUS.DONE
         : CODEX_STATUS.IDLE;
-  const selected = actionable.length > 0 ? actionable : activeWorking.slice(0, 3);
+  const selected = status === CODEX_STATUS.NEEDS_INPUT
+    ? problemSessions
+    : status === CODEX_STATUS.WORKING
+      ? activeWorking
+      : status === CODEX_STATUS.DONE
+        ? doneSessions
+        : [];
   const messages = selected.slice(0, 5).map((session) => ({
     id: `inherit-${session.id}-${Math.round(session.updatedAt)}`,
     role: session.status === CODEX_STATUS.NEEDS_INPUT ? 'error' : session.status === CODEX_STATUS.DONE ? 'codex' : 'system',

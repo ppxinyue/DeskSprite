@@ -1196,3 +1196,10 @@
 - 过程消息：继承 session 会保留最近 8 条中间 agent 输出，黄色状态下逐条显示为气泡；切到绿色时只保留最终输出。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ChatDialog.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R153. 继承 Coding 状态优先级修正（2026-05-10）
+- 主进程：继承状态聚合改为红色需处理 > 黄色工作中 > 绿色完成 > 灰色空闲，避免旧完成通知压过当前 active working。
+- 小窗：继承模式处于黄色时优先选择 working session 渲染，因此 `progressMessages` 会实际显示为一串过程气泡。
+- 结果：agent 工作中即使已有旧的 green/done 输出，也不会把 chat button 或小窗内容抢成绿色。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
