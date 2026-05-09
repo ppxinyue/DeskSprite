@@ -900,3 +900,10 @@
 - 范围：pet 和 orb 模式共用 PetWindow 逻辑，因此两种模式同时生效。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R113. 休息倒计时尺寸与 Pop-in 动效（2026-05-09）
+- 尺寸：休息倒计时从 48px 缩小到 24px，提前结束按钮从 33px 缩小到 17px 左右。
+- 动效：新增 `AnimatedCountdown`，每秒倒计时变化时逐字符重新触发 Transitions.dev Number pop-in。
+- CSS：加入 `t-digit-pop-in` keyframes、stagger 变量和 reduced-motion 兜底。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, index.css, ISSUES.md, PROGRESS.md
