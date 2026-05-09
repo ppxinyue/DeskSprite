@@ -295,6 +295,7 @@ function PetWindow() {
   const restEndAtRef = useRef<number | null>(null);
   const focusStartedAtRef = useRef<number | null>(null);
   const focusWarningAtRef = useRef(0);
+  const autoFocusAfterRestRef = useRef(false);
   const restPresentationFrameRef = useRef<number | null>(null);
   const restPresentationSnapshotRef = useRef<RestPresentationSnapshot | null>(null);
   const visualPetScaleRef = useRef(settings.petScale);
@@ -563,26 +564,20 @@ function PetWindow() {
     });
   }, [animateRestPresentation, applyLayoutState, requestLayout, settings.petScale]);
 
-  const finishRest = useCallback(async () => {
-    restEndAtRef.current = null;
-    setRestEndAt(null);
-    setPetPrompt(null);
-    await restorePetAfterRest().catch(() => {});
-    setPetState('idle');
-  }, [restorePetAfterRest, setPetState]);
-
   const startRestAction = useCallback(() => {
     const endAt = Date.now() + REST_ACTION_DURATION_MS;
+    const shouldStartNextFocus = petPrompt?.id === 'focus-complete';
     setPetPrompt(null);
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
+    autoFocusAfterRestRef.current = shouldStartNextFocus;
     restEndAtRef.current = endAt;
     setRestEndAt(endAt);
     setNextRestReminderAt(Date.now() + Math.max(1, settings.restReminderIntervalMinutes) * 60_000);
     setPetState('rest');
     invoke("hide_compact_chat_window").catch(() => {});
     expandPetForRest().catch(() => {});
-  }, [expandPetForRest, settings.restReminderIntervalMinutes, setPetState]);
+  }, [expandPetForRest, petPrompt?.id, settings.restReminderIntervalMinutes, setPetState]);
 
   const dismissPrompt = useCallback(() => {
     setPetPrompt(null);
@@ -592,6 +587,7 @@ function PetWindow() {
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
     focusWarningAtRef.current = 0;
+    autoFocusAfterRestRef.current = false;
     setPetPrompt(null);
     if (!restEndAt) setPetState('idle');
   }, [restEndAt, setPetState]);
@@ -611,6 +607,17 @@ function PetWindow() {
     if (focusEndAtRef.current) endFocus();
     else startFocus();
   }, [endFocus, startFocus]);
+
+  const finishRest = useCallback(async () => {
+    const shouldStartNextFocus = autoFocusAfterRestRef.current;
+    autoFocusAfterRestRef.current = false;
+    restEndAtRef.current = null;
+    setRestEndAt(null);
+    setPetPrompt(null);
+    await restorePetAfterRest().catch(() => {});
+    if (shouldStartNextFocus) startFocus();
+    else setPetState('idle');
+  }, [restorePetAfterRest, setPetState, startFocus]);
 
   useEffect(() => {
     const config = mediaConfig[petState] ?? DEFAULT_MEDIA_CONFIG[petState];
