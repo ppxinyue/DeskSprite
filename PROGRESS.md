@@ -699,3 +699,11 @@
 - 体验：文字动效从“hover 才发生的翻牌”改为“常驻柔和呼吸”，和球体本体的呼吸、内部流动更一致。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R85. Orb 羽化边缘与自然能量体重做（2026-05-09）
+- 边缘：移除 Orb shell 的硬边框，改用 radial mask 做由内到外的透明羽化，让外边缘自然过渡到桌面。
+- 材质：重写球体内部渐变，加入柔和 edge bloom、conic 流光和更强的状态色能量层，整体更接近自然发光体而不是玻璃按钮。
+- 呼吸：扩大 shell 循环缩放幅度并调整节奏，让呼吸在正常桌面视距下可见；hover 时保留轻微聚焦放大。
+- 修复：修正 `orb-avatar__flow` 的 `inset: -24%` 被公共 selector 覆盖的问题，恢复内部流动层的真实运动范围。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

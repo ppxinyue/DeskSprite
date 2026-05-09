@@ -581,10 +581,10 @@ function OrbAvatar({
       <motion.div
         className="orb-avatar__shell"
         animate={{
-          scale: hovering ? 1.012 : [1, 1.04, 0.985, 1],
+          scale: hovering ? 1.035 : [0.965, 1.075, 0.99, 1.045, 0.965],
         }}
         transition={{
-          scale: hovering ? { duration: 0.2 } : { duration: 4.8, repeat: Infinity, ease: 'easeInOut' },
+          scale: hovering ? { duration: 0.24 } : { duration: 5.2, repeat: Infinity, ease: 'easeInOut' },
         }}
       >
         <motion.div

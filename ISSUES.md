@@ -1055,3 +1055,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Orb 模式里的文字动效应该和球体呼吸属于同一种节奏；默认持续的轻量变化比 hover 翻牌更适合桌面常驻物。
 - 是否需更新技术文档：否。
+
+## ISSUE-090
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb 模式视觉自然度
+- 严重程度：改进
+- 问题现象：Orb 仍然不够自然，外边缘过于明显，呼吸效果不够强，整体缺少 fancy 的高级生命感。
+- 原因分析：上一版仍保留了硬边框和按钮式玻璃材质；同时 `orb-avatar__flow` 的负 inset 被后续公共 selector 覆盖，导致内部流动范围被压缩，呼吸和流光都显得不够明显。
+- 解决方案：移除硬边框，改用 radial mask 羽化到透明；重写球体渐变、edge bloom 和 conic 流光；扩大 shell 呼吸缩放幅度；修正 flow inset 覆盖问题，让内部颜色真正大范围流动。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Orb 不应像一个有描边的 UI 控件，而应像一个有体积、有边缘消散、有内部流体的桌面生命体；动效层级要检查 selector 覆盖，避免设计参数被后续规则悄悄抹掉。
+- 是否需更新技术文档：否。

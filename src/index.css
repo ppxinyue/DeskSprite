@@ -361,7 +361,7 @@
   opacity: var(--orb-opacity);
   display: grid;
   place-items: center;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 50%;
   transform-origin: center;
   transition: filter 520ms ease;
@@ -373,48 +373,83 @@
 
 .orb-avatar__shell {
   position: relative;
-  width: 100%;
-  height: 100%;
+  width: 96%;
+  height: 96%;
   border-radius: 50%;
   display: grid;
   place-items: center;
   isolation: isolate;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--orb-accent) 18%, rgba(255,255,255,0.22));
+  overflow: visible;
+  border: 0;
   background:
-    radial-gradient(circle at 36% 24%, rgba(255,255,255,0.62), rgba(255,255,255,0.16) 18%, transparent 38%),
-    radial-gradient(circle at 67% 72%, color-mix(in srgb, var(--orb-accent) 16%, transparent), transparent 42%),
-    linear-gradient(145deg, rgba(255,255,255,0.22), rgba(255,255,255,0.035) 42%, rgba(0,0,0,0.045));
-  backdrop-filter: blur(26px) saturate(1.22);
-  -webkit-backdrop-filter: blur(26px) saturate(1.22);
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,0.68), rgba(255,255,255,0.20) 18%, transparent 45%),
+    radial-gradient(circle at 70% 68%, color-mix(in srgb, var(--orb-accent) 24%, transparent), transparent 46%),
+    radial-gradient(circle at 45% 54%, rgba(255,255,255,0.10), transparent 58%),
+    linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.035) 48%, rgba(0,0,0,0.035));
+  backdrop-filter: blur(24px) saturate(1.32);
+  -webkit-backdrop-filter: blur(24px) saturate(1.32);
+  -webkit-mask-image: radial-gradient(circle, #000 0 56%, rgba(0,0,0,0.92) 66%, rgba(0,0,0,0.46) 81%, transparent 100%);
+  mask-image: radial-gradient(circle, #000 0 56%, rgba(0,0,0,0.92) 66%, rgba(0,0,0,0.46) 81%, transparent 100%);
   box-shadow:
-    inset 0 1px 1px rgba(255,255,255,0.58),
-    inset 10px 14px 32px rgba(255,255,255,0.10),
-    inset -18px -22px 42px rgba(0,0,0,0.105),
-    0 10px 22px rgba(0,0,0,0.10);
+    inset 0 1px 12px rgba(255,255,255,0.38),
+    inset 18px 18px 42px rgba(255,255,255,0.08),
+    inset -28px -26px 58px rgba(0,0,0,0.09),
+    0 14px 34px color-mix(in srgb, var(--orb-accent) 13%, transparent),
+    0 20px 42px rgba(0,0,0,0.08);
   transition: border-color 520ms ease, box-shadow 520ms ease, filter 520ms ease, transform 380ms cubic-bezier(.18,.9,.2,1);
+}
+
+.orb-avatar__shell::before,
+.orb-avatar__shell::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.orb-avatar__shell::before {
+  inset: -18%;
+  z-index: 0;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--orb-accent) 16%, transparent), transparent 66%),
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.12), transparent 48%);
+  filter: blur(22px);
+  opacity: 0.72;
+  animation: orbEdgeBloom 5.2s ease-in-out infinite;
+}
+
+.orb-avatar__shell::after {
+  inset: 5%;
+  z-index: 2;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.34), transparent 26%),
+    radial-gradient(ellipse at 74% 78%, rgba(0,0,0,0.10), transparent 40%);
+  mix-blend-mode: soft-light;
+  opacity: 0.76;
 }
 
 .dark .orb-avatar__shell {
   background:
-    radial-gradient(circle at 36% 24%, rgba(255,255,255,0.22), rgba(255,255,255,0.07) 18%, transparent 38%),
-    radial-gradient(circle at 67% 72%, color-mix(in srgb, var(--orb-accent) 18%, transparent), transparent 42%),
-    linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025) 42%, rgba(0,0,0,0.22));
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,0.26), rgba(255,255,255,0.08) 18%, transparent 45%),
+    radial-gradient(circle at 70% 68%, color-mix(in srgb, var(--orb-accent) 30%, transparent), transparent 46%),
+    radial-gradient(circle at 45% 54%, rgba(255,255,255,0.07), transparent 58%),
+    linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02) 48%, rgba(0,0,0,0.22));
   box-shadow:
-    inset 0 1px 1px rgba(255,255,255,0.22),
-    inset 12px 16px 34px rgba(255,255,255,0.035),
-    inset -18px -22px 42px rgba(0,0,0,0.28),
-    0 10px 24px rgba(0,0,0,0.22);
+    inset 0 1px 12px rgba(255,255,255,0.16),
+    inset 18px 18px 42px rgba(255,255,255,0.035),
+    inset -28px -26px 58px rgba(0,0,0,0.28),
+    0 14px 34px color-mix(in srgb, var(--orb-accent) 18%, transparent),
+    0 20px 42px rgba(0,0,0,0.18);
 }
 
 .orb-avatar.is-hovering .orb-avatar__shell {
-  border-color: color-mix(in srgb, var(--orb-accent) 54%, rgba(255,255,255,0.22));
-  filter: saturate(1.08);
+  filter: saturate(1.18) brightness(1.03);
   box-shadow:
-    inset 0 1px 1px rgba(255,255,255,0.62),
-    inset 12px 16px 34px rgba(255,255,255,0.13),
-    inset -18px -22px 42px rgba(0,0,0,0.11),
-    0 14px 28px rgba(0,0,0,0.11);
+    inset 0 1px 14px rgba(255,255,255,0.44),
+    inset 20px 20px 46px rgba(255,255,255,0.12),
+    inset -28px -26px 58px rgba(0,0,0,0.10),
+    0 18px 42px color-mix(in srgb, var(--orb-accent) 22%, transparent),
+    0 22px 48px rgba(0,0,0,0.10);
 }
 
 .orb-avatar__glow {
@@ -437,13 +472,14 @@
   border-radius: inherit;
   pointer-events: none;
   background:
-    radial-gradient(circle at 24% 40%, color-mix(in srgb, var(--orb-accent) 34%, transparent), transparent 23%),
-    radial-gradient(circle at 72% 54%, rgba(255,255,255,0.24), transparent 28%),
-    radial-gradient(circle at 48% 78%, color-mix(in srgb, var(--orb-accent) 20%, transparent), transparent 27%);
-  opacity: 0.9;
-  filter: blur(9px);
+    radial-gradient(ellipse at 18% 40%, color-mix(in srgb, var(--orb-accent) 42%, transparent), transparent 30%),
+    radial-gradient(ellipse at 78% 54%, rgba(255,255,255,0.30), transparent 34%),
+    radial-gradient(ellipse at 48% 82%, color-mix(in srgb, var(--orb-accent) 28%, transparent), transparent 32%),
+    conic-gradient(from 120deg, transparent, color-mix(in srgb, var(--orb-accent) 18%, transparent), transparent, rgba(255,255,255,0.12), transparent);
+  opacity: 0.96;
+  filter: blur(11px);
   mix-blend-mode: screen;
-  animation: orbIdleFlow 6.8s ease-in-out infinite;
+  animation: orbIdleFlow 5.8s ease-in-out infinite;
 }
 
 .orb-avatar--work .orb-avatar__flow {
@@ -462,7 +498,6 @@
 }
 
 .orb-avatar__glass,
-.orb-avatar__flow,
 .orb-avatar__noise {
   position: absolute;
   inset: 0;
@@ -472,6 +507,7 @@
 
 .orb-avatar__glass {
   inset: 1px;
+  z-index: 2;
   background:
     radial-gradient(ellipse at 34% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0.08) 18%, transparent 39%),
     radial-gradient(ellipse at 70% 78%, rgba(0,0,0,0.11), transparent 44%),
@@ -480,6 +516,7 @@
 }
 
 .orb-avatar__noise {
+  z-index: 2;
   opacity: 0.028;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E");
@@ -487,7 +524,7 @@
 
 .orb-avatar__text {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -519,23 +556,28 @@
 }
 
 @keyframes orbGlow {
-  0%, 100% { opacity: 0.07; transform: scale(0.90); }
-  50% { opacity: 0.14; transform: scale(1.02); }
+  0%, 100% { opacity: 0.06; transform: scale(0.86); }
+  50% { opacity: 0.18; transform: scale(1.10); }
+}
+
+@keyframes orbEdgeBloom {
+  0%, 100% { opacity: 0.48; transform: scale(0.96); }
+  50% { opacity: 0.88; transform: scale(1.10); }
 }
 
 @keyframes orbIdleFlow {
-  0%, 100% { transform: translateX(-18%) translateY(1%) scale(1.12); }
-  50% { transform: translateX(18%) translateY(-2%) scale(1.18); }
+  0%, 100% { transform: translateX(-24%) translateY(2%) rotate(-5deg) scale(1.16); }
+  50% { transform: translateX(24%) translateY(-4%) rotate(7deg) scale(1.24); }
 }
 
 @keyframes orbWorkFlow {
-  0%, 100% { transform: translateX(-12%) translateY(5%) scale(1.10); }
-  50% { transform: translateX(12%) translateY(-5%) scale(1.15); }
+  0%, 100% { transform: translateX(-16%) translateY(7%) rotate(-4deg) scale(1.12); }
+  50% { transform: translateX(16%) translateY(-7%) rotate(5deg) scale(1.19); }
 }
 
 @keyframes orbRestFlow {
-  from { transform: rotate(0deg) scale(1.17); }
-  to { transform: rotate(360deg) scale(1.17); }
+  from { transform: rotate(0deg) scale(1.24); }
+  to { transform: rotate(360deg) scale(1.24); }
 }
 
 .dark .orb-avatar {
