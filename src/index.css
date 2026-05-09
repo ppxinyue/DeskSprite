@@ -377,7 +377,7 @@
   height: 100%;
   border-radius: 50%;
   overflow: visible;
-  border: 1.5px solid rgba(128,128,128,0.18);
+  border: 1.5px solid rgba(70,70,70,0.30);
   background: rgba(128,128,128,0.035);
   box-shadow: inset 0 0 40px rgba(128,128,128,0.05);
   animation: orbShellBreath 4.8s ease-in-out infinite;
@@ -393,7 +393,7 @@
   top: 50%;
   z-index: 2;
   transform: translate(-50%, -50%);
-  color: rgba(25,25,25,0.54);
+  color: rgba(18,18,18,0.68);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: var(--orb-font-size);
   font-weight: 500;
@@ -434,7 +434,7 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  color: rgba(20,20,20,0.30);
+  color: rgba(18,18,18,0.44);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: calc(var(--orb-font-size) * 0.78);
   font-weight: 700;
@@ -454,7 +454,7 @@
 }
 
 .orb-avatar--idle.is-hovering .orb-avatar__idle-letter {
-  color: rgba(20,20,20,0.40);
+  color: rgba(18,18,18,0.58);
   transform:
     translate(-50%, -50%)
     rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
@@ -469,7 +469,7 @@
   width: calc(var(--orb-size) * 0.035);
   height: calc(var(--orb-size) * 0.035);
   border-radius: 999px;
-  background: rgba(20,20,20,0.46);
+  background: rgba(18,18,18,0.64);
   box-shadow: 0 0 10px rgba(255,255,255,0.65);
   transform: translate(-50%, -50%) translateY(calc(var(--orb-size) * -0.62));
   animation: orbSatellitePulse 2s ease-in-out infinite;
@@ -487,12 +487,12 @@
   position: absolute;
   left: calc(50% + var(--letter-x));
   top: calc(20% + var(--fall-progress) * (63% - var(--stack-index) * 5%));
-  color: rgba(20,20,20,0.24);
+  color: rgba(18,18,18,0.42);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: calc(var(--orb-font-size) * 1.05);
   font-weight: 520;
   line-height: 1;
-  opacity: calc(0.18 + var(--fall-progress) * 0.48);
+  opacity: calc(0.26 + var(--fall-progress) * 0.56);
   transform: translate(-50%, -50%) rotate(calc((var(--stack-index) - 1.5) * 5deg));
   transition: top 950ms linear, opacity 950ms linear;
 }
@@ -523,12 +523,12 @@
       calc(var(--grid-row) * var(--orb-size) * 0.15)
     )
     rotate(0deg);
-  opacity: 0.26;
+  opacity: 0.42;
 }
 
 .orb-avatar__rest-letter {
-  opacity: 0.14;
-  font-size: calc(var(--orb-font-size) * 0.70);
+  opacity: 0.24;
+  font-size: calc(var(--orb-font-size) * 0.76);
   font-weight: 800;
   transform:
     translate(-50%, -50%)
@@ -544,8 +544,8 @@
 }
 
 @keyframes orbShellBreath {
-  0%, 100% { border-color: rgba(128,128,128,0.12); }
-  50% { border-color: rgba(128,128,128,0.32); }
+  0%, 100% { border-color: rgba(70,70,70,0.22); }
+  50% { border-color: rgba(70,70,70,0.42); }
 }
 
 @keyframes orbIdleSatellite {

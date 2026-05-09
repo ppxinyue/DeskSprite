@@ -769,3 +769,10 @@
 - rest：恢复 28 个 `rest` 字母铺在外圈快速旋转，hover 时停转并排成低透明网格，保留当前动静反差。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R94. Orb 灰度与字号可读性增强（2026-05-09）
+- 字号：Orb 字母基础字号比例从 `size * 0.052` 提升到 `size * 0.062`，最小字号从 9px 提升到 10px。
+- 灰度：外圈边框、idle/rest 字母、work 下落字母、hover 文本和 satellite dot 整体加深，提高桌面背景上的可读性。
+- 克制：只提高对比度和尺寸，没有改变上一轮恢复的字母环动态与 hover 逻辑。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

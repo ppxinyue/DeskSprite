@@ -574,7 +574,7 @@ function OrbAvatar({
   const orbState = state === 'work' || state === 'rest' ? state : 'idle';
   const meta = ORB_STATE_META[orbState];
   const [hovering, setHovering] = useState(false);
-  const fontSize = Math.max(9, Math.round(size * 0.052));
+  const fontSize = Math.max(10, Math.round(size * 0.062));
   const letters = meta.label.split('');
   const restLetters = Array.from({ length: 28 }, (_, index) => 'rest'[index % 4]);
   const fallEase = (value: number) => value * value * (3 - 2 * value);
