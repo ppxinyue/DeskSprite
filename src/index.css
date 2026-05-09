@@ -497,7 +497,6 @@
   line-height: 1;
   letter-spacing: 0.045em;
   text-transform: uppercase;
-  perspective: 420px;
   text-shadow:
     0 1px 0 rgba(255,255,255,0.20),
     0 12px 28px color-mix(in srgb, var(--orb-accent) 10%, transparent);
@@ -508,31 +507,10 @@
   display: inline-block;
   min-width: 0.62em;
   text-align: center;
-  font-weight: var(--letter-weight, 520);
-  transform-style: preserve-3d;
-  transform: translateZ(-0.5lh);
-  transition: font-weight 130ms linear, transform 280ms cubic-bezier(.2,.9,.18,1), opacity 280ms ease;
-}
-
-.orb-avatar__text--work .orb-avatar__letter {
-  transform-origin: center center -.35em;
-}
-
-.orb-avatar.is-hovering .orb-avatar__letter {
-  animation: orbLetter3DSwap 680ms cubic-bezier(.18,.9,.2,1) both;
-  animation-delay: calc(var(--letter-index) * 48ms);
-}
-
-.orb-avatar__letter-face {
-  display: block;
-  backface-visibility: hidden;
-  transform: translateZ(0.5lh);
-}
-
-.orb-avatar__letter-face--back {
-  position: absolute;
-  inset: 0;
-  transform: rotateX(-90deg) translateZ(0.5lh);
+  font-weight: 520;
+  font-variation-settings: 'wght' 520, 'slnt' 0;
+  white-space: pre;
+  will-change: font-variation-settings;
 }
 
 @keyframes orbBreath {
@@ -558,13 +536,6 @@
 @keyframes orbRestFlow {
   from { transform: rotate(0deg) scale(1.17); }
   to { transform: rotate(360deg) scale(1.17); }
-}
-
-@keyframes orbLetter3DSwap {
-  0% { transform: translateZ(-0.5lh) rotateX(0deg); }
-  48% { transform: translateZ(-0.5lh) rotateX(90deg); }
-  52% { transform: translateZ(-0.5lh) rotateX(-90deg); }
-  100% { transform: translateZ(-0.5lh) rotateX(0deg); }
 }
 
 .dark .orb-avatar {

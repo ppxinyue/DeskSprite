@@ -692,3 +692,10 @@
 - 约束：仍只在单个球体内部做动效，没有增加外圈、背景卡片或额外装饰层。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R84. Orb 文字呼吸动效（2026-05-09）
+- 删除：移除 Orb 文字 hover 时的 Letter 3D Swap 翻牌结构和 CSS 动画，不再需要鼠标触发文字变化。
+- 新增：每个状态字母默认持续执行 `fontVariationSettings` 呼吸动画，字重和倾斜从中间向两侧错开循环。
+- 体验：文字动效从“hover 才发生的翻牌”改为“常驻柔和呼吸”，和球体本体的呼吸、内部流动更一致。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

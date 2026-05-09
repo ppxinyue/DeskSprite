@@ -609,17 +609,21 @@ function OrbAvatar({
             transition={{ duration: 0.38, ease: [0.2, 0.8, 0.2, 1] }}
           >
             {letters.map((letter, index) => (
-              <span
+              <motion.span
                 key={`${orbState}-${letter}-${index}`}
                 className="orb-avatar__letter"
-                style={{
-                  '--letter-index': String(index),
-                  '--letter-weight': '520',
-                } as CSSProperties & Record<string, string>}
+                initial={{ fontVariationSettings: "'wght' 360, 'slnt' 0" }}
+                animate={{ fontVariationSettings: ["'wght' 360, 'slnt' 0", "'wght' 760, 'slnt' -6", "'wght' 360, 'slnt' 0"] }}
+                transition={{
+                  duration: 1.85,
+                  ease: 'easeInOut',
+                  repeat: Infinity,
+                  repeatDelay: 0.18,
+                  delay: Math.abs(index - Math.floor(letters.length / 2)) * 0.08,
+                }}
               >
-                <span className="orb-avatar__letter-face">{letter}</span>
-                <span className="orb-avatar__letter-face orb-avatar__letter-face--back">{letter}</span>
-              </span>
+                {letter}
+              </motion.span>
             ))}
           </motion.div>
         </AnimatePresence>

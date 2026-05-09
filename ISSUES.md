@@ -1043,3 +1043,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：桌面常驻 Orb 的动效不能只在“仔细看”时才成立；需要在不破坏高级感的前提下，让呼吸和内部流动在正常视距也能被看见。
 - 是否需更新技术文档：否。
+
+## ISSUE-089
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb 模式文字动效
+- 严重程度：改进
+- 问题现象：Orb 文字 hover 时的 3D Swap 动效需要删除，改为默认持续的 Breathing Text 风格动效。
+- 原因分析：hover 翻牌动效偏强，和当前 Orb 的慢呼吸、内部流动气质不够统一；用户希望文字本身持续轻微变化，而不是依赖 hover 触发。
+- 解决方案：删除每个字母的 front/back 3D 面、hover selector 和 `orbLetter3DSwap` keyframes；改用 `motion.span` 为每个字母持续动画 `fontVariationSettings`，实现错峰字重呼吸。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Orb 模式里的文字动效应该和球体呼吸属于同一种节奏；默认持续的轻量变化比 hover 翻牌更适合桌面常驻物。
+- 是否需更新技术文档：否。
