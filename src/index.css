@@ -377,10 +377,33 @@
   height: 100%;
   border-radius: 50%;
   overflow: visible;
-  border: 1.5px solid rgba(70,70,70,0.30);
-  background: rgba(128,128,128,0.035);
-  box-shadow: inset 0 0 40px rgba(128,128,128,0.05);
+  border: 0;
+  background:
+    radial-gradient(circle at 50% 50%,
+      rgba(28,28,28,0.20) 0%,
+      rgba(74,74,74,0.14) 34%,
+      rgba(128,128,128,0.075) 62%,
+      rgba(170,170,170,0.018) 82%,
+      rgba(190,190,190,0) 100%);
+  box-shadow: inset 0 0 38px rgba(20,20,20,0.045);
   animation: orbShellBreath 4.8s ease-in-out infinite;
+}
+
+.orb-avatar__shell::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 1.5px dashed rgba(18,18,18,0.42);
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.985);
+  transition: opacity 180ms ease, transform 220ms ease;
+}
+
+.orb-avatar.is-hovering .orb-avatar__shell::after {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .orb-avatar.is-hovering {
@@ -531,8 +554,8 @@
 }
 
 @keyframes orbShellBreath {
-  0%, 100% { border-color: rgba(70,70,70,0.22); }
-  50% { border-color: rgba(70,70,70,0.42); }
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.08); }
 }
 
 @keyframes orbIdleSatellite {

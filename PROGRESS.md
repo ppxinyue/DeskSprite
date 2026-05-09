@@ -788,3 +788,10 @@
 - 清理：移除对应的 dot 样式和 pulse keyframes，减少无用 CSS。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R97. Orb 径向填充与 Hover 虚线边界（2026-05-09）
+- 常态：移除 Orb 外部实线边框，shell 改为中心较深、向外逐渐透明的灰阶径向渐变填充。
+- Hover：通过 `::after` 伪元素在 hover 时显示一圈低对比度虚线边界，常态下完全隐藏。
+- 动效：保留原有呼吸、idle/work/rest 字母运动和 hover 文字逻辑，只调整容器材质。
+- 验证：`pnpm build` 通过。
+- 文件：index.css, ISSUES.md, PROGRESS.md
