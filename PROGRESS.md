@@ -962,3 +962,11 @@
 - GIF/视频：当前状态使用 GIF 动图或 video 时，不再叠加跳动、摇摆、呼吸等额外动作。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, ISSUES.md, PROGRESS.md
+
+### R122. Pet Rest 保持原尺寸绕屏展示（2026-05-09）
+- Pet 模式：休息状态不再把低分辨率图片/GIF 放大到屏幕中央，改为保持当前尺寸并绕屏幕工作区转一圈。
+- Orb 模式：保留原来的放大到屏幕中央展示。
+- 倒计时：Pet rest 时倒计时和提前结束按钮固定在屏幕底部居中，不跟随 pet 绕圈移动。
+- 素材：同步当前 rest GIF 池，移除已删除的 `rest.GIF`，加入 `IMG_3448.GIF`、`IMG_3449.GIF`。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, animations.ts, public/assets/rest/gif, ISSUES.md, PROGRESS.md

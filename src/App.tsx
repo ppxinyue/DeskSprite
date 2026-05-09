@@ -36,6 +36,7 @@ const REST_PRESENTATION_SCREEN_RATIO = 0.8;
 const REST_PRESENTATION_ANIMATION_MS = 820;
 const REST_COUNTDOWN_SPACE = 58;
 const ORB_REST_VISUAL_BLEED_RATIO = 0.18;
+const PET_REST_ORBIT_MARGIN = 34;
 const DISTRACTION_CHECK_INTERVAL_MS = 3000;
 const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
 
@@ -508,8 +509,89 @@ function PetWindow() {
     });
   }, [applyLayoutState]);
 
+  const startPetRestOrbitPresentation = useCallback(async () => {
+    if (restPresentationFrameRef.current) {
+      window.cancelAnimationFrame(restPresentationFrameRef.current);
+      restPresentationFrameRef.current = null;
+    }
+    try {
+      const win = getCurrentWindow();
+      const monitor = await currentMonitor();
+      if (!monitor) return;
+      const position = await win.outerPosition();
+      const size = await win.outerSize();
+      const scale = monitor.scaleFactor;
+      const work = monitor.workArea;
+      const workLeft = work.position.x / scale;
+      const workTop = work.position.y / scale;
+      const workWidth = work.size.width / scale;
+      const workHeight = work.size.height / scale;
+      const startScale = visualPetScaleRef.current;
+      const orbitPetWidth = Math.round(120 * startScale);
+      const orbitPetHeight = Math.round(150 * startScale);
+      const orbitCenterX = workWidth / 2;
+      const orbitCenterY = (workHeight - REST_COUNTDOWN_SPACE) / 2;
+      const radiusX = Math.max(0, (workWidth - orbitPetWidth) / 2 - PET_REST_ORBIT_MARGIN);
+      const radiusY = Math.max(0, (workHeight - REST_COUNTDOWN_SPACE - orbitPetHeight) / 2 - PET_REST_ORBIT_MARGIN);
+      const orbitRadius = Math.max(0, Math.min(radiusX, radiusY));
+      const startedAt = Date.now();
+
+      restPresentationSnapshotRef.current = {
+        windowLeft: position.x / scale,
+        windowTop: position.y / scale,
+        windowWidth: size.width / scale,
+        windowHeight: size.height / scale,
+        layout: layoutRef.current,
+        visualScale: startScale,
+      };
+      restPresentationActiveRef.current = true;
+      setRestPresentationActive(true);
+      layoutApplyingRef.current = true;
+      visualPetScaleRef.current = startScale;
+      setVisualPetScale(startScale);
+
+      await win.setSize(new LogicalSize(workWidth, workHeight)).catch(() => {});
+      await win.setPosition(new PhysicalPosition(workLeft, workTop)).catch(() => {});
+
+      const tick = () => {
+        if (!restEndAtRef.current) {
+          restPresentationFrameRef.current = null;
+          return;
+        }
+        const elapsed = Date.now() - startedAt;
+        const progress = clamp(elapsed / REST_ACTION_DURATION_MS, 0, 1);
+        const angle = -Math.PI / 2 + progress * Math.PI * 2;
+        const petLeft = orbitCenterX + Math.cos(angle) * orbitRadius - orbitPetWidth / 2;
+        const petTop = orbitCenterY + Math.sin(angle) * orbitRadius - orbitPetHeight / 2;
+        applyLayoutState({
+          windowWidth: workWidth,
+          windowHeight: workHeight,
+          petLeft,
+          petTop,
+          dialogLeft: PET_CONTENT_MARGIN,
+          dialogTop: PET_CONTENT_MARGIN,
+          dialogWidth: 300,
+          dialogMaxHeight: 300,
+          toolsLeft: workWidth - PET_CONTENT_MARGIN - toolButtonSize,
+          toolsTop: PET_CONTENT_MARGIN,
+        });
+        restPresentationFrameRef.current = window.requestAnimationFrame(tick);
+      };
+      tick();
+    } catch (e) {
+      console.warn("Failed to start pet rest orbit:", e);
+      restPresentationActiveRef.current = false;
+      setRestPresentationActive(false);
+      layoutApplyingRef.current = false;
+    }
+  }, [applyLayoutState, toolButtonSize]);
+
   const expandPetForRest = useCallback(async () => {
     try {
+      if (!orbMode) {
+        await startPetRestOrbitPresentation();
+        return;
+      }
       const win = getCurrentWindow();
       const monitor = await currentMonitor();
       if (!monitor) return;
@@ -569,7 +651,7 @@ function PetWindow() {
     } catch (e) {
       console.warn("Failed to expand pet for rest:", e);
     }
-  }, [animateRestPresentation, orbMode, toolButtonSize]);
+  }, [animateRestPresentation, orbMode, startPetRestOrbitPresentation, toolButtonSize]);
 
   const restorePetAfterRest = useCallback(async () => {
     const snapshot = restPresentationSnapshotRef.current;
@@ -1153,7 +1235,7 @@ function PetWindow() {
               onMenuOpenChange={setContextMenuOpen}
               onFocusToggle={toggleFocus}
             />
-            {restEndAt ? (
+            {restEndAt && (orbMode || !restPresentationActive) ? (
               <div className="mt-2 flex flex-col items-center gap-2">
                 <div className="pointer-events-none text-center text-[18px] font-semibold leading-none tabular-nums text-[#4d4a45] drop-shadow-[0_2px_12px_rgba(32,28,22,0.12)]">
                   {formatCountdown(Math.max(0, restEndAt - now))}
@@ -1192,6 +1274,21 @@ function PetWindow() {
               <MessageCircle className={`h-3.5 w-3.5 ${chatBurst ? "animate-chat-pop" : ""}`} />
             </FloatingToolButton>
           </div>
+
+          {restEndAt && !orbMode && restPresentationActive && (
+            <div className="absolute inset-x-0 bottom-8 z-40 flex flex-col items-center gap-2">
+              <div className="pointer-events-none text-center text-[18px] font-semibold leading-none tabular-nums text-[#4d4a45] drop-shadow-[0_2px_12px_rgba(32,28,22,0.12)]">
+                {formatCountdown(Math.max(0, restEndAt - now))}
+              </div>
+              <button
+                type="button"
+                className="rounded-[9px] border border-border/65 bg-background/90 px-4 py-1.5 text-[14px] font-medium leading-none text-muted-foreground shadow-[0_8px_22px_rgba(32,28,22,0.12)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:text-foreground active:translate-y-0"
+                onClick={() => finishRest().catch(() => {})}
+              >
+                提前结束
+              </button>
+            </div>
+          )}
 
         </div>
       </div>

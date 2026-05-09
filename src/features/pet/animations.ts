@@ -47,9 +47,10 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
     mediaMode: 'gif',
     defaultAssets: ['assets/idle/png/sleeping.png'],
     defaultGifAssets: [
-      'assets/rest/gif/rest.GIF',
       'assets/rest/gif/idle_raw_1.GIF',
       'assets/rest/gif/drinking_raw.GIF',
+      'assets/rest/gif/IMG_3448.GIF',
+      'assets/rest/gif/IMG_3449.GIF',
     ],
     userFrames: [],
     userGifs: [],
@@ -132,10 +133,11 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
     : defaults.defaultGifAssets;
   const mergedDefaultGifAssets = state === 'rest'
     ? Array.from(new Set([
-      ...defaultGifAssets.filter((path) => path !== 'assets/rest/gif/playing_clean_3.GIF'),
-      'assets/rest/gif/rest.GIF',
+      ...defaultGifAssets.filter((path) => !['assets/rest/gif/playing_clean_3.GIF', 'assets/rest/gif/rest.GIF'].includes(path)),
       'assets/rest/gif/idle_raw_1.GIF',
       'assets/rest/gif/drinking_raw.GIF',
+      'assets/rest/gif/IMG_3448.GIF',
+      'assets/rest/gif/IMG_3449.GIF',
     ]))
     : defaultGifAssets;
   const defaultAssets = raw.defaultAssets?.length
