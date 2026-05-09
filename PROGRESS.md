@@ -865,3 +865,10 @@
 - Work：将偏灰的浅蓝调为更清新明亮的浅天空蓝，并提高少量波纹亮度。
 - 验证：`pnpm build` 通过。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R108. Orb Hover 实心填充与亮色增强（2026-05-09）
+- Hover：补充 `--orb-hover-fill` 并在 hover 时给 shell 加不透底的柔色填充，解决只改根 opacity 但材质仍半透明的问题。
+- Work：天空蓝进一步提亮，改为更清澈的蓝青色核心和波纹。
+- Rest：浅粉进一步提亮，休息态更轻盈明亮。
+- 验证：`pnpm build` 通过。
+- 文件：index.css, ISSUES.md, PROGRESS.md
