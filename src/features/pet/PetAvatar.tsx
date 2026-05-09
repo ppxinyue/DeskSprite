@@ -12,7 +12,7 @@ import {
   isBuiltinAsset,
 } from './animations';
 import { stopPetStateEngine } from './petStateEngine';
-import type { AvatarRenderMode, CodingSessionMode, PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
+import type { AvatarRenderMode, CodingProvider, CodingSessionMode, PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
 import type { PetState } from './animations';
 
 function toSrc(path: string): string {
@@ -20,7 +20,7 @@ function toSrc(path: string): string {
 }
 
 function isCodingConversationTitle(title: string | null | undefined) {
-  return /^Codex(?::|\s+Coding\b|\b)/i.test((title || '').trim());
+  return /^(Codex|Claude Code)(?::|\s+Coding\b|\b)/i.test((title || '').trim());
 }
 
 const MOTION_NAMES: PetMotionName[] = ['petJump', 'petWobble', 'petBreathe'];
@@ -61,6 +61,7 @@ export function PetAvatar({
   onMenuOpenChange,
   onFocusToggle,
   codingModeEnabled = false,
+  codingProvider = 'codex',
   onCodingModeToggle,
 }: {
   opacity?: number;
@@ -77,6 +78,7 @@ export function PetAvatar({
   onMenuOpenChange?: (open: boolean) => void;
   onFocusToggle?: () => void;
   codingModeEnabled?: boolean;
+  codingProvider?: CodingProvider;
   onCodingModeToggle?: (mode?: CodingSessionMode) => void;
 }) {
   const { petState, mediaConfig, userFrames, userGifs, openChat, dialogOpen, loadUserFrames } = usePetStore();
@@ -457,8 +459,12 @@ export function PetAvatar({
                 submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
               }`}
             >
-              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-inherit')}>继承当前 session</button>
-              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-new')}>开启新 session</button>
+              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-inherit')}>
+                {codingProvider === 'claude' ? '继承 Claude Code' : '继承当前 session'}
+              </button>
+              {codingProvider === 'codex' && (
+                <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-new')}>开启新 session</button>
+              )}
             </div>
           </div>
         )}

@@ -1907,3 +1907,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：窗口外壳可复用普通 chat，但 Coding 的消息呈现需要明确指定气泡化，不能依赖普通大窗默认透明 assistant 样式。
 - 是否需更新技术文档：否。
+
+## ISSUE-161
+- 发现时间：2026-05-10
+- 发现者：用户需求
+- 相关任务：Coding 模式接入 Claude Code
+- 严重程度：增强
+- 问题现象：Coding 模式只能接入 Codex，无法监听用户已经在终端中运行的 Claude Code session。
+- 原因分析：现有状态源只解析 Codex app-server 与 `~/.codex/sessions`，没有工具选择，也没有 Claude Code JSONL session 的本地扫描和状态映射。
+- 解决方案：新增 `codingProvider` 设置；Claude Code 走继承 session 模式，扫描 `~/.claude/projects/**/*.jsonl`，把 `AskUserQuestion` 映射为红色、非 `end_turn` assistant/tool_use 映射为黄色过程气泡、`end_turn` 映射为绿色完成输出。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：外部 agent 接入应该抽象成 provider + inherited session source，UI 可以复用，但状态解析必须贴合每个工具自己的日志格式。
+- 是否需更新技术文档：否。

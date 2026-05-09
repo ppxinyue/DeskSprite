@@ -1571,7 +1571,36 @@ function AISection({
       <SectionTitle>Coding 模式</SectionTitle>
       <SettingsGroup>
         <div className="px-4">
-          <SettingRow label="接入 Codex" hint="开启后，灵宠右侧小对话框会显示 Codex 输出，并可直接向 Codex 发送输入">
+          <SettingRow label="Coding 工具">
+            <div className="flex rounded-[10px] border border-border/65 bg-background/35 p-1">
+              {[
+                { id: 'codex' as const, label: 'Codex' },
+                { id: 'claude' as const, label: 'Claude Code' },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`rounded-[8px] px-3 py-1.5 text-[13px] font-medium transition ${
+                    settings.codingProvider === item.id
+                      ? 'bg-[#2f94ff] text-white shadow-sm'
+                      : 'text-muted-foreground hover:bg-background/60 hover:text-foreground'
+                  }`}
+                  onClick={() => {
+                    updateSetting('codingProvider', item.id);
+                    if (item.id === 'claude') updateSetting('codingSessionMode', 'inherit');
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </SettingRow>
+          <SettingRow
+            label="启用 Coding 模式"
+            hint={settings.codingProvider === 'claude'
+              ? '开启后，灵宠会继承最近活跃的 Claude Code session，并显示状态与输出'
+              : '开启后，灵宠右侧小对话框会显示 Codex 输出，并可直接向 Codex 发送输入'}
+          >
             <Switch checked={settings.codingModeEnabled} onCheckedChange={(v) => updateSetting('codingModeEnabled', v)} />
           </SettingRow>
         </div>

@@ -1513,6 +1513,264 @@ async function ackInheritedCodingSessions({ ackKeys } = {}) {
   return getInheritedCodingState();
 }
 
+const inheritedClaudeAcknowledged = new Map();
+
+function claudeSessionTitle(session) {
+  const cwdName = session.cwd ? path.basename(session.cwd) : path.basename(path.dirname(session.path || '')) || 'Claude Code';
+  return `${cwdName} · ${session.id.slice(0, 8)}`;
+}
+
+function extractClaudeTextParts(content) {
+  if (!Array.isArray(content)) return [];
+  return content
+    .filter((part) => part && part.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text.trim())
+    .filter(Boolean);
+}
+
+function extractClaudeToolUses(content) {
+  if (!Array.isArray(content)) return [];
+  return content.filter((part) => part && part.type === 'tool_use');
+}
+
+function claudeToolQuestion(toolUse) {
+  const input = toolUse?.input || {};
+  return compactCodexSessionMessage(
+    input.question
+      || input.prompt
+      || input.message
+      || input.description
+      || extractCodexSessionContent(input.questions)
+      || '',
+    '',
+  );
+}
+
+function summarizeClaudeToolUses(toolUses) {
+  const names = toolUses
+    .map((tool) => String(tool?.name || '').trim())
+    .filter(Boolean);
+  if (names.length === 0) return '';
+  return `Claude Code 正在使用 ${Array.from(new Set(names)).slice(0, 3).join('、')}`;
+}
+
+function parseClaudeSessionFile(filePath, text, mtimeMs) {
+  const session = {
+    id: path.basename(filePath, '.jsonl'),
+    cwd: '',
+    path: filePath,
+    updatedAt: mtimeMs,
+    eventAt: mtimeMs,
+    ackKey: '',
+    title: '',
+    status: CODEX_STATUS.WORKING,
+    message: '',
+    progressMessages: [],
+  };
+  let lastUserAt = 0;
+  let lastWorkAt = 0;
+  let lastProgress = '';
+  const progressMessages = [];
+  let lastAssistantAt = 0;
+  let lastAssistant = '';
+  let lastProblemAt = 0;
+  let lastProblem = '';
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  for (const line of lines) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const eventAt = Date.parse(event.timestamp || '') || mtimeMs;
+    session.id = event.sessionId || session.id;
+    session.cwd = event.cwd || session.cwd;
+
+    if (event.type === 'user') {
+      const content = event.message?.content;
+      if (Array.isArray(content) && content.some((part) => part?.type === 'tool_result')) {
+        lastWorkAt = Math.max(lastWorkAt, eventAt);
+      } else {
+        lastUserAt = Math.max(lastUserAt, eventAt);
+      }
+      continue;
+    }
+
+    if (event.type !== 'assistant') continue;
+
+    const message = event.message || {};
+    const content = message.content;
+    const textParts = extractClaudeTextParts(content);
+    const textMessage = compactCodexSessionMessage(textParts.join('\n\n'), '');
+    const toolUses = extractClaudeToolUses(content);
+    const askTool = toolUses.find((tool) => String(tool?.name || '').toLowerCase() === 'askuserquestion');
+    if (askTool) {
+      lastProblemAt = eventAt;
+      lastProblem = claudeToolQuestion(askTool) || 'Claude Code 需要你回复或处理';
+      continue;
+    }
+
+    if (message.stop_reason === 'end_turn') {
+      lastAssistantAt = eventAt;
+      lastAssistant = textMessage || 'Claude Code 执行完毕。';
+      continue;
+    }
+
+    if (textMessage) {
+      lastWorkAt = Math.max(lastWorkAt, eventAt);
+      lastProgress = textMessage;
+      pushCodexProgressMessage(progressMessages, textMessage, eventAt);
+    } else if (toolUses.length > 0) {
+      const toolSummary = summarizeClaudeToolUses(toolUses);
+      lastWorkAt = Math.max(lastWorkAt, eventAt);
+      lastProgress = toolSummary || lastProgress;
+      if (toolSummary) pushCodexProgressMessage(progressMessages, toolSummary, eventAt);
+    } else {
+      lastWorkAt = Math.max(lastWorkAt, eventAt);
+    }
+  }
+
+  const title = claudeSessionTitle(session);
+  const prefix = `[${title}]`;
+  session.progressMessages = progressMessages.slice(-8).map((message, index) => ({
+    id: `claude-progress-${session.id}-${Math.round(message.createdAt)}-${index}`,
+    role: 'system',
+    content: `${prefix} ${message.content}`,
+    createdAt: message.createdAt,
+  }));
+  const latestActivityAt = Math.max(lastUserAt, lastWorkAt, lastAssistantAt, lastProblemAt, mtimeMs);
+  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt && lastProblemAt >= lastWorkAt) {
+    session.status = CODEX_STATUS.NEEDS_INPUT;
+    session.message = `${prefix} ${lastProblem}`;
+    session.eventAt = lastProblemAt;
+  } else if (lastAssistantAt && lastAssistantAt >= lastUserAt && lastAssistantAt >= lastWorkAt) {
+    session.status = CODEX_STATUS.DONE;
+    session.message = `${prefix} ${lastAssistant}`;
+    session.eventAt = lastAssistantAt;
+  } else {
+    session.status = CODEX_STATUS.WORKING;
+    session.message = `${prefix} ${lastProgress || 'Claude Code 正在工作中'}`;
+    session.eventAt = latestActivityAt;
+  }
+  session.updatedAt = latestActivityAt;
+  session.title = title;
+  session.ackKey = `${session.id}:${session.status}:${Math.round(session.eventAt)}`;
+  return session;
+}
+
+async function getInheritedClaudeCodingState() {
+  const root = path.join(app.getPath('home'), '.claude', 'projects');
+  const nowMs = Date.now();
+  const files = await listCodexSessionFiles(root);
+  const candidates = [];
+  for (const filePath of files) {
+    let stat;
+    try {
+      stat = await fsp.stat(filePath);
+    } catch {
+      continue;
+    }
+    if (nowMs - stat.mtimeMs > CODEX_INHERIT_LOOKBACK_MS) continue;
+    candidates.push({ filePath, mtimeMs: stat.mtimeMs });
+  }
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const sessions = [];
+  for (const item of candidates.slice(0, 12)) {
+    try {
+      const file = await fsp.open(item.filePath, 'r');
+      const stat = await file.stat();
+      const size = Math.min(240_000, stat.size);
+      const buffer = Buffer.alloc(size);
+      await file.read(buffer, 0, size, Math.max(0, stat.size - size));
+      await file.close();
+      sessions.push(parseClaudeSessionFile(item.filePath, buffer.toString('utf8'), item.mtimeMs));
+    } catch {
+      // Ignore unreadable sessions.
+    }
+  }
+  const unacknowledged = sessions.filter((session) => (
+    session.status === CODEX_STATUS.WORKING
+    || inheritedClaudeAcknowledged.get(session.id) !== session.ackKey
+  ));
+  const actionable = unacknowledged.filter((session) => session.status !== CODEX_STATUS.WORKING);
+  const activeWorking = unacknowledged.filter((session) => (
+    session.status === CODEX_STATUS.WORKING
+    && nowMs - session.updatedAt <= CODEX_INHERIT_ACTIVE_MS
+  ));
+  const problemSessions = actionable.filter((session) => session.status === CODEX_STATUS.NEEDS_INPUT);
+  const doneSessions = actionable.filter((session) => session.status === CODEX_STATUS.DONE);
+  const status = problemSessions.length > 0
+    ? CODEX_STATUS.NEEDS_INPUT
+    : activeWorking.length > 0
+      ? CODEX_STATUS.WORKING
+      : doneSessions.length > 0
+        ? CODEX_STATUS.DONE
+        : CODEX_STATUS.IDLE;
+  const selected = status === CODEX_STATUS.NEEDS_INPUT
+    ? problemSessions
+    : status === CODEX_STATUS.WORKING
+      ? activeWorking
+      : status === CODEX_STATUS.DONE
+        ? doneSessions
+        : [];
+  const messages = selected.slice(0, 5).map((session) => ({
+    id: `claude-inherit-${session.id}-${Math.round(session.updatedAt)}`,
+    role: session.status === CODEX_STATUS.NEEDS_INPUT ? 'error' : session.status === CODEX_STATUS.DONE ? 'codex' : 'system',
+    content: session.message,
+    createdAt: session.updatedAt,
+  }));
+  if (messages.length === 0) {
+    messages.push({
+      id: 'claude-inherit-empty',
+      role: 'system',
+      content: status === CODEX_STATUS.IDLE ? '没有新的 Claude Code 通知。' : '没有检测到最近活跃的 Claude Code session。',
+      createdAt: Date.now(),
+    });
+  } else if (status === CODEX_STATUS.WORKING) {
+    messages.unshift({
+      id: 'claude-inherit-working',
+      role: 'system',
+      content: 'Claude Code 正在工作中。',
+      createdAt: Date.now(),
+    });
+  }
+  return {
+    status,
+    messages,
+    sessions: selected.slice(0, 12).map((session) => ({
+      id: session.id,
+      ackKey: session.ackKey,
+      title: session.title,
+      status: session.status,
+      message: session.message,
+      progressMessages: session.status === CODEX_STATUS.WORKING ? session.progressMessages : [],
+      updatedAt: session.updatedAt,
+      cwd: session.cwd,
+      path: session.path,
+    })),
+  };
+}
+
+async function ackInheritedClaudeCodingSessions({ ackKeys } = {}) {
+  if (Array.isArray(ackKeys)) {
+    for (const item of ackKeys) {
+      if (!item || typeof item !== 'object') continue;
+      const id = String(item.id || '');
+      const ackKey = String(item.ackKey || '');
+      if (id && ackKey) inheritedClaudeAcknowledged.set(id, ackKey);
+    }
+  } else {
+    const state = await getInheritedClaudeCodingState();
+    for (const session of state.sessions || []) {
+      if (session.status !== CODEX_STATUS.WORKING && session.id && session.ackKey) {
+        inheritedClaudeAcknowledged.set(session.id, session.ackKey);
+      }
+    }
+  }
+  return getInheritedClaudeCodingState();
+}
+
 const keyStore = new Map();
 
 const handlers = {
@@ -1574,6 +1832,8 @@ const handlers = {
   coding_get_state: () => publishCodingState(),
   coding_get_inherited_state: getInheritedCodingState,
   coding_ack_inherited_sessions: ackInheritedCodingSessions,
+  coding_get_claude_inherited_state: getInheritedClaudeCodingState,
+  coding_ack_claude_inherited_sessions: ackInheritedClaudeCodingSessions,
   coding_send_message: sendCodingMessage,
   coding_clear: () => {
     codingState.messages = [];

@@ -1216,3 +1216,11 @@
 - 菜单：右键菜单宽度从 112px 增加到 136px，并禁止“退出 Coding 模式”换行。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示；确认旧清空文案和 112px 菜单宽度无残留。
 - 文件：App.tsx, PetAvatar.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md
+
+### R156. Coding 模式接入 Claude Code（2026-05-10）
+- 设置：Coding 模式新增工具选择，可在 Codex 与 Claude Code 间切换；选择 Claude Code 时自动使用继承 session 模式。
+- 右键菜单：Coding 模式入口会按当前工具显示继承 Claude Code / Codex session 的入口，退出文案保持统一。
+- 主进程：新增 `~/.claude/projects/**/*.jsonl` 扫描器，解析 Claude Code 的 assistant / tool_use / AskUserQuestion / end_turn 记录，映射为红黄绿状态和过程气泡。
+- 前端：小窗、大窗、状态提示、空态和错误信息复用同一套 Coding UI，并按工具名显示 Codex 或 Claude Code。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, PetAvatar.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
