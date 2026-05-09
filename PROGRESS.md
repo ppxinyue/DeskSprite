@@ -977,3 +977,10 @@
 - 兼容：normalize 阶段清理已删除的 `IMG_3448.GIF`、`IMG_3449.GIF`、`rest.GIF`、`playing_clean_3.GIF` 引用。
 - 验证：`pnpm build` 通过。
 - 文件：animations.ts, public/assets, ISSUES.md, PROGRESS.md
+
+### R124. 增加休息时长设置（2026-05-09）
+- 设置：提醒事项页新增“休息时长”，默认 60s，支持 10-300s 调节。
+- 状态机：进入 rest 时根据 `restDurationSeconds` 计算结束时间。
+- 动效：Pet 模式绕屏一周的进度与休息时长同步，Orb 模式倒计时也使用同一设置。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md

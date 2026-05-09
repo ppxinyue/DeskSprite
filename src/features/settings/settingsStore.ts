@@ -50,6 +50,7 @@ export interface AppSettings {
   screenshotShortcut: string;
   restReminderEnabled: boolean;
   restReminderIntervalMinutes: number;
+  restDurationSeconds: number;
   focusDurationMinutes: number;
   distractionDetectionEnabled: boolean;
   distractionGraceSeconds: number;
@@ -95,6 +96,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   screenshotShortcut: 'CommandOrControl+Shift+S',
   restReminderEnabled: true,
   restReminderIntervalMinutes: 25,
+  restDurationSeconds: 60,
   focusDurationMinutes: 25,
   distractionDetectionEnabled: true,
   distractionGraceSeconds: 8,
@@ -167,6 +169,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
                   ? Math.min(15, Math.max(11, parsed))
                 : key === 'restReminderIntervalMinutes' && typeof parsed === 'number'
                   ? Math.min(240, Math.max(1, parsed))
+                : key === 'restDurationSeconds' && typeof parsed === 'number'
+                  ? Math.min(600, Math.max(10, parsed))
                 : key === 'focusDurationMinutes' && typeof parsed === 'number'
                   ? Math.min(240, Math.max(1, parsed))
                 : key === 'distractionGraceSeconds' && typeof parsed === 'number'

@@ -1523,3 +1523,15 @@
 - 涉及文件：`src/features/pet/animations.ts`, `public/assets`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：批量素材替换后需要同时提交文件变更和默认资源清单，否则运行时会继续请求不存在的文件。
 - 是否需更新技术文档：否。
+
+## ISSUE-129
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：休息时长设置
+- 严重程度：改进
+- 问题现象：休息时长固定为 60 秒，用户无法在设置中调整。
+- 原因分析：休息倒计时使用前端常量计算结束时间，设置模型和提醒事项页面没有对应字段。
+- 解决方案：新增 `restDurationSeconds` 设置，默认 60 秒并限制在 10-600 秒；提醒事项页提供 10-300 秒滑条；进入 rest 和 pet 绕圈进度都读取该设置。
+- 涉及文件：`src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：用户可感知的计时流程应避免硬编码，尤其是专注/休息这种节奏类功能。
+- 是否需更新技术文档：否。

@@ -31,7 +31,6 @@ const CONTEXT_MENU_HEIGHT = 204;
 const PET_RIGHT_EDGE_MENU_THRESHOLD = 0.62;
 const PET_BUBBLE_TOP_SPACE = 78;
 const PET_PROMPT_BUBBLE_WIDTH = 196;
-const REST_ACTION_DURATION_MS = 60_000;
 const REST_PRESENTATION_SCREEN_RATIO = 0.8;
 const REST_PRESENTATION_ANIMATION_MS = 820;
 const REST_COUNTDOWN_SPACE = 58;
@@ -559,7 +558,7 @@ function PetWindow() {
           return;
         }
         const elapsed = Date.now() - startedAt;
-        const progress = clamp(elapsed / REST_ACTION_DURATION_MS, 0, 1);
+        const progress = clamp(elapsed / (Math.max(10, settings.restDurationSeconds) * 1000), 0, 1);
         const angle = -Math.PI / 2 + progress * Math.PI * 2;
         const petLeft = orbitCenterX + Math.cos(angle) * orbitRadius - orbitPetWidth / 2;
         const petTop = orbitCenterY + Math.sin(angle) * orbitRadius - orbitPetHeight / 2;
@@ -584,7 +583,7 @@ function PetWindow() {
       setRestPresentationActive(false);
       layoutApplyingRef.current = false;
     }
-  }, [applyLayoutState, toolButtonSize]);
+  }, [applyLayoutState, settings.restDurationSeconds, toolButtonSize]);
 
   const expandPetForRest = useCallback(async () => {
     try {
@@ -675,7 +674,7 @@ function PetWindow() {
   }, [animateRestPresentation, applyLayoutState, requestLayout, settings.petScale]);
 
   const startRestAction = useCallback(() => {
-    const endAt = Date.now() + REST_ACTION_DURATION_MS;
+    const endAt = Date.now() + Math.max(10, settings.restDurationSeconds) * 1000;
     const shouldStartNextFocus = autoFocusAfterRestRef.current || petPrompt?.id === 'focus-complete';
     setPetPrompt(null);
     setFocusEndAt(null);
@@ -687,7 +686,7 @@ function PetWindow() {
     setPetState('rest');
     invoke("hide_compact_chat_window").catch(() => {});
     expandPetForRest().catch(() => {});
-  }, [expandPetForRest, petPrompt?.id, settings.restReminderIntervalMinutes, setPetState]);
+  }, [expandPetForRest, petPrompt?.id, settings.restDurationSeconds, settings.restReminderIntervalMinutes, setPetState]);
 
   const dismissPrompt = useCallback(() => {
     autoFocusAfterRestRef.current = false;

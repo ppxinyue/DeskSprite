@@ -597,6 +597,7 @@ function RemindersSection({
   const [draft, setDraft] = useState({
     restReminderEnabled: settings.restReminderEnabled,
     restReminderIntervalMinutes: settings.restReminderIntervalMinutes,
+    restDurationSeconds: settings.restDurationSeconds,
     focusDurationMinutes: settings.focusDurationMinutes,
     distractionDetectionEnabled: settings.distractionDetectionEnabled,
     distractionGraceSeconds: settings.distractionGraceSeconds,
@@ -610,6 +611,7 @@ function RemindersSection({
     setDraft({
       restReminderEnabled: settings.restReminderEnabled,
       restReminderIntervalMinutes: settings.restReminderIntervalMinutes,
+      restDurationSeconds: settings.restDurationSeconds,
       focusDurationMinutes: settings.focusDurationMinutes,
       distractionDetectionEnabled: settings.distractionDetectionEnabled,
       distractionGraceSeconds: settings.distractionGraceSeconds,
@@ -619,6 +621,7 @@ function RemindersSection({
   }, [
     settings.restReminderEnabled,
     settings.restReminderIntervalMinutes,
+    settings.restDurationSeconds,
     settings.focusDurationMinutes,
     settings.distractionDetectionEnabled,
     settings.distractionGraceSeconds,
@@ -634,6 +637,7 @@ function RemindersSection({
   const dirty =
     draft.restReminderEnabled !== settings.restReminderEnabled ||
     draft.restReminderIntervalMinutes !== settings.restReminderIntervalMinutes ||
+    draft.restDurationSeconds !== settings.restDurationSeconds ||
     draft.focusDurationMinutes !== settings.focusDurationMinutes ||
     draft.distractionDetectionEnabled !== settings.distractionDetectionEnabled ||
     draft.distractionGraceSeconds !== settings.distractionGraceSeconds ||
@@ -673,6 +677,16 @@ function RemindersSection({
               value={[draft.restReminderIntervalMinutes]}
               onValueChange={([v]) => update('restReminderIntervalMinutes', v)}
               min={1} max={120} step={1} className="w-52"
+            />
+          </div>
+        </AppearanceRow>
+        <AppearanceRow label="休息时长">
+          <div className="flex max-w-[320px] items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.restDurationSeconds}s</span>
+            <Slider
+              value={[draft.restDurationSeconds]}
+              onValueChange={([v]) => update('restDurationSeconds', v)}
+              min={10} max={300} step={5} className="w-52"
             />
           </div>
         </AppearanceRow>
