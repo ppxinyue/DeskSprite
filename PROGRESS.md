@@ -714,3 +714,12 @@
 - 粒子：新增 `orb-avatar__particles` 内部光尘层，使用多点 radial gradients 和慢速 drift 动画，在球体内部形成细小漂浮粒子。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R87. Orb 液态金属球重做与 Rest 对齐（2026-05-09）
+- 结构：删除 Orb 的 particles/glass/noise 三层和逐字 breathing 文字，保留 shell/glow/flow/text 四层，视觉主角回到球体本身。
+- 材质：shell 改为液态金属球结构，使用主高光、右下反光、状态色核心和基底球面渐变；idle/work/rest 改为暖银/电光蓝/琥珀金。
+- 动效：统一为 shell 主呼吸；idle 只做 glow 慢脉冲，work 做短周期横向能量扰动，rest 做 12s 慢旋转。
+- 文字：Orb 文本使用 macOS 系统字体栈，整词渲染，不再拆字母；文字光影与左上主高光保持同一方向。
+- 性能与状态：rest 放大展示时减少原生窗口 resize/move 调用；focus-complete 触发休息时显式保留 `autoFocusAfterRestRef`，休息结束后继续下一轮专注。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

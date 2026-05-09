@@ -49,6 +49,7 @@ export function PetAvatar({
   renderMode = 'pet',
   motions,
   dragging = false,
+  restPresentationActive = false,
   focusActive = false,
   onDragStart,
   onDragMove,
@@ -61,6 +62,7 @@ export function PetAvatar({
   renderMode?: AvatarRenderMode;
   motions: PetMotionSettings;
   dragging?: boolean;
+  restPresentationActive?: boolean;
   focusActive?: boolean;
   onDragStart?: (point: { screenX: number; screenY: number }) => void;
   onDragMove?: (point: { screenX: number; screenY: number }) => void;
@@ -445,7 +447,13 @@ export function PetAvatar({
           }}
           {...interactiveProps}
         >
-          <OrbAvatar state={petState} opacity={opacity} size={Math.min(w, h)} dragging={dragging} />
+          <OrbAvatar
+            state={petState}
+            opacity={opacity}
+            size={Math.min(w, h)}
+            dragging={dragging}
+            restPresentationActive={restPresentationActive}
+          />
         </div>
         {menu}
       </>
@@ -541,9 +549,9 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 const ORB_STATE_META: Record<Extract<PetState, 'idle' | 'work' | 'rest'>, { label: string; accent: string; lightAccent: string }> = {
-  idle: { label: 'idle', accent: '#ffffff', lightAccent: '#1c1c1e' },
-  work: { label: 'work', accent: '#8bbcff', lightAccent: '#5f9fee' },
-  rest: { label: 'rest', accent: '#7be3bd', lightAccent: '#46c99a' },
+  idle: { label: 'idle', accent: '#a09b93', lightAccent: '#c8c4bc' },
+  work: { label: 'work', accent: '#6aaeff', lightAccent: '#4f8ef7' },
+  rest: { label: 'rest', accent: '#f0b860', lightAccent: '#e8a84a' },
 };
 
 function OrbAvatar({
@@ -551,21 +559,22 @@ function OrbAvatar({
   opacity,
   size,
   dragging,
+  restPresentationActive,
 }: {
   state: PetState;
   opacity: number;
   size: number;
   dragging: boolean;
+  restPresentationActive: boolean;
 }) {
   const orbState = state === 'work' || state === 'rest' ? state : 'idle';
   const meta = ORB_STATE_META[orbState];
   const [hovering, setHovering] = useState(false);
-  const letters = meta.label.split('');
-  const fontSize = Math.max(10, Math.round(size * 0.07));
+  const fontSize = Math.max(9, Math.round(size * 0.06));
 
   return (
     <motion.div
-      className={`orb-avatar orb-avatar--${orbState} ${hovering ? 'is-hovering' : ''} ${dragging ? 'is-dragging' : ''}`}
+      className={`orb-avatar orb-avatar--${orbState} ${hovering ? 'is-hovering' : ''} ${dragging ? 'is-dragging' : ''} ${restPresentationActive ? 'is-rest-presentation' : ''}`}
       style={{
         '--orb-size': `${size}px`,
         '--orb-opacity': String(opacity),
@@ -575,30 +584,20 @@ function OrbAvatar({
       } as CSSProperties & Record<string, string>}
       onPointerEnter={() => setHovering(true)}
       onPointerLeave={() => setHovering(false)}
-      animate={{ scale: hovering ? 1.025 : 1 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
     >
       <motion.div
         className="orb-avatar__shell"
         animate={{
-          scale: hovering ? 1.035 : [0.965, 1.075, 0.99, 1.045, 0.965],
+          scale: hovering ? 1.04 : [1, 1.018, 1],
+          y: hovering ? -2 : 0,
         }}
         transition={{
-          scale: hovering ? { duration: 0.24 } : { duration: 5.2, repeat: Infinity, ease: 'easeInOut' },
+          scale: hovering ? { type: 'spring', stiffness: 260, damping: 22 } : { duration: 4, repeat: Infinity, ease: 'easeInOut' },
+          y: { type: 'spring', stiffness: 260, damping: 22 },
         }}
       >
-        <motion.div
-          className="orb-avatar__glow"
-          animate={{
-            opacity: hovering ? 0.28 : [0.08, 0.16, 0.08],
-            scale: hovering ? 1.14 : 1,
-          }}
-          transition={{ duration: 4, repeat: Infinity }}
-        />
+        <div className="orb-avatar__glow" />
         <div className="orb-avatar__flow" />
-        <div className="orb-avatar__particles" />
-        <div className="orb-avatar__glass" />
-        <div className="orb-avatar__noise" />
         <AnimatePresence mode="wait">
           <motion.div
             key={orbState}
@@ -609,23 +608,7 @@ function OrbAvatar({
             exit={{ opacity: 0, scale: 0.92, filter: 'blur(6px)' }}
             transition={{ duration: 0.38, ease: [0.2, 0.8, 0.2, 1] }}
           >
-            {letters.map((letter, index) => (
-              <motion.span
-                key={`${orbState}-${letter}-${index}`}
-                className="orb-avatar__letter"
-                initial={{ fontVariationSettings: "'wght' 360, 'slnt' 0" }}
-                animate={{ fontVariationSettings: ["'wght' 360, 'slnt' 0", "'wght' 760, 'slnt' -6", "'wght' 360, 'slnt' 0"] }}
-                transition={{
-                  duration: 1.85,
-                  ease: 'easeInOut',
-                  repeat: Infinity,
-                  repeatDelay: 0.18,
-                  delay: Math.abs(index - Math.floor(letters.length / 2)) * 0.08,
-                }}
-              >
-                {letter}
-              </motion.span>
-            ))}
+            {meta.label}
           </motion.div>
         </AnimatePresence>
       </motion.div>

@@ -1079,3 +1079,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Orb 的 fancy 感不只来自更强的颜色，也可以来自更轻的文字、更低饱和的材质和细节粒子的慢速运动。
 - 是否需更新技术文档：否。
+
+## ISSUE-092
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb 模式视觉与 Rest 行为
+- 严重程度：重要
+- 问题现象：Orb 视觉仍不稳定，光源和动画过多，材质像雾化泡泡而非有重量的球体；字体/字距不自然；rest 放大时卡顿；rest 结束后没有稳定继续专注。
+- 原因分析：Orb DOM 包含 particles/glass/noise 等多个非必要层，CSS 同时运行 edge bloom、glow、flow、particle drift、逐字 breathing 等多套节奏；状态色过弱且分散，缺少主视觉；rest 大尺寸时多层 blur/粒子和每帧原生窗口 resize/move 叠加，容易卡顿；自动续专注依赖点击 OK 时的 prompt 快照。
+- 解决方案：按液态金属球方向重做 Orb，只保留 shell/glow/flow/text 四层；三态使用暖银/电光蓝/琥珀金；删除粒子、玻璃、噪声和逐字 breathing；精简为主呼吸 + 状态专属 flow/glow；rest 放大动画减少原生窗口调用；focus-complete 时写入 `autoFocusAfterRestRef`，确保休息结束后继续专注。
+- 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Orb 的高级感来自明确的材质主角和少量方向统一的动画；进入 80% 屏幕尺寸的 rest presentation 时要控制原生窗口调用和 CSS 重绘；状态机关键意图要用显式 ref 保留，而不是依赖某次渲染里的 prompt 快照。
+- 是否需更新技术文档：否。

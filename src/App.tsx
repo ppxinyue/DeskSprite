@@ -288,6 +288,7 @@ function PetWindow() {
   const [petPrompt, setPetPrompt] = useState<PetPrompt | null>(null);
   const [focusEndAt, setFocusEndAt] = useState<number | null>(null);
   const [restEndAt, setRestEndAt] = useState<number | null>(null);
+  const [restPresentationActive, setRestPresentationActive] = useState(false);
   const [nextRestReminderAt, setNextRestReminderAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [visualPetScale, setVisualPetScale] = useState(settings.petScale);
@@ -436,8 +437,10 @@ function PetWindow() {
     const startedAt = performance.now();
     const ease = (t: number) => 1 - Math.pow(1 - t, 3);
     const mix = (from: number, to: number, t: number) => from + (to - from) * t;
+    let nativeFrame = 0;
 
     restPresentationActiveRef.current = true;
+    setRestPresentationActive(true);
     layoutApplyingRef.current = true;
 
     await new Promise<void>((resolve) => {
@@ -460,12 +463,15 @@ function PetWindow() {
         setVisualPetScale(nextScale);
         applyLayoutState(nextLayout);
 
-        const width = Math.round(mix(start.windowWidth, target.windowWidth, progress));
-        const height = Math.round(mix(start.windowHeight, target.windowHeight, progress));
-        const left = Math.round(mix(start.windowLeft, target.windowLeft, progress));
-        const top = Math.round(mix(start.windowTop, target.windowTop, progress));
-        void win.setSize(new LogicalSize(width, height)).catch(() => {});
-        void win.setPosition(new PhysicalPosition(left, top)).catch(() => {});
+        nativeFrame += 1;
+        if (nativeFrame % 2 === 0 || progress >= 1) {
+          const width = Math.round(mix(start.windowWidth, target.windowWidth, progress));
+          const height = Math.round(mix(start.windowHeight, target.windowHeight, progress));
+          const left = Math.round(mix(start.windowLeft, target.windowLeft, progress));
+          const top = Math.round(mix(start.windowTop, target.windowTop, progress));
+          void win.setSize(new LogicalSize(width, height)).catch(() => {});
+          void win.setPosition(new PhysicalPosition(left, top)).catch(() => {});
+        }
 
         if (progress < 1) {
           restPresentationFrameRef.current = window.requestAnimationFrame(step);
@@ -480,6 +486,7 @@ function PetWindow() {
         window.setTimeout(() => {
           layoutApplyingRef.current = false;
           restPresentationActiveRef.current = Boolean(restEndAtRef.current);
+          setRestPresentationActive(Boolean(restEndAtRef.current));
           options.onDone?.();
           resolve();
         }, 80);
@@ -551,6 +558,7 @@ function PetWindow() {
     restPresentationSnapshotRef.current = null;
     if (!snapshot) {
       restPresentationActiveRef.current = false;
+      setRestPresentationActive(false);
       setVisualPetScale(settings.petScale);
       requestLayout().catch(() => {});
       return;
@@ -558,6 +566,7 @@ function PetWindow() {
     await animateRestPresentation(snapshot, {
       onDone: () => {
         restPresentationActiveRef.current = false;
+        setRestPresentationActive(false);
         visualPetScaleRef.current = settings.petScale;
         setVisualPetScale(settings.petScale);
         applyLayoutState(snapshot.layout);
@@ -567,7 +576,7 @@ function PetWindow() {
 
   const startRestAction = useCallback(() => {
     const endAt = Date.now() + REST_ACTION_DURATION_MS;
-    const shouldStartNextFocus = petPrompt?.id === 'focus-complete';
+    const shouldStartNextFocus = autoFocusAfterRestRef.current || petPrompt?.id === 'focus-complete';
     setPetPrompt(null);
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
@@ -581,6 +590,7 @@ function PetWindow() {
   }, [expandPetForRest, petPrompt?.id, settings.restReminderIntervalMinutes, setPetState]);
 
   const dismissPrompt = useCallback(() => {
+    autoFocusAfterRestRef.current = false;
     setPetPrompt(null);
   }, []);
 
@@ -656,6 +666,7 @@ function PetWindow() {
     if (!settings.restReminderEnabled || !nextRestReminderAt) return;
     if (focusEndAt || restEndAt || petPrompt) return;
     if (now < nextRestReminderAt) return;
+    autoFocusAfterRestRef.current = false;
     setPetPrompt({ id: 'rest-reminder', message: '该休息啦', variant: 'rest' });
     setPetState('rest');
     setNextRestReminderAt(null);
@@ -667,6 +678,7 @@ function PetWindow() {
     recordCurrentFocusSession(focusEndAt);
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
+    autoFocusAfterRestRef.current = true;
     setPetState('rest');
     setPetPrompt({ id: 'focus-complete', message: '该休息啦', variant: 'rest' });
   }, [focusEndAt, now, recordCurrentFocusSession, setPetState]);
@@ -1111,6 +1123,7 @@ function PetWindow() {
               renderMode={settings.avatarRenderMode}
               motions={settings.petMotions}
               dragging={dragging}
+              restPresentationActive={restPresentationActive}
               focusActive={Boolean(focusEndAt)}
               onDragStart={handleBoundedDragStart}
               onDragMove={handleBoundedDragMove}
