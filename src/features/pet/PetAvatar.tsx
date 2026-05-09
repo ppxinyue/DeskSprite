@@ -46,19 +46,23 @@ export function PetAvatar({
   scale = 1,
   motions,
   dragging = false,
+  focusActive = false,
   onDragStart,
   onDragMove,
   onDragEnd,
   onMenuOpenChange,
+  onFocusToggle,
 }: {
   opacity?: number;
   scale?: number;
   motions: PetMotionSettings;
   dragging?: boolean;
+  focusActive?: boolean;
   onDragStart?: (point: { screenX: number; screenY: number }) => void;
   onDragMove?: (point: { screenX: number; screenY: number }) => void;
   onDragEnd?: () => void;
   onMenuOpenChange?: (open: boolean) => void;
+  onFocusToggle?: () => void;
 }) {
   const { petState, mediaConfig, userFrames, userGifs, openChat, dialogOpen, loadUserFrames } = usePetStore();
   const config = mediaConfig[petState];
@@ -189,7 +193,8 @@ export function PetAvatar({
         try { await invoke('show_settings_cmd'); } catch (e) { console.error(e); }
         break;
       case 'focus':
-        emit('pet:start-focus', {}).catch(() => {});
+        if (onFocusToggle) onFocusToggle();
+        else emit('pet:start-focus', {}).catch(() => {});
         break;
       case 'hide':
         try { await invoke('hide_pet_window'); } catch (e) { console.error(e); }
@@ -407,7 +412,9 @@ export function PetAvatar({
           </div>
         </div>
         <div className="my-1 h-px bg-border/60" />
-        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('focus')}>专注模式</button>
+        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('focus')}>
+          {focusActive ? '退出专注' : '专注模式'}
+        </button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs text-destructive hover:bg-destructive/10" onClick={() => handleContextMenu('quit')}>退出</button>

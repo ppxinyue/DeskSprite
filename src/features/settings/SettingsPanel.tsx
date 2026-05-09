@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Check, ChevronDown, Clock3, ExternalLink, Keyboard, Loader2, Palette, PawPrint, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
+import { Bell, Bot, Check, ChevronDown, Clock3, ExternalLink, Keyboard, Loader2, Palette, PawPrint, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,13 +24,14 @@ import { emit } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { ReactNode } from 'react';
 
-type SettingsSection = 'appearance' | 'ai' | 'history' | 'shortcuts' | 'privacy';
+type SettingsSection = 'appearance' | 'reminders' | 'ai' | 'history' | 'shortcuts' | 'privacy';
 const ALLOWED_STATIC_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp']);
 const ALLOWED_GIF_EXTENSIONS = new Set(['gif']);
 const MASKED_API_KEY = '••••••••';
 
 const SECTIONS: { id: SettingsSection; label: string; icon: typeof Palette }[] = [
   { id: 'appearance', label: '外观', icon: Palette },
+  { id: 'reminders', label: '提醒事项', icon: Bell },
   { id: 'ai', label: 'AI 对话', icon: Bot },
   { id: 'history', label: '历史对话', icon: Clock3 },
   { id: 'shortcuts', label: '快捷键', icon: Keyboard },
@@ -81,6 +82,9 @@ export function SettingsPanel() {
     <SettingsLayout sidebar={sidebar}>
       {activeSection === 'appearance' && (
         <AppearanceSection settings={settings} updateSettings={updateSettings} />
+      )}
+      {activeSection === 'reminders' && (
+        <RemindersSection settings={settings} updateSettings={updateSettings} />
       )}
       {activeSection === 'ai' && (
         <AISection
@@ -177,13 +181,6 @@ function AppearanceSection({
     theme: settings.theme,
     petMotions: settings.petMotions,
     alwaysOnTop: settings.alwaysOnTop,
-    restReminderEnabled: settings.restReminderEnabled,
-    restReminderIntervalMinutes: settings.restReminderIntervalMinutes,
-    focusDurationMinutes: settings.focusDurationMinutes,
-    distractionDetectionEnabled: settings.distractionDetectionEnabled,
-    distractionGraceSeconds: settings.distractionGraceSeconds,
-    distractionBlockedApps: settings.distractionBlockedApps,
-    distractionBlockedKeywords: settings.distractionBlockedKeywords,
   });
 
   const update = <K extends keyof typeof draft>(k: K, v: typeof draft[K]) => {
@@ -201,15 +198,8 @@ function AppearanceSection({
       theme: settings.theme,
       petMotions: settings.petMotions,
       alwaysOnTop: settings.alwaysOnTop,
-      restReminderEnabled: settings.restReminderEnabled,
-      restReminderIntervalMinutes: settings.restReminderIntervalMinutes,
-      focusDurationMinutes: settings.focusDurationMinutes,
-      distractionDetectionEnabled: settings.distractionDetectionEnabled,
-      distractionGraceSeconds: settings.distractionGraceSeconds,
-      distractionBlockedApps: settings.distractionBlockedApps,
-      distractionBlockedKeywords: settings.distractionBlockedKeywords,
     });
-  }, [settings.petOpacity, settings.petScale, settings.dialogWidth, settings.compactChatFontSize, settings.theme, settings.petMotions, settings.alwaysOnTop, settings.restReminderEnabled, settings.restReminderIntervalMinutes, settings.focusDurationMinutes, settings.distractionDetectionEnabled, settings.distractionGraceSeconds, settings.distractionBlockedApps, settings.distractionBlockedKeywords]);
+  }, [settings.petOpacity, settings.petScale, settings.dialogWidth, settings.compactChatFontSize, settings.theme, settings.petMotions, settings.alwaysOnTop]);
 
   return (
     <>
@@ -272,7 +262,95 @@ function AppearanceSection({
         </AppearanceRow>
       </SettingsGroup>
 
-      <SectionTitle>提醒事项</SectionTitle>
+      <SectionTitle>灵宠动作</SectionTitle>
+      <SettingsGroup>
+        <div className="px-4 py-4">
+          <PetMotionControls
+            value={draft.petMotions}
+            onChange={(petMotions) => update('petMotions', petMotions)}
+          />
+        </div>
+      </SettingsGroup>
+
+      <SectionTitle>形象自定义</SectionTitle>
+      <ImageSection />
+
+    </>
+  );
+}
+
+function RemindersSection({
+  settings,
+  updateSettings,
+}: {
+  settings: import('./settingsStore').AppSettings;
+  updateSettings: import('./settingsStore').SettingsState['updateSettings'];
+}) {
+  const [draft, setDraft] = useState({
+    restReminderEnabled: settings.restReminderEnabled,
+    restReminderIntervalMinutes: settings.restReminderIntervalMinutes,
+    focusDurationMinutes: settings.focusDurationMinutes,
+    distractionDetectionEnabled: settings.distractionDetectionEnabled,
+    distractionGraceSeconds: settings.distractionGraceSeconds,
+    distractionBlockedApps: settings.distractionBlockedApps,
+    distractionBlockedKeywords: settings.distractionBlockedKeywords,
+  });
+  const [saving, setSaving] = useState(false);
+  const [savedPulse, setSavedPulse] = useState(false);
+
+  useEffect(() => {
+    setDraft({
+      restReminderEnabled: settings.restReminderEnabled,
+      restReminderIntervalMinutes: settings.restReminderIntervalMinutes,
+      focusDurationMinutes: settings.focusDurationMinutes,
+      distractionDetectionEnabled: settings.distractionDetectionEnabled,
+      distractionGraceSeconds: settings.distractionGraceSeconds,
+      distractionBlockedApps: settings.distractionBlockedApps,
+      distractionBlockedKeywords: settings.distractionBlockedKeywords,
+    });
+  }, [
+    settings.restReminderEnabled,
+    settings.restReminderIntervalMinutes,
+    settings.focusDurationMinutes,
+    settings.distractionDetectionEnabled,
+    settings.distractionGraceSeconds,
+    settings.distractionBlockedApps,
+    settings.distractionBlockedKeywords,
+  ]);
+
+  const update = <K extends keyof typeof draft>(k: K, v: typeof draft[K]) => {
+    setDraft((d) => ({ ...d, [k]: v }));
+    setSavedPulse(false);
+  };
+
+  const dirty =
+    draft.restReminderEnabled !== settings.restReminderEnabled ||
+    draft.restReminderIntervalMinutes !== settings.restReminderIntervalMinutes ||
+    draft.focusDurationMinutes !== settings.focusDurationMinutes ||
+    draft.distractionDetectionEnabled !== settings.distractionDetectionEnabled ||
+    draft.distractionGraceSeconds !== settings.distractionGraceSeconds ||
+    draft.distractionBlockedApps.join('\n') !== settings.distractionBlockedApps.join('\n') ||
+    draft.distractionBlockedKeywords.join('\n') !== settings.distractionBlockedKeywords.join('\n');
+
+  const handleApply = async () => {
+    setSaving(true);
+    try {
+      await updateSettings(draft);
+      await emit('reminders:settings-applied', draft);
+      setSavedPulse(true);
+      window.setTimeout(() => setSavedPulse(false), 1200);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="mb-5">
+        <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.018em] text-foreground">提醒事项</h1>
+      </div>
+
+      <SectionTitle>休息提醒</SectionTitle>
       <SettingsGroup>
         <AppearanceRow label="休息喝水提醒">
           <Switch
@@ -340,21 +418,19 @@ function AppearanceSection({
             />
           </div>
         </div>
-      </SettingsGroup>
-
-      <SectionTitle>灵宠动作</SectionTitle>
-      <SettingsGroup>
-        <div className="px-4 py-4">
-          <PetMotionControls
-            value={draft.petMotions}
-            onChange={(petMotions) => update('petMotions', petMotions)}
-          />
+        <div className="flex items-center justify-end gap-2 border-t border-border/45 py-3">
+          {savedPulse && <span className="text-[11px] text-muted-foreground">已应用，前端计时已刷新</span>}
+          <Button
+            size="sm"
+            onClick={handleApply}
+            disabled={!dirty || saving}
+            className="h-8 rounded-[9px] px-3 text-[12px]"
+          >
+            {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}
+            确认
+          </Button>
         </div>
       </SettingsGroup>
-
-      <SectionTitle>形象自定义</SectionTitle>
-      <ImageSection />
-
     </>
   );
 }

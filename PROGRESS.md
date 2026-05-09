@@ -601,3 +601,11 @@
 - 防护：休息展示期间隐藏小聊天窗口、禁用 pet 拖拽和侧边 chat button，避免大尺寸展示和普通桌面交互互相抢布局。
 - 验证：`pnpm build` 通过；`git diff --check` 通过。
 - 文件：App.tsx, animations.ts, PetAvatar.tsx, ISSUES.md, PROGRESS.md
+
+### R71. 专注状态菜单与提醒事项独立设置页（2026-05-09）
+- 菜单：PetAvatar 新增 `focusActive` / `onFocusToggle`，右键菜单在专注中自动把“专注模式”切换为“退出专注”，点击同一入口即可结束专注并回到待机。
+- 设置：左侧导航新增“提醒事项”，休息提醒、提醒间隔、专注时长、分心检测、检测宽限期和屏蔽规则从外观页迁出。
+- 确认：提醒事项页改为草稿编辑，滑动条/开关/文本框不再即时保存；点击“确认”后才写入设置并显示“已应用，前端计时已刷新”。
+- 刷新：pet 窗口监听设置变化；专注时长确认后，如果当前正在专注，会立即按新的时长重算倒计时。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, PetAvatar.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

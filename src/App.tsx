@@ -599,6 +599,11 @@ function PetWindow() {
     setPetState('work');
   }, [settings.focusDurationMinutes, setPetState]);
 
+  const toggleFocus = useCallback(() => {
+    if (focusEndAtRef.current) endFocus();
+    else startFocus();
+  }, [endFocus, startFocus]);
+
   useEffect(() => {
     const config = mediaConfig[petState] ?? DEFAULT_MEDIA_CONFIG[petState];
     const activeSources = getPetFrameSources(config, userFrames[petState], userGifs[petState]);
@@ -610,6 +615,11 @@ function PetWindow() {
     const unlisten = listen("pet:start-focus", () => startFocus());
     return () => { unlisten.then((fn) => fn()); };
   }, [startFocus]);
+
+  useEffect(() => {
+    if (!focusEndAtRef.current || !focusStartedAtRef.current) return;
+    setFocusEndAt(focusStartedAtRef.current + Math.max(1, settings.focusDurationMinutes) * 60_000);
+  }, [settings.focusDurationMinutes]);
 
   useEffect(() => {
     if (!settings.restReminderEnabled) {
@@ -1080,10 +1090,12 @@ function PetWindow() {
               scale={visualPetScale}
               motions={settings.petMotions}
               dragging={dragging}
+              focusActive={Boolean(focusEndAt)}
               onDragStart={handleBoundedDragStart}
               onDragMove={handleBoundedDragMove}
               onDragEnd={handleBoundedDragEnd}
               onMenuOpenChange={setContextMenuOpen}
+              onFocusToggle={toggleFocus}
             />
             {(focusEndAt || restEndAt) && (
               <div className="pointer-events-none mt-1 text-center text-[11px] font-medium tabular-nums text-muted-foreground drop-shadow-sm">
