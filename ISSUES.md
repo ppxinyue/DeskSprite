@@ -1763,3 +1763,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：继承外部 agent 状态时，应以只读观察为默认能力，避免误导用户以为可以直接接管外部 session 输入。
 - 是否需更新技术文档：否。
+
+## ISSUE-149
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：继承模式小窗 UI 对齐
+- 严重程度：中等
+- 问题现象：继承当前 session 时的小窗口 UI 和普通 chat 小窗口不一致，输入区域虽然不可用但仍影响视觉。
+- 原因分析：上一版复用了 `Composer` 并通过 error 显示提示，导致底部仍然存在输入框结构，不符合“隐去输入框”的要求。
+- 解决方案：继承模式小窗仅保留普通消息容器和气泡，隐藏整个输入栏，单独渲染红色提示小字。
+- 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：只读模式应移除不可交互控件，而不是禁用控件后继续展示。
+- 是否需更新技术文档：否。

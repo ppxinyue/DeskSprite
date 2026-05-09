@@ -573,25 +573,30 @@ function CodingDialog({
           )}
         </div>
       </div>
-      <div>
-        <Composer
-          input={input}
-          isStreaming={isWorking}
-          onInputChange={setInput}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              send();
-            }
-          }}
-          onSubmit={send}
-          selectedImage={null}
-          textareaRef={textareaRef}
-          compact
-          compactFontSize={compactFontSize}
-          error={inherited ? '继承当前 session 时请回到 Codex 中处理或继续输入。' : null}
-        />
-      </div>
+      {inherited ? (
+        <p className="px-3 pb-2 pt-1 text-[11px] leading-5 text-destructive">
+          继承当前 session 时请回到 Codex 中处理或继续输入。
+        </p>
+      ) : (
+        <div>
+          <Composer
+            input={input}
+            isStreaming={isWorking}
+            onInputChange={setInput}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                send();
+              }
+            }}
+            onSubmit={send}
+            selectedImage={null}
+            textareaRef={textareaRef}
+            compact
+            compactFontSize={compactFontSize}
+          />
+        </div>
+      )}
       {state.messages.length > 0 && (
         <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1.5 rounded-full border border-[var(--color-chat-border)] bg-background/72 px-1.5 py-1 text-[10px] text-[var(--color-chat-muted)] opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-100">
           <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(state.status)}`} />

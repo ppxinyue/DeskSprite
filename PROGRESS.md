@@ -1127,3 +1127,10 @@
 - 小窗：继承模式不显示输入框含义，只提示回到 Codex 中处理或继续输入。
 - 验证：`pnpm exec tsc -b --pretty false`、`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, PetAvatar.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
+
+### R144. 继承模式小窗 UI 对齐（2026-05-10）
+- 小窗：继承模式继续使用普通 compact chat 的容器、消息区和 `MessageBubble` 气泡样式。
+- 输入：继承模式下完全隐藏输入栏，避免 disabled composer 破坏普通聊天窗口视觉。
+- 提示：保留底部红色小字，提醒用户回到 Codex 中处理或继续输入。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md
