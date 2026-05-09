@@ -2260,34 +2260,64 @@ async function getCompactChatGeometry({
   const baseWindowTop = windowTop ?? (position ? position.y / scale : safeTop);
   const petX = baseWindowLeft + layout.petLeft;
   const petY = baseWindowTop + layout.petTop;
-  const contentWidth = clamp(requestedDialogWidth, MIN_DIALOG_WIDTH, Math.max(MIN_DIALOG_WIDTH, safeRight - safeLeft - COMPACT_CHAT_SIDE_CHROME * 2));
-  const outerWidth = contentWidth + COMPACT_CHAT_SIDE_CHROME * 2;
-  const availableBelow = safeBottom - (petY + petImageHeight + 12);
+  const safeWidth = Math.max(MIN_DIALOG_WIDTH, safeRight - safeLeft);
+  const safeHeight = Math.max(MIN_DIALOG_HEIGHT, safeBottom - safeTop);
+  const contentWidth = clamp(
+    requestedDialogWidth,
+    MIN_DIALOG_WIDTH,
+    Math.max(MIN_DIALOG_WIDTH, safeWidth - COMPACT_CHAT_SIDE_CHROME * 2),
+  );
+  const outerWidth = Math.min(safeWidth, contentWidth + COMPACT_CHAT_SIDE_CHROME * 2);
   const outerChromeY = COMPACT_CHAT_TOP_CHROME + COMPACT_CHAT_BOTTOM_CHROME;
   const preferredContentHeight = compact ? 128 : COMPACT_CHAT_PREFERRED_HEIGHT;
   const preferredOuterHeight = preferredContentHeight + outerChromeY;
-  const belowHeight = Math.min(preferredOuterHeight, Math.max(0, availableBelow));
+  const minOuterHeight = MIN_DIALOG_HEIGHT + outerChromeY;
+  const maxOuterHeight = Math.max(minOuterHeight, Math.min(preferredOuterHeight, safeHeight));
+  const gap = 12;
+  const petCenterX = petX + petImageWidth / 2;
+  const petCenterY = petY + petImageHeight / 2;
 
-  if (belowHeight >= MIN_DIALOG_HEIGHT + outerChromeY) {
-    return {
-      x: clamp(petX - COMPACT_CHAT_SIDE_CHROME, safeLeft, Math.max(safeLeft, safeRight - outerWidth)),
-      y: petY + petImageHeight + 12,
-      w: outerWidth,
-      h: Math.max(MIN_DIALOG_HEIGHT + outerChromeY, belowHeight),
+  type Candidate = {
+    x: number;
+    y: number;
+    h: number;
+    priority: number;
+  };
+
+  const makeCandidate = (x: number, y: number, h: number, priority: number): Candidate | null => {
+    if (h < minOuterHeight) return null;
+    return { x, y, h: Math.min(maxOuterHeight, h), priority };
+  };
+
+  const centeredX = petCenterX - outerWidth / 2;
+  const centeredY = petCenterY - maxOuterHeight / 2;
+  const candidates = [
+    makeCandidate(centeredX, petY + petImageHeight + gap, safeBottom - (petY + petImageHeight + gap), 0),
+    makeCandidate(centeredX, petY - gap - Math.min(maxOuterHeight, petY - gap - safeTop), petY - gap - safeTop, 1),
+    makeCandidate(petX + petImageWidth + gap, centeredY, maxOuterHeight, 2),
+    makeCandidate(petX - outerWidth - gap, centeredY, maxOuterHeight, 3),
+    makeCandidate(safeLeft + (safeWidth - outerWidth) / 2, safeTop + (safeHeight - maxOuterHeight) / 2, maxOuterHeight, 4),
+  ].filter((item): item is Candidate => Boolean(item));
+
+  const scoreCandidate = (candidate: Candidate) => {
+    const overflowX = Math.max(0, safeLeft - candidate.x) + Math.max(0, candidate.x + outerWidth - safeRight);
+    const overflowY = Math.max(0, safeTop - candidate.y) + Math.max(0, candidate.y + candidate.h - safeBottom);
+    const heightLoss = maxOuterHeight - candidate.h;
+    return overflowX * 1000 + overflowY * 1000 + heightLoss * 10 + candidate.priority;
+  };
+
+  const best = candidates
+    .sort((a, b) => scoreCandidate(a) - scoreCandidate(b))[0] ?? {
+      x: safeLeft + (safeWidth - outerWidth) / 2,
+      y: safeTop + (safeHeight - maxOuterHeight) / 2,
+      h: maxOuterHeight,
+      priority: 5,
     };
-  }
+  const height = Math.max(minOuterHeight, Math.min(maxOuterHeight, best.h));
 
-  const height = Math.max(
-    MIN_DIALOG_HEIGHT + outerChromeY,
-    Math.min(preferredOuterHeight, Math.max(MIN_DIALOG_HEIGHT + outerChromeY, safeBottom - safeTop)),
-  );
-  const canPlaceRight = petX + petImageWidth + 12 + outerWidth <= safeRight;
-  const x = canPlaceRight
-    ? petX + petImageWidth + 12
-    : petX - outerWidth - 12;
   return {
-    x: clamp(x, safeLeft, Math.max(safeLeft, safeRight - outerWidth)),
-    y: clamp(petY, safeTop, Math.max(safeTop, safeBottom - height)),
+    x: clamp(best.x, safeLeft, Math.max(safeLeft, safeRight - outerWidth)),
+    y: clamp(best.y, safeTop, Math.max(safeTop, safeBottom - height)),
     w: outerWidth,
     h: height,
   };

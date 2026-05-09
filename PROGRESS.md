@@ -1308,3 +1308,10 @@
 - Coding 大窗：移除左上角“新建对话”，在“新 session 历史”列表底部新增低调的“新建 session”入口。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R169. 小聊天框边缘展开位置修正（2026-05-10）
+- Compact chat：重写边缘展开几何选择，不再只在原始位置附近 clamp，而是同时计算下方、上方、左右和屏幕内居中候选位置。
+- 边缘容错：当灵宠靠近屏幕边缘导致附近空间不足时，小聊天框会直接移动到完整可容纳的位置，避免横向 overflow 和内容被压窄。
+- 高度策略：候选位置会按安全工作区、最小高度和期望高度打分，优先选择完整显示且高度损失最少的位置。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md
