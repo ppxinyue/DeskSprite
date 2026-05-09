@@ -323,7 +323,10 @@ function CodingCompactDialog({
   useEffect(() => {
     invoke<CodingState>('coding_get_state')
       .then((next) => setState(next ?? DEFAULT_CODING_STATE))
-      .catch(() => setState({ status: 'needs-input', messages: [{ id: 'coding-error', role: 'error', content: '无法连接 Codex。', createdAt: Date.now() }] }));
+      .catch((error) => setState({
+        status: 'needs-input',
+        messages: [{ id: 'coding-error', role: 'error', content: codingConnectionErrorMessage(error), createdAt: Date.now() }],
+      }));
     const unlisten = listen<CodingState>('coding:state', ({ payload }) => {
       setState(payload ?? DEFAULT_CODING_STATE);
     });
@@ -341,7 +344,7 @@ function CodingCompactDialog({
     await invoke('coding_send_message', { prompt }).catch((e) => {
       setState((current) => ({
         status: 'needs-input',
-        messages: [...current.messages, { id: `local-${Date.now()}`, role: 'error', content: String(e), createdAt: Date.now() }],
+        messages: [...current.messages, { id: `local-${Date.now()}`, role: 'error', content: codingConnectionErrorMessage(e), createdAt: Date.now() }],
       }));
     });
   };
@@ -400,6 +403,14 @@ function codingStatusColor(status: CodingStatus) {
   if (status === 'working') return '#ffbd2e';
   if (status === 'needs-input') return '#ff5f57';
   return '#28c840';
+}
+
+function codingConnectionErrorMessage(error: unknown) {
+  const detail = error instanceof Error ? error.message : String(error || '');
+  if (/Unknown command: coding_|coding_get_state|coding_send_message/i.test(detail)) {
+    return 'Coding 模式的主进程接口还没有加载。请重启应用或重新运行 pnpm electron:dev。';
+  }
+  return detail ? `无法连接 Codex：${detail}` : '无法连接 Codex。';
 }
 
 function codingMessageClass(role: CodingMessage['role']) {

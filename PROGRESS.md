@@ -1020,3 +1020,10 @@
 - 布局：同步右键菜单高度估算，避免新增菜单项后靠近屏幕边缘时定位不准。
 - 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, PetAvatar.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R130. Coding 连接错误提示修正（2026-05-09）
+- 小聊天框：`coding_get_state` 失败时不再笼统显示“无法连接 Codex”，改为展示具体原因。
+- 兼容：如果错误是 `Unknown command: coding_*`，明确提示需要重启应用或重新运行 `pnpm electron:dev`，因为 Electron 主进程新增 IPC 不会被前端热更新加载。
+- 发送：向 Codex 发送消息失败时复用同一套错误解释，避免用户误判是 Codex 输出错误。
+- 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md

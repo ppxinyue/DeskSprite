@@ -1595,3 +1595,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：模式级功能应该提供设置页入口和就地快捷入口，不能只藏在某个参数分组里。
 - 是否需更新技术文档：否。
+
+## ISSUE-135
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Coding 连接错误提示修正
+- 严重程度：重要
+- 问题现象：小聊天框在 Coding 模式下显示红色 `Action / 无法连接 Codex`，但该错误可能来自前端调用新增 IPC command 失败，而不是 Codex CLI 本身不可用。
+- 原因分析：Electron 主进程新增的 `coding_get_state`、`coding_send_message` handlers 需要重启主进程后才会加载；前端 catch 分支把所有失败都归类成“无法连接 Codex”，掩盖了 `Unknown command` 这类真实原因。
+- 解决方案：新增连接错误格式化逻辑，对 `Unknown command: coding_*` 给出“重启应用或重新运行 pnpm electron:dev”的明确提示，其余错误保留原始细节。
+- 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：新增 Electron IPC 时，前端错误提示要区分“主进程未加载接口”和“后端工具不可用”，否则排障方向会错。
+- 是否需更新技术文档：否。
