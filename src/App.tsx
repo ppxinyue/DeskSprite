@@ -28,7 +28,7 @@ const COMPACT_CHAT_SIDE_CHROME = 10;
 const COMPACT_CHAT_TOP_CHROME = 20;
 const COMPACT_CHAT_BOTTOM_CHROME = 10;
 const COMPACT_CHAT_PREFERRED_HEIGHT = 340;
-const CONTEXT_MENU_WIDTH = 112;
+const CONTEXT_MENU_WIDTH = 136;
 const CONTEXT_SUBMENU_WIDTH = 170;
 const CONTEXT_MENU_HEIGHT = 226;
 const PET_RIGHT_EDGE_MENU_THRESHOLD = 0.62;
@@ -518,12 +518,14 @@ function CodingDialog({
       <div className="relative grid h-full grid-cols-[260px_minmax(0,1fr)] bg-background pt-14 text-[var(--text-primary)]">
         <div className="app-drag-region fixed inset-x-0 top-0 z-50 h-14" />
         <aside className="glass-panel flex min-h-0 flex-col rounded-none border-y-0 border-l-0">
-          <div className="app-no-drag shrink-0 p-3">
-            <button className="flex h-10 w-full items-center gap-2 rounded-[12px] px-3 text-left text-[14px] font-medium leading-[1.5] transition-all duration-200 hover:bg-background/55" onClick={clear}>
-              <Plus className="h-4 w-4" />
-              {inherited ? '清空通知' : '新建对话'}
-            </button>
-          </div>
+          {!inherited && (
+            <div className="app-no-drag shrink-0 p-3">
+              <button className="flex h-10 w-full items-center gap-2 rounded-[12px] px-3 text-left text-[14px] font-medium leading-[1.5] transition-all duration-200 hover:bg-background/55" onClick={clear}>
+                <Plus className="h-4 w-4" />
+                新建对话
+              </button>
+            </div>
+          )}
           <div className="app-no-drag min-h-0 flex-1 overflow-y-auto px-2 pb-3">
             {inherited ? (
               inheritedSessions.length === 0 ? (
@@ -567,9 +569,6 @@ function CodingDialog({
               <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
               <span>Codex</span>
             </div>
-            <Button variant="ghost" size="sm" className="h-8 rounded-[7px] px-2.5 text-[12px]" onClick={clear}>
-              清空
-            </Button>
           </div>
           <div className="app-no-drag min-h-0 flex-1 overflow-hidden p-3">
             <section className="quiet-card flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] ring-2 ring-ring/16">
@@ -586,7 +585,7 @@ function CodingDialog({
                       {inherited ? (state.status === 'idle' ? '没有新的 Codex 通知' : 'Codex 正在工作中') : state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
                     </div>
                   ) : visibleMessages.map((message) => (
-                    <MessageBubble key={message.id} message={message} />
+                    <MessageBubble key={message.id} message={message} fullWidth bubble />
                   ))}
                   {isWorking && !archivedMessages && (
                     <MessageBubble message={{ id: 'coding-working', role: 'assistant', content: '...', timestamp: Date.now() }} />
@@ -688,14 +687,6 @@ function CodingDialog({
             compact
             compactFontSize={compactFontSize}
           />
-        </div>
-      )}
-      {state.messages.length > 0 && (
-        <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1.5 rounded-full border border-[var(--color-chat-border)] bg-background/72 px-1.5 py-1 text-[10px] text-[var(--color-chat-muted)] opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-100">
-          <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(state.status)}`} />
-          <button className="pointer-events-auto rounded px-1 hover:text-[var(--color-chat-text)]" onClick={clear}>
-            清空
-          </button>
         </div>
       )}
     </div>

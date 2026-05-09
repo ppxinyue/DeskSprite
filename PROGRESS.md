@@ -1209,3 +1209,10 @@
 - 行为：重复过程消息只更新时间，不新增气泡；不同过程消息仍按出现顺序保留最近 8 条。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R155. Coding 窗口气泡与菜单宽度调整（2026-05-10）
+- 清空：移除 Coding 小窗悬浮清空按钮、Coding 大窗右上清空按钮，以及继承模式左侧“清空通知”入口。
+- 大窗：`MessageBubble` 支持强制气泡样式，Coding 大聊天窗口中的 agent 回复按小窗一样逐条显示为不透明气泡。
+- 菜单：右键菜单宽度从 112px 增加到 136px，并禁止“退出 Coding 模式”换行。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示；确认旧清空文案和 112px 菜单宽度无残留。
+- 文件：App.tsx, PetAvatar.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md

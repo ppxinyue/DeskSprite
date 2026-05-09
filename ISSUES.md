@@ -1895,3 +1895,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：读取外部 append-only 日志时，同一语义事件可能有多个投影格式，进入 UI 前要按内容或 call id 做去重。
 - 是否需更新技术文档：否。
+
+## ISSUE-160
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Coding 窗口气泡与菜单宽度调整
+- 严重程度：中等
+- 问题现象：Coding 大小窗口仍有清空入口；大聊天窗口里的 agent 回复不像小窗一样逐条气泡化；右键菜单“退出 Coding 模式”会换行。
+- 原因分析：Coding 大窗复用了普通大窗的透明 assistant 样式和清空按钮；右键菜单宽度仍按旧的 112px 计算和渲染。
+- 解决方案：删除 Coding 清空 UI；给消息气泡增加强制 bubble 样式并用于 Coding 大窗；右键菜单宽度同步扩大到 136px。
+- 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：窗口外壳可复用普通 chat，但 Coding 的消息呈现需要明确指定气泡化，不能依赖普通大窗默认透明 assistant 样式。
+- 是否需更新技术文档：否。

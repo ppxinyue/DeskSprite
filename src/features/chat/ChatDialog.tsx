@@ -1333,6 +1333,7 @@ export function MessageBubble({
   isStreaming = false,
   fullWidth = false,
   compact = false,
+  bubble = false,
   compactFontSize = 13,
   speakRate = 1.0,
   onSpeak,
@@ -1341,6 +1342,7 @@ export function MessageBubble({
   isStreaming?: boolean;
   fullWidth?: boolean;
   compact?: boolean;
+  bubble?: boolean;
   compactFontSize?: number;
   speakRate?: number;
   onSpeak?: (text: string, rate: number) => void;
@@ -1377,7 +1379,7 @@ export function MessageBubble({
         } ${
           isUser
             ? 'border-[var(--color-chat-bubble-border)] bg-[var(--surface-flat)] text-right shadow-[0_1px_0_rgba(255,255,255,0.55)_inset]'
-            : compact ? 'border-[var(--color-chat-bubble-border)] bg-[var(--surface-flat)] text-left shadow-[0_1px_0_rgba(255,255,255,0.45)_inset]' : 'border-transparent bg-transparent text-left shadow-none'
+            : (compact || bubble) ? 'border-[var(--color-chat-bubble-border)] bg-[var(--surface-flat)] text-left shadow-[0_1px_0_rgba(255,255,255,0.45)_inset]' : 'border-transparent bg-transparent text-left shadow-none'
         }`}
         style={{ fontSize: compact ? compactFontSize : undefined }}
       >

@@ -408,7 +408,7 @@ export function PetAvatar({
         }}
       />
       <div
-        className="fixed z-50 w-[112px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 text-popover-foreground shadow-xl dark:bg-[#1c1b18]"
+        className="fixed z-50 w-[136px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 text-popover-foreground shadow-xl dark:bg-[#1c1b18]"
         style={{ left: menuPos.x, top: menuPos.y }}
         onPointerDown={(e) => e.stopPropagation()}
         onContextMenu={(e) => e.stopPropagation()}
@@ -446,7 +446,7 @@ export function PetAvatar({
           {focusActive ? '退出专注' : '专注模式'}
         </button>
         {codingModeEnabled ? (
-          <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding')}>
+          <button className="block w-full whitespace-nowrap rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding')}>
             退出 Coding 模式
           </button>
         ) : (
