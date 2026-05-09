@@ -30,6 +30,7 @@ const CONTEXT_SUBMENU_WIDTH = 170;
 const CONTEXT_MENU_HEIGHT = 204;
 const PET_RIGHT_EDGE_MENU_THRESHOLD = 0.62;
 const PET_BUBBLE_TOP_SPACE = 78;
+const PET_PROMPT_BUBBLE_WIDTH = 196;
 const REST_ACTION_DURATION_MS = 60_000;
 const REST_PRESENTATION_SCREEN_RATIO = 0.8;
 const REST_PRESENTATION_ANIMATION_MS = 820;
@@ -321,6 +322,12 @@ function PetWindow() {
   );
   const collapsedHeight = Math.max(220 + PET_BUBBLE_TOP_SPACE, petSize + 70 + PET_BUBBLE_TOP_SPACE);
   const [layout, setLayout] = useState<PetWindowLayout>(() => createDefaultPetWindowLayout(collapsedWidth, collapsedHeight));
+  const promptBubbleLeft = clamp(
+    petImageWidth / 2 - PET_PROMPT_BUBBLE_WIDTH / 2,
+    -layout.petLeft + 8,
+    layout.windowWidth - layout.petLeft - PET_PROMPT_BUBBLE_WIDTH - 8,
+  );
+  const promptBubbleArrowLeft = clamp(petImageWidth / 2 - promptBubbleLeft, 14, PET_PROMPT_BUBBLE_WIDTH - 14);
   const [dragging, setDragging] = useState(false);
   const layoutRef = useRef(layout);
   const movedTimerRef = useRef<number | null>(null);
@@ -1116,6 +1123,8 @@ function PetWindow() {
             {petPrompt && (
               <PetPromptBubble
                 prompt={petPrompt}
+                left={promptBubbleLeft}
+                arrowLeft={promptBubbleArrowLeft}
                 onOk={startRestAction}
                 onIgnore={() => {
                   if (petPrompt.id === 'focus-warning' && focusEndAtRef.current) setPetState('work');
@@ -1144,13 +1153,13 @@ function PetWindow() {
               onFocusToggle={toggleFocus}
             />
             {restEndAt ? (
-              <div className="mt-2 flex flex-col items-center gap-1.5">
-                <div className="pointer-events-none rounded-full bg-background/82 px-3 py-1 text-center text-[12px] font-semibold tabular-nums text-foreground shadow-sm backdrop-blur-md">
+              <div className="mt-3 flex flex-col items-center gap-4">
+                <div className="pointer-events-none text-center text-[48px] font-semibold leading-none tabular-nums text-foreground drop-shadow-[0_2px_12px_rgba(32,28,22,0.18)]">
                   {formatCountdown(Math.max(0, restEndAt - now))}
                 </div>
                 <button
                   type="button"
-                  className="rounded-full border border-border/65 bg-background/88 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:text-foreground active:translate-y-0"
+                  className="rounded-[16px] border border-border/65 bg-background/90 px-9 py-3 text-[33px] font-medium leading-none text-muted-foreground shadow-[0_10px_28px_rgba(32,28,22,0.14)] backdrop-blur-md transition-all duration-200 hover:-translate-y-1 hover:border-border hover:text-foreground active:translate-y-0"
                   onClick={() => finishRest().catch(() => {})}
                 >
                   提前结束
@@ -1227,18 +1236,25 @@ function FloatingToolButton({
 
 function PetPromptBubble({
   prompt,
+  left,
+  arrowLeft,
   onOk,
   onIgnore,
   onEndFocus,
 }: {
   prompt: PetPrompt;
+  left: number;
+  arrowLeft: number;
   onOk: () => void;
   onIgnore: () => void;
   onEndFocus: () => void;
 }) {
   const isWarning = prompt.id === 'focus-warning';
   return (
-    <div className="absolute left-1/2 top-[-74px] z-50 w-[196px] -translate-x-1/2 animate-pet-bubble-in rounded-[10px] border border-border/75 bg-background/96 px-2.5 py-2 text-center shadow-[0_12px_34px_rgba(32,28,22,0.16)] backdrop-blur-md">
+    <div
+      className="absolute top-[-74px] z-50 w-[196px] animate-pet-bubble-in rounded-[10px] border border-border/75 bg-background/96 px-2.5 py-2 text-center shadow-[0_12px_34px_rgba(32,28,22,0.16)] backdrop-blur-md"
+      style={{ left }}
+    >
       <div className="text-[12px] font-medium leading-snug text-foreground">{prompt.message}</div>
       <div className="mt-2 flex justify-center gap-1.5">
         {isWarning ? (
@@ -1261,7 +1277,10 @@ function PetPromptBubble({
           </>
         )}
       </div>
-      <div className="absolute bottom-[-5px] left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-border/75 bg-background/96" />
+      <div
+        className="absolute bottom-[-5px] h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-border/75 bg-background/96"
+        style={{ left: arrowLeft }}
+      />
     </div>
   );
 }

@@ -892,3 +892,11 @@
 - 保留：work/rest 的奶白底逻辑不变，work hover 仍保持半透明。
 - 验证：`pnpm build` 通过。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R112. 休息提示与倒计时布局修复（2026-05-09）
+- 提示框：休息/专注结束提示框根据当前 pet 窗口边界 clamp 水平位置，避免靠左时显示不全；箭头仍对准 pet 中心。
+- 倒计时：休息状态下方倒计时从圆角块改为纯文本，并把字号放大到 48px。
+- 提前结束：按钮放大约 3 倍，提升休息展示时的可点击性。
+- 范围：pet 和 orb 模式共用 PetWindow 逻辑，因此两种模式同时生效。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md
