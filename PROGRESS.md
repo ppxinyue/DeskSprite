@@ -830,3 +830,10 @@
 - 结果：`W/O/R/K` 吸附完成后应稳定分布在四象限，彼此相隔 90 度。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R103. Orb Work 取消公转（2026-05-09）
+- Work：删除字母 orbit 包裹层和公转 keyframes，四个字母不再绕内核旋转。
+- 吸附：保留逐字从四角旋转吸入中心的倒计时动效，吸附目标回到中心点。
+- 背景：保留 work 状态的内向波纹，继续表达中心吸附语义。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

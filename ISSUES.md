@@ -1271,3 +1271,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：CSS 变量参与 keyframes 角度插值时跨浏览器稳定性不如固定 keyframes + 负延迟相位；状态语义也应反映在背景波纹方向上。
 - 是否需更新技术文档：否。
+
+## ISSUE-108
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb Work 动效简化
+- 严重程度：改进
+- 问题现象：Work 的 4 个字母不需要公转，只需要向内被吸附。
+- 原因分析：公转层增加了运动复杂度，但用户当前希望 work 只表达“被中心吸入”的单一语义。
+- 解决方案：删除 work orbit 包裹层、`orbWorkOrbit` keyframes 和相位延迟；保留字母自身从四角旋转吸入中心的 transform 过渡。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：当用户收敛动效语义时，应减少复合运动层，保留最清晰的一条视觉动线。
+- 是否需更新技术文档：否。

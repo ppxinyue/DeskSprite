@@ -622,24 +622,17 @@ function OrbAvatar({
               return (
                 <span
                   key={`${letter}-${index}`}
-                  className="orb-avatar__work-orbit"
+                  className="orb-avatar__work-letter"
                   style={{
+                    '--attract-progress': String(localProgress),
+                    '--work-x': `${startPoint.x * size * remaining}px`,
+                    '--work-y': `${startPoint.y * size * remaining}px`,
+                    '--work-rotate': `${startPoint.rotate * remaining}deg`,
+                    '--work-scale': String(0.92 + localProgress * 0.16),
                     '--stack-index': String(index),
                   } as CSSProperties & Record<string, string>}
                 >
-                  <span
-                    className="orb-avatar__work-letter"
-                    style={{
-                      '--attract-progress': String(localProgress),
-                      '--work-x': `${startPoint.x * size * remaining}px`,
-                      '--work-y': `${(startPoint.y * remaining - 0.10 * localProgress) * size}px`,
-                      '--work-rotate': `${startPoint.rotate * remaining}deg`,
-                      '--work-scale': String(0.92 + localProgress * 0.16),
-                      '--stack-index': String(index),
-                    } as CSSProperties & Record<string, string>}
-                  >
-                    {letter}
-                  </span>
+                  {letter}
                 </span>
               );
             })}
