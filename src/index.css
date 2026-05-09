@@ -387,17 +387,17 @@
 }
 
 .orb-avatar--work {
-  --orb-state-core: rgba(112, 219, 255, 0.34);
-  --orb-state-mid: rgba(112, 219, 255, 0.19);
-  --orb-state-edge: rgba(112, 219, 255, 0.060);
+  --orb-state-core: rgba(47, 143, 255, 0.36);
+  --orb-state-mid: rgba(47, 143, 255, 0.20);
+  --orb-state-edge: rgba(47, 143, 255, 0.064);
   --orb-base-core: rgba(255, 252, 244, 0.92);
   --orb-base-mid: rgba(255, 250, 240, 0.64);
   --orb-base-soft: rgba(255, 246, 232, 0.34);
   --orb-base-edge: rgba(255, 244, 226, 0.11);
   --orb-base-clear: rgba(255, 244, 226, 0);
-  --orb-hover-fill: rgba(226, 248, 255, 0.98);
-  --orb-wave-strong: rgba(42, 190, 255, 0.150);
-  --orb-wave-soft: rgba(156, 232, 255, 0.078);
+  --orb-hover-fill: rgba(225, 241, 255, 0.98);
+  --orb-wave-strong: rgba(47, 143, 255, 0.170);
+  --orb-wave-soft: rgba(132, 190, 255, 0.088);
 }
 
 .orb-avatar--rest {

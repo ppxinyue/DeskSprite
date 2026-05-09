@@ -886,3 +886,9 @@
 - 保留：hover 放大、边界和中央文字交互仍对所有状态有效。
 - 验证：`pnpm build` 通过。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R111. Orb Work Vite 蓝配色（2026-05-09）
+- Work：将状态核心、边缘和波纹色统一调整为接近用户参考图中的 Vite 亮蓝。
+- 保留：work/rest 的奶白底逻辑不变，work hover 仍保持半透明。
+- 验证：`pnpm build` 通过。
+- 文件：index.css, ISSUES.md, PROGRESS.md
