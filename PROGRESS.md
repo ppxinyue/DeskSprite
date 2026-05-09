@@ -850,3 +850,11 @@
 - 保留：非 hover 状态仍使用设置里的 `petOpacity`，不改变用户的常态透明度偏好。
 - 验证：`pnpm build` 通过。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R106. Orb 状态色波纹（2026-05-09）
+- Idle：在灰阶基础上混入小聊天框背景 token 的暖灰/玻璃色，让待机态和聊天窗口气质一致。
+- Work：波纹和核心渐变混入低透明浅蓝色，保持克制但增强专注态辨识度。
+- Rest：波纹和核心渐变混入低透明浅粉色，休息态更柔和。
+- 约束：状态色只叠在核心渐变和波纹层上，保留整体黑白灰基调。
+- 验证：`pnpm build` 通过。
+- 文件：index.css, ISSUES.md, PROGRESS.md

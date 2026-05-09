@@ -357,6 +357,11 @@
   position: relative;
   width: var(--orb-size);
   height: var(--orb-size);
+  --orb-state-core: color-mix(in srgb, var(--color-pet-dialog-bg) 64%, rgba(28,28,28,0.12));
+  --orb-state-mid: color-mix(in srgb, var(--color-pet-dialog-bg) 38%, transparent);
+  --orb-state-edge: color-mix(in srgb, var(--color-pet-dialog-bg) 16%, transparent);
+  --orb-wave-strong: color-mix(in srgb, var(--color-pet-dialog-bg) 46%, rgba(18,18,18,0.040));
+  --orb-wave-soft: color-mix(in srgb, var(--color-pet-dialog-bg) 25%, rgba(140,140,140,0.018));
   opacity: var(--orb-opacity);
   display: grid;
   place-items: center;
@@ -371,6 +376,22 @@
   animation-duration: 7.2s;
 }
 
+.orb-avatar--work {
+  --orb-state-core: rgba(143, 192, 255, 0.20);
+  --orb-state-mid: rgba(143, 192, 255, 0.10);
+  --orb-state-edge: rgba(143, 192, 255, 0.028);
+  --orb-wave-strong: rgba(111, 170, 245, 0.070);
+  --orb-wave-soft: rgba(148, 198, 255, 0.030);
+}
+
+.orb-avatar--rest {
+  --orb-state-core: rgba(255, 187, 216, 0.20);
+  --orb-state-mid: rgba(255, 187, 216, 0.10);
+  --orb-state-edge: rgba(255, 187, 216, 0.030);
+  --orb-wave-strong: rgba(255, 156, 198, 0.074);
+  --orb-wave-soft: rgba(255, 196, 221, 0.032);
+}
+
 .orb-avatar__shell {
   position: relative;
   width: 100%;
@@ -379,6 +400,11 @@
   overflow: visible;
   border: 0;
   background:
+    radial-gradient(circle at 50% 50%,
+      var(--orb-state-core) 0%,
+      var(--orb-state-mid) 38%,
+      var(--orb-state-edge) 68%,
+      transparent 100%),
     radial-gradient(circle at 50% 50%,
       rgba(28,28,28,0.20) 0%,
       rgba(74,74,74,0.14) 34%,
@@ -396,9 +422,9 @@
   border-radius: inherit;
   background:
     repeating-radial-gradient(circle at 50% 50%,
-      rgba(18,18,18,0.055) 0%,
+      var(--orb-wave-strong) 0%,
       rgba(18,18,18,0.038) 7%,
-      rgba(140,140,140,0.020) 12%,
+      var(--orb-wave-soft) 12%,
       rgba(190,190,190,0) 19%);
   opacity: 0.72;
   pointer-events: none;
