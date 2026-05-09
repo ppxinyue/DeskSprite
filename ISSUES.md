@@ -1571,3 +1571,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：展示元素可以运动，关键操作按钮应保持稳定可点，尤其是退出/结束类控制。
 - 是否需更新技术文档：否。
+
+## ISSUE-133
+- 发现时间：2026-05-09
+- 发现者：用户需求
+- 相关任务：Coding 模式接入 Codex
+- 严重程度：新功能
+- 问题现象：灵宠右侧小对话框只能连接普通 AI 对话，不能承接本机 Codex 的执行状态、输出和用户输入。
+- 原因分析：前端没有 Coding 模式开关，主进程没有 Codex CLI 执行桥接，pet 侧 chat 按钮也没有可表达 Codex 状态的红黄绿状态灯。
+- 解决方案：新增 `codingModeEnabled` 设置；主进程通过本机 Codex CLI 执行用户输入并广播 `coding:state`；小聊天框在 Coding 模式下切换为 Codex 面板；右侧 chat 按钮常显并使用 mac 红黄绿表达需要处理、工作中、已完成。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：外部 agent 接入需要把“执行桥接、状态广播、输入面板、入口状态灯”作为一套完整闭环实现。
+- 是否需更新技术文档：否。

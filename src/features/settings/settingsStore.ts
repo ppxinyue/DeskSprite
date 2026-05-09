@@ -29,6 +29,7 @@ export interface AppSettings {
   attachActivity: 'low' | 'medium' | 'high';
   alwaysOnTop: boolean;
   chatModelMode: ModelMode;
+  codingModeEnabled: boolean;
   temperature: number;
   maxTokens: number;
   streamOutput: boolean;
@@ -75,6 +76,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   attachActivity: 'medium',
   alwaysOnTop: true,
   chatModelMode: 'default',
+  codingModeEnabled: false,
   temperature: 0.7,
   maxTokens: 2048,
   streamOutput: true,

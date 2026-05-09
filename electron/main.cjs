@@ -16,7 +16,7 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const { execFile } = require('node:child_process');
+const { execFile, spawn } = require('node:child_process');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
@@ -27,6 +27,16 @@ let tray = null;
 let currentAppIcon = null;
 const floatingConfiguredWindows = new WeakSet();
 const IGNORED_DISTRACTION_APPS = ['DeskSprite', 'PawPal', 'Electron'];
+const CODEX_STATUS = {
+  NEEDS_INPUT: 'needs-input',
+  WORKING: 'working',
+  DONE: 'done',
+};
+const codingState = {
+  status: CODEX_STATUS.DONE,
+  messages: [],
+  running: null,
+};
 
 app.setName('DeskSprite');
 if (process.platform === 'darwin') app.setActivationPolicy('regular');
@@ -714,6 +724,150 @@ async function synthesizeSpeech({ request }) {
   return { dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`, mimeType };
 }
 
+function getCodexBinary() {
+  if (process.env.CODEX_BIN) return process.env.CODEX_BIN;
+  const bundled = '/Applications/Codex.app/Contents/Resources/codex';
+  if (fs.existsSync(bundled)) return bundled;
+  return 'codex';
+}
+
+function publishCodingState() {
+  const { running, ...safeState } = codingState;
+  broadcast('coding:state', safeState);
+  return safeState;
+}
+
+function pushCodingMessage(role, content) {
+  const text = String(content || '').trim();
+  if (!text) return;
+  codingState.messages.push({
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    role,
+    content: text,
+    createdAt: Date.now(),
+  });
+  if (codingState.messages.length > 80) codingState.messages.splice(0, codingState.messages.length - 80);
+  publishCodingState();
+}
+
+function extractCodexEventText(event) {
+  if (!event || typeof event !== 'object') return '';
+  const candidates = [
+    event.message,
+    event.content,
+    event.text,
+    event.delta,
+    event.output,
+    event.item?.text,
+    event.item?.content,
+    event.msg?.content,
+    event.msg?.message,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) return candidate;
+    if (Array.isArray(candidate)) {
+      const joined = candidate
+        .map((part) => typeof part === 'string' ? part : part?.text || part?.content || '')
+        .filter(Boolean)
+        .join('');
+      if (joined.trim()) return joined;
+    }
+  }
+  if (event.type && /approval|permission|confirm|input/i.test(String(event.type))) {
+    codingState.status = CODEX_STATUS.NEEDS_INPUT;
+    return `需要处理：${event.type}`;
+  }
+  if (event.type && /error|failed/i.test(String(event.type))) return `Codex 出错：${JSON.stringify(event)}`;
+  return '';
+}
+
+async function sendCodingMessage({ prompt }) {
+  const text = String(prompt || '').trim();
+  if (!text) throw new Error('输入为空。');
+  if (codingState.running) {
+    codingState.status = CODEX_STATUS.WORKING;
+    pushCodingMessage('system', 'Codex 正在工作，请等这次任务结束后再发送。');
+    return publishCodingState();
+  }
+
+  pushCodingMessage('user', text);
+  codingState.status = CODEX_STATUS.WORKING;
+  publishCodingState();
+
+  const args = [
+    'exec',
+    '--json',
+    '--color',
+    'never',
+    '--ask-for-approval',
+    'on-request',
+    '--sandbox',
+    'workspace-write',
+    '--cd',
+    process.cwd(),
+    text,
+  ];
+  const child = spawn(getCodexBinary(), args, {
+    cwd: process.cwd(),
+    env: { ...process.env, FORCE_COLOR: '0' },
+  });
+  codingState.running = child;
+
+  let stdoutBuffer = '';
+  let stderrBuffer = '';
+  child.stdout.on('data', (chunk) => {
+    stdoutBuffer += chunk.toString();
+    const lines = stdoutBuffer.split(/\r?\n/);
+    stdoutBuffer = lines.pop() || '';
+    for (const line of lines) {
+      const raw = line.trim();
+      if (!raw) continue;
+      try {
+        const event = JSON.parse(raw);
+        const content = extractCodexEventText(event);
+        if (content) pushCodingMessage('codex', content);
+      } catch {
+        pushCodingMessage('codex', raw);
+      }
+    }
+  });
+  child.stderr.on('data', (chunk) => {
+    stderrBuffer += chunk.toString();
+    const text = stderrBuffer.trim();
+    if (/approval|permission|authorize|confirm|login|auth|input/i.test(text)) {
+      codingState.status = CODEX_STATUS.NEEDS_INPUT;
+      publishCodingState();
+    }
+  });
+  child.on('error', (error) => {
+    codingState.running = null;
+    codingState.status = CODEX_STATUS.NEEDS_INPUT;
+    pushCodingMessage('error', `无法启动 Codex：${error.message}`);
+  });
+  child.on('close', (code) => {
+    if (stdoutBuffer.trim()) {
+      try {
+        const event = JSON.parse(stdoutBuffer.trim());
+        const content = extractCodexEventText(event);
+        if (content) pushCodingMessage('codex', content);
+      } catch {
+        pushCodingMessage('codex', stdoutBuffer.trim());
+      }
+    }
+    codingState.running = null;
+    if (code === 0) {
+      codingState.status = CODEX_STATUS.DONE;
+      pushCodingMessage('system', 'Codex 执行完毕。');
+    } else {
+      codingState.status = CODEX_STATUS.NEEDS_INPUT;
+      pushCodingMessage('error', stderrBuffer.trim() || `Codex 退出，状态码 ${code}。可能需要用户输入或授权。`);
+    }
+    publishCodingState();
+  });
+
+  return publishCodingState();
+}
+
 const keyStore = new Map();
 
 const handlers = {
@@ -772,6 +926,13 @@ const handlers = {
   synthesize_speech: synthesizeSpeech,
   can_start_speech_recognition: () => true,
   check_distraction: checkDistraction,
+  coding_get_state: () => publishCodingState(),
+  coding_send_message: sendCodingMessage,
+  coding_clear: () => {
+    codingState.messages = [];
+    if (!codingState.running) codingState.status = CODEX_STATUS.DONE;
+    return publishCodingState();
+  },
   set_app_icon: ({ path: iconPath }) => setAppIcon(iconPath),
   save_api_key: ({ keyringRef, key }) => {
     keyStore.set(keyringRef, key);

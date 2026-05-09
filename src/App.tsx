@@ -170,6 +170,22 @@ interface CompactChatSession {
   version: number;
 }
 
+type CodingStatus = 'needs-input' | 'working' | 'done';
+
+interface CodingMessage {
+  id: string;
+  role: 'user' | 'codex' | 'system' | 'error';
+  content: string;
+  createdAt: number;
+}
+
+interface CodingState {
+  status: CodingStatus;
+  messages: CodingMessage[];
+}
+
+const DEFAULT_CODING_STATE: CodingState = { status: 'done', messages: [] };
+
 function CompactChatWindow() {
   const { settings } = useSettingsStore();
   const lastCompactHeightRef = useRef(0);
@@ -246,6 +262,11 @@ function CompactChatWindow() {
     invoke("resize_compact_chat_window", { height: nextHeight }).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!settings.codingModeEnabled) return;
+    handleContentHeightChange(COMPACT_CHAT_PREFERRED_HEIGHT);
+  }, [handleContentHeightChange, settings.codingModeEnabled]);
+
   const hoverFrameHeight = Math.max(
     MIN_DIALOG_HEIGHT,
     Math.min(
@@ -266,19 +287,133 @@ function CompactChatWindow() {
         </MacControlButton>
       </div>
       <div className="absolute left-[10px] right-[10px] top-[20px]">
-        <ChatDialog
-          key={`${session.mode}-${session.conversationId ?? 'new'}-${session.version}`}
-          initialConversationId={session.conversationId}
-          initialMode={session.mode}
-          dialogOpacity={settings.petOpacity}
-          compactFontSize={settings.compactChatFontSize}
-          maxHeight={COMPACT_CHAT_PREFERRED_HEIGHT}
-          onContentHeightChange={handleContentHeightChange}
-          onConversationChange={handleConversationChange}
+        {settings.codingModeEnabled ? (
+          <CodingCompactDialog
+            compactFontSize={settings.compactChatFontSize}
+            maxHeight={COMPACT_CHAT_PREFERRED_HEIGHT}
+          />
+        ) : (
+          <ChatDialog
+            key={`${session.mode}-${session.conversationId ?? 'new'}-${session.version}`}
+            initialConversationId={session.conversationId}
+            initialMode={session.mode}
+            dialogOpacity={settings.petOpacity}
+            compactFontSize={settings.compactChatFontSize}
+            maxHeight={COMPACT_CHAT_PREFERRED_HEIGHT}
+            onContentHeightChange={handleContentHeightChange}
+            onConversationChange={handleConversationChange}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CodingCompactDialog({
+  compactFontSize,
+  maxHeight,
+}: {
+  compactFontSize: number;
+  maxHeight: number;
+}) {
+  const [state, setState] = useState<CodingState>(DEFAULT_CODING_STATE);
+  const [input, setInput] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    invoke<CodingState>('coding_get_state')
+      .then((next) => setState(next ?? DEFAULT_CODING_STATE))
+      .catch(() => setState({ status: 'needs-input', messages: [{ id: 'coding-error', role: 'error', content: '无法连接 Codex。', createdAt: Date.now() }] }));
+    const unlisten = listen<CodingState>('coding:state', ({ payload }) => {
+      setState(payload ?? DEFAULT_CODING_STATE);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [state.messages.length]);
+
+  const send = async () => {
+    const prompt = input.trim();
+    if (!prompt || state.status === 'working') return;
+    setInput('');
+    await invoke('coding_send_message', { prompt }).catch((e) => {
+      setState((current) => ({
+        status: 'needs-input',
+        messages: [...current.messages, { id: `local-${Date.now()}`, role: 'error', content: String(e), createdAt: Date.now() }],
+      }));
+    });
+  };
+
+  return (
+    <div className="chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--surface-flat)] font-sans text-[var(--color-chat-text)] shadow-[0_8px_24px_rgba(42,38,31,0.10)]" style={{ maxHeight, fontSize: compactFontSize }}>
+      <div className="flex items-center justify-between border-b border-border/55 px-3 py-2">
+        <div className="flex items-center gap-2 text-[12px] font-medium">
+          <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
+          <span>Codex</span>
+        </div>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => invoke('coding_clear').catch(() => {})}>
+          清空
+        </Button>
+      </div>
+      <div ref={scrollRef} className="min-h-[120px] flex-1 overflow-y-auto px-3 py-2" style={{ maxHeight: Math.max(120, maxHeight - 92) }}>
+        {state.messages.length === 0 ? (
+          <div className="py-8 text-center text-[12px] text-muted-foreground">Coding 模式已连接，输入任务发送给 Codex。</div>
+        ) : (
+          <div className="space-y-2">
+            {state.messages.map((message) => (
+              <div key={message.id} className={`rounded-[9px] px-2.5 py-2 text-[12px] leading-relaxed ${codingMessageClass(message.role)}`}>
+                <div className="mb-1 text-[10px] uppercase tracking-[0.08em] opacity-60">{codingRoleLabel(message.role)}</div>
+                <pre className="whitespace-pre-wrap break-words font-sans">{message.content}</pre>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="border-t border-border/55 p-2">
+        <textarea
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              send();
+            }
+          }}
+          placeholder={state.status === 'working' ? 'Codex 正在工作...' : '发送给 Codex'}
+          disabled={state.status === 'working'}
+          className="min-h-8 w-full resize-none rounded-[9px] border border-border/65 bg-background px-2 py-1.5 text-[12px] outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
       </div>
     </div>
   );
+}
+
+function codingStatusDotClass(status: CodingStatus) {
+  if (status === 'working') return 'bg-[#ffbd2e]';
+  if (status === 'needs-input') return 'bg-[#ff5f57]';
+  return 'bg-[#28c840]';
+}
+
+function codingStatusColor(status: CodingStatus) {
+  if (status === 'working') return '#ffbd2e';
+  if (status === 'needs-input') return '#ff5f57';
+  return '#28c840';
+}
+
+function codingMessageClass(role: CodingMessage['role']) {
+  if (role === 'user') return 'bg-muted text-foreground';
+  if (role === 'error') return 'bg-[#ff5f57]/12 text-[#7a1f1a] dark:text-[#ffb4ae]';
+  if (role === 'system') return 'bg-background text-muted-foreground';
+  return 'bg-background text-foreground';
+}
+
+function codingRoleLabel(role: CodingMessage['role']) {
+  if (role === 'user') return 'You';
+  if (role === 'codex') return 'Codex';
+  if (role === 'error') return 'Action';
+  return 'Status';
 }
 
 function PetWindow() {
@@ -288,6 +423,7 @@ function PetWindow() {
   const [chatBurst, setChatBurst] = useState(false);
   const [petHovering, setPetHovering] = useState(false);
   const [compactVisible, setCompactVisible] = useState(false);
+  const [codingState, setCodingState] = useState<CodingState>(DEFAULT_CODING_STATE);
   const [petPrompt, setPetPrompt] = useState<PetPrompt | null>(null);
   const [focusEndAt, setFocusEndAt] = useState<number | null>(null);
   const [restEndAt, setRestEndAt] = useState<number | null>(null);
@@ -371,6 +507,20 @@ function PetWindow() {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!settings.codingModeEnabled) {
+      setCodingState(DEFAULT_CODING_STATE);
+      return;
+    }
+    invoke<CodingState>('coding_get_state')
+      .then((next) => setCodingState(next ?? DEFAULT_CODING_STATE))
+      .catch(() => setCodingState({ status: 'needs-input', messages: [] }));
+    const unlisten = listen<CodingState>('coding:state', ({ payload }) => {
+      setCodingState(payload ?? DEFAULT_CODING_STATE);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [settings.codingModeEnabled]);
 
   const requestLayout = useCallback(async (overrides: { contextMenuOpen?: boolean } = {}) => {
     if (restEndAtRef.current || restPresentationActiveRef.current) return;
@@ -1265,8 +1415,9 @@ function PetWindow() {
             <FloatingToolButton
               muted
               opacity={settings.petOpacity}
-              visible={petHovering && !compactVisible && !restEndAt}
-              title="打开对话"
+              visible={settings.codingModeEnabled || (petHovering && !compactVisible && !restEndAt)}
+              title={settings.codingModeEnabled ? "打开 Coding 模式" : "打开对话"}
+              accentColor={settings.codingModeEnabled ? codingStatusColor(codingState.status) : undefined}
               onClick={() => {
                 openLatestChat();
               }}
@@ -1302,6 +1453,7 @@ function FloatingToolButton({
   muted = false,
   opacity = 1,
   visible = false,
+  accentColor,
   title,
   onClick,
   children,
@@ -1309,6 +1461,7 @@ function FloatingToolButton({
   muted?: boolean;
   opacity?: number;
   visible?: boolean;
+  accentColor?: string;
   title: string;
   onClick?: () => void;
   children: React.ReactNode;
@@ -1325,9 +1478,16 @@ function FloatingToolButton({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`h-5 w-5 rounded-full border border-border/70 bg-background/95 p-0 text-muted-foreground shadow-sm transition-all hover:text-foreground ${
-        muted ? "saturate-0 hover:saturate-100" : ""
+        muted && !accentColor ? "saturate-0 hover:saturate-100" : ""
       }`}
-      style={{ opacity: visible || hovered ? opacity : 0, transform: visible || hovered ? 'scale(1)' : 'scale(0.86)' }}
+      style={{
+        opacity: visible || hovered ? opacity : 0,
+        transform: visible || hovered ? 'scale(1)' : 'scale(0.86)',
+        backgroundColor: accentColor,
+        borderColor: accentColor ? 'rgba(0,0,0,0.14)' : undefined,
+        color: accentColor ? 'rgba(32,28,22,0.62)' : undefined,
+        boxShadow: accentColor ? `0 0 0 1px rgba(255,255,255,0.45) inset, 0 5px 14px ${accentColor}40` : undefined,
+      }}
     >
       {children}
     </Button>

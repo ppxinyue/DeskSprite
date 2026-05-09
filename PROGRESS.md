@@ -1005,3 +1005,11 @@
 - 动效：pet 图片继续快速绕屏，运动半径只按图片尺寸计算。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R128. Coding 模式接入 Codex（2026-05-09）
+- 设置：AI 对话页新增 Coding 模式开关，默认关闭。
+- 主进程：新增 Codex CLI 桥接，使用本机 Codex 执行用户输入，并通过 `coding:state` 推送状态和输出。
+- 小聊天框：Coding 模式下切换为 Codex 输出面板，支持查看输出、清空记录、继续输入内容发送给 Codex。
+- Pet 窗口：Coding 模式下右侧 chat 按钮始终显示，并按 mac 窗口按钮颜色显示状态：红色需要输入/授权，黄色正在工作，绿色完成。
+- 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, main.cjs, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
