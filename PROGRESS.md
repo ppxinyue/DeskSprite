@@ -984,3 +984,10 @@
 - 动效：Pet 模式绕屏一周的进度与休息时长同步，Orb 模式倒计时也使用同一设置。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
+
+### R125. Pet Rest 整组快速绕屏（2026-05-09）
+- Pet 模式：rest 时图片、倒计时和提前结束按钮重新作为一个整体一起移动。
+- 动效：绕屏速度改为固定 8 秒一圈，可在休息时长内连续转多圈。
+- 布局：绕圈半径按整组高度计算，避免按钮贴近屏幕边缘。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md
