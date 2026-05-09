@@ -593,3 +593,11 @@
 - 交互：用户点击“继续专注”仍保持 `work`，点击“结束”才回到 `idle`。
 - 验证：`pnpm build` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R70. 休息/喝水合并与中央放大休息展示（2026-05-09）
+- 状态：`rest` 默认 GIF 池合并休息与喝水两张图，设置页不再单独展示 `drinking` 状态；旧 `drinking` 类型保留兼容，但休息倒计时统一使用 `rest`。
+- 随机：宠物状态切换时会在可用素材中随机选择一张，因此每次休息会在休息/喝水图之间轮换。
+- 展示：用户点击休息提示后，pet 窗口保存当前几何和布局，平滑放大并移动到屏幕中央，目标尺寸约占工作区 80%；休息结束后平滑缩回原位置，再回到待机。
+- 防护：休息展示期间隐藏小聊天窗口、禁用 pet 拖拽和侧边 chat button，避免大尺寸展示和普通桌面交互互相抢布局。
+- 验证：`pnpm build` 通过；`git diff --check` 通过。
+- 文件：App.tsx, animations.ts, PetAvatar.tsx, ISSUES.md, PROGRESS.md

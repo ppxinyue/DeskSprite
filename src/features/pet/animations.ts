@@ -46,7 +46,7 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   rest: {
     mediaMode: 'gif',
     defaultAssets: ['assets/idle/png/sleeping.png'],
-    defaultGifAssets: ['assets/rest/gif/playing_clean_3.GIF'],
+    defaultGifAssets: ['assets/rest/gif/playing_clean_3.GIF', 'assets/rest/gif/drinking_raw.GIF'],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -95,13 +95,13 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   },
 };
 
-export const ALL_PET_STATES: PetState[] = ['idle', 'rest', 'work', 'drinking'];
+export const ALL_PET_STATES: PetState[] = ['idle', 'rest', 'work'];
 
 export const STATE_META: Record<PetState, { label: string; desc: string }> = {
   idle:     { label: '待机',   desc: '默认状态；会在多张PNG之间随机切换' },
-  rest:     { label: '休息',   desc: '休息提醒状态' },
+  rest:     { label: '休息',   desc: '休息/喝水倒计时状态；会随机显示休息或喝水 GIF' },
   work:     { label: '专注',   desc: '专注模式状态' },
-  drinking: { label: '喝水',   desc: '休息喝水倒计时状态' },
+  drinking: { label: '喝水',   desc: '旧版兼容状态；当前已合并到休息' },
   thinking: { label: '思考中', desc: '等待AI回复期间显示；会在多张PNG之间随机切换' },
   sleeping: { label: '睡眠',   desc: '智能附着等场景显示；会在多张PNG之间随机切换' },
 };

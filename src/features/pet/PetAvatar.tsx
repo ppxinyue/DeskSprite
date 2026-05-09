@@ -93,7 +93,7 @@ export function PetAvatar({
   }, [config.userAnimatedPath, dialogOpen, frameSources.length, currentFrame, currentMotion, motions]);
 
   useEffect(() => {
-    setCurrentFrame(0);
+    setCurrentFrame(frameSources.length > 1 ? Math.floor(Math.random() * frameSources.length) : 0);
     setCurrentMotion((motion) => pickNextMotion(motions, motion));
   }, [petState, config.userAnimatedPath, frameSources.length, motions]);
 
@@ -421,7 +421,7 @@ export function PetAvatar({
         <div
           ref={petRootRef}
           className="cursor-pointer select-none flex items-center justify-center"
-          style={{ width: w, height: h, fontSize: Math.round(80 * scale), opacity, background: 'transparent' }}
+          style={{ width: w, height: h, fontSize: Math.round(80 * scale), opacity, background: 'transparent', transition: 'width 120ms linear, height 120ms linear, font-size 120ms linear' }}
           {...interactiveProps}
         >🐱</div>
         {menu}
@@ -451,6 +451,7 @@ export function PetAvatar({
           background: 'transparent',
           display: 'inline-block',
           lineHeight: 0,
+          transition: 'width 120ms linear, height 120ms linear',
         }}
         {...interactiveProps}
       >

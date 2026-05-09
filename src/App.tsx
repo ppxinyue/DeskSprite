@@ -31,6 +31,9 @@ const CONTEXT_MENU_HEIGHT = 204;
 const PET_RIGHT_EDGE_MENU_THRESHOLD = 0.62;
 const PET_BUBBLE_TOP_SPACE = 78;
 const REST_ACTION_DURATION_MS = 60_000;
+const REST_PRESENTATION_SCREEN_RATIO = 0.8;
+const REST_PRESENTATION_ANIMATION_MS = 820;
+const REST_COUNTDOWN_SPACE = 24;
 const DISTRACTION_CHECK_INTERVAL_MS = 3000;
 const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
 
@@ -287,13 +290,19 @@ function PetWindow() {
   const [restEndAt, setRestEndAt] = useState<number | null>(null);
   const [nextRestReminderAt, setNextRestReminderAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [visualPetScale, setVisualPetScale] = useState(settings.petScale);
   const focusEndAtRef = useRef<number | null>(null);
+  const restEndAtRef = useRef<number | null>(null);
   const focusStartedAtRef = useRef<number | null>(null);
   const focusWarningAtRef = useRef(0);
+  const restPresentationFrameRef = useRef<number | null>(null);
+  const restPresentationSnapshotRef = useRef<RestPresentationSnapshot | null>(null);
+  const visualPetScaleRef = useRef(settings.petScale);
+  const restPresentationActiveRef = useRef(false);
 
-  const petSize = Math.round(150 * settings.petScale);
-  const petImageWidth = Math.round(120 * settings.petScale);
-  const petImageHeight = Math.round(150 * settings.petScale);
+  const petSize = Math.round(150 * visualPetScale);
+  const petImageWidth = Math.round(120 * visualPetScale);
+  const petImageHeight = Math.round(150 * visualPetScale);
   const toolButtonSize = 28;
   const toolGap = 4;
   const toolRowWidth = toolButtonSize + toolGap;
@@ -329,11 +338,26 @@ function PetWindow() {
   }, [focusEndAt]);
 
   useEffect(() => {
+    restEndAtRef.current = restEndAt;
+  }, [restEndAt]);
+
+  useEffect(() => {
+    visualPetScaleRef.current = visualPetScale;
+  }, [visualPetScale]);
+
+  useEffect(() => {
+    if (restEndAtRef.current || restPresentationActiveRef.current) return;
+    visualPetScaleRef.current = settings.petScale;
+    setVisualPetScale(settings.petScale);
+  }, [settings.petScale]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
   const requestLayout = useCallback(async (overrides: { contextMenuOpen?: boolean } = {}) => {
+    if (restEndAtRef.current || restPresentationActiveRef.current) return;
     const targetDialogOpen = false;
     const targetContextMenuOpen = overrides.contextMenuOpen ?? contextMenuOpen;
     layoutApplyingRef.current = true;
@@ -391,15 +415,166 @@ function PetWindow() {
     window.setTimeout(() => setChatBurst(false), 360);
   }, [positionCompactChatWindow]);
 
+  const animateRestPresentation = useCallback(async (target: RestPresentationSnapshot, options: { onDone?: () => void } = {}) => {
+    if (restPresentationFrameRef.current) {
+      window.cancelAnimationFrame(restPresentationFrameRef.current);
+      restPresentationFrameRef.current = null;
+    }
+    const win = getCurrentWindow();
+    const position = await win.outerPosition();
+    const size = await win.outerSize();
+    const start = {
+      windowLeft: position.x,
+      windowTop: position.y,
+      windowWidth: size.width,
+      windowHeight: size.height,
+      layout: layoutRef.current,
+      visualScale: visualPetScaleRef.current,
+    };
+    const startedAt = performance.now();
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+    const mix = (from: number, to: number, t: number) => from + (to - from) * t;
+
+    restPresentationActiveRef.current = true;
+    layoutApplyingRef.current = true;
+
+    await new Promise<void>((resolve) => {
+      const step = (time: number) => {
+        const progress = ease(clamp((time - startedAt) / REST_PRESENTATION_ANIMATION_MS, 0, 1));
+        const nextLayout: PetWindowLayout = {
+          windowWidth: mix(start.windowWidth, target.windowWidth, progress),
+          windowHeight: mix(start.windowHeight, target.windowHeight, progress),
+          petLeft: mix(start.layout.petLeft, target.layout.petLeft, progress),
+          petTop: mix(start.layout.petTop, target.layout.petTop, progress),
+          dialogLeft: mix(start.layout.dialogLeft, target.layout.dialogLeft, progress),
+          dialogTop: mix(start.layout.dialogTop, target.layout.dialogTop, progress),
+          dialogWidth: mix(start.layout.dialogWidth, target.layout.dialogWidth, progress),
+          dialogMaxHeight: mix(start.layout.dialogMaxHeight, target.layout.dialogMaxHeight, progress),
+          toolsLeft: mix(start.layout.toolsLeft, target.layout.toolsLeft, progress),
+          toolsTop: mix(start.layout.toolsTop, target.layout.toolsTop, progress),
+        };
+        const nextScale = mix(start.visualScale, target.visualScale, progress);
+        visualPetScaleRef.current = nextScale;
+        setVisualPetScale(nextScale);
+        applyLayoutState(nextLayout);
+
+        const width = Math.round(mix(start.windowWidth, target.windowWidth, progress));
+        const height = Math.round(mix(start.windowHeight, target.windowHeight, progress));
+        const left = Math.round(mix(start.windowLeft, target.windowLeft, progress));
+        const top = Math.round(mix(start.windowTop, target.windowTop, progress));
+        void win.setSize(new LogicalSize(width, height)).catch(() => {});
+        void win.setPosition(new PhysicalPosition(left, top)).catch(() => {});
+
+        if (progress < 1) {
+          restPresentationFrameRef.current = window.requestAnimationFrame(step);
+          return;
+        }
+        restPresentationFrameRef.current = null;
+        visualPetScaleRef.current = target.visualScale;
+        setVisualPetScale(target.visualScale);
+        applyLayoutState(target.layout);
+        void win.setSize(new LogicalSize(target.windowWidth, target.windowHeight)).catch(() => {});
+        void win.setPosition(new PhysicalPosition(target.windowLeft, target.windowTop)).catch(() => {});
+        window.setTimeout(() => {
+          layoutApplyingRef.current = false;
+          restPresentationActiveRef.current = Boolean(restEndAtRef.current);
+          options.onDone?.();
+          resolve();
+        }, 80);
+      };
+
+      restPresentationFrameRef.current = window.requestAnimationFrame(step);
+    });
+  }, [applyLayoutState]);
+
+  const expandPetForRest = useCallback(async () => {
+    try {
+      const win = getCurrentWindow();
+      const monitor = await currentMonitor();
+      if (!monitor) return;
+      const position = await win.outerPosition();
+      const size = await win.outerSize();
+      const scale = monitor.scaleFactor;
+      const work = monitor.workArea;
+      const workLeft = work.position.x / scale;
+      const workTop = work.position.y / scale;
+      const workWidth = work.size.width / scale;
+      const workHeight = work.size.height / scale;
+      restPresentationSnapshotRef.current = {
+        windowLeft: position.x / scale,
+        windowTop: position.y / scale,
+        windowWidth: size.width / scale,
+        windowHeight: size.height / scale,
+        layout: layoutRef.current,
+        visualScale: visualPetScaleRef.current,
+      };
+
+      const targetScale = Math.min(
+        (workWidth * REST_PRESENTATION_SCREEN_RATIO) / 120,
+        ((workHeight * REST_PRESENTATION_SCREEN_RATIO) - REST_COUNTDOWN_SPACE) / 150,
+      );
+      const targetPetWidth = Math.round(120 * targetScale);
+      const targetPetHeight = Math.round(150 * targetScale);
+      const targetWindowWidth = Math.min(workWidth, targetPetWidth + PET_CONTENT_MARGIN * 2);
+      const targetWindowHeight = Math.min(workHeight, targetPetHeight + PET_CONTENT_MARGIN * 2 + REST_COUNTDOWN_SPACE);
+      const targetWindowLeft = workLeft + (workWidth - targetWindowWidth) / 2;
+      const targetWindowTop = workTop + (workHeight - targetWindowHeight) / 2;
+      const targetLayout: PetWindowLayout = {
+        windowWidth: targetWindowWidth,
+        windowHeight: targetWindowHeight,
+        petLeft: (targetWindowWidth - targetPetWidth) / 2,
+        petTop: PET_CONTENT_MARGIN,
+        dialogLeft: PET_CONTENT_MARGIN,
+        dialogTop: PET_CONTENT_MARGIN,
+        dialogWidth: 300,
+        dialogMaxHeight: 300,
+        toolsLeft: targetWindowWidth - PET_CONTENT_MARGIN - toolButtonSize,
+        toolsTop: PET_CONTENT_MARGIN,
+      };
+      await animateRestPresentation({
+        windowLeft: targetWindowLeft,
+        windowTop: targetWindowTop,
+        windowWidth: targetWindowWidth,
+        windowHeight: targetWindowHeight,
+        layout: targetLayout,
+        visualScale: targetScale,
+      });
+    } catch (e) {
+      console.warn("Failed to expand pet for rest:", e);
+    }
+  }, [animateRestPresentation, toolButtonSize]);
+
+  const restorePetAfterRest = useCallback(async () => {
+    const snapshot = restPresentationSnapshotRef.current;
+    restPresentationSnapshotRef.current = null;
+    if (!snapshot) {
+      restPresentationActiveRef.current = false;
+      setVisualPetScale(settings.petScale);
+      requestLayout().catch(() => {});
+      return;
+    }
+    await animateRestPresentation(snapshot, {
+      onDone: () => {
+        restPresentationActiveRef.current = false;
+        visualPetScaleRef.current = settings.petScale;
+        setVisualPetScale(settings.petScale);
+        applyLayoutState(snapshot.layout);
+      },
+    });
+  }, [animateRestPresentation, applyLayoutState, requestLayout, settings.petScale]);
+
   const startRestAction = useCallback(() => {
     const endAt = Date.now() + REST_ACTION_DURATION_MS;
     setPetPrompt(null);
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
+    restEndAtRef.current = endAt;
     setRestEndAt(endAt);
     setNextRestReminderAt(Date.now() + Math.max(1, settings.restReminderIntervalMinutes) * 60_000);
-    setPetState('drinking');
-  }, [settings.restReminderIntervalMinutes, setPetState]);
+    setPetState('rest');
+    invoke("hide_compact_chat_window").catch(() => {});
+    expandPetForRest().catch(() => {});
+  }, [expandPetForRest, settings.restReminderIntervalMinutes, setPetState]);
 
   const dismissPrompt = useCallback(() => {
     setPetPrompt(null);
@@ -465,10 +640,13 @@ function PetWindow() {
   useEffect(() => {
     if (!restEndAt) return;
     if (Date.now() < restEndAt) return;
+    restEndAtRef.current = null;
     setRestEndAt(null);
     setPetPrompt(null);
-    setPetState('idle');
-  }, [restEndAt, now, setPetState]);
+    restorePetAfterRest()
+      .catch(() => {})
+      .finally(() => setPetState('idle'));
+  }, [restEndAt, now, restorePetAfterRest, setPetState]);
 
   useEffect(() => {
     if (!focusEndAt || !settings.distractionDetectionEnabled) return;
@@ -590,6 +768,7 @@ function PetWindow() {
   useEffect(() => () => {
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
     if (dragFrameRef.current) window.cancelAnimationFrame(dragFrameRef.current);
+    if (restPresentationFrameRef.current) window.cancelAnimationFrame(restPresentationFrameRef.current);
   }, []);
 
   // Initialize always-on-top fullscreen pinning
@@ -758,6 +937,7 @@ function PetWindow() {
   }, [settings.wakeWordEnabled, settings.wakeWord, dialogOpen]);
 
   const handleBoundedDragStart = async (point: { screenX: number; screenY: number }) => {
+    if (restEndAtRef.current || restPresentationActiveRef.current) return;
     setDragging(true);
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
     try {
@@ -796,6 +976,7 @@ function PetWindow() {
   };
 
   const handleBoundedDragMove = (point: { screenX: number; screenY: number }) => {
+    if (restEndAtRef.current || restPresentationActiveRef.current) return;
     pendingDragPointRef.current = point;
     if (dragFrameRef.current) return;
     dragFrameRef.current = window.requestAnimationFrame(() => {
@@ -825,6 +1006,7 @@ function PetWindow() {
   };
 
   const handleBoundedDragEnd = () => {
+    if (restEndAtRef.current || restPresentationActiveRef.current) return;
     dragSessionRef.current = null;
     pendingDragPointRef.current = null;
     lastDragPositionRef.current = null;
@@ -895,7 +1077,7 @@ function PetWindow() {
             )}
             <PetAvatar
               opacity={settings.petOpacity}
-              scale={settings.petScale}
+              scale={visualPetScale}
               motions={settings.petMotions}
               dragging={dragging}
               onDragStart={handleBoundedDragStart}
@@ -920,7 +1102,7 @@ function PetWindow() {
             <FloatingToolButton
               muted
               opacity={settings.petOpacity}
-              visible={petHovering && !compactVisible}
+              visible={petHovering && !compactVisible && !restEndAt}
               title="打开对话"
               onClick={() => {
                 openLatestChat();
@@ -1113,6 +1295,15 @@ interface BoundedDragSession {
   maxWindowLeft: number;
   minWindowTop: number;
   maxWindowTop: number;
+}
+
+interface RestPresentationSnapshot {
+  windowLeft: number;
+  windowTop: number;
+  windowWidth: number;
+  windowHeight: number;
+  layout: PetWindowLayout;
+  visualScale: number;
 }
 
 async function getCompactChatGeometry({
