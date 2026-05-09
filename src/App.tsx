@@ -194,6 +194,7 @@ interface CodingInheritedSession {
   title: string;
   status: CodingStatus;
   message: string;
+  progressMessages?: CodingMessage[];
   updatedAt: number;
   cwd?: string;
   path?: string;
@@ -498,12 +499,15 @@ function CodingDialog({
       ? inheritedSessions.find((session) => session.id === activeInheritedSessionId) ?? inheritedSessions[0]
       : inheritedSessions.find((session) => session.status !== 'working') ?? inheritedSessions[0])
     : null;
-  const inheritedMessages = activeInheritedSession ? [codingMessageToChatMessage({
-    id: `inherit-panel-${activeInheritedSession.id}-${Math.round(activeInheritedSession.updatedAt)}`,
-    role: activeInheritedSession.status === 'needs-input' ? 'error' : activeInheritedSession.status === 'done' ? 'codex' : 'system',
-    content: activeInheritedSession.message,
-    createdAt: activeInheritedSession.updatedAt,
-  })] : state.messages.map(codingMessageToChatMessage);
+  const activeInheritedMessages = activeInheritedSession?.status === 'working' && activeInheritedSession.progressMessages?.length
+    ? activeInheritedSession.progressMessages
+    : activeInheritedSession ? [{
+      id: `inherit-panel-${activeInheritedSession.id}-${Math.round(activeInheritedSession.updatedAt)}`,
+      role: activeInheritedSession.status === 'needs-input' ? 'error' as const : activeInheritedSession.status === 'done' ? 'codex' as const : 'system' as const,
+      content: activeInheritedSession.message,
+      createdAt: activeInheritedSession.updatedAt,
+    }] : state.messages;
+  const inheritedMessages = activeInheritedMessages.map(codingMessageToChatMessage);
   const messages = inherited ? inheritedMessages : state.messages.map(codingMessageToChatMessage);
   const visibleMessages = archivedMessages ?? messages;
 
@@ -621,7 +625,7 @@ function CodingDialog({
   return (
     <div
       ref={rootRef}
-      className="chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--surface-flat)] font-sans text-[var(--color-chat-text)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]"
+      className="chat-dialog mx-auto flex w-full max-w-[720px] min-w-0 flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--surface-flat)] font-sans text-[var(--color-chat-text)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]"
       style={{
         maxHeight,
         fontSize: compactFontSize,

@@ -344,6 +344,20 @@
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
 }
 
+.chat-markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.chat-markdown th,
+.chat-markdown td {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 @keyframes petJump {
   0% { transform: translateY(0); }
   40% { transform: translateY(var(--pet-motion-y, -8px)); }

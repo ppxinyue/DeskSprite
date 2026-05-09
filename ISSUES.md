@@ -1859,3 +1859,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：自动滚动应该服务于“正在看最新消息”的用户，而不能覆盖用户主动查看历史的位置。
 - 是否需更新技术文档：否。
+
+## ISSUE-157
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Compact Chat 溢出与 Coding 过程气泡重修
+- 严重程度：重要
+- 问题现象：小聊天框仍可能出现横向 overflow；agent 中间阶段偶尔闪绿色；黄色状态下中间回复没有逐条保留；拖动后小窗 UI 尺寸又不标准。
+- 原因分析：拖动重定位时主进程重设了 compact 窗口宽高，把已由内容撑开的高度压回默认几何；继承扫描只保存最后一条过程消息，且 `final_answer` 片段仍可能被视作最终完成；部分 Markdown/table/code 路径仍可能撑宽气泡。
+- 解决方案：重定位只移动小窗位置并保留当前尺寸；过程消息数组化返回给前端；最终完成判定收紧到 `task_complete` / `last_agent_message`；继续补齐横向 overflow 限制。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：compact 窗口的“定位”和“尺寸”必须解耦；继承外部 agent 时，中间文本应作为工作态日志，而不是覆盖或触发完成态。
+- 是否需更新技术文档：否。

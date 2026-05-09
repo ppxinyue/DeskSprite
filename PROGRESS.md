@@ -1188,3 +1188,11 @@
 - 逻辑：新增 `stickToBottom` 标记，只有用户本来在底部附近时才自动跟随新消息；用户手动上滚后保持当前位置。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md
+
+### R152. Compact Chat 溢出与 Coding 过程气泡重修（2026-05-10）
+- 主进程：`position_compact_chat_window` 只移动已有小窗，不再重设宽高，避免拖动后 compact UI 被压回默认高度。
+- 横向滚动：普通/Coding 小窗根容器、滚动区、气泡、Markdown、表格和代码块继续收紧 `min-w-0` / `overflow-x-hidden` / 强制换行。
+- Coding 继承：只把 `task_complete` / `last_agent_message` 当最终完成，`final_answer` 片段和普通 assistant message 不再触发绿色闪烁。
+- 过程消息：继承 session 会保留最近 8 条中间 agent 输出，黄色状态下逐条显示为气泡；切到绿色时只保留最终输出。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ChatDialog.tsx, index.css, ISSUES.md, PROGRESS.md

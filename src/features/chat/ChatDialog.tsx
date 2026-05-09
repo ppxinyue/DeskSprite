@@ -321,7 +321,7 @@ export function ChatDialog({
   return (
     <div
       ref={rootRef}
-      className={`chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] font-sans text-[14px] text-[var(--color-chat-text)] ${standalone ? 'glass-panel' : 'border border-[var(--color-chat-border)] bg-[var(--surface-flat)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]'}`}
+      className={`chat-dialog mx-auto flex w-full max-w-[720px] min-w-0 flex-col overflow-hidden rounded-[10px] font-sans text-[14px] text-[var(--color-chat-text)] ${standalone ? 'glass-panel' : 'border border-[var(--color-chat-border)] bg-[var(--surface-flat)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]'}`}
       style={{
         maxHeight: standalone ? undefined : maxHeight,
         height: standalone ? '100%' : undefined,
@@ -352,11 +352,11 @@ export function ChatDialog({
       {mode === 'chat' && messages.length > 0 && (
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4"
           onScroll={handleScroll}
           style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 60) }}
         >
-        <div className="min-w-0 space-y-2.5 overflow-x-hidden py-4">
+          <div className="min-w-0 space-y-2.5 overflow-x-hidden py-4">
             {messages.map((msg) => (
               <MessageBubble
                 key={msg.id}
@@ -1389,7 +1389,7 @@ export function MessageBubble({
         ) : isUser ? (
           <p className="whitespace-pre-wrap break-words">{cleanChatText(message.content)}</p>
         ) : (
-          <div className="chat-markdown max-w-none">
+          <div className="chat-markdown max-w-full overflow-hidden">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {cleanChatText(message.content)}
             </ReactMarkdown>

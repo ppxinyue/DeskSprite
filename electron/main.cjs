@@ -477,6 +477,12 @@ function showChatWindow() {
 }
 
 function showCompactChatWindow({ x, y, w, h }, show = true) {
+  const existing = windows.get('compact-chat');
+  if (!show && existing && !existing.isDestroyed()) {
+    existing.setPosition(Math.round(x), Math.round(y));
+    applyFloatingFullscreenBehavior(existing);
+    return;
+  }
   const win = createWindow('compact-chat', {
     width: Math.round(w),
     height: Math.round(h),
@@ -1257,9 +1263,7 @@ function isCodexProblemEvent(type, payload, raw) {
 
 function isFinalCodexSessionOutput(payload) {
   const payloadType = String(payload.type || payload.kind || '');
-  const phase = String(payload.phase || payload.status || '');
-  return /task_complete|final_answer|turn_complete|turn_completed/i.test(payloadType)
-    || /final_answer|completed/i.test(phase)
+  return /task_complete|turn_complete|turn_completed/i.test(payloadType)
     || Boolean(payload.last_agent_message);
 }
 
@@ -1274,10 +1278,12 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
     title: '',
     status: CODEX_STATUS.WORKING,
     message: '',
+    progressMessages: [],
   };
   let lastUserAt = 0;
   let lastWorkAt = 0;
   let lastProgress = '';
+  const progressMessages = [];
   let lastAssistantAt = 0;
   let lastAssistant = '';
   let lastProblemAt = 0;
@@ -1316,6 +1322,7 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
         } else if (message) {
           lastWorkAt = Math.max(lastWorkAt, eventAt);
           lastProgress = message;
+          progressMessages.push({ content: message, createdAt: eventAt });
         } else {
           lastWorkAt = Math.max(lastWorkAt, eventAt);
         }
@@ -1338,6 +1345,7 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
         } else if (message) {
           lastWorkAt = Math.max(lastWorkAt, eventAt);
           lastProgress = message;
+          progressMessages.push({ content: message, createdAt: eventAt });
         }
       }
       if (/function_call|tool|command|exec/i.test(String(payload.type || ''))) {
@@ -1353,6 +1361,12 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
   }
   const title = codexSessionTitle(session);
   const prefix = `[${title}]`;
+  session.progressMessages = progressMessages.slice(-8).map((message, index) => ({
+    id: `inherit-progress-${session.id}-${Math.round(message.createdAt)}-${index}`,
+    role: 'system',
+    content: `${prefix} ${message.content}`,
+    createdAt: message.createdAt,
+  }));
   const latestActivityAt = Math.max(lastUserAt, lastWorkAt, lastAssistantAt, lastProblemAt, mtimeMs);
   if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt && lastProblemAt >= lastWorkAt) {
     session.status = CODEX_STATUS.NEEDS_INPUT;
@@ -1449,6 +1463,7 @@ async function getInheritedCodingState() {
       title: session.title,
       status: session.status,
       message: session.message,
+      progressMessages: session.status === CODEX_STATUS.WORKING ? session.progressMessages : [],
       updatedAt: session.updatedAt,
       cwd: session.cwd,
       path: session.path,
