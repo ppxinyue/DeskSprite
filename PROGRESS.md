@@ -738,3 +738,11 @@
 - 观感：粒子不再沿彗星方向拖成“蝌蚪”，而是像星空里短暂闪现、扩散后消失的光点。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R90. Orb 字母环与倒计时下落（2026-05-09）
+- 方向：放弃粒子/彗星方案，Orb 改为纯字母动效系统，继续保持黑白灰和单层柔灰圆形边界。
+- idle：`idle` 四个字母挂在大圆边缘缓慢环绕，并增加一个柔灰 satellite dot。
+- work：`work` 四个字母按专注进度依次从上方落到底部堆叠，进度由 `focusStartedAt` / `focusEndAt` / `now` 同源计算，和倒计时同步。
+- rest：重复的 `rest` 字母铺在圆圈外侧，整圈快速旋转；圆圈和边框都保留柔和透明呼吸。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

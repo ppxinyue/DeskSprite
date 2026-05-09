@@ -372,35 +372,27 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid #050505;
+  overflow: visible;
+  border: 1.5px solid rgba(20,20,20,0.42);
   background: transparent;
+  animation: orbShellBreath 4.8s ease-in-out infinite;
 }
 
 .orb-avatar.is-hovering {
   transform: scale(1.015);
 }
 
-.orb-avatar__canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  border-radius: inherit;
-}
-
-.orb-avatar__text {
+.orb-avatar__hover-text {
   position: absolute;
   left: 50%;
   top: 50%;
   z-index: 2;
   transform: translate(-50%, -50%);
-  color: #111;
+  color: rgba(25,25,25,0.54);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   font-size: var(--orb-font-size);
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   line-height: 1;
   opacity: 0;
   pointer-events: none;
@@ -408,12 +400,106 @@
   transition: opacity 160ms ease, transform 160ms ease;
 }
 
-.orb-avatar.is-hovering .orb-avatar__text {
-  opacity: 0.82;
+.orb-avatar.is-hovering .orb-avatar__hover-text {
+  opacity: 0.72;
   transform: translate(-50%, -50%) translateY(-1px);
+}
+
+.orb-avatar__idle-ring,
+.orb-avatar__rest-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.orb-avatar__idle-ring {
+  animation: orbIdleSatellite 18s linear infinite;
+}
+
+.orb-avatar__idle-letter,
+.orb-avatar__rest-letter {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  color: rgba(20,20,20,0.42);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  font-size: calc(var(--orb-font-size) * 0.86);
+  font-weight: 480;
+  line-height: 1;
+}
+
+.orb-avatar__idle-letter {
+  transform:
+    translate(-50%, -50%)
+    rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
+    translateY(calc(var(--orb-size) * -0.43))
+    rotate(calc(-360deg / var(--letter-count) * var(--letter-index)));
+}
+
+.orb-avatar__satellite-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--orb-size) * 0.035);
+  height: calc(var(--orb-size) * 0.035);
+  border-radius: 999px;
+  background: rgba(20,20,20,0.34);
+  transform: translate(-50%, -50%) translateY(calc(var(--orb-size) * -0.43));
+}
+
+.orb-avatar__work-field {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.orb-avatar__work-letter {
+  position: absolute;
+  left: calc(50% + var(--letter-x));
+  top: calc(20% + var(--fall-progress) * (63% - var(--stack-index) * 5%));
+  color: rgba(20,20,20,0.46);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+  font-size: calc(var(--orb-font-size) * 1.05);
+  font-weight: 520;
+  line-height: 1;
+  opacity: calc(0.18 + var(--fall-progress) * 0.48);
+  transform: translate(-50%, -50%) rotate(calc((var(--stack-index) - 1.5) * 5deg));
+  transition: top 950ms linear, opacity 950ms linear;
+}
+
+.orb-avatar__rest-ring {
+  inset: -4%;
+  animation: orbRestLetters 2.2s linear infinite;
+}
+
+.orb-avatar__rest-letter {
+  font-size: calc(var(--orb-font-size) * 0.72);
+  opacity: 0.38;
+  transform:
+    translate(-50%, -50%)
+    rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
+    translateY(calc(var(--orb-size) * -0.51))
+    rotate(90deg);
 }
 
 @keyframes orbBoundaryBreath {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.025); }
+}
+
+@keyframes orbShellBreath {
+  0%, 100% { border-color: rgba(20,20,20,0.34); }
+  50% { border-color: rgba(20,20,20,0.54); }
+}
+
+@keyframes orbIdleSatellite {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes orbRestLetters {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }

@@ -306,6 +306,10 @@ function PetWindow() {
   const petSize = Math.round(150 * visualPetScale);
   const petImageWidth = Math.round((orbMode ? 150 : 120) * visualPetScale);
   const petImageHeight = Math.round(150 * visualPetScale);
+  const focusStartedAt = focusStartedAtRef.current;
+  const focusProgress = focusEndAt && focusStartedAt
+    ? clamp((now - focusStartedAt) / Math.max(1, focusEndAt - focusStartedAt), 0, 1)
+    : 0;
   const toolButtonSize = 28;
   const toolGap = 4;
   const toolRowWidth = toolButtonSize + toolGap;
@@ -1125,6 +1129,7 @@ function PetWindow() {
               dragging={dragging}
               restPresentationActive={restPresentationActive}
               focusActive={Boolean(focusEndAt)}
+              focusProgress={focusProgress}
               onDragStart={handleBoundedDragStart}
               onDragMove={handleBoundedDragMove}
               onDragEnd={handleBoundedDragEnd}
