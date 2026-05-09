@@ -1040,3 +1040,11 @@
 - 状态灯：stderr 中的普通 `input` 文案不再被误判为需要用户处理，只有 approval/permission/authorize/confirm/login 这类信号才切红。
 - 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R133. Coding 回复可见性与最终消息兜底（2026-05-09）
+- 主进程：发送给 Codex 后立即向小聊天框推送“Codex 正在工作”的系统消息，避免长连接/重试期间看起来没有反馈。
+- JSONL：单独识别 `turn.started`、`error` 重连事件和 `item.completed` 的 `agent_message`，把重连显示为状态，把最终回答显示为 Codex 回复。
+- 兜底：为 `codex exec` 增加 `--output-last-message` 临时文件，进程结束时读取最终回复，避免 JSONL 解析遗漏导致小聊天框无回复。
+- 清理：最终消息读取后删除临时输出文件。
+- 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md

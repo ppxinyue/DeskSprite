@@ -14,6 +14,7 @@ const {
 } = require('electron');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const { execFile, spawn } = require('node:child_process');
@@ -781,6 +782,21 @@ function extractCodexEventText(event) {
   return '';
 }
 
+function extractCodexAgentText(event) {
+  if (!event || typeof event !== 'object') return '';
+  if (event.type === 'item.completed' && event.item?.type === 'agent_message' && typeof event.item.text === 'string') {
+    return event.item.text.trim();
+  }
+  return '';
+}
+
+function extractCodexStatusText(event) {
+  if (!event || typeof event !== 'object') return '';
+  if (event.type === 'error' && typeof event.message === 'string') return event.message.trim();
+  if (event.type === 'turn.started') return 'Codex 已开始处理。';
+  return '';
+}
+
 async function sendCodingMessage({ prompt }) {
   const text = String(prompt || '').trim();
   if (!text) throw new Error('输入为空。');
@@ -792,8 +808,10 @@ async function sendCodingMessage({ prompt }) {
 
   codingState.status = CODEX_STATUS.WORKING;
   pushCodingMessage('user', text);
+  pushCodingMessage('system', 'Codex 正在工作，首次连接可能需要稍等。');
   publishCodingState();
 
+  const outputPath = path.join(os.tmpdir(), `desksprite-codex-${Date.now()}-${Math.random().toString(16).slice(2)}.txt`);
   const args = [
     'exec',
     '--json',
@@ -803,6 +821,8 @@ async function sendCodingMessage({ prompt }) {
     'workspace-write',
     '--cd',
     process.cwd(),
+    '--output-last-message',
+    outputPath,
     text,
   ];
   const child = spawn(getCodexBinary(), args, {
@@ -814,6 +834,22 @@ async function sendCodingMessage({ prompt }) {
 
   let stdoutBuffer = '';
   let stderrBuffer = '';
+  let lastAgentText = '';
+  const handleCodexEvent = (event) => {
+    const agentText = extractCodexAgentText(event);
+    if (agentText) {
+      lastAgentText = agentText;
+      pushCodingMessage('codex', agentText);
+      return;
+    }
+    const statusText = extractCodexStatusText(event);
+    if (statusText) {
+      pushCodingMessage('system', statusText);
+      return;
+    }
+    const content = extractCodexEventText(event);
+    if (content) pushCodingMessage('codex', content);
+  };
   child.stdout.on('data', (chunk) => {
     stdoutBuffer += chunk.toString();
     const lines = stdoutBuffer.split(/\r?\n/);
@@ -823,8 +859,7 @@ async function sendCodingMessage({ prompt }) {
       if (!raw) continue;
       try {
         const event = JSON.parse(raw);
-        const content = extractCodexEventText(event);
-        if (content) pushCodingMessage('codex', content);
+        handleCodexEvent(event);
       } catch {
         pushCodingMessage('codex', raw);
       }
@@ -843,15 +878,22 @@ async function sendCodingMessage({ prompt }) {
     codingState.status = CODEX_STATUS.NEEDS_INPUT;
     pushCodingMessage('error', `无法启动 Codex：${error.message}`);
   });
-  child.on('close', (code) => {
+  child.on('close', async (code) => {
     if (stdoutBuffer.trim()) {
       try {
         const event = JSON.parse(stdoutBuffer.trim());
-        const content = extractCodexEventText(event);
-        if (content) pushCodingMessage('codex', content);
+        handleCodexEvent(event);
       } catch {
         pushCodingMessage('codex', stdoutBuffer.trim());
       }
+    }
+    try {
+      const finalText = (await fsp.readFile(outputPath, 'utf8')).trim();
+      if (finalText && finalText !== lastAgentText) pushCodingMessage('codex', finalText);
+    } catch {
+      // Best-effort fallback only.
+    } finally {
+      fsp.unlink(outputPath).catch(() => {});
     }
     codingState.running = null;
     if (code === 0) {

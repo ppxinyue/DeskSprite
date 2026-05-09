@@ -1631,3 +1631,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：CLI 桥接要显式管理 stdio，状态机也应先切状态再广播消息，避免 UI 观察到中间态。
 - 是否需更新技术文档：否。
+
+## ISSUE-138
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Coding 回复可见性与最终消息兜底
+- 严重程度：重要
+- 问题现象：小聊天框发送给 Codex 后长时间没有可见回复，终端只看到 macOS 输入法/窗口警告，用户无法判断 Codex 是否在工作。
+- 原因分析：本机 `codex exec` 启动后会进行插件/采样连接重试，期间 stdout 只有 JSONL 状态事件，stderr 有大量无关警告；桥接层没有把“已开始/重试中”作为状态消息展示，也完全依赖 JSONL 解析最终回答。
+- 解决方案：发送后立即推送工作中系统消息；将 `turn.started` 和 `error` 重连事件映射为状态消息；解析 `item.completed` 的 `agent_message`；同时使用 `--output-last-message` 临时文件作为最终回复兜底。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：长耗时 CLI 集成需要持续可见的进度反馈和最终结果兜底，不能只等理想路径的标准输出。
+- 是否需更新技术文档：否。
