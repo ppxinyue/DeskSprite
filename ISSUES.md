@@ -1955,3 +1955,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：桌面悬浮菜单的 BrowserWindow 尺寸必须按“展开后的最大二级菜单”预留；agent 输出应按最坏情况的无空格长文本处理，不能只依赖 Markdown 默认换行。
 - 是否需更新技术文档：否。
+
+## ISSUE-165
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Claude Code 连续新会话与 Coding 大窗工具切换
+- 严重程度：重要
+- 问题现象：Claude Code new session 中每次回复前都会出现“正在启动 Claude Code 新回合”；大聊天框只能看到当前 coding provider，不能在 Codex 和 Claude Code 间切换查看。
+- 原因分析：Claude Code 每次发送都启动独立 `claude -p` 调用，没有显式复用 `--session-id`；Coding 大窗直接跟随全局 `codingProvider`，缺少 standalone 内部 provider tab。
+- 解决方案：为 Claude Code 新 session 生成并复用同一个 UUID session id，后续发送用同一个 `--session-id`；启动提示只在第一条消息前显示；Coding standalone 顶部加入 Codex / Claude Code 切换，并按 provider 分离历史 key。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：CLI print 模式也需要显式会话 id 才能表现为连续聊天；多 provider UI 不能只依赖全局设置，standalone 窗口需要自己的查看维度。
+- 是否需更新技术文档：否。

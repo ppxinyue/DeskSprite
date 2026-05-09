@@ -1247,3 +1247,11 @@
 - 右键菜单：修正菜单实际宽度常量，二级菜单宽度增至 190px；窗口预留高度提升到 312px，避免 Coding / Claude Code 二级菜单被裁切。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, PetAvatar.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md
+
+### R160. Claude Code 连续新会话与 Coding 大窗工具切换（2026-05-10）
+- Claude Code：新 session 生成并复用同一个 `--session-id`，后续消息接着同一段 Claude Code 对话继续，不再每次当成独立会话。
+- 状态文案：只在第一条 Claude Code 新 session 消息前显示启动提示，后续发送不再反复插入“正在启动新回合”系统气泡。
+- Coding 大窗：顶部新增 Codex / Claude Code 切换按钮，可在同一个大聊天框里查看和使用两个工具的当前对话。
+- 历史隔离：Coding 历史会话 key 与 saved message key 按 provider 分离，Codex 与 Claude Code 的新 session 记录互不串线。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md

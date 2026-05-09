@@ -16,6 +16,7 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const path = require('node:path');
 const zlib = require('node:zlib');
+const { randomUUID } = require('node:crypto');
 const { execFile, spawn } = require('node:child_process');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -1299,13 +1300,18 @@ async function sendClaudeCodingMessage({ prompt }) {
   }
 
   claudeCodingState.status = CODEX_STATUS.WORKING;
+  const isFirstClaudeMessage = claudeCodingState.messages.length === 0;
+  const sessionId = claudeCodingState.threadId || randomUUID();
+  claudeCodingState.threadId = sessionId;
   pushClaudeCodingMessage('user', text);
-  pushClaudeCodingMessage('system', claudeCodingState.threadId ? '正在启动 Claude Code 新回合。' : '正在启动 Claude Code 新 session。');
+  if (isFirstClaudeMessage) pushClaudeCodingMessage('system', '正在启动 Claude Code 新 session。');
   const child = spawn(getClaudeBinary(), [
     '-p',
     '--output-format',
     'stream-json',
     '--verbose',
+    '--session-id',
+    sessionId,
     '--permission-mode',
     'default',
     text,
@@ -2017,6 +2023,7 @@ const handlers = {
   },
   coding_clear_claude: () => {
     claudeCodingState.messages = [];
+    claudeCodingState.threadId = '';
     if (!claudeCodingState.running) claudeCodingState.status = CODEX_STATUS.DONE;
     return publishClaudeCodingState();
   },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -232,6 +232,19 @@ function isCodingConversationTitle(title: string | null | undefined) {
   return /^(Codex|Claude Code)(?::|\s+Coding\b|\b)/i.test((title || '').trim());
 }
 
+function isProviderCodingConversationTitle(title: string | null | undefined, provider: CodingProvider) {
+  const prefix = provider === 'claude' ? 'Claude Code' : 'Codex';
+  return new RegExp(`^${prefix.replace(/\s+/g, '\\s+')}(?::|\\s+Coding\\b|\\b)`, 'i').test((title || '').trim());
+}
+
+function codingConversationKey(provider: CodingProvider) {
+  return provider === 'claude' ? `${CODING_CONVERSATION_KEY}:claude` : CODING_CONVERSATION_KEY;
+}
+
+function codingSavedMessagesKey(provider: CodingProvider) {
+  return provider === 'claude' ? `${CODING_SAVED_MESSAGES_KEY}:claude` : CODING_SAVED_MESSAGES_KEY;
+}
+
 function CompactChatWindow() {
   const { settings } = useSettingsStore();
   const lastCompactHeightRef = useRef(0);
@@ -377,13 +390,16 @@ function CodingDialog({
   const [historyItems, setHistoryItems] = useState<Array<{ id: number; title: string | null; updatedAt: string }>>([]);
   const [archivedMessages, setArchivedMessages] = useState<ChatMessage[] | null>(null);
   const [activeInheritedSessionId, setActiveInheritedSessionId] = useState<string | null>(null);
+  const [standaloneProvider, setStandaloneProvider] = useState<CodingProvider>(settings.codingProvider);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const codingLabel = codingProviderLabel(settings.codingProvider);
-  const inherited = isInheritedCodingMode(settings);
-  const stateCommand = codingStateCommand(settings);
+  const activeProvider = standalone ? standaloneProvider : settings.codingProvider;
+  const effectiveSettings = useMemo(() => ({ ...settings, codingProvider: activeProvider }), [activeProvider, settings]);
+  const codingLabel = codingProviderLabel(activeProvider);
+  const inherited = isInheritedCodingMode(effectiveSettings);
+  const stateCommand = codingStateCommand(effectiveSettings);
 
   const applyCodingState = useCallback((next: CodingState | null | undefined) => {
     const resolved = next ?? DEFAULT_CODING_STATE;
@@ -404,11 +420,11 @@ function CodingDialog({
         status: 'needs-input',
         messages: [{ id: 'coding-error', role: 'error', content: codingConnectionErrorMessage(error, codingLabel), createdAt: Date.now() }],
       }));
-    const unlisten = !inherited && settings.codingProvider === 'codex' ? listen<CodingState>('coding:state', ({ payload }) => {
+    const unlisten = !inherited && activeProvider === 'codex' ? listen<CodingState>('coding:state', ({ payload }) => {
       applyCodingState(payload);
     }) : Promise.resolve(() => {});
     let timer = 0;
-    if (inherited || settings.codingProvider === 'claude') {
+    if (inherited || activeProvider === 'claude') {
       timer = window.setInterval(() => {
         invoke<CodingState>(stateCommand)
           .then(applyCodingState)
@@ -422,7 +438,7 @@ function CodingDialog({
       if (timer) window.clearInterval(timer);
       unlisten.then((fn) => fn());
     };
-  }, [applyCodingState, codingLabel, inherited, settings.codingProvider, stateCommand]);
+  }, [activeProvider, applyCodingState, codingLabel, inherited, stateCommand]);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -438,17 +454,19 @@ function CodingDialog({
 
   useEffect(() => {
     if (inherited) return;
-    persistCodingMessages(state.messages, codingLabel).catch((error) => {
+    persistCodingMessages(state.messages, activeProvider, codingLabel).catch((error) => {
       console.warn("Failed to persist coding messages:", error);
     });
-  }, [codingLabel, inherited, state.messages]);
+  }, [activeProvider, codingLabel, inherited, state.messages]);
 
   useEffect(() => {
     if (!standalone) return;
     getConversations()
-      .then((items) => setHistoryItems(items.map((item) => ({ id: item.id, title: item.title, updatedAt: item.updated_at }))))
+      .then((items) => setHistoryItems(items
+        .filter((item) => isProviderCodingConversationTitle(item.title, activeProvider))
+        .map((item) => ({ id: item.id, title: item.title, updatedAt: item.updated_at }))))
       .catch((error) => console.warn("Failed to load coding history:", error));
-  }, [standalone, state.messages.length]);
+  }, [activeProvider, standalone, state.messages.length]);
 
   useEffect(() => {
     if (standalone || !onContentHeightChange) return;
@@ -459,6 +477,12 @@ function CodingDialog({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [standalone, onContentHeightChange, state.messages, input, state.status, compactFontSize]);
+
+  useEffect(() => {
+    setArchivedMessages(null);
+    setActiveInheritedSessionId(null);
+    stickToBottomRef.current = true;
+  }, [activeProvider]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -472,7 +496,7 @@ function CodingDialog({
     if (inherited || !prompt || state.status === 'working') return;
     setArchivedMessages(null);
     setInput('');
-    await invoke('coding_send_message', { prompt, provider: settings.codingProvider }).catch((e) => {
+    await invoke('coding_send_message', { prompt, provider: activeProvider }).catch((e) => {
       setState((current) => ({
         status: 'needs-input',
         messages: [...current.messages, { id: `local-${Date.now()}`, role: 'error', content: codingConnectionErrorMessage(e, codingLabel), createdAt: Date.now() }],
@@ -486,13 +510,13 @@ function CodingDialog({
       const ackKeys = (state.sessions || [])
         .filter((session) => session.status !== 'working')
         .map((session) => ({ id: session.id, ackKey: session.ackKey }));
-      const next = await invoke<CodingState>(codingAckCommand(settings.codingProvider), { ackKeys }).catch(() => null);
+      const next = await invoke<CodingState>(codingAckCommand(activeProvider), { ackKeys }).catch(() => null);
       applyCodingState(next);
       return;
     }
-    localStorage.removeItem(CODING_CONVERSATION_KEY);
-    localStorage.removeItem(CODING_SAVED_MESSAGES_KEY);
-    await invoke(settings.codingProvider === 'claude' ? 'coding_clear_claude' : 'coding_clear').catch(() => {});
+    localStorage.removeItem(codingConversationKey(activeProvider));
+    localStorage.removeItem(codingSavedMessagesKey(activeProvider));
+    await invoke(activeProvider === 'claude' ? 'coding_clear_claude' : 'coding_clear').catch(() => {});
   };
 
   const loadArchivedConversation = async (conversationId: number) => {
@@ -585,6 +609,22 @@ function CodingDialog({
             <div className="flex items-center gap-2 text-[13px] font-medium">
               <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
               <span>{codingLabel}</span>
+            </div>
+            <div className="flex rounded-[10px] border border-border/65 bg-background/45 p-1">
+              {(['codex', 'claude'] as const).map((provider) => (
+                <button
+                  key={provider}
+                  type="button"
+                  className={`rounded-[8px] px-2.5 py-1 text-[12px] font-medium transition ${
+                    activeProvider === provider
+                      ? 'bg-[#2f94ff] text-white shadow-sm'
+                      : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
+                  }`}
+                  onClick={() => setStandaloneProvider(provider)}
+                >
+                  {codingProviderLabel(provider)}
+                </button>
+              ))}
             </div>
           </div>
           <div className="app-no-drag min-h-0 flex-1 overflow-hidden p-3">
@@ -729,17 +769,17 @@ function codingMessageToChatMessage(message: CodingMessage): ChatMessage {
   };
 }
 
-function readCodingSavedMessageIds() {
+function readCodingSavedMessageIds(provider: CodingProvider = 'codex') {
   try {
-    const parsed = JSON.parse(localStorage.getItem(CODING_SAVED_MESSAGES_KEY) || '[]');
+    const parsed = JSON.parse(localStorage.getItem(codingSavedMessagesKey(provider)) || '[]');
     return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []);
   } catch {
     return new Set<string>();
   }
 }
 
-function writeCodingSavedMessageIds(ids: Set<string>) {
-  localStorage.setItem(CODING_SAVED_MESSAGES_KEY, JSON.stringify(Array.from(ids).slice(-240)));
+function writeCodingSavedMessageIds(ids: Set<string>, provider: CodingProvider = 'codex') {
+  localStorage.setItem(codingSavedMessagesKey(provider), JSON.stringify(Array.from(ids).slice(-240)));
 }
 
 function formatAppConversationTime(value: string) {
@@ -768,29 +808,30 @@ function formatCodingTimestamp(value: number) {
   });
 }
 
-async function ensureCodingHistoryConversation(messages: CodingMessage[], label = 'Codex') {
-  const existing = Number(localStorage.getItem(CODING_CONVERSATION_KEY) || 0);
+async function ensureCodingHistoryConversation(messages: CodingMessage[], provider: CodingProvider = 'codex', label = 'Codex') {
+  const key = codingConversationKey(provider);
+  const existing = Number(localStorage.getItem(key) || 0);
   if (existing > 0) return existing;
   const firstUser = messages.find((message) => message.role === 'user')?.content.trim();
   await createConversation(firstUser ? `${label}: ${firstUser.slice(0, 42)}` : `${label} Coding`);
   const latest = (await getConversations())[0]?.id ?? null;
-  if (latest) localStorage.setItem(CODING_CONVERSATION_KEY, String(latest));
+  if (latest) localStorage.setItem(key, String(latest));
   return latest;
 }
 
-async function persistCodingMessages(messages: CodingMessage[], label = 'Codex') {
+async function persistCodingMessages(messages: CodingMessage[], provider: CodingProvider = 'codex', label = 'Codex') {
   if (messages.length === 0) return;
-  const savedIds = readCodingSavedMessageIds();
+  const savedIds = readCodingSavedMessageIds(provider);
   const unsaved = messages.filter((message) => !savedIds.has(message.id));
   if (unsaved.length === 0) return;
-  const conversationId = await ensureCodingHistoryConversation(messages, label);
+  const conversationId = await ensureCodingHistoryConversation(messages, provider, label);
   if (!conversationId) return;
   for (const message of unsaved) {
     const role = message.role === 'user' ? 'user' : message.role === 'codex' ? 'assistant' : 'system';
     await insertMessage(conversationId, role, message.content);
     savedIds.add(message.id);
   }
-  writeCodingSavedMessageIds(savedIds);
+  writeCodingSavedMessageIds(savedIds, provider);
 }
 
 function codingStatusDotClass(status: CodingStatus) {
