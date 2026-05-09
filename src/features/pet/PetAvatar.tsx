@@ -561,7 +561,7 @@ function OrbAvatar({
   const [hovering, setHovering] = useState(false);
   const [pointer, setPointer] = useState({ x: 0.5, y: 0.5 });
   const letters = meta.label.split('');
-  const fontSize = Math.max(28, Math.round(size * 0.28));
+  const fontSize = Math.max(22, Math.round(size * 0.19));
 
   const idleWeights = useMemo(() => {
     if (orbState !== 'idle') return [];
@@ -599,7 +599,10 @@ function OrbAvatar({
       }}
     >
       <div className="orb-avatar__glow" />
+      <div className="orb-avatar__ambient" />
+      <div className="orb-avatar__glass" />
       <div className="orb-avatar__ring" />
+      <div className="orb-avatar__aura" />
       <div className={`orb-avatar__text orb-avatar__text--${orbState}`} aria-label={meta.label}>
         {letters.map((letter, index) => (
           <span

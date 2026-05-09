@@ -363,28 +363,48 @@
   display: grid;
   place-items: center;
   isolation: isolate;
-  border: 1px solid color-mix(in srgb, var(--orb-accent) 7%, transparent);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--orb-accent) 18%, rgba(255,255,255,0.22));
   background:
-    radial-gradient(circle at 42% 30%, rgba(255,255,255,0.10), transparent 32%),
-    color-mix(in srgb, var(--background) 9%, transparent);
-  backdrop-filter: blur(22px) saturate(1.25);
-  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    radial-gradient(circle at 36% 24%, rgba(255,255,255,0.62), rgba(255,255,255,0.16) 18%, transparent 38%),
+    radial-gradient(circle at 67% 72%, color-mix(in srgb, var(--orb-accent) 16%, transparent), transparent 42%),
+    linear-gradient(145deg, rgba(255,255,255,0.22), rgba(255,255,255,0.035) 42%, rgba(0,0,0,0.045));
+  backdrop-filter: blur(26px) saturate(1.22);
+  -webkit-backdrop-filter: blur(26px) saturate(1.22);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.12),
-    inset 0 -18px 48px rgba(0,0,0,0.05),
-    0 14px 48px rgba(0,0,0,0.10);
+    inset 0 1px 1px rgba(255,255,255,0.58),
+    inset 10px 14px 32px rgba(255,255,255,0.10),
+    inset -18px -22px 42px rgba(0,0,0,0.105),
+    0 10px 22px rgba(0,0,0,0.10),
+    0 28px 68px rgba(0,0,0,0.08);
   transform-origin: center;
-  animation: orbBreath 4s ease-in-out infinite;
-  transition: border-color 500ms ease, box-shadow 500ms ease, transform 320ms cubic-bezier(.2,.9,.18,1);
+  animation: orbBreath 5.8s ease-in-out infinite;
+  transition: border-color 520ms ease, box-shadow 520ms ease, filter 520ms ease, transform 380ms cubic-bezier(.18,.9,.2,1);
+}
+
+.dark .orb-avatar {
+  background:
+    radial-gradient(circle at 36% 24%, rgba(255,255,255,0.22), rgba(255,255,255,0.07) 18%, transparent 38%),
+    radial-gradient(circle at 67% 72%, color-mix(in srgb, var(--orb-accent) 18%, transparent), transparent 42%),
+    linear-gradient(145deg, rgba(255,255,255,0.09), rgba(255,255,255,0.025) 42%, rgba(0,0,0,0.22));
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.22),
+    inset 12px 16px 34px rgba(255,255,255,0.035),
+    inset -18px -22px 42px rgba(0,0,0,0.28),
+    0 10px 24px rgba(0,0,0,0.22),
+    0 30px 78px rgba(0,0,0,0.18);
 }
 
 .orb-avatar.is-hovering {
-  border-color: color-mix(in srgb, var(--orb-accent) 72%, transparent);
-  transform: scale(1.05);
+  border-color: color-mix(in srgb, var(--orb-accent) 54%, rgba(255,255,255,0.22));
+  transform: scale(1.035);
+  filter: saturate(1.08);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.18),
-    inset 0 -18px 48px rgba(0,0,0,0.06),
-    0 18px 58px color-mix(in srgb, var(--orb-accent) 18%, rgba(0,0,0,0.08));
+    inset 0 1px 1px rgba(255,255,255,0.62),
+    inset 12px 16px 34px rgba(255,255,255,0.13),
+    inset -18px -22px 42px rgba(0,0,0,0.11),
+    0 14px 28px rgba(0,0,0,0.11),
+    0 32px 74px color-mix(in srgb, var(--orb-accent) 15%, rgba(0,0,0,0.10));
 }
 
 .orb-avatar.is-dragging {
@@ -392,37 +412,73 @@
 }
 
 .orb-avatar--rest {
-  animation: orbBreath 4s ease-in-out infinite, orbRotate 20s linear infinite;
+  animation: orbBreath 6.2s ease-in-out infinite, orbRotate 32s linear infinite;
 }
 
 .orb-avatar__glow {
   position: absolute;
-  inset: 8%;
+  inset: 18%;
   z-index: -1;
   border-radius: inherit;
   background: var(--orb-accent);
-  filter: blur(48px);
-  opacity: 0.08;
+  filter: blur(38px);
+  opacity: 0.09;
   transform: scale(0.92);
-  animation: orbGlow 4s ease-in-out infinite;
+  animation: orbGlow 5.8s ease-in-out infinite;
   transition: background-color 1s ease, opacity 300ms ease, transform 300ms ease;
 }
 
 .orb-avatar.is-hovering .orb-avatar__glow {
-  opacity: 0.28;
-  transform: scale(1.16);
+  opacity: 0.18;
+  transform: scale(1.08);
 }
 
-.orb-avatar__ring {
+.orb-avatar__ambient,
+.orb-avatar__glass,
+.orb-avatar__aura {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
+}
+
+.orb-avatar__ambient {
   background:
-    conic-gradient(from 90deg, transparent, color-mix(in srgb, var(--orb-accent) 18%, transparent), transparent 42%),
-    radial-gradient(circle at 50% 50%, transparent 58%, color-mix(in srgb, var(--orb-accent) 10%, transparent));
-  opacity: 0.62;
-  transition: opacity 500ms ease;
+    radial-gradient(circle at 50% 50%, transparent 54%, color-mix(in srgb, var(--orb-accent) 12%, transparent) 68%, transparent 72%),
+    conic-gradient(from 210deg, transparent, color-mix(in srgb, var(--orb-accent) 9%, transparent), transparent 32%, rgba(255,255,255,0.11), transparent 58%);
+  opacity: 0.72;
+  mix-blend-mode: screen;
+  animation: orbAmbientDrift 14s ease-in-out infinite alternate;
+}
+
+.orb-avatar__glass {
+  inset: 1px;
+  background:
+    radial-gradient(ellipse at 34% 22%, rgba(255,255,255,0.42), rgba(255,255,255,0.08) 18%, transparent 39%),
+    radial-gradient(ellipse at 70% 78%, rgba(0,0,0,0.11), transparent 44%),
+    linear-gradient(120deg, transparent 18%, rgba(255,255,255,0.09) 48%, transparent 74%);
+  opacity: 0.86;
+}
+
+.orb-avatar__aura {
+  inset: 9%;
+  border: 1px solid color-mix(in srgb, var(--orb-accent) 16%, transparent);
+  opacity: 0.45;
+  transform: scale(0.86);
+  animation: orbAura 5.8s ease-in-out infinite;
+}
+
+.orb-avatar__ring {
+  position: absolute;
+  inset: 7%;
+  border-radius: inherit;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--orb-accent) 22%, rgba(255,255,255,0.08));
+  box-shadow:
+    inset 0 0 18px color-mix(in srgb, var(--orb-accent) 8%, transparent),
+    0 0 14px color-mix(in srgb, var(--orb-accent) 5%, transparent);
+  opacity: 0.72;
+  transition: opacity 500ms ease, border-color 500ms ease;
 }
 
 .orb-avatar__text {
@@ -431,24 +487,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: color-mix(in srgb, var(--orb-accent) 74%, var(--foreground));
+  color: color-mix(in srgb, var(--orb-accent) 48%, var(--foreground));
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: var(--orb-font-size);
   line-height: 1;
-  letter-spacing: 0;
+  letter-spacing: 0.045em;
   text-transform: uppercase;
   perspective: 420px;
   animation: orbTextIn 420ms cubic-bezier(.2,.9,.18,1);
+  text-shadow:
+    0 1px 0 rgba(255,255,255,0.20),
+    0 12px 28px color-mix(in srgb, var(--orb-accent) 10%, transparent);
 }
 
 .orb-avatar__letter {
   position: relative;
   display: inline-block;
-  min-width: 0.58em;
+  min-width: 0.62em;
   text-align: center;
   font-weight: var(--letter-weight, 520);
   transform-style: preserve-3d;
-  transition: font-weight 90ms linear, transform 260ms cubic-bezier(.2,.9,.18,1);
+  transition: font-weight 130ms linear, transform 280ms cubic-bezier(.2,.9,.18,1), opacity 280ms ease;
 }
 
 .orb-avatar__text--work .orb-avatar__letter {
@@ -456,8 +515,8 @@
 }
 
 .orb-avatar--work.is-hovering .orb-avatar__letter {
-  animation: orbLetterFlip 620ms cubic-bezier(.18,.9,.2,1) both;
-  animation-delay: calc(var(--letter-index) * 55ms);
+  animation: orbLetterFlip 760ms cubic-bezier(.18,.9,.2,1) both;
+  animation-delay: calc(var(--letter-index) * 68ms);
 }
 
 .orb-avatar__letter-face {
@@ -472,18 +531,28 @@
 }
 
 .orb-avatar__text--rest .orb-avatar__letter {
-  animation: orbLetterBreathe 1.5s ease-in-out infinite alternate;
+  animation: orbLetterBreathe 2.2s ease-in-out infinite alternate;
   animation-delay: calc(var(--letter-index) * 80ms);
 }
 
 @keyframes orbBreath {
-  0%, 100% { scale: 1; }
-  50% { scale: 1.018; }
+  0%, 100% { scale: 1; translate: 0 0; }
+  50% { scale: 1.012; translate: 0 -1px; }
 }
 
 @keyframes orbGlow {
-  0%, 100% { opacity: 0.06; }
-  50% { opacity: 0.15; }
+  0%, 100% { opacity: 0.07; transform: scale(0.90); }
+  50% { opacity: 0.14; transform: scale(1.02); }
+}
+
+@keyframes orbAura {
+  0%, 100% { opacity: 0.34; transform: scale(0.84); }
+  50% { opacity: 0.58; transform: scale(0.92); }
+}
+
+@keyframes orbAmbientDrift {
+  from { transform: rotate(-8deg) scale(1); opacity: 0.58; }
+  to { transform: rotate(10deg) scale(1.04); opacity: 0.78; }
 }
 
 @keyframes orbRotate {
@@ -492,20 +561,20 @@
 }
 
 @keyframes orbTextIn {
-  from { opacity: 0; transform: scale(.92); }
+  from { opacity: 0; transform: scale(.96) translateY(2px); filter: blur(5px); }
   to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes orbLetterFlip {
   0% { transform: rotateX(0deg); }
-  48% { transform: rotateX(88deg); }
-  52% { transform: rotateX(-88deg); }
+  40% { transform: rotateX(82deg) translateY(-1px); opacity: 0.62; }
+  52% { transform: rotateX(-72deg) translateY(1px); opacity: 0.72; }
   100% { transform: rotateX(0deg); }
 }
 
 @keyframes orbLetterBreathe {
-  0% { font-weight: 140; }
-  100% { font-weight: 880; }
+  0% { font-weight: 230; opacity: 0.68; transform: translateY(0); }
+  100% { font-weight: 760; opacity: 1; transform: translateY(-0.5px); }
 }
 
 .dark .orb-avatar {

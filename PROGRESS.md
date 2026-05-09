@@ -651,3 +651,10 @@
 - 尺寸：Orb 常驻尺寸复用“灵宠大小”设置；休息放大仍复用屏幕 80% 展示逻辑，并针对 Orb 使用正圆几何计算。
 - 验证：`pnpm build` 通过。
 - 文件：settingsStore.ts, SettingsPanel.tsx, PetAvatar.tsx, App.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R78. Orb 视觉材质与动效重做（2026-05-09）
+- 材质：Orb 从高饱和彩色 glow 改为多层玻璃体，增加 ambient、glass、aura 层，使用低对比边缘折射、内阴影和细微状态色。
+- 动效：常态呼吸放慢且幅度减弱；rest 自转改为更慢的 32s，文字呼吸更柔和；work hover 翻牌延长并降低机械跳变。
+- 字体：文字字号下调、字距更稳，状态文本更像嵌在玻璃里的系统标记，而不是大号网页标题。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

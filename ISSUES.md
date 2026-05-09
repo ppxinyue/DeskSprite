@@ -971,3 +971,15 @@
 - 涉及文件：`src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/pet/PetAvatar.tsx`, `src/App.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：视觉模式应只替换渲染内核，桌面宠物的交互边界、菜单和窗口定位要继续复用同一套外壳，避免两套模式行为分叉。
 - 是否需更新技术文档：否。
+
+## ISSUE-083
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb 模式视觉质量
+- 严重程度：改进
+- 问题现象：Orb 模式框架可用，但悬浮球视觉显得粗糙，偏网页发光球，不够高级；动效也太直白。
+- 原因分析：首版 Orb 使用高可见度彩色 glow、较硬的文字和直接的边框高亮，缺少 macOS 风格玻璃材质里的边缘折射、内阴影、微弱层次和克制状态色。
+- 解决方案：重做 Orb 材质层：新增 ambient/glass/aura 多层结构，降低状态色占比，强化半透明玻璃、高光、内阴影和细边缘折射；文字字号下调，字距和动效节奏收敛，rest 旋转和呼吸更慢，work 翻牌更柔和。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Apple 风格的“高级感”更多来自低对比、材质层次、克制运动和精细阴影，而不是更亮的颜色或更强的发光。
+- 是否需更新技术文档：否。
