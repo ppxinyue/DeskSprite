@@ -1143,3 +1143,11 @@
 - 状态：聚合规则改为红色优先、绿色其次、无可通知输出时黄色，更贴近“Codex 离开后完成再通知”的使用场景。
 - 验证：`pnpm exec tsc -b --pretty false`、`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R146. 普通 Chat 与 Coding Chat 分离（2026-05-10）
+- 打开路径：Coding 模式下点击 chat button 只打开 Coding 小窗，不再写入普通 compact chat 的会话 key。
+- 退出：从右键菜单退出 Coding 时会先隐藏当前 Coding 小窗，下一次点击 chat button 重新按普通聊天逻辑打开。
+- 普通会话：普通 chat 的“最近对话”和右键历史菜单过滤 `Codex` Coding 历史，避免退出 Coding 后误打开上一条 Codex 会话。
+- 目标：普通 chat 保持用户上一次普通对话；Coding chat 使用自己的历史与状态，两套上下文互不污染。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, PetAvatar.tsx, ISSUES.md, PROGRESS.md

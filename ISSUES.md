@@ -1787,3 +1787,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：观察外部 agent 的 UI 不能只显示聚合状态，还需要“通知已读”和“session 归属”两个概念，否则会像状态灯坏掉一样反复误报。
 - 是否需更新技术文档：否。
+
+## ISSUE-151
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：普通 Chat 与 Coding Chat 分离
+- 严重程度：重要
+- 问题现象：退出 Coding 模式后点击 chat button，打开的不是上一次普通 chat，而可能是 Coding 模式留下的 Codex 会话。
+- 原因分析：Coding 模式下打开小窗仍复用了普通 `openLatestChat()` 路径，会写入普通 compact chat 的本地会话 key；同时普通最近会话查询没有过滤 Codex Coding 历史。
+- 解决方案：Coding 模式单独走 `forceShowCodingChat()`，不改普通 compact chat key；退出 Coding 时隐藏当前 Coding 小窗；普通最近会话和右键历史菜单过滤 Codex 会话标题。
+- 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：两个模式共享窗口壳可以，但会话 key 和最近会话选择必须分开，否则模式切换后会产生上下文污染。
+- 是否需更新技术文档：否。

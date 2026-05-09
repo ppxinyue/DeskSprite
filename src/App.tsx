@@ -210,6 +210,10 @@ function codingStateCommand(mode: string) {
   return mode === 'inherit' ? 'coding_get_inherited_state' : 'coding_get_state';
 }
 
+function isCodingConversationTitle(title: string | null | undefined) {
+  return /^Codex(?::|\s+Coding\b|\b)/i.test((title || '').trim());
+}
+
 function CompactChatWindow() {
   const { settings } = useSettingsStore();
   const lastCompactHeightRef = useRef(0);
@@ -959,6 +963,15 @@ function PetWindow() {
     window.setTimeout(() => setChatBurst(false), 360);
   }, [positionCompactChatWindow]);
 
+  const forceShowCodingChat = useCallback(async () => {
+    compactDismissedRef.current = false;
+    localStorage.removeItem(COMPACT_CHAT_DISMISSED_KEY);
+    await positionCompactChatWindow({ show: true });
+    setCompactVisible(true);
+    setChatBurst(true);
+    window.setTimeout(() => setChatBurst(false), 360);
+  }, [positionCompactChatWindow]);
+
   const animateRestPresentation = useCallback(async (target: RestPresentationSnapshot, options: { onDone?: () => void } = {}) => {
     if (restPresentationFrameRef.current) {
       window.cancelAnimationFrame(restPresentationFrameRef.current);
@@ -1686,8 +1699,12 @@ function PetWindow() {
   };
 
   const openLatestChat = async () => {
+    if (settings.codingModeEnabled) {
+      await forceShowCodingChat();
+      return;
+    }
     try {
-      const [latest] = await getConversations();
+      const latest = (await getConversations()).find((item) => !isCodingConversationTitle(item.title));
       if (latest) {
         openChat('history', latest.id);
         await forceShowCompactChat('history', latest.id);
@@ -1772,6 +1789,10 @@ function PetWindow() {
                 updateSettings(updates).catch((e) => {
                   console.warn("Failed to toggle coding mode:", e);
                 });
+                if (settings.codingModeEnabled && !nextEnabled) {
+                  invoke("hide_compact_chat_window").catch(() => {});
+                  setCompactVisible(false);
+                }
               }}
             />
             {restEndAt && (orbMode || !restPresentationActive) ? (

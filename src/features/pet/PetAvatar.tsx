@@ -19,6 +19,10 @@ function toSrc(path: string): string {
   return isBuiltinAsset(path) ? getBuiltinAssetUrl(path) : convertFileSrc(path);
 }
 
+function isCodingConversationTitle(title: string | null | undefined) {
+  return /^Codex(?::|\s+Coding\b|\b)/i.test((title || '').trim());
+}
+
 const MOTION_NAMES: PetMotionName[] = ['petJump', 'petWobble', 'petBreathe'];
 const MOTION_BASE_DURATION: Record<PetMotionName, number> = {
   petJump: 4,
@@ -258,7 +262,12 @@ export function PetAvatar({
       setMenuOpen(true);
     }, 40);
     getConversations()
-      .then((convos) => setRecentConversations(convos.slice(0, 3).map((c) => ({ id: c.id, title: c.title }))))
+      .then((convos) => setRecentConversations(
+        convos
+          .filter((c) => !isCodingConversationTitle(c.title))
+          .slice(0, 3)
+          .map((c) => ({ id: c.id, title: c.title })),
+      ))
       .catch(() => setRecentConversations([]));
   };
 
