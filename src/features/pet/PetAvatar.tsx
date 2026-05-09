@@ -569,6 +569,7 @@ interface OrbParticle {
   life: number;
   maxLife: number;
   size: number;
+  twinkle: number;
 }
 
 function OrbAvatar({
@@ -635,19 +636,20 @@ function OrbAvatar({
     let animationFrame = 0;
     let cancelled = false;
 
-    const emitParticle = (x: number, y: number, vx: number, vy: number, outward = false) => {
-      const cap = restPresentationActive ? 90 : 150;
+    const emitParticle = (x: number, y: number, outward = false) => {
+      const cap = restPresentationActive ? 120 : 220;
       if (particles.length > cap) particles.splice(0, particles.length - cap);
-      const angle = outward ? Math.atan2(y - center, x - center) + (Math.random() - 0.5) * 0.9 : Math.atan2(vy, vx) + Math.PI + (Math.random() - 0.5) * 0.7;
-      const push = logicalSize * (outward ? 0.004 : 0.0022) * (0.55 + Math.random());
+      const angle = outward ? Math.atan2(y - center, x - center) + (Math.random() - 0.5) * 1.3 : Math.random() * Math.PI * 2;
+      const push = logicalSize * (outward ? 0.0024 : 0.0011) * (0.35 + Math.random() * 0.8);
       particles.push({
         x,
         y,
-        vx: Math.cos(angle) * push + (Math.random() - 0.5) * 0.22,
-        vy: Math.sin(angle) * push + (Math.random() - 0.5) * 0.22,
+        vx: Math.cos(angle) * push + (Math.random() - 0.5) * 0.06,
+        vy: Math.sin(angle) * push + (Math.random() - 0.5) * 0.06,
         life: 0,
-        maxLife: outward ? 68 + Math.random() * 30 : 42 + Math.random() * 28,
-        size: Math.max(0.8, logicalSize * (outward ? 0.0042 : 0.0032) * (0.7 + Math.random())),
+        maxLife: outward ? 34 + Math.random() * 24 : 26 + Math.random() * 22,
+        size: Math.max(0.45, logicalSize * (outward ? 0.0024 : 0.0018) * (0.6 + Math.random() * 0.8)),
+        twinkle: Math.random() * Math.PI * 2,
       });
     };
 
@@ -740,15 +742,15 @@ function OrbAvatar({
         const emissions = restPresentationActive ? 2 : 4;
         for (let i = 0; i < emissions; i += 1) {
           const angle = (frame * 0.11) + (i / emissions) * Math.PI * 2;
-          emitParticle(center + Math.cos(angle) * comet.radius, center + Math.sin(angle) * comet.radius, Math.cos(angle), Math.sin(angle), true);
+          emitParticle(center + Math.cos(angle) * comet.radius, center + Math.sin(angle) * comet.radius, true);
         }
       } else {
         for (const comet of comets) {
           comet.x += comet.vx;
           comet.y += comet.vy;
           bounceComet(comet);
-          const every = orbState === 'rest' ? 1 : 2;
-          if (frame % every === 0) emitParticle(comet.x, comet.y, comet.vx, comet.vy);
+          const every = orbState === 'rest' ? 1 : 3;
+          if (frame % every === 0) emitParticle(comet.x, comet.y);
         }
         collideComets();
       }
@@ -758,16 +760,26 @@ function OrbAvatar({
         particle.life += 1;
         particle.x += particle.vx;
         particle.y += particle.vy;
-        particle.vx *= 0.985;
-        particle.vy *= 0.985;
+        particle.vx *= 0.955;
+        particle.vy *= 0.955;
         const fade = 1 - particle.life / particle.maxLife;
         if (fade <= 0) {
           particles.splice(i, 1);
           continue;
         }
-        ctx.fillStyle = `rgba(0,0,0,${0.42 * fade})`;
+        const sparkle = 0.55 + Math.sin(frame * 0.18 + particle.twinkle) * 0.35;
+        const alpha = Math.max(0, Math.min(1, fade * sparkle));
+        ctx.strokeStyle = `rgba(0,0,0,${0.26 * alpha})`;
+        ctx.lineWidth = Math.max(0.4, particle.size * 0.34);
         ctx.beginPath();
-        ctx.arc(particle.x, particle.y, particle.size * (0.7 + fade), 0, Math.PI * 2);
+        ctx.moveTo(particle.x - particle.size * 2.2, particle.y);
+        ctx.lineTo(particle.x + particle.size * 2.2, particle.y);
+        ctx.moveTo(particle.x, particle.y - particle.size * 2.2);
+        ctx.lineTo(particle.x, particle.y + particle.size * 2.2);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(0,0,0,${0.34 * alpha})`;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size * (0.45 + alpha * 0.45), 0, Math.PI * 2);
         ctx.fill();
       }
 

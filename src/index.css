@@ -363,6 +363,7 @@
   overflow: visible;
   border-radius: 50%;
   transform-origin: center;
+  animation: orbBoundaryBreath 4.8s ease-in-out infinite;
   transition: transform 220ms ease, opacity 220ms ease;
 }
 
@@ -410,4 +411,9 @@
 .orb-avatar.is-hovering .orb-avatar__text {
   opacity: 0.82;
   transform: translate(-50%, -50%) translateY(-1px);
+}
+
+@keyframes orbBoundaryBreath {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025); }
 }

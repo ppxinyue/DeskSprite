@@ -731,3 +731,10 @@
 - 性能：canvas DPR 在 rest presentation 下限制到 1.25，并设置粒子数量上限，避免大尺寸休息展示时重绘过重。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R89. Orb 边框呼吸与星空粒子（2026-05-09）
+- 边框：外层黑色圆圈增加 4.8s 的轻微呼吸缩放，让静态边界也有生命感。
+- 粒子：把尾部粒子从长寿命拖尾点改为短寿命星尘，速度快速衰减，并绘制细小十字星芒与闪烁亮度。
+- 观感：粒子不再沿彗星方向拖成“蝌蚪”，而是像星空里短暂闪现、扩散后消失的光点。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
