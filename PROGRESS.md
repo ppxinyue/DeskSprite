@@ -1033,3 +1033,10 @@
 - 兼容：保留 `--json`、`--color never`、`--sandbox workspace-write`、`--cd` 和 prompt，匹配当前本机 Codex CLI help。
 - 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R132. Coding 工作状态与 stdin 修复（2026-05-09）
+- 主进程：启动 Codex 前先把状态置为 working，再广播用户消息，避免发送瞬间仍显示绿色完成态。
+- Codex CLI：spawn 时将 stdin 设为 ignore，避免 `codex exec` 读取额外 stdin 并卡在 `Reading additional input from stdin...`。
+- 状态灯：stderr 中的普通 `input` 文案不再被误判为需要用户处理，只有 approval/permission/authorize/confirm/login 这类信号才切红。
+- 验证：`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md

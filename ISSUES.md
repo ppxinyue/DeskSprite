@@ -1619,3 +1619,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：外部 CLI 版本变化时，桥接层应严格以本机 `--help` 为准，不要沿用旧版本参数。
 - 是否需更新技术文档：否。
+
+## ISSUE-137
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Coding 工作状态与 stdin 修复
+- 严重程度：重要
+- 问题现象：用户在小对话框向 Codex 发送消息后没有回复且状态变红；同时 Codex 工作中状态有时仍显示绿色。
+- 原因分析：桥接进程默认打开 stdin，`codex exec` 会提示 `Reading additional input from stdin...` 并等待额外输入；stderr 中的 `input` 又被正则误判为需要用户输入。另一个问题是先广播用户消息再设置 working，导致短暂绿色完成态。
+- 解决方案：spawn Codex 时忽略 stdin；先将状态置为 working 再推送用户消息；stderr 状态判定移除普通 `input` 关键字，仅保留明确的授权/确认/登录信号。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：CLI 桥接要显式管理 stdio，状态机也应先切状态再广播消息，避免 UI 观察到中间态。
+- 是否需更新技术文档：否。

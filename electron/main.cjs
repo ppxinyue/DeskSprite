@@ -790,8 +790,8 @@ async function sendCodingMessage({ prompt }) {
     return publishCodingState();
   }
 
-  pushCodingMessage('user', text);
   codingState.status = CODEX_STATUS.WORKING;
+  pushCodingMessage('user', text);
   publishCodingState();
 
   const args = [
@@ -808,6 +808,7 @@ async function sendCodingMessage({ prompt }) {
   const child = spawn(getCodexBinary(), args, {
     cwd: process.cwd(),
     env: { ...process.env, FORCE_COLOR: '0' },
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
   codingState.running = child;
 
@@ -832,7 +833,7 @@ async function sendCodingMessage({ prompt }) {
   child.stderr.on('data', (chunk) => {
     stderrBuffer += chunk.toString();
     const text = stderrBuffer.trim();
-    if (/approval|permission|authorize|confirm|login|auth|input/i.test(text)) {
+    if (/approval|permission|authorize|confirm|login/i.test(text)) {
       codingState.status = CODEX_STATUS.NEEDS_INPUT;
       publishCodingState();
     }
