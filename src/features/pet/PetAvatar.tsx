@@ -489,6 +489,7 @@ export function PetAvatar({
             </div>
           </div>
         )}
+        <div className="my-1 h-px bg-border/60" />
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs text-destructive hover:bg-destructive/10" onClick={() => handleContextMenu('quit')}>退出</button>

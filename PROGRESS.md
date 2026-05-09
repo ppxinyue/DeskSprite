@@ -1288,3 +1288,8 @@
 - 修复：避免第二条消息再次用 `--session-id` 抢占同一个 Claude Code session，触发 “Session ID ... is already in use”。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R166. 右键菜单操作区分割线（2026-05-10）
+- 右键菜单：在专注模式 / Coding 模式功能区与设置 / 隐藏 / 退出操作区之间增加分割线。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：PetAvatar.tsx, ISSUES.md, PROGRESS.md

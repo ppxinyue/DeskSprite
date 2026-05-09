@@ -2027,3 +2027,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：CLI 的“指定 session id”和“恢复 session”语义不同；连续聊天要用 resume，而不是反复指定同一个 session id。
 - 是否需更新技术文档：否。
+
+## ISSUE-171
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：右键菜单操作区分割线
+- 严重程度：轻微
+- 问题现象：右键菜单中专注模式 / Coding 模式与设置 / 隐藏 / 退出之间缺少视觉分组。
+- 原因分析：功能区和窗口/应用操作区连续排列，层级不够清晰。
+- 解决方案：在 Coding 模式区块之后增加一条分割线。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：右键菜单要按操作语义分组，避免高频功能和 destructive/窗口操作粘在一起。
+- 是否需更新技术文档：否。
