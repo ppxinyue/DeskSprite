@@ -943,3 +943,9 @@
 - Orb：orb 模式下宠物名字改为收起态不可展开，System Prompt 保持可编辑。
 - 验证：`pnpm build` 通过。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R119. 专注结束忽略休息后继续下一轮（2026-05-09）
+- 状态机：专注结束弹出的 `focus-complete` 休息提示，点击忽略后直接调用 `startFocus()`。
+- 保留：普通休息提醒忽略仍回到 idle；分心提示忽略仍回到当前 work。
+- 验证：`pnpm build` 通过。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md

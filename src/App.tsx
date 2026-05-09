@@ -1128,6 +1128,7 @@ function PetWindow() {
                 onOk={startRestAction}
                 onIgnore={() => {
                   if (petPrompt.id === 'focus-warning' && focusEndAtRef.current) setPetState('work');
+                  else if (petPrompt.id === 'focus-complete') startFocus();
                   else if (!restEndAt) {
                     setPetState('idle');
                     setNextRestReminderAt(Date.now() + Math.max(1, settings.restReminderIntervalMinutes) * 60_000);
