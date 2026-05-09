@@ -32,6 +32,8 @@ const CODEX_STATUS = {
   WORKING: 'working',
   DONE: 'done',
 };
+const DEFAULT_CODEX_HTTP_PROXY = 'http://127.0.0.1:6478';
+const DEFAULT_CODEX_SOCKS_PROXY = 'socks5://127.0.0.1:6478';
 const CURRENT_CODEX_THREAD_ID = process.env.DESKSPRITE_CODEX_THREAD_ID || process.env.CODEX_THREAD_ID || '';
 const codingState = {
   status: CODEX_STATUS.DONE,
@@ -742,6 +744,17 @@ function getCodexBinary() {
   return 'codex';
 }
 
+function getCodexEnv() {
+  const env = { ...process.env, FORCE_COLOR: '0' };
+  env.https_proxy = env.https_proxy || env.HTTPS_PROXY || DEFAULT_CODEX_HTTP_PROXY;
+  env.http_proxy = env.http_proxy || env.HTTP_PROXY || DEFAULT_CODEX_HTTP_PROXY;
+  env.all_proxy = env.all_proxy || env.ALL_PROXY || DEFAULT_CODEX_SOCKS_PROXY;
+  env.HTTPS_PROXY = env.HTTPS_PROXY || env.https_proxy;
+  env.HTTP_PROXY = env.HTTP_PROXY || env.http_proxy;
+  env.ALL_PROXY = env.ALL_PROXY || env.all_proxy;
+  return env;
+}
+
 function publishCodingState() {
   const { running, ...safeState } = codingState;
   broadcast('coding:state', safeState);
@@ -1038,7 +1051,7 @@ function ensureCodexAppServer() {
   codexAppServer.ready = new Promise((resolve, reject) => {
     const child = spawn(getCodexBinary(), ['app-server', '--listen', 'stdio://'], {
       cwd: process.cwd(),
-      env: { ...process.env, FORCE_COLOR: '0' },
+      env: getCodexEnv(),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     codexAppServer.child = child;

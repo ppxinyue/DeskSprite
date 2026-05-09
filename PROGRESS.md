@@ -1095,3 +1095,10 @@
 - stderr：从 app-server stderr 中筛出 reconnect、retry、error、permission 等关键行展示到小聊天框，方便定位慢或失败的真实原因。
 - 验证：`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R140. Coding 默认代理注入（2026-05-10）
+- 主进程：新增 Codex 子进程环境构造，启动 app-server 时自动携带代理环境变量。
+- 代理：优先尊重用户已有 `https_proxy` / `http_proxy` / `all_proxy` / 大写变量；未设置时默认使用 `http://127.0.0.1:6478` 和 `socks5://127.0.0.1:6478`。
+- 目的：减少 Codex app-server 采样流因网络链路断开而反复 `Reconnecting...` 的情况。
+- 验证：`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md
