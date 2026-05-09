@@ -33,7 +33,7 @@ const PET_BUBBLE_TOP_SPACE = 78;
 const REST_ACTION_DURATION_MS = 60_000;
 const REST_PRESENTATION_SCREEN_RATIO = 0.8;
 const REST_PRESENTATION_ANIMATION_MS = 820;
-const REST_COUNTDOWN_SPACE = 24;
+const REST_COUNTDOWN_SPACE = 58;
 const DISTRACTION_CHECK_INTERVAL_MS = 3000;
 const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
 
@@ -563,6 +563,14 @@ function PetWindow() {
     });
   }, [animateRestPresentation, applyLayoutState, requestLayout, settings.petScale]);
 
+  const finishRest = useCallback(async () => {
+    restEndAtRef.current = null;
+    setRestEndAt(null);
+    setPetPrompt(null);
+    await restorePetAfterRest().catch(() => {});
+    setPetState('idle');
+  }, [restorePetAfterRest, setPetState]);
+
   const startRestAction = useCallback(() => {
     const endAt = Date.now() + REST_ACTION_DURATION_MS;
     setPetPrompt(null);
@@ -650,13 +658,8 @@ function PetWindow() {
   useEffect(() => {
     if (!restEndAt) return;
     if (Date.now() < restEndAt) return;
-    restEndAtRef.current = null;
-    setRestEndAt(null);
-    setPetPrompt(null);
-    restorePetAfterRest()
-      .catch(() => {})
-      .finally(() => setPetState('idle'));
-  }, [restEndAt, now, restorePetAfterRest, setPetState]);
+    finishRest().catch(() => {});
+  }, [finishRest, restEndAt, now]);
 
   useEffect(() => {
     if (!focusEndAt || !settings.distractionDetectionEnabled) return;
@@ -1097,11 +1100,24 @@ function PetWindow() {
               onMenuOpenChange={setContextMenuOpen}
               onFocusToggle={toggleFocus}
             />
-            {(focusEndAt || restEndAt) && (
-              <div className="pointer-events-none mt-1 text-center text-[11px] font-medium tabular-nums text-muted-foreground drop-shadow-sm">
-                {formatCountdown(Math.max(0, (restEndAt ?? focusEndAt ?? Date.now()) - now))}
+            {restEndAt ? (
+              <div className="mt-2 flex flex-col items-center gap-1.5">
+                <div className="pointer-events-none rounded-full bg-background/82 px-3 py-1 text-center text-[12px] font-semibold tabular-nums text-foreground shadow-sm backdrop-blur-md">
+                  {formatCountdown(Math.max(0, restEndAt - now))}
+                </div>
+                <button
+                  type="button"
+                  className="rounded-full border border-border/65 bg-background/88 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:text-foreground active:translate-y-0"
+                  onClick={() => finishRest().catch(() => {})}
+                >
+                  提前结束
+                </button>
               </div>
-            )}
+            ) : focusEndAt ? (
+              <div className="pointer-events-none mt-1 text-center text-[11px] font-medium tabular-nums text-muted-foreground drop-shadow-sm">
+                {formatCountdown(Math.max(0, focusEndAt - now))}
+              </div>
+            ) : null}
           </div>
 
           <div
