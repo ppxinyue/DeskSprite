@@ -1253,6 +1253,14 @@ function isCodexProblemEvent(type, payload, raw) {
     || /\berror\b|failed/i.test(haystack);
 }
 
+function isFinalCodexSessionOutput(payload) {
+  const payloadType = String(payload.type || payload.kind || '');
+  const phase = String(payload.phase || payload.status || '');
+  return /task_complete|final_answer|turn_complete|turn_completed/i.test(payloadType)
+    || /final_answer|completed/i.test(phase)
+    || Boolean(payload.last_agent_message);
+}
+
 function parseCodexSessionFile(filePath, text, mtimeMs) {
   const session = {
     id: path.basename(filePath, '.jsonl').split('-').slice(-5).join('-'),
@@ -1299,9 +1307,11 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
       }
       if (/agent_message|assistant_message|final_answer|task_complete/i.test(payloadType)) {
         const message = compactCodexSessionMessage(codexSessionEventText(payload), '');
-        if (message) {
+        if (message && isFinalCodexSessionOutput(payload)) {
           lastAssistantAt = eventAt;
           lastAssistant = message;
+        } else {
+          lastWorkAt = Math.max(lastWorkAt, eventAt);
         }
         continue;
       }
@@ -1316,9 +1326,11 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
       }
       if (payload.role === 'assistant' || payload.type === 'message') {
         const message = compactCodexSessionMessage(codexSessionEventText(payload), '');
-        if (message) {
+        if (message && isFinalCodexSessionOutput(payload)) {
           lastAssistantAt = eventAt;
           lastAssistant = message;
+        } else if (message) {
+          lastWorkAt = Math.max(lastWorkAt, eventAt);
         }
       }
       if (/function_call|tool|command|exec/i.test(String(payload.type || ''))) {

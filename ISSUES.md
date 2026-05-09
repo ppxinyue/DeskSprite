@@ -1799,3 +1799,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：两个模式共享窗口壳可以，但会话 key 和最近会话选择必须分开，否则模式切换后会产生上下文污染。
 - 是否需更新技术文档：否。
+
+## ISSUE-152
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：继承 Codex 过程输出保持工作态
+- 严重程度：重要
+- 问题现象：Codex 还在规划或执行工具时，过程性短回复会让 Coding chat button 短暂变绿，随后又变黄，状态抖动。
+- 原因分析：继承 session 的 JSONL 扫描把所有 `agent_message` / assistant message 都当作完成输出，没有区分 `commentary` 和 `final_answer`。
+- 解决方案：新增 final 输出判断，只有 `phase=final_answer`、`task_complete`、`last_agent_message` 等完整结果才切 done；过程性 agent message 只更新工作态活动时间。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Codex 的 assistant 文本不一定等于最终回答，状态灯必须基于 turn 完成语义，而不是“出现文本”这个弱信号。
+- 是否需更新技术文档：否。

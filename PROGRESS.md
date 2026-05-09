@@ -1151,3 +1151,10 @@
 - 目标：普通 chat 保持用户上一次普通对话；Coding chat 使用自己的历史与状态，两套上下文互不污染。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, PetAvatar.tsx, ISSUES.md, PROGRESS.md
+
+### R147. 继承 Codex 过程输出保持工作态（2026-05-10）
+- 主进程：继承 session 的 JSONL 解析新增 final 输出判断，只把 `phase=final_answer`、`task_complete`、`last_agent_message` 等完整输出认作完成。
+- 过程态：`agent_message` / assistant message 若只是 commentary 或没有 final phase，会更新为工作中活动时间，不再短暂切成绿色。
+- 体验：Codex 规划、说明、执行工具期间 chat button 保持黄色；只有完整回复出现后才变绿色。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md
