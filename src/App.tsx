@@ -489,7 +489,7 @@ function PetWindow() {
         if (Date.now() - focusWarningAtRef.current < DISTRACTION_WARNING_COOLDOWN_MS) return;
         focusWarningAtRef.current = Date.now();
         const rule = result.matchedRule.replace(/^(app|keyword):/, '');
-        setPetState('rest');
+        setPetState('work');
         setPetPrompt({
           id: 'focus-warning',
           message: `检测到分心：${rule}`,
