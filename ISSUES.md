@@ -1979,3 +1979,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：多 provider 共用同一个事件通道时必须携带来源元数据；小窗高度测量要跟随实时消息流，否则拖动和 resize 会感觉像另一套 UI。
 - 是否需更新技术文档：否。
+
+## ISSUE-167
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Coding 大窗去除重复工具标题
+- 严重程度：轻微
+- 问题现象：Coding 大聊天窗口右侧顶部已经显示当前工具和切换按钮，聊天框内部顶部又重复显示 Codex / Claude Code 文案。
+- 原因分析：新增 provider tab 后，旧的聊天卡片内部工具标签栏没有移除，造成视觉重复。
+- 解决方案：删除 Coding standalone 聊天卡片内部的工具标签栏，保留外层顶部作为唯一工具状态与切换入口。
+- 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：新增全局层级控件后，要清理旧局部标签，避免同一信息在相邻层级重复出现。
+- 是否需更新技术文档：否。

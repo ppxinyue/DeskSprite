@@ -1262,3 +1262,9 @@
 - 横向约束：Coding compact 根容器和 Composer 表单补齐 `max-w-full`、`min-w-0`、`overflow-hidden`，输入栏和气泡统一不能撑出横向滚动。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md
+
+### R162. Coding 大窗去除重复工具标题（2026-05-10）
+- 大聊天框：右侧顶部已有当前工具名和 Codex / Claude Code 切换按钮，移除聊天卡片内部重复的工具标签栏。
+- 布局：消息区直接从卡片顶部开始，避免同一屏出现两个 Codex / Claude Code 文案。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md

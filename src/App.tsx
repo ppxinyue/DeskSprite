@@ -636,12 +636,6 @@ function CodingDialog({
           </div>
           <div className="app-no-drag min-h-0 flex-1 overflow-hidden p-3">
             <section className="quiet-card flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] ring-2 ring-ring/16">
-              <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border/45 px-3">
-                <div className="flex h-8 items-center gap-2 rounded-[9px] border border-[var(--color-chat-border)] bg-background/70 px-2.5 text-[12px] text-[var(--text-secondary)]">
-                  <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(state.status)}`} />
-                  <span>{codingLabel}</span>
-                </div>
-              </div>
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 [overflow-wrap:anywhere]" onScroll={handleScroll}>
                 <div className="mx-auto w-full max-w-none min-w-0 space-y-3 overflow-x-hidden py-5 [overflow-wrap:anywhere]">
                   {visibleMessages.length === 0 ? (
