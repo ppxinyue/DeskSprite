@@ -1279,7 +1279,7 @@ export function Composer({
   }
 
   return (
-    <div className={compact ? "p-1.5 pt-1" : "p-2.5"}>
+    <div className={`${compact ? "p-1.5 pt-1" : "p-2.5"} min-w-0 max-w-full overflow-x-hidden`}>
       {selectedImage && (
         <div className={`mb-1.5 flex items-center gap-1.5 rounded-[7px] border px-2 py-1 text-[12px] leading-[1.5] text-[var(--color-chat-muted)] ${error ? 'animate-input-shake border-destructive/45 bg-destructive/5' : 'border-[var(--color-chat-border)] bg-background'}`}>
           <img src={selectedImage.dataUrl} alt="" className="h-9 w-9 rounded-[9px] object-cover shadow-sm" />
@@ -1288,7 +1288,7 @@ export function Composer({
       )}
       <form
         key={shakeKey}
-        className={`${compact ? 'rounded-[7px]' : 'rounded-[9px]'} ${error ? 'animate-input-shake border-destructive/55' : 'border-[var(--color-chat-border)]'} flex w-full items-end gap-0.5 border bg-[var(--surface-flat)] p-0.5 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset,0_6px_18px_rgba(42,38,31,0.06)] transition-[border-color,box-shadow,background] hover:border-[var(--color-chat-accent)] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_13%,transparent)] dark:bg-[var(--surface-flat)]`}
+        className={`${compact ? 'rounded-[7px]' : 'rounded-[9px]'} ${error ? 'animate-input-shake border-destructive/55' : 'border-[var(--color-chat-border)]'} flex w-full min-w-0 max-w-full items-end gap-0.5 overflow-hidden border bg-[var(--surface-flat)] p-0.5 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset,0_6px_18px_rgba(42,38,31,0.06)] transition-[border-color,box-shadow,background] hover:border-[var(--color-chat-accent)] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_13%,transparent)] dark:bg-[var(--surface-flat)]`}
         onSubmit={(e) => {
           e.preventDefault();
           onSubmit();
@@ -1310,7 +1310,7 @@ export function Composer({
             if (compact) invoke('focus_compact_chat_window').catch(() => {});
           }}
           placeholder="输入消息..."
-          className={`${compact ? 'min-h-[28px] px-1.5 py-1.5 leading-[1.35] overflow-hidden' : 'min-h-[34px] px-2 py-1.5 text-[14px] leading-[1.45] overflow-y-auto'} max-h-[112px] flex-1 resize-none border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
+          className={`${compact ? 'min-h-[28px] px-1.5 py-1.5 leading-[1.35] overflow-hidden' : 'min-h-[34px] px-2 py-1.5 text-[14px] leading-[1.45] overflow-y-auto'} max-h-[112px] min-w-0 flex-1 resize-none border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
           style={{ fontSize: compact ? compactFontSize : undefined }}
           rows={1}
           disabled={isStreaming}

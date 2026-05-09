@@ -1967,3 +1967,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：CLI print 模式也需要显式会话 id 才能表现为连续聊天；多 provider UI 不能只依赖全局设置，standalone 窗口需要自己的查看维度。
 - 是否需更新技术文档：否。
+
+## ISSUE-166
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Claude Code New Session 小窗实时布局对齐
+- 严重程度：重要
+- 问题现象：Claude Code new session 的小聊天窗口仍存在高度、拖动后布局和横向 overflow 问题。
+- 原因分析：Claude Code new session 状态虽然由主进程实时广播，但前端为了避免 Codex 状态串线只通过轮询读取 Claude 状态，导致高度重算和窗口 resize 滞后；Composer 外层也缺少和消息区一样强的 `min-w-0` / `overflow-hidden` 约束。
+- 解决方案：给 Coding state 添加 provider 标记，让前端实时订阅并过滤当前 provider；切换 provider/session mode 时重置 compact 高度缓存；Composer 根容器、form、textarea 补齐横向约束。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：多 provider 共用同一个事件通道时必须携带来源元数据；小窗高度测量要跟随实时消息流，否则拖动和 resize 会感觉像另一套 UI。
+- 是否需更新技术文档：否。

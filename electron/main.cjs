@@ -781,14 +781,16 @@ function getClaudeBinary() {
 
 function publishCodingState() {
   const { running, ...safeState } = codingState;
-  broadcast('coding:state', safeState);
-  return safeState;
+  const state = { ...safeState, provider: 'codex' };
+  broadcast('coding:state', state);
+  return state;
 }
 
 function publishClaudeCodingState() {
   const { running, ...safeState } = claudeCodingState;
-  broadcast('coding:state', safeState);
-  return safeState;
+  const state = { ...safeState, provider: 'claude' };
+  broadcast('coding:state', state);
+  return state;
 }
 
 function pushCodingMessage(role, content) {
@@ -1658,6 +1660,7 @@ async function getInheritedCodingState() {
     });
   }
   return {
+    provider: 'codex',
     status,
     messages,
     sessions: selected.slice(0, 12).map((session) => ({
@@ -1916,6 +1919,7 @@ async function getInheritedClaudeCodingState() {
     });
   }
   return {
+    provider: 'claude',
     status,
     messages,
     sessions: selected.slice(0, 12).map((session) => ({

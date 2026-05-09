@@ -203,6 +203,7 @@ interface CodingInheritedSession {
 interface CodingState {
   status: CodingStatus;
   messages: CodingMessage[];
+  provider?: CodingProvider;
   threadId?: string;
   sessions?: CodingInheritedSession[];
 }
@@ -327,6 +328,11 @@ function CompactChatWindow() {
 
   useEffect(() => {
     if (!settings.codingModeEnabled) return;
+    lastCompactHeightRef.current = 0;
+  }, [settings.codingModeEnabled, settings.codingProvider, settings.codingSessionMode]);
+
+  useEffect(() => {
+    if (!settings.codingModeEnabled) return;
     handleContentHeightChange(chatContentHeight || MIN_DIALOG_HEIGHT);
   }, [chatContentHeight, handleContentHeightChange, settings.codingModeEnabled]);
 
@@ -420,7 +426,8 @@ function CodingDialog({
         status: 'needs-input',
         messages: [{ id: 'coding-error', role: 'error', content: codingConnectionErrorMessage(error, codingLabel), createdAt: Date.now() }],
       }));
-    const unlisten = !inherited && activeProvider === 'codex' ? listen<CodingState>('coding:state', ({ payload }) => {
+    const unlisten = !inherited ? listen<CodingState>('coding:state', ({ payload }) => {
+      if (payload.provider && payload.provider !== activeProvider) return;
       applyCodingState(payload);
     }) : Promise.resolve(() => {});
     let timer = 0;
@@ -683,7 +690,7 @@ function CodingDialog({
   return (
     <div
       ref={rootRef}
-      className="chat-dialog mx-auto flex w-full max-w-[720px] min-w-0 flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--surface-flat)] font-sans text-[var(--color-chat-text)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]"
+      className="chat-dialog mx-auto flex w-full max-w-full min-w-0 flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--surface-flat)] font-sans text-[var(--color-chat-text)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]"
       style={{
         maxHeight,
         fontSize: compactFontSize,
@@ -958,7 +965,8 @@ function PetWindow() {
     invoke<CodingState>(command)
       .then((next) => setCodingState(next ?? DEFAULT_CODING_STATE))
       .catch(() => setCodingState({ status: 'needs-input', messages: [] }));
-    const unlisten = !inherited && settings.codingProvider === 'codex' ? listen<CodingState>('coding:state', ({ payload }) => {
+    const unlisten = !inherited ? listen<CodingState>('coding:state', ({ payload }) => {
+      if (payload.provider && payload.provider !== settings.codingProvider) return;
       setCodingState(payload ?? DEFAULT_CODING_STATE);
     }) : Promise.resolve(() => {});
     let timer = 0;

@@ -1255,3 +1255,10 @@
 - 历史隔离：Coding 历史会话 key 与 saved message key 按 provider 分离，Codex 与 Claude Code 的新 session 记录互不串线。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R161. Claude Code New Session 小窗实时布局对齐（2026-05-10）
+- 状态事件：Codex / Claude Code 的 `coding:state` 广播增加 provider 标记，前端可安全订阅实时状态，只应用当前 provider 的消息。
+- 高度：Claude Code new session 不再只依赖 2.5s 轮询刷新，小窗能在新气泡到达时立即重算高度；切换 provider / session mode 时重置 compact 高度缓存。
+- 横向约束：Coding compact 根容器和 Composer 表单补齐 `max-w-full`、`min-w-0`、`overflow-hidden`，输入栏和气泡统一不能撑出横向滚动。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md
