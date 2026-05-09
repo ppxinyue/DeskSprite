@@ -618,6 +618,7 @@ function OrbAvatar({
                 } as CSSProperties & Record<string, string>}
               >
                 <span className="orb-avatar__letter-face">{letter}</span>
+                <span className="orb-avatar__letter-face orb-avatar__letter-face--back">{letter}</span>
               </span>
             ))}
           </motion.div>

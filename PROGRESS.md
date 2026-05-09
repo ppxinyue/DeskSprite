@@ -679,3 +679,9 @@
 - 约束：没有新增外部圆环或方形背景，所有视觉变化都发生在单个球体内部。
 - 验证：`pnpm build` 通过。
 - 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R82. Orb 三态文字 3D Swap（2026-05-09）
+- 动效：idle/work/rest 三种文字都增加 Letter 3D Swap 风格 hover 效果，每个字母有前后两个 3D 面。
+- 触发：hover 到球体时按字母顺序 stagger 翻转，翻转后自动复位；动效只作用在文字层，不改变单球体结构。
+- 验证：`pnpm build` 通过。
+- 文件：PetAvatar.tsx, index.css, ISSUES.md, PROGRESS.md

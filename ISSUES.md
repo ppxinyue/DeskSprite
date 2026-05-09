@@ -1019,3 +1019,15 @@
 - 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Orb 的状态动效应发生在单一球体内部，不能重新引入外部环形装饰；动效要增强生命感而不破坏轮廓简洁。
 - 是否需更新技术文档：否。
+
+## ISSUE-087
+- 发现时间：2026-05-09
+- 发现者：用户反馈
+- 相关任务：Orb 模式文字动效
+- 严重程度：改进
+- 问题现象：Orb 三种状态文字需要在鼠标 hover 时统一增加 Letter 3D Swap 翻牌效果。
+- 原因分析：上一轮为了收敛视觉，删除了文字动态效果；但用户希望保留 Fancy Components 风格的 3D 字母翻转作为 hover 微交互。
+- 解决方案：为 idle/work/rest 三态文字的每个字母增加前后两个 3D 面；hover 到球体时按字母顺序 stagger 执行 X 轴 3D 翻牌动画，结束后复位。
+- 涉及文件：`src/features/pet/PetAvatar.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：文字动效可以保留，但要限制在文字本身，不重新引入外圈或额外背景，避免破坏单球体约束。
+- 是否需更新技术文档：否。
