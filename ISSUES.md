@@ -1727,3 +1727,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：外部 CLI 集成不能假设桌面进程继承了 shell 代理环境，关键网络子进程应显式补齐代理变量。
 - 是否需更新技术文档：否。
+
+## ISSUE-146
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Coding 对话体验统一
+- 严重程度：重要
+- 问题现象：Coding 模式的小对话框 UI 与普通聊天不一致，无法展开成大聊天框，且 Codex 对话没有进入历史记录。
+- 原因分析：上一版 Coding 使用了独立的 `CodingCompactDialog` 和主进程内存消息状态，只服务于状态灯/小窗展示，没有复用普通聊天的历史存储、气泡组件和大窗入口。
+- 解决方案：抽出 Coding 对话视图复用普通聊天的 `MessageBubble` / `Composer`；监听 Coding state 后写入本地历史；大聊天窗口在 Coding 模式下渲染 Codex 视图。
+- 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：模式切换应尽量复用同一个 UI 与存储模型，否则细节会快速分叉。
+- 是否需更新技术文档：否。

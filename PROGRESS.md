@@ -1102,3 +1102,11 @@
 - 目的：减少 Codex app-server 采样流因网络链路断开而反复 `Reconnecting...` 的情况。
 - 验证：`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R141. Coding 对话体验统一（2026-05-10）
+- 历史：Coding 模式下和 Codex 的消息会写入现有历史对话存储，使用独立的 `Codex:` 会话标题并去重保存消息 id。
+- 小窗：Coding 小对话框改用普通聊天的消息气泡和输入栏组件，去掉单独的 header/list 样式，使 UI 与普通 compact chat 保持一致。
+- 大窗：Coding 模式下点击小窗放大按钮会打开大聊天窗口，并渲染同一套 Codex 对话视图。
+- 交互：清空 Coding 对话时同步清理本地 Coding 历史会话绑定，下一轮重新创建历史会话。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, ChatDialog.tsx, ISSUES.md, PROGRESS.md

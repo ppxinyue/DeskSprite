@@ -6,17 +6,20 @@ import { Check, MessageCircle, Minus, Maximize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
-import { ChatDialog } from "@/features/chat/ChatDialog";
+import { ChatDialog, Composer, MessageBubble } from "@/features/chat/ChatDialog";
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore } from "@/features/settings/settingsStore";
-import { getConversations, getSetting, recordDistraction, recordFocusSession } from "@/lib/db";
+import { createConversation, getConversations, getSetting, insertMessage, recordDistraction, recordFocusSession } from "@/lib/db";
+import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
 import "./index.css";
 
 const CHAT_HANDOFF_KEY = "desksprite:chat-handoff-conversation-id";
 const COMPACT_CHAT_KEY = "desksprite:compact-chat";
 const COMPACT_CHAT_DISMISSED_KEY = "desksprite:compact-chat-dismissed";
+const CODING_CONVERSATION_KEY = "desksprite:coding-conversation-id";
+const CODING_SAVED_MESSAGES_KEY = "desksprite:coding-saved-message-ids";
 const SCREEN_MARGIN = 16;
 const PET_CONTENT_MARGIN = 20;
 const MIN_DIALOG_WIDTH = 200;
@@ -142,12 +145,16 @@ function App() {
     return (
       <TooltipProvider>
         <div className="h-screen w-screen bg-background text-foreground">
-          <ChatDialog
-            initialConversationId={handoffConversationId}
-            initialMode={handoffConversationId ? "history" : "new"}
-            maxHeight={760}
-            standalone
-          />
+          {settings.codingModeEnabled ? (
+            <CodingStandaloneDialog />
+          ) : (
+            <ChatDialog
+              initialConversationId={handoffConversationId}
+              initialMode={handoffConversationId ? "history" : "new"}
+              maxHeight={760}
+              standalone
+            />
+          )}
         </div>
       </TooltipProvider>
     );
@@ -229,18 +236,22 @@ function CompactChatWindow() {
   }, []);
 
   const expandToStandaloneChat = useCallback(async () => {
-    if (session.conversationId) {
+    if (settings.codingModeEnabled) {
+      localStorage.removeItem(CHAT_HANDOFF_KEY);
+    } else if (session.conversationId) {
       localStorage.setItem(CHAT_HANDOFF_KEY, String(session.conversationId));
     } else {
       localStorage.removeItem(CHAT_HANDOFF_KEY);
     }
     try {
       await invoke("show_chat_window");
-      await emit("chat:open-conversation", { conversationId: session.conversationId });
+      if (!settings.codingModeEnabled) {
+        await emit("chat:open-conversation", { conversationId: session.conversationId });
+      }
     } catch (e) {
       console.warn("Failed to expand compact chat:", e);
     }
-  }, [session.conversationId]);
+  }, [session.conversationId, settings.codingModeEnabled]);
 
   const collapseCompactChat = useCallback(async () => {
     localStorage.setItem(COMPACT_CHAT_DISMISSED_KEY, "1");
@@ -265,8 +276,8 @@ function CompactChatWindow() {
 
   useEffect(() => {
     if (!settings.codingModeEnabled) return;
-    handleContentHeightChange(COMPACT_CHAT_PREFERRED_HEIGHT);
-  }, [handleContentHeightChange, settings.codingModeEnabled]);
+    handleContentHeightChange(chatContentHeight || MIN_DIALOG_HEIGHT);
+  }, [chatContentHeight, handleContentHeightChange, settings.codingModeEnabled]);
 
   const hoverFrameHeight = Math.max(
     MIN_DIALOG_HEIGHT,
@@ -289,9 +300,10 @@ function CompactChatWindow() {
       </div>
       <div className="absolute left-[10px] right-[10px] top-[20px]">
         {settings.codingModeEnabled ? (
-          <CodingCompactDialog
+          <CodingDialog
             compactFontSize={settings.compactChatFontSize}
             maxHeight={COMPACT_CHAT_PREFERRED_HEIGHT}
+            onContentHeightChange={handleContentHeightChange}
           />
         ) : (
           <ChatDialog
@@ -310,16 +322,22 @@ function CompactChatWindow() {
   );
 }
 
-function CodingCompactDialog({
+function CodingDialog({
   compactFontSize,
   maxHeight,
+  onContentHeightChange,
+  standalone = false,
 }: {
   compactFontSize: number;
   maxHeight: number;
+  onContentHeightChange?: (height: number) => void;
+  standalone?: boolean;
 }) {
   const [state, setState] = useState<CodingState>(DEFAULT_CODING_STATE);
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     invoke<CodingState>('coding_get_state')
@@ -336,7 +354,30 @@ function CodingCompactDialog({
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [state.messages.length]);
+  }, [state.messages]);
+
+  useEffect(() => {
+    persistCodingMessages(state.messages).catch((error) => {
+      console.warn("Failed to persist coding messages:", error);
+    });
+  }, [state.messages]);
+
+  useEffect(() => {
+    if (standalone || !onContentHeightChange) return;
+    const frame = window.requestAnimationFrame(() => {
+      const root = rootRef.current;
+      if (!root) return;
+      onContentHeightChange(Math.ceil(root.scrollHeight));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [standalone, onContentHeightChange, state.messages, input, state.status, compactFontSize]);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = standalone ? '34px' : '28px';
+    el.style.height = `${Math.min(el.scrollHeight, standalone ? 160 : 112)}px`;
+  }, [input, standalone]);
 
   const send = async () => {
     const prompt = input.trim();
@@ -350,50 +391,157 @@ function CodingCompactDialog({
     });
   };
 
+  const clear = async () => {
+    localStorage.removeItem(CODING_CONVERSATION_KEY);
+    localStorage.removeItem(CODING_SAVED_MESSAGES_KEY);
+    await invoke('coding_clear').catch(() => {});
+  };
+
+  const messages = state.messages.map(codingMessageToChatMessage);
+  const isWorking = state.status === 'working';
+
   return (
-    <div className="chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] border border-[var(--color-chat-border)] bg-[var(--surface-flat)] font-sans text-[var(--color-chat-text)] shadow-[0_8px_24px_rgba(42,38,31,0.10)]" style={{ maxHeight, fontSize: compactFontSize }}>
-      <div className="flex items-center justify-between border-b border-border/55 px-3 py-2">
-        <div className="flex items-center gap-2 text-[12px] font-medium">
-          <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
-          <span>Codex</span>
+    <div
+      ref={rootRef}
+      className={`chat-dialog mx-auto flex w-full max-w-[720px] flex-col overflow-hidden rounded-[10px] font-sans text-[var(--color-chat-text)] ${
+        standalone
+          ? 'h-full max-w-none rounded-none border-0 bg-background pt-14'
+          : 'border border-[var(--color-chat-border)] bg-[var(--surface-flat)] shadow-[0_8px_24px_rgba(42,38,31,0.10)] dark:bg-[var(--surface-flat)]'
+      }`}
+      style={{
+        maxHeight: standalone ? undefined : maxHeight,
+        fontSize: standalone ? undefined : compactFontSize,
+        background: standalone ? undefined : 'color-mix(in srgb, var(--surface-flat) 68%, transparent)',
+        backdropFilter: standalone ? undefined : 'blur(10px)',
+        WebkitBackdropFilter: standalone ? undefined : 'blur(10px)',
+      }}
+    >
+      {standalone && <div className="app-drag-region fixed inset-x-0 top-0 z-50 h-14" />}
+      {standalone && (
+        <div className="app-no-drag flex h-11 shrink-0 items-center justify-between border-b border-border/55 px-4">
+          <div className="flex items-center gap-2 text-[13px] font-medium">
+            <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
+            <span>Codex</span>
+          </div>
+          <Button variant="ghost" size="sm" className="h-8 rounded-[7px] px-2.5 text-[12px]" onClick={clear}>
+            清空
+          </Button>
         </div>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px]" onClick={() => invoke('coding_clear').catch(() => {})}>
-          清空
-        </Button>
+      )}
+      <div
+        ref={scrollRef}
+        className={`${standalone ? 'app-no-drag px-5' : 'px-4'} min-h-0 flex-1 overflow-y-auto overscroll-contain`}
+        style={{ maxHeight: standalone ? undefined : Math.max(80, maxHeight - 60) }}
+      >
+        <div className={`${standalone ? 'mx-auto max-w-4xl space-y-3 py-5' : 'space-y-2.5 py-4'}`}>
+          {messages.length === 0 ? (
+            <div className={`${standalone ? 'pt-16 text-[14px]' : 'py-8 text-[12px]'} text-center leading-[1.5] text-[var(--color-chat-muted)]`}>
+              {state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
+            </div>
+          ) : messages.map((message) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              fullWidth={!standalone}
+              compact={!standalone}
+              compactFontSize={compactFontSize}
+            />
+          ))}
+          {isWorking && (
+            <MessageBubble
+              message={{ id: 'coding-working', role: 'assistant', content: '...', timestamp: Date.now() }}
+              fullWidth={!standalone}
+              compact={!standalone}
+              compactFontSize={compactFontSize}
+            />
+          )}
+        </div>
       </div>
-      <div ref={scrollRef} className="min-h-[120px] flex-1 overflow-y-auto px-3 py-2" style={{ maxHeight: Math.max(120, maxHeight - 92) }}>
-        {state.messages.length === 0 ? (
-          <div className="py-8 text-center text-[12px] text-muted-foreground">
-            {state.threadId ? '已连接 Codex 对话，输入内容会发送到当前 thread。' : '输入第一条消息后会自动启动新的 Codex 对话。'}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {state.messages.map((message) => (
-              <div key={message.id} className={`rounded-[9px] px-2.5 py-2 text-[12px] leading-relaxed ${codingMessageClass(message.role)}`}>
-                <div className="mb-1 text-[10px] uppercase tracking-[0.08em] opacity-60">{codingRoleLabel(message.role)}</div>
-                <pre className="whitespace-pre-wrap break-words font-sans">{message.content}</pre>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="border-t border-border/55 p-2">
-        <textarea
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
+      <div className={`${standalone ? 'app-no-drag mx-auto w-full max-w-4xl shrink-0 px-2 pb-3' : ''}`}>
+        <Composer
+          input={input}
+          isStreaming={isWorking}
+          onInputChange={setInput}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
               send();
             }
           }}
-          placeholder={state.status === 'working' ? 'Codex 正在工作...' : '发送给 Codex'}
-          disabled={state.status === 'working'}
-          className="min-h-8 w-full resize-none rounded-[9px] border border-border/65 bg-background px-2 py-1.5 text-[12px] outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          onSubmit={send}
+          selectedImage={null}
+          textareaRef={textareaRef}
+          compact={!standalone}
+          compactFontSize={compactFontSize}
         />
       </div>
+      {!standalone && state.messages.length > 0 && (
+        <div className="pointer-events-none absolute right-2 top-2 flex items-center gap-1.5 rounded-full border border-[var(--color-chat-border)] bg-background/72 px-1.5 py-1 text-[10px] text-[var(--color-chat-muted)] opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-100">
+          <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(state.status)}`} />
+          <button className="pointer-events-auto rounded px-1 hover:text-[var(--color-chat-text)]" onClick={clear}>
+            清空
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+function CodingStandaloneDialog() {
+  return (
+    <CodingDialog
+      compactFontSize={13}
+      maxHeight={760}
+      standalone
+    />
+  );
+}
+
+function codingMessageToChatMessage(message: CodingMessage): ChatMessage {
+  return {
+    id: message.id,
+    role: message.role === 'user' ? 'user' : message.role === 'codex' ? 'assistant' : 'system',
+    content: message.content,
+    timestamp: message.createdAt,
+  };
+}
+
+function readCodingSavedMessageIds() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CODING_SAVED_MESSAGES_KEY) || '[]');
+    return new Set(Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : []);
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function writeCodingSavedMessageIds(ids: Set<string>) {
+  localStorage.setItem(CODING_SAVED_MESSAGES_KEY, JSON.stringify(Array.from(ids).slice(-240)));
+}
+
+async function ensureCodingHistoryConversation(messages: CodingMessage[]) {
+  const existing = Number(localStorage.getItem(CODING_CONVERSATION_KEY) || 0);
+  if (existing > 0) return existing;
+  const firstUser = messages.find((message) => message.role === 'user')?.content.trim();
+  await createConversation(firstUser ? `Codex: ${firstUser.slice(0, 42)}` : 'Codex Coding');
+  const latest = (await getConversations())[0]?.id ?? null;
+  if (latest) localStorage.setItem(CODING_CONVERSATION_KEY, String(latest));
+  return latest;
+}
+
+async function persistCodingMessages(messages: CodingMessage[]) {
+  if (messages.length === 0) return;
+  const savedIds = readCodingSavedMessageIds();
+  const unsaved = messages.filter((message) => !savedIds.has(message.id));
+  if (unsaved.length === 0) return;
+  const conversationId = await ensureCodingHistoryConversation(messages);
+  if (!conversationId) return;
+  for (const message of unsaved) {
+    const role = message.role === 'user' ? 'user' : message.role === 'codex' ? 'assistant' : 'system';
+    await insertMessage(conversationId, role, message.content);
+    savedIds.add(message.id);
+  }
+  writeCodingSavedMessageIds(savedIds);
 }
 
 function codingStatusDotClass(status: CodingStatus) {
@@ -414,20 +562,6 @@ function codingConnectionErrorMessage(error: unknown) {
     return 'Coding 模式的主进程接口还没有加载。请重启应用或重新运行 pnpm electron:dev。';
   }
   return detail ? `无法连接 Codex：${detail}` : '无法连接 Codex。';
-}
-
-function codingMessageClass(role: CodingMessage['role']) {
-  if (role === 'user') return 'bg-muted text-foreground';
-  if (role === 'error') return 'bg-[#ff5f57]/12 text-[#7a1f1a] dark:text-[#ffb4ae]';
-  if (role === 'system') return 'bg-background text-muted-foreground';
-  return 'bg-background text-foreground';
-}
-
-function codingRoleLabel(role: CodingMessage['role']) {
-  if (role === 'user') return 'You';
-  if (role === 'codex') return 'Codex';
-  if (role === 'error') return 'Action';
-  return 'Status';
 }
 
 function PetWindow() {

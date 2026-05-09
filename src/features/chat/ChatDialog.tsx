@@ -1222,7 +1222,7 @@ function ModelControl({
   );
 }
 
-function Composer({
+export function Composer({
   input,
   isStreaming,
   isListening = false,
@@ -1313,7 +1313,7 @@ function Composer({
   );
 }
 
-function MessageBubble({
+export function MessageBubble({
   message,
   isStreaming = false,
   fullWidth = false,
