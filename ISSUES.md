@@ -1751,3 +1751,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：用户说“完全一致”时，不能只复用局部组件，窗口级布局也要一致。
 - 是否需更新技术文档：否。
+
+## ISSUE-148
+- 发现时间：2026-05-10
+- 发现者：用户需求扩展
+- 相关任务：Coding 继承当前 Codex Session
+- 严重程度：重要
+- 问题现象：现有 Coding 模式只会开启灵宠自己的新 Codex session，无法观察本机已经进行中的多个 Codex session。
+- 原因分析：上一版只维护 app-server 自己的 thread，没有读取 Codex 本地 session 日志，也没有区分“新 session”和“继承当前 session”两种模式。
+- 解决方案：新增 session 模式设置；继承模式扫描 `~/.codex/sessions` 最近活跃 JSONL，按需要处理、已输出、工作中聚合状态；右键菜单提供两个入口。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：继承外部 agent 状态时，应以只读观察为默认能力，避免误导用户以为可以直接接管外部 session 输入。
+- 是否需更新技术文档：否。

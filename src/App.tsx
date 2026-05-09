@@ -194,6 +194,10 @@ interface CodingState {
 
 const DEFAULT_CODING_STATE: CodingState = { status: 'done', messages: [] };
 
+function codingStateCommand(mode: string) {
+  return mode === 'inherit' ? 'coding_get_inherited_state' : 'coding_get_state';
+}
+
 function CompactChatWindow() {
   const { settings } = useSettingsStore();
   const lastCompactHeightRef = useRef(0);
@@ -333,6 +337,7 @@ function CodingDialog({
   onContentHeightChange?: (height: number) => void;
   standalone?: boolean;
 }) {
+  const { settings } = useSettingsStore();
   const [state, setState] = useState<CodingState>(DEFAULT_CODING_STATE);
   const [input, setInput] = useState('');
   const [historyItems, setHistoryItems] = useState<Array<{ id: number; title: string | null; updatedAt: string }>>([]);
@@ -342,27 +347,42 @@ function CodingDialog({
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    invoke<CodingState>('coding_get_state')
+    invoke<CodingState>(codingStateCommand(settings.codingSessionMode))
       .then((next) => setState(next ?? DEFAULT_CODING_STATE))
       .catch((error) => setState({
         status: 'needs-input',
         messages: [{ id: 'coding-error', role: 'error', content: codingConnectionErrorMessage(error), createdAt: Date.now() }],
       }));
-    const unlisten = listen<CodingState>('coding:state', ({ payload }) => {
+    const unlisten = settings.codingSessionMode === 'new' ? listen<CodingState>('coding:state', ({ payload }) => {
       setState(payload ?? DEFAULT_CODING_STATE);
-    });
-    return () => { unlisten.then((fn) => fn()); };
-  }, []);
+    }) : Promise.resolve(() => {});
+    let timer = 0;
+    if (settings.codingSessionMode === 'inherit') {
+      timer = window.setInterval(() => {
+        invoke<CodingState>('coding_get_inherited_state')
+          .then((next) => setState(next ?? DEFAULT_CODING_STATE))
+          .catch((error) => setState({
+            status: 'needs-input',
+            messages: [{ id: 'coding-inherit-error', role: 'error', content: codingConnectionErrorMessage(error), createdAt: Date.now() }],
+          }));
+      }, 2500);
+    }
+    return () => {
+      if (timer) window.clearInterval(timer);
+      unlisten.then((fn) => fn());
+    };
+  }, [settings.codingSessionMode]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [state.messages]);
 
   useEffect(() => {
+    if (settings.codingSessionMode !== 'new') return;
     persistCodingMessages(state.messages).catch((error) => {
       console.warn("Failed to persist coding messages:", error);
     });
-  }, [state.messages]);
+  }, [settings.codingSessionMode, state.messages]);
 
   useEffect(() => {
     if (!standalone) return;
@@ -390,7 +410,7 @@ function CodingDialog({
 
   const send = async () => {
     const prompt = input.trim();
-    if (!prompt || state.status === 'working') return;
+    if (settings.codingSessionMode === 'inherit' || !prompt || state.status === 'working') return;
     setArchivedMessages(null);
     setInput('');
     await invoke('coding_send_message', { prompt }).catch((e) => {
@@ -425,6 +445,7 @@ function CodingDialog({
   const messages = state.messages.map(codingMessageToChatMessage);
   const visibleMessages = archivedMessages ?? messages;
   const isWorking = state.status === 'working';
+  const inherited = settings.codingSessionMode === 'inherit';
 
   if (standalone) {
     return (
@@ -434,7 +455,7 @@ function CodingDialog({
           <div className="app-no-drag shrink-0 p-3">
             <button className="flex h-10 w-full items-center gap-2 rounded-[12px] px-3 text-left text-[14px] font-medium leading-[1.5] transition-all duration-200 hover:bg-background/55" onClick={clear}>
               <Plus className="h-4 w-4" />
-              新建对话
+              {inherited ? '继承当前 session' : '新建对话'}
             </button>
           </div>
           <div className="app-no-drag min-h-0 flex-1 overflow-y-auto px-2 pb-3">
@@ -459,7 +480,7 @@ function CodingDialog({
               <span className={`h-2.5 w-2.5 rounded-full ${codingStatusDotClass(state.status)}`} />
               <span>Codex</span>
             </div>
-            <Button variant="ghost" size="sm" className="h-8 rounded-[7px] px-2.5 text-[12px]" onClick={clear}>
+            <Button variant="ghost" size="sm" className="h-8 rounded-[7px] px-2.5 text-[12px]" onClick={clear} disabled={inherited}>
               清空
             </Button>
           </div>
@@ -475,7 +496,7 @@ function CodingDialog({
                 <div className="mx-auto w-full max-w-none space-y-3 py-5">
                   {visibleMessages.length === 0 ? (
                     <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">
-                      {state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
+                      {inherited ? 'Codex 正在工作中' : state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
                     </div>
                   ) : visibleMessages.map((message) => (
                     <MessageBubble key={message.id} message={message} />
@@ -488,7 +509,7 @@ function CodingDialog({
               <div className="shrink-0 px-2 pb-2">
                 <div className="mx-auto w-full max-w-none">
                   <Composer
-                    input={input}
+                    input={inherited ? '' : input}
                     isStreaming={isWorking}
                     onInputChange={setInput}
                     onKeyDown={(event) => {
@@ -500,6 +521,7 @@ function CodingDialog({
                     onSubmit={send}
                     selectedImage={null}
                     textareaRef={textareaRef}
+                    error={inherited ? '继承当前 session 时请回到 Codex 中处理或继续输入。' : null}
                   />
                 </div>
               </div>
@@ -530,7 +552,7 @@ function CodingDialog({
         <div className="space-y-2.5 py-4">
           {visibleMessages.length === 0 ? (
             <div className="py-8 text-center text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
-              {state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
+              {inherited ? 'Codex 正在工作中' : state.threadId ? '已连接 Codex 对话' : '输入第一条消息后会自动启动 Codex'}
             </div>
           ) : visibleMessages.map((message) => (
             <MessageBubble
@@ -567,6 +589,7 @@ function CodingDialog({
           textareaRef={textareaRef}
           compact
           compactFontSize={compactFontSize}
+          error={inherited ? '继承当前 session 时请回到 Codex 中处理或继续输入。' : null}
         />
       </div>
       {state.messages.length > 0 && (
@@ -674,7 +697,7 @@ function codingConnectionErrorMessage(error: unknown) {
 }
 
 function PetWindow() {
-  const { settings, updateSetting } = useSettingsStore();
+  const { settings, updateSettings } = useSettingsStore();
   const { dialogOpen, chatMode, chatConversationId, openChat, closeChat, setPetState, petState, mediaConfig, userFrames, userGifs } = usePetStore();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [chatBurst, setChatBurst] = useState(false);
@@ -770,14 +793,25 @@ function PetWindow() {
       setCodingState(DEFAULT_CODING_STATE);
       return;
     }
-    invoke<CodingState>('coding_get_state')
+    invoke<CodingState>(codingStateCommand(settings.codingSessionMode))
       .then((next) => setCodingState(next ?? DEFAULT_CODING_STATE))
       .catch(() => setCodingState({ status: 'needs-input', messages: [] }));
-    const unlisten = listen<CodingState>('coding:state', ({ payload }) => {
+    const unlisten = settings.codingSessionMode === 'new' ? listen<CodingState>('coding:state', ({ payload }) => {
       setCodingState(payload ?? DEFAULT_CODING_STATE);
-    });
-    return () => { unlisten.then((fn) => fn()); };
-  }, [settings.codingModeEnabled]);
+    }) : Promise.resolve(() => {});
+    let timer = 0;
+    if (settings.codingSessionMode === 'inherit') {
+      timer = window.setInterval(() => {
+        invoke<CodingState>('coding_get_inherited_state')
+          .then((next) => setCodingState(next ?? DEFAULT_CODING_STATE))
+          .catch(() => setCodingState({ status: 'needs-input', messages: [] }));
+      }, 2500);
+    }
+    return () => {
+      if (timer) window.clearInterval(timer);
+      unlisten.then((fn) => fn());
+    };
+  }, [settings.codingModeEnabled, settings.codingSessionMode]);
 
   const requestLayout = useCallback(async (overrides: { contextMenuOpen?: boolean } = {}) => {
     if (restEndAtRef.current || restPresentationActiveRef.current) return;
@@ -1642,8 +1676,13 @@ function PetWindow() {
               onMenuOpenChange={setContextMenuOpen}
               onFocusToggle={toggleFocus}
               codingModeEnabled={settings.codingModeEnabled}
-              onCodingModeToggle={() => {
-                updateSetting('codingModeEnabled', !settings.codingModeEnabled).catch((e) => {
+              codingSessionMode={settings.codingSessionMode}
+              onCodingModeToggle={(mode) => {
+                const nextEnabled = mode ? true : !settings.codingModeEnabled;
+                const updates = mode
+                  ? { codingModeEnabled: nextEnabled, codingSessionMode: mode }
+                  : { codingModeEnabled: nextEnabled };
+                updateSettings(updates).catch((e) => {
                   console.warn("Failed to toggle coding mode:", e);
                 });
               }}

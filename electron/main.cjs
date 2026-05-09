@@ -41,6 +41,7 @@ const codingState = {
   running: null,
   threadId: CURRENT_CODEX_THREAD_ID,
 };
+const CODEX_INHERIT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const codexAppServer = {
   child: null,
   buffer: '',
@@ -1188,6 +1189,172 @@ async function sendCodingMessage({ prompt }) {
   return publishCodingState();
 }
 
+async function listCodexSessionFiles(dir, out = []) {
+  let entries = [];
+  try {
+    entries = await fsp.readdir(dir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      await listCodexSessionFiles(fullPath, out);
+    } else if (entry.isFile() && entry.name.endsWith('.jsonl')) {
+      out.push(fullPath);
+    }
+  }
+  return out;
+}
+
+function extractCodexSessionContent(content) {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => extractCodexSessionContent(part?.text ?? part?.content ?? part?.input_text ?? part?.output_text ?? part))
+      .filter(Boolean)
+      .join('')
+      .trim();
+  }
+  if (content && typeof content === 'object') return extractCodexSessionContent(content.text ?? content.content ?? content.message);
+  return '';
+}
+
+function parseCodexSessionFile(filePath, text, mtimeMs) {
+  const session = {
+    id: path.basename(filePath, '.jsonl').split('-').slice(-5).join('-'),
+    cwd: '',
+    path: filePath,
+    updatedAt: mtimeMs,
+    status: CODEX_STATUS.WORKING,
+    message: '',
+  };
+  let lastUserAt = 0;
+  let lastAssistantAt = 0;
+  let lastAssistant = '';
+  let lastProblemAt = 0;
+  let lastProblem = '';
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  for (const line of lines) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const eventAt = Date.parse(event.timestamp || '') || mtimeMs;
+    if (event.type === 'session_meta') {
+      session.id = event.payload?.id || session.id;
+      session.cwd = event.payload?.cwd || session.cwd;
+      continue;
+    }
+    const payload = event.payload || {};
+    if (event.type === 'turn_context') {
+      session.cwd = payload.cwd || session.cwd;
+      lastUserAt = Math.max(lastUserAt, eventAt);
+      continue;
+    }
+    if (event.type === 'event_msg' && payload.message) {
+      lastUserAt = Math.max(lastUserAt, eventAt);
+      continue;
+    }
+    if (event.type === 'response_item') {
+      if (payload.role === 'user') {
+        lastUserAt = Math.max(lastUserAt, eventAt);
+        continue;
+      }
+      if (payload.role === 'assistant' || payload.type === 'message') {
+        const text = extractCodexSessionContent(payload.content);
+        if (text) {
+          lastAssistantAt = eventAt;
+          lastAssistant = text;
+        }
+      }
+      if (/function_call|tool|command|approval|permission/i.test(String(payload.type || ''))) {
+        lastUserAt = Math.max(lastUserAt, eventAt);
+      }
+    }
+    const raw = line.toLowerCase();
+    if (/requestapproval|request_user_input|permission|approval|guardian|error|failed|denied/.test(raw)) {
+      lastProblemAt = eventAt;
+      lastProblem = extractCodexSessionContent(payload.message ?? payload.error ?? payload.content) || '需要在 Codex 中处理';
+    }
+  }
+  const cwdName = session.cwd ? path.basename(session.cwd) : 'Codex';
+  const prefix = `[${session.id.slice(0, 8)} · ${cwdName}]`;
+  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt) {
+    session.status = CODEX_STATUS.NEEDS_INPUT;
+    session.message = `${prefix} ${lastProblem}`;
+  } else if (lastAssistantAt && lastAssistantAt >= lastUserAt) {
+    session.status = CODEX_STATUS.DONE;
+    session.message = `${prefix} ${lastAssistant}`;
+  } else {
+    session.status = CODEX_STATUS.WORKING;
+    session.message = `${prefix} Codex 正在工作中`;
+  }
+  return session;
+}
+
+async function getInheritedCodingState() {
+  const root = path.join(app.getPath('home'), '.codex', 'sessions');
+  const nowMs = Date.now();
+  const files = await listCodexSessionFiles(root);
+  const candidates = [];
+  for (const filePath of files) {
+    let stat;
+    try {
+      stat = await fsp.stat(filePath);
+    } catch {
+      continue;
+    }
+    if (nowMs - stat.mtimeMs > CODEX_INHERIT_LOOKBACK_MS) continue;
+    candidates.push({ filePath, mtimeMs: stat.mtimeMs });
+  }
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const sessions = [];
+  for (const item of candidates.slice(0, 12)) {
+    try {
+      const file = await fsp.open(item.filePath, 'r');
+      const size = Math.min(240_000, (await file.stat()).size);
+      const buffer = Buffer.alloc(size);
+      await file.read(buffer, 0, size, Math.max(0, (await file.stat()).size - size));
+      await file.close();
+      sessions.push(parseCodexSessionFile(item.filePath, buffer.toString('utf8'), item.mtimeMs));
+    } catch {
+      // Ignore unreadable sessions.
+    }
+  }
+  const actionable = sessions.filter((session) => session.status !== CODEX_STATUS.WORKING);
+  const status = actionable.some((session) => session.status === CODEX_STATUS.NEEDS_INPUT)
+    ? CODEX_STATUS.NEEDS_INPUT
+    : actionable.some((session) => session.status === CODEX_STATUS.DONE)
+      ? CODEX_STATUS.DONE
+      : CODEX_STATUS.WORKING;
+  const selected = actionable.length > 0 ? actionable : sessions.slice(0, 3);
+  const messages = selected.slice(0, 5).map((session) => ({
+    id: `inherit-${session.id}-${Math.round(session.updatedAt)}`,
+    role: session.status === CODEX_STATUS.NEEDS_INPUT ? 'error' : session.status === CODEX_STATUS.DONE ? 'codex' : 'system',
+    content: session.message,
+    createdAt: session.updatedAt,
+  }));
+  if (messages.length === 0) {
+    messages.push({
+      id: 'inherit-empty',
+      role: 'system',
+      content: '没有检测到最近活跃的 Codex session。',
+      createdAt: Date.now(),
+    });
+  } else if (status === CODEX_STATUS.WORKING) {
+    messages.unshift({
+      id: 'inherit-working',
+      role: 'system',
+      content: 'Codex 正在工作中。',
+      createdAt: Date.now(),
+    });
+  }
+  return { status, messages };
+}
+
 const keyStore = new Map();
 
 const handlers = {
@@ -1247,6 +1414,7 @@ const handlers = {
   can_start_speech_recognition: () => true,
   check_distraction: checkDistraction,
   coding_get_state: () => publishCodingState(),
+  coding_get_inherited_state: getInheritedCodingState,
   coding_send_message: sendCodingMessage,
   coding_clear: () => {
     codingState.messages = [];

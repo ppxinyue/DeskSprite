@@ -12,7 +12,7 @@ import {
   isBuiltinAsset,
 } from './animations';
 import { stopPetStateEngine } from './petStateEngine';
-import type { AvatarRenderMode, PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
+import type { AvatarRenderMode, CodingSessionMode, PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
 import type { PetState } from './animations';
 
 function toSrc(path: string): string {
@@ -57,6 +57,7 @@ export function PetAvatar({
   onMenuOpenChange,
   onFocusToggle,
   codingModeEnabled = false,
+  codingSessionMode = 'new',
   onCodingModeToggle,
 }: {
   opacity?: number;
@@ -73,7 +74,8 @@ export function PetAvatar({
   onMenuOpenChange?: (open: boolean) => void;
   onFocusToggle?: () => void;
   codingModeEnabled?: boolean;
-  onCodingModeToggle?: () => void;
+  codingSessionMode?: CodingSessionMode;
+  onCodingModeToggle?: (mode?: CodingSessionMode) => void;
 }) {
   const { petState, mediaConfig, userFrames, userGifs, openChat, dialogOpen, loadUserFrames } = usePetStore();
   const config = mediaConfig[petState];
@@ -210,6 +212,12 @@ export function PetAvatar({
         break;
       case 'coding':
         onCodingModeToggle?.();
+        break;
+      case 'coding-new':
+        onCodingModeToggle?.('new');
+        break;
+      case 'coding-inherit':
+        onCodingModeToggle?.('inherit');
         break;
       case 'hide':
         try { await invoke('hide_pet_window'); } catch (e) { console.error(e); }
@@ -430,9 +438,23 @@ export function PetAvatar({
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('focus')}>
           {focusActive ? '退出专注' : '专注模式'}
         </button>
-        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding')}>
-          {codingModeEnabled ? '退出 Coding' : 'Coding 模式'}
-        </button>
+        {codingModeEnabled ? (
+          <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding')}>
+            退出 Coding{codingSessionMode === 'inherit' ? ' · 继承' : ''}
+          </button>
+        ) : (
+          <div className="group/coding relative">
+            <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">Coding 模式</button>
+            <div
+              className={`absolute top-0 hidden w-[150px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/coding:block dark:bg-[#1c1b18] ${
+                submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
+              }`}
+            >
+              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-inherit')}>继承当前 session</button>
+              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-new')}>开启新 session</button>
+            </div>
+          </div>
+        )}
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs text-destructive hover:bg-destructive/10" onClick={() => handleContextMenu('quit')}>退出</button>

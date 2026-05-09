@@ -1118,3 +1118,12 @@
 - 视觉：右侧消息区、面板边框、输入栏间距和普通大聊天窗口保持一致，只把模型控制位置替换为 Codex 状态标识。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, PROGRESS.md, ISSUES.md
+
+### R143. Coding 继承当前 Codex Session（2026-05-10）
+- 设置：新增 `codingSessionMode`，支持 `new` 和 `inherit` 两种 Coding session 模式。
+- 右键菜单：Coding 模式改为二级菜单，可选择“继承当前 session”或“开启新 session”；已开启时仍可退出 Coding。
+- 主进程：新增 `coding_get_inherited_state`，扫描最近 24 小时 `~/.codex/sessions` JSONL，聚合多个 Codex session 的红黄绿状态。
+- 继承模式：红/绿状态显示带 session 前缀的最新 Codex 消息；所有 session 都没有红/绿输出时显示黄色工作中。
+- 小窗：继承模式不显示输入框含义，只提示回到 Codex 中处理或继续输入。
+- 验证：`pnpm exec tsc -b --pretty false`、`node --check electron/main.cjs`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, PetAvatar.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md

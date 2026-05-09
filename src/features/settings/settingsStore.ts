@@ -7,6 +7,7 @@ export type PetMotionName = 'petJump' | 'petWobble' | 'petBreathe';
 export type VoiceProviderMode = 'system' | 'cloud-auto' | 'user-cloud';
 export type ModelMode = 'default' | 'custom';
 export type AvatarRenderMode = 'pet' | 'orb';
+export type CodingSessionMode = 'new' | 'inherit';
 
 export interface PetMotionSetting {
   enabled: boolean;
@@ -30,6 +31,7 @@ export interface AppSettings {
   alwaysOnTop: boolean;
   chatModelMode: ModelMode;
   codingModeEnabled: boolean;
+  codingSessionMode: CodingSessionMode;
   temperature: number;
   maxTokens: number;
   streamOutput: boolean;
@@ -77,6 +79,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   alwaysOnTop: true,
   chatModelMode: 'default',
   codingModeEnabled: false,
+  codingSessionMode: 'new',
   temperature: 0.7,
   maxTokens: 2048,
   streamOutput: true,
@@ -163,6 +166,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
                   ? 'default'
                 : key === 'avatarRenderMode' && !isAvatarRenderMode(parsed)
                   ? 'pet'
+                : key === 'codingSessionMode' && !isCodingSessionMode(parsed)
+                  ? 'new'
                 : (key === 'voiceInputProvider' || key === 'voiceOutputProvider') && !isVoiceProviderMode(parsed)
                   ? 'system'
                 : key === 'dialogWidth' && typeof parsed === 'number'
@@ -230,6 +235,10 @@ function isModelMode(value: unknown): value is ModelMode {
 
 function isAvatarRenderMode(value: unknown): value is AvatarRenderMode {
   return value === 'pet' || value === 'orb';
+}
+
+function isCodingSessionMode(value: unknown): value is CodingSessionMode {
+  return value === 'new' || value === 'inherit';
 }
 
 function normalizeStringList(value: unknown, fallback: string[]): string[] {
