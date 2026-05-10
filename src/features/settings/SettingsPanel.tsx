@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bot, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Gamepad2, Globe2, Keyboard, Layers3, Loader2, MessageSquareText, Monitor, Music2, Palette, PawPrint, Pencil, Plus, Settings2, ShieldAlert, Sparkles, Terminal, Trash2, UserRound } from 'lucide-react';
+import { BarChart3, Bell, Bot, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Gamepad2, Globe2, Keyboard, Loader2, MessageSquareText, Monitor, Music2, Palette, PawPrint, Pencil, Plus, Settings2, ShieldAlert, Sparkles, Terminal, Trash2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -37,8 +37,7 @@ type SettingsSection =
   | 'motion'
   | 'rest'
   | 'focus'
-  | 'blockedApps'
-  | 'blockedKeywords'
+  | 'blocked'
   | 'aiQuota'
   | 'coding'
   | 'chatModel'
@@ -63,8 +62,6 @@ const SECTION_GROUPS: Array<{
     items: [
       { id: 'general', label: '基础', icon: Settings2 },
       { id: 'timeline', label: 'Timeline', icon: BarChart3 },
-      { id: 'games', label: '游戏识别', icon: Gamepad2 },
-      { id: 'music', label: '音乐识别', icon: Music2 },
       { id: 'shortcuts', label: '快捷键', icon: Keyboard },
     ],
   },
@@ -81,8 +78,9 @@ const SECTION_GROUPS: Array<{
     items: [
       { id: 'rest', label: '休息提醒', icon: Bell },
       { id: 'focus', label: '专注模式', icon: BriefcaseBusiness },
-      { id: 'blockedApps', label: '屏蔽应用', icon: ShieldAlert },
-      { id: 'blockedKeywords', label: '屏蔽关键词', icon: Layers3 },
+      { id: 'blocked', label: '屏蔽列表', icon: ShieldAlert },
+      { id: 'games', label: '游戏识别', icon: Gamepad2 },
+      { id: 'music', label: '音乐识别', icon: Music2 },
     ],
   },
   {
@@ -151,8 +149,8 @@ export function SettingsPanel() {
       {(['appearance', 'avatar', 'motion'] as SettingsSection[]).includes(activeSection) && (
         <AppearanceSection settings={settings} updateSettings={updateSettings} view={activeSection as 'appearance' | 'avatar' | 'motion'} />
       )}
-      {(['rest', 'focus', 'blockedApps', 'blockedKeywords'] as SettingsSection[]).includes(activeSection) && (
-        <RemindersSection settings={settings} updateSettings={updateSettings} view={activeSection as 'rest' | 'focus' | 'blockedApps' | 'blockedKeywords'} />
+      {(['rest', 'focus', 'blocked'] as SettingsSection[]).includes(activeSection) && (
+        <RemindersSection settings={settings} updateSettings={updateSettings} view={activeSection as 'rest' | 'focus' | 'blocked'} />
       )}
       {(['aiQuota', 'coding', 'chatModel', 'voiceModel'] as SettingsSection[]).includes(activeSection) && (
         <AISection
@@ -429,7 +427,7 @@ function CollapsedUnavailableRow({ title, reason }: { title: string; reason: str
     <button
       type="button"
       disabled
-      className="flex min-h-[56px] w-full cursor-not-allowed items-center justify-between gap-4 border-b border-[#e6e8eb] px-4 py-3 text-left last:border-0 dark:border-white/10"
+      className="relative flex min-h-[56px] w-full cursor-not-allowed items-center justify-between gap-4 px-4 py-3 text-left after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-foreground/[0.055] last:after:hidden dark:after:bg-white/[0.065]"
       aria-expanded={false}
     >
       <div className="min-w-0">
@@ -527,7 +525,7 @@ function ProfileSection() {
     <>
       <div className="mb-5 flex items-center justify-between gap-3">
         <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.018em] text-foreground">个人档案</h1>
-        <div ref={calendarRef} className="relative flex items-center gap-1.5 rounded-[9px] border border-border/60 bg-transparent p-1">
+        <div ref={calendarRef} className="relative flex items-center gap-1.5 rounded-[9px] bg-white/44 p-1 shadow-[0_8px_22px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.7)_inset] dark:bg-white/[0.045]">
           <button
             type="button"
             className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
@@ -587,7 +585,7 @@ function ProfileSection() {
         onSelect={setSelectedTimelineId}
       />
 
-      <div className="mb-4 rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035]">
+      <div className="mb-4 rounded-[14px] bg-white/50 p-3 shadow-[0_14px_34px_rgba(52,64,84,0.06),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.045]">
         <div className="grid divide-y divide-[#e6e8eb] dark:divide-white/10 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
           <ProfileMetric label="专注时长" value={formatFocusDuration(selectedStats.focusMs)} />
           <ProfileMetric label="专注次数" value={`${selectedStats.focusSessions} 次`} />
@@ -612,8 +610,8 @@ function ProfileSection() {
           </div>
         </div>
 
-        <div ref={statsScrollRef} className="overflow-x-auto border-b border-[#e6e8eb] pb-2 [scrollbar-width:thin] dark:border-white/10">
-          <div className="flex min-w-max items-end gap-1.5 rounded-[12px] border border-[#dfe3e6] bg-[#f7f8f9] px-2 py-2 dark:border-white/10 dark:bg-white/[0.035]">
+        <div ref={statsScrollRef} className="overflow-x-auto pb-2 [scrollbar-width:thin]">
+          <div className="flex min-w-max items-end gap-1.5 rounded-[12px] bg-white/38 px-2 py-2 shadow-[0_8px_22px_rgba(52,64,84,0.045),0_1px_0_rgba(255,255,255,0.68)_inset] dark:bg-white/[0.035]">
             {stats.map((day) => {
               const height = Math.max(day.focusMs > 0 ? 8 : 2, (day.focusMs / maxFocusMs) * 72);
               const selected = day.date === selectedDate;
@@ -650,7 +648,7 @@ function ProfileSection() {
           </div>
         </div>
 
-        <div className="mt-3 grid gap-0 overflow-hidden rounded-[12px] border border-[#dfe3e6] bg-[#fbfcfd] dark:border-white/10 dark:bg-white/[0.035] sm:grid-cols-3">
+        <div className="mt-3 grid gap-0 overflow-hidden rounded-[12px] bg-white/42 shadow-[0_10px_26px_rgba(52,64,84,0.052),0_1px_0_rgba(255,255,255,0.66)_inset] dark:bg-white/[0.04] sm:grid-cols-3">
           <MiniMetric label="平均每日专注" value={formatFocusDuration(totalFocusMs / Math.max(1, focusWindowStats.length))} />
           <MiniMetric label="最高单日专注" value={formatFocusDuration(Math.max(0, ...focusWindowStats.map((day) => day.focusMs)))} />
           <MiniMetric label="平均分心次数" value={`${(totalDistractions / Math.max(1, focusWindowStats.length)).toFixed(1)} 次`} />
@@ -673,7 +671,7 @@ function ProfileMetric({ label, value }: { label: string; value: string }) {
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border-b border-[#e6e8eb] px-3 py-2 last:border-b-0 dark:border-white/10 sm:border-b-0 sm:border-r sm:last:border-r-0">
+    <div className="relative px-3 py-2 after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-foreground/[0.055] last:after:hidden dark:after:bg-white/[0.065] sm:after:bottom-3 sm:after:left-auto sm:after:right-0 sm:after:top-3 sm:after:h-auto sm:after:w-px sm:last:after:hidden">
       <div className="text-[11px] text-[#687076] dark:text-white/56">{label}</div>
       <div className="mt-0.5 text-[13px] font-semibold text-[#1c2024] dark:text-white/82">{value}</div>
     </div>
@@ -700,13 +698,13 @@ function DistractionAppsPanel({ apps }: { apps: Record<string, { count: number; 
         )}
       </div>
 
-      <div className="overflow-hidden rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] dark:border-white/10 dark:bg-white/[0.035]">
+      <div className="overflow-hidden rounded-[14px] bg-white/46 shadow-[0_12px_30px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.68)_inset] dark:bg-white/[0.04]">
         {items.length === 0 ? (
           <div className="px-3 py-5 text-center text-[12px] text-[#687076] dark:text-white/56">
             这一天还没有记录到分心软件
           </div>
         ) : items.map((item, index) => (
-          <div key={item.appName} className="grid grid-cols-[28px_minmax(82px,1fr)_minmax(120px,1.4fr)_86px] items-center gap-3 border-b border-[#e6e8eb] px-3 py-2.5 text-[11px] last:border-b-0 dark:border-white/10">
+          <div key={item.appName} className="relative grid grid-cols-[28px_minmax(82px,1fr)_minmax(120px,1.4fr)_86px] items-center gap-3 px-3 py-2.5 text-[11px] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-foreground/[0.055] last:after:hidden dark:after:bg-white/[0.065]">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#eef0f2] text-[10px] font-semibold text-[#687076] dark:bg-white/8 dark:text-white/58">
               {index + 1}
             </div>
@@ -817,7 +815,7 @@ function TimelineSection({
             <Clock3 className="h-4 w-4 text-muted-foreground" />
             Timeline
             {isMockPreview && (
-              <span className="rounded-full border border-[#dfe3e6] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[#687076] dark:border-white/10 dark:bg-white/5 dark:text-white/60">
+              <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-[#687076] shadow-[0_4px_12px_rgba(52,64,84,0.06)] dark:bg-white/7 dark:text-white/60">
                 昨日示例
               </span>
             )}
@@ -848,7 +846,7 @@ function TimelineSection({
 
       <div ref={scrollRef} className="overflow-x-auto pb-2">
         <div className="min-w-[960px]">
-          <div className="rounded-[16px] border border-[#dfe3e6] bg-[#f7f8f9] p-4 shadow-[0_1px_0_rgba(255,255,255,0.76)_inset] dark:border-white/10 dark:bg-white/[0.035]">
+          <div className="rounded-[16px] bg-white/38 p-4 shadow-[0_14px_34px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.035]">
             <div className="relative h-[74px]">
               {Array.from({ length: 13 }, (_, index) => index * 2).map((hour) => (
                 <div
@@ -860,7 +858,7 @@ function TimelineSection({
                 </div>
               ))}
 
-              <div className="absolute inset-x-0 top-7 h-12 overflow-hidden rounded-[15px] border border-[#dde1e4] bg-[#edf0f2] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_10px_24px_rgba(28,32,36,0.04)] dark:border-white/10 dark:bg-white/8">
+              <div className="absolute inset-x-0 top-7 h-12 overflow-hidden rounded-[15px] bg-[#edf0f2] shadow-[0_10px_24px_rgba(28,32,36,0.045),0_1px_0_rgba(255,255,255,0.9)_inset] dark:bg-white/8">
                 {entries.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-[12px] text-muted-foreground">
                     暂无足够长的焦点窗口记录
@@ -908,7 +906,7 @@ function TimelineSection({
       </div>
 
       {selected && (
-        <div className="mt-3 rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035]">
+        <div className="mt-3 rounded-[14px] bg-white/50 p-3 shadow-[0_14px_34px_rgba(52,64,84,0.06),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.045]">
           <div className="mb-2 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
@@ -927,7 +925,7 @@ function TimelineSection({
               <div className="mt-0.5 font-medium text-foreground">{formatTimelineDuration(selectedGroup.reduce((sum, entry) => sum + getTimelineDurationMs(entry), 0))}</div>
             </div>
           </div>
-          <div className="space-y-1.5 border-t border-[#e6e8eb] pt-2 dark:border-white/10">
+          <div className="space-y-1.5 border-t border-foreground/[0.055] pt-2 dark:border-white/10">
             {selectedActivityRows.map((entry) => (
               <button
                 key={`detail-${entry.id}-${entry.startedAt}`}
@@ -948,7 +946,7 @@ function TimelineSection({
               </button>
             ))}
             {selectedShortRows.length > 0 && (
-              <div className="mt-2 border-t border-[#e6e8eb] pt-2 dark:border-white/10">
+              <div className="mt-2 border-t border-foreground/[0.055] pt-2 dark:border-white/10">
                 <div className="mb-1 px-2 text-[10px] font-medium text-[#8b8d98]">短暂切换</div>
                 <div className="space-y-1.5">
                   {selectedShortRows.map((entry, index) => (
@@ -971,7 +969,7 @@ function TimelineSection({
       )}
 
       {backgroundDetail && backgroundDetail.length > 0 && (
-        <div className="mt-3 rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035]">
+        <div className="mt-3 rounded-[14px] bg-white/50 p-3 shadow-[0_14px_34px_rgba(52,64,84,0.06),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.045]">
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="text-[12px] font-semibold text-foreground">后台详情</div>
             <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground" onClick={() => setBackgroundDetail(null)}>收起</button>
@@ -990,7 +988,7 @@ function TimelineSection({
         </div>
       )}
 
-      <div className="mt-3 grid gap-3 rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035] md:grid-cols-[1fr_1.2fr]">
+      <div className="mt-3 grid gap-3 rounded-[14px] bg-white/50 p-3 shadow-[0_14px_34px_rgba(52,64,84,0.06),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.045] md:grid-cols-[1fr_1.2fr]">
         <div>
           <div className="mb-2 text-[12px] font-semibold text-foreground">Top 软件</div>
           <div className="space-y-2">
@@ -1233,7 +1231,7 @@ function getApproxTextWidth(text: string): number {
 function TimelineHoverCardView({ card }: { card: TimelineHoverCard }) {
   return (
     <div
-      className="pointer-events-none fixed z-[9999] rounded-[14px] border border-[#dfe3e6] bg-white p-3 text-left text-[11px] leading-4 text-[#687076] shadow-[0_18px_54px_rgba(28,32,36,0.20)] dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70"
+      className="pointer-events-none fixed z-[9999] rounded-[14px] bg-white p-3 text-left text-[11px] leading-4 text-[#687076] shadow-[0_18px_54px_rgba(28,32,36,0.20),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-[#1c1c1f] dark:text-white/70"
       style={{ left: card.x, top: card.y, width: card.width }}
     >
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b8d98]">{card.eyebrow}</div>
@@ -1366,7 +1364,7 @@ function ProfileCalendar({
                 selected
                   ? 'bg-[#2f8fff] text-white shadow-none'
                   : today
-                    ? 'border border-border/70 text-foreground hover:bg-background/70'
+                    ? 'bg-white/62 text-foreground shadow-[0_6px_16px_rgba(52,64,84,0.055)] hover:bg-white/78 dark:bg-white/8'
                     : 'text-foreground hover:bg-background/70'
               } ${day.outsideMonth ? 'text-muted-foreground/45' : ''} disabled:pointer-events-none disabled:opacity-30`}
               onClick={() => onSelect(day.date)}
@@ -1514,7 +1512,7 @@ function RemindersSection({
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSettings: import('./settingsStore').SettingsState['updateSettings'];
-  view: 'rest' | 'focus' | 'blockedApps' | 'blockedKeywords';
+  view: 'rest' | 'focus' | 'blocked';
 }) {
   const [draft, setDraft] = useState({
     restReminderEnabled: settings.restReminderEnabled,
@@ -1649,21 +1647,23 @@ function RemindersSection({
         </>
       )}
 
-      {view === 'blockedApps' && (
+      {view === 'blocked' && (
         <>
-          <SectionTitle>屏蔽应用</SectionTitle>
+          <SectionTitle>屏蔽列表</SectionTitle>
           <SettingsGroup className="p-4">
-            <RuleTokenEditor value={draft.distractionBlockedApps} onChange={(value) => update('distractionBlockedApps', value)} addLabel="添加应用" />
-            <ApplyFooter />
-          </SettingsGroup>
-        </>
-      )}
-
-      {view === 'blockedKeywords' && (
-        <>
-          <SectionTitle>屏蔽关键词</SectionTitle>
-          <SettingsGroup className="p-4">
-            <RuleTokenEditor value={draft.distractionBlockedKeywords} onChange={(value) => update('distractionBlockedKeywords', value)} addLabel="添加关键词" />
+            <p className="mb-4 text-[11px] leading-5 text-muted-foreground">
+              专注模式下，检测到这些软件或关键词会触发分心提醒。
+            </p>
+            <div className="grid gap-4">
+              <div>
+                <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽应用</div>
+                <RuleTokenEditor value={draft.distractionBlockedApps} onChange={(value) => update('distractionBlockedApps', value)} addLabel="添加应用" />
+              </div>
+              <div>
+                <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽关键词</div>
+                <RuleTokenEditor value={draft.distractionBlockedKeywords} onChange={(value) => update('distractionBlockedKeywords', value)} addLabel="添加关键词" />
+              </div>
+            </div>
             <ApplyFooter />
           </SettingsGroup>
         </>
@@ -1748,7 +1748,7 @@ function PetMotionControls({
       {PET_MOTION_OPTIONS.map((option) => {
         const motion = value[option.id];
         return (
-          <div key={option.id} className="rounded-[10px] border border-border/60 bg-transparent px-3.5 py-3 transition-all duration-200 hover:border-border">
+          <div key={option.id} className="rounded-[10px] bg-white/42 px-3.5 py-3 shadow-[0_10px_24px_rgba(52,64,84,0.052),0_1px_0_rgba(255,255,255,0.68)_inset] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/58 dark:bg-white/[0.04] dark:hover:bg-white/[0.065]">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-[13px] font-medium leading-[1.35] text-foreground">{option.title}</div>
@@ -2064,7 +2064,7 @@ function AvatarModeSelect({
     { id: 'orb', label: 'Orb' },
   ];
   return (
-    <div className="flex rounded-[9px] border border-border/60 bg-transparent p-1">
+    <div className="flex rounded-[9px] bg-white/44 p-1 shadow-[0_8px_22px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.7)_inset] dark:bg-white/[0.045]">
       {options.map((option) => (
         <button
           key={option.id}
@@ -2111,8 +2111,8 @@ function ImageTile({
   return (
     <div
       data-path={path}
-      className={`group relative aspect-square overflow-hidden rounded-[10px] border transition-all duration-200 hover:-translate-y-0.5 ${
-        enabled ? 'border-border/70 bg-transparent' : 'border-border/40 bg-transparent opacity-70'
+      className={`group relative aspect-square overflow-hidden rounded-[10px] shadow-[0_8px_20px_rgba(52,64,84,0.045),0_1px_0_rgba(255,255,255,0.62)_inset] transition-all duration-200 hover:-translate-y-0.5 ${
+        enabled ? 'bg-white/42 dark:bg-white/[0.045]' : 'bg-white/24 opacity-70 dark:bg-white/[0.025]'
       }`}
     >
       {isLoading ? (
@@ -2401,7 +2401,7 @@ function ImageSection() {
         })}
       </div>
 
-      <div className="grid grid-cols-2 gap-2 rounded-[10px] border border-border/55 bg-transparent p-1">
+      <div className="grid grid-cols-2 gap-2 rounded-[10px] bg-white/42 p-1 shadow-[0_8px_22px_rgba(52,64,84,0.052),0_1px_0_rgba(255,255,255,0.68)_inset] dark:bg-white/[0.04]">
         {([
           { id: 'gif' as const, label: 'GIF 动图', detail: `${config.defaultGifAssets.length + userGifs[selectedState].length} 个` },
           { id: 'image' as const, label: '图片', detail: `${config.defaultAssets.length + userFrames[selectedState].length} 张` },
@@ -2461,7 +2461,7 @@ function ImageSection() {
         ))}
         <button
           onClick={handleAddImages}
-          className="flex aspect-square items-center justify-center rounded-[10px] border border-dashed border-border/70 bg-background/36 text-muted-foreground transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-background/62 hover:text-foreground"
+          className="flex aspect-square items-center justify-center rounded-[10px] bg-white/34 text-muted-foreground shadow-[0_8px_20px_rgba(52,64,84,0.045),0_1px_0_rgba(255,255,255,0.62)_inset] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/58 hover:text-foreground dark:bg-white/[0.035] dark:hover:bg-white/[0.06]"
         >
           <Plus className="h-6 w-6" />
         </button>
@@ -2475,7 +2475,7 @@ function ImageSection() {
       </p>
 
       {/* Reset All */}
-      <div className="border-t border-border/45 pt-3">
+      <div className="pt-1">
         <Button variant="outline" size="sm" onClick={handleResetAll}>
           恢复全部默认
         </Button>
@@ -2649,16 +2649,16 @@ function AISection({
         const isTesting = testingConfigId === c.id;
         const activeVoiceConfig = target !== 'chat' && isVoiceConfigActive(target, c);
         return (
-          <div key={`${target}-${c.id}`} className="rounded-lg border border-border p-3">
+          <div key={`${target}-${c.id}`} className="rounded-[12px] bg-white/42 p-3 shadow-[0_10px_26px_rgba(52,64,84,0.052),0_1px_0_rgba(255,255,255,0.66)_inset] dark:bg-white/[0.04]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex items-center gap-2">
                   <span className="font-medium text-[13px]">{getProviderName(c.providerId || c.provider)}</span>
                   {target === 'chat' && c.isDefault && (
-                    <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
+                    <span className="shrink-0 rounded bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
                   )}
                   {activeVoiceConfig && (
-                    <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">使用中</span>
+                    <span className="shrink-0 rounded bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">使用中</span>
                   )}
                 </div>
                 <div className="mb-1 text-[11px] text-muted-foreground">Model: {c.model}</div>
@@ -2697,7 +2697,7 @@ function AISection({
         );
       })}
       {configs.length === 0 && (
-        <div className="rounded-lg border border-border p-4 text-[13px] text-muted-foreground">
+        <div className="rounded-[12px] bg-white/42 p-4 text-[13px] text-muted-foreground shadow-[0_10px_26px_rgba(52,64,84,0.052),0_1px_0_rgba(255,255,255,0.66)_inset] dark:bg-white/[0.04]">
           暂无 API 配置，点击“添加 API Key”添加
         </div>
       )}
@@ -2807,7 +2807,7 @@ function AISection({
         </SettingRow>
         {settings.chatModelMode === 'custom' && (
           <>
-            <div className="flex items-center justify-between gap-3 border-b border-[#e6e8eb] px-4 py-3 dark:border-white/10">
+            <div className="relative flex items-center justify-between gap-3 px-4 py-3 after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-foreground/[0.055] dark:after:bg-white/[0.065]">
               <div>
                 <div className="text-[13px] font-medium leading-5 text-foreground">自定义配置</div>
                 <div className="mt-1 text-[11px] leading-5 text-muted-foreground">Base URL、Model、API Key；标记为默认的配置会用于 Chat</div>
@@ -2893,7 +2893,7 @@ function AISection({
           </select>
         </SettingRow>
         {settings.voiceInputProvider === 'user-cloud' && (
-          <div className="border-b border-[#e6e8eb] dark:border-white/10">
+          <div className="relative after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-foreground/[0.055] dark:after:bg-white/[0.065]">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <div>
                 <div className="text-[13px] font-medium leading-5 text-foreground">STT 自定义配置</div>
@@ -2933,7 +2933,7 @@ function AISection({
           </select>
         </SettingRow>
         {settings.voiceOutputProvider === 'user-cloud' && (
-          <div className="border-b border-[#e6e8eb] dark:border-white/10">
+          <div className="relative after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-foreground/[0.055] dark:after:bg-white/[0.065]">
             <div className="flex items-center justify-between gap-3 px-4 py-3">
               <div>
                 <div className="text-[13px] font-medium leading-5 text-foreground">TTS 自定义配置</div>
@@ -3140,7 +3140,7 @@ function HistorySection() {
         </div>
         <div className="space-y-3">
           {selected.messages.map((msg) => (
-            <div key={msg.id} className="border border-border rounded-lg p-3">
+            <div key={msg.id} className="rounded-[12px] bg-white/46 p-3 shadow-[0_10px_26px_rgba(52,64,84,0.052),0_1px_0_rgba(255,255,255,0.66)_inset] dark:bg-white/[0.04]">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-medium text-muted-foreground">{msg.role}</span>
                 <span className="text-[11px] text-muted-foreground">{msg.timestamp}</span>
@@ -3204,14 +3204,14 @@ function HistorySection() {
       </div>
       <div className="space-y-3">
         {items.length === 0 && (
-          <div className="text-[13px] text-muted-foreground border border-border rounded-lg p-4">
+          <div className="rounded-[12px] bg-white/46 p-4 text-[13px] text-muted-foreground shadow-[0_10px_26px_rgba(52,64,84,0.052),0_1px_0_rgba(255,255,255,0.66)_inset] dark:bg-white/[0.04]">
             暂无对话历史
           </div>
         )}
         {items.map((item) => (
           <button
             key={item.id}
-            className="block w-full text-left border border-border rounded-lg p-3 transition-colors hover:bg-accent/50"
+            className="block w-full rounded-[12px] bg-white/46 p-3 text-left shadow-[0_10px_26px_rgba(52,64,84,0.052),0_1px_0_rgba(255,255,255,0.66)_inset] transition-colors hover:bg-white/62 dark:bg-white/[0.04] dark:hover:bg-white/[0.065]"
             onClick={() => openConversation(item)}
           >
             <div className="flex items-center justify-between gap-3 mb-2">

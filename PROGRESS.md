@@ -1804,3 +1804,11 @@
 - 节奏：侧边栏图标统一 16px，标签圆角统一为 8px；列表 token 和额度卡片也改成轻量 elevation。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 486.44 kB，未触发 chunk 体积 warning。
 - 文件：SettingsPanel.tsx, SettingsLayout.tsx, ISSUES.md, PROGRESS.md
+
+### R235. 设置页专注列表合并与英文残留补齐（2026-05-11）
+- 目录：音乐识别、游戏识别移入“专注与提醒”末尾；通用目录只保留基础、Timeline、快捷键。
+- 合并：Blocked Apps 与 Blocked Keywords 合并为“屏蔽列表”，顶部补充专注模式触发分心提醒的说明，并在同一页分别编辑应用和关键词。
+- 视觉：设置右侧进一步弱化硬边框，Profile、Timeline、API 配置、历史对话、自定义形象和灵宠动作卡片统一改用半透明底、blur/elevation 和轻分割线建立层级。
+- 英文：扫描 `SettingsPanel.tsx` 设置文案，补齐个人/基础/显示/快捷键/屏蔽列表/游戏识别/音乐识别/短暂切换/API 配置等英文映射，以及 `自定义：...`、`默认：...`、`对话 n` 等动态翻译。
+- 验证：`pnpm exec tsc -b --pretty false`、设置页中文残留扫描脚本、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 488.14 kB，未触发 chunk 体积 warning。
+- 文件：SettingsPanel.tsx, i18n.ts, ISSUES.md, PROGRESS.md
