@@ -1699,3 +1699,11 @@
 - 测试：新增“采样器重启后恢复未完成片段”的单元测试，覆盖 4 分钟重启后继续到 6 分钟以上落库的场景。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, ISSUES.md, PROGRESS.md
+
+### R220. Timeline 暂停超过最小时长后断段（2026-05-10）
+- 语义：休眠、熄屏或全屏游戏暂停超过用户设置的 Timeline 最小时长后，不再把恢复后的同一 App 拼成一个跨空白的大段。
+- 实现：`resumeForeground` 接收恢复时间和最大暂停时长；短暂停顿继续当前片段，长暂停清空 paused，下一次采样重新开始 active。
+- 结果：如果 Timeline 最小时长为 5 分钟，暂停 5 分钟以内可续记；暂停超过 5 分钟则断成新段，Timeline 视觉上不会跨休眠空白。
+- 测试：新增短暂停顿续记、长暂停断段两个 timeline 单测。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, ISSUES.md, PROGRESS.md

@@ -1799,7 +1799,7 @@ function PetWindow() {
         }
         if (foregroundPaused) {
           foregroundPaused = false;
-          recorder.resumeForeground();
+          recorder.resumeForeground(Date.now(), minSegmentMs);
           saveTimelineRecorderState(recorder.getState(), minSegmentMs);
         }
         const result = await readTimelineSnapshot();

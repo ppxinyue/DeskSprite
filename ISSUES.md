@@ -2675,3 +2675,15 @@
 - 涉及文件：`src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：长时间采样器不能只依赖 React effect 内存态，至少要保存“未完成但有价值”的当前片段，避免窗口/HMR/设置变更造成统计断档。
 - 是否需更新技术文档：否。
+
+## ISSUE-225
+- 发现时间：2026-05-10
+- 发现者：用户追问
+- 相关任务：Timeline 暂停超过最小时长后断段
+- 严重程度：一般
+- 问题现象：如果用户先使用某个 App，再让电脑长时间休眠，恢复后继续使用同一个 App，旧逻辑可能把恢复前后拼成一个跨休眠空白的长时间段，Timeline 视觉上会误以为 App 连续占用了整个休眠期间。
+- 原因分析：`pauseForeground` 会保存 paused 片段，但 `resumeForeground` 只做清理，没有表达“短暂停顿可续、长暂停应断段”的规则；暂停阈值也需要跟用户设置的 Timeline 最小时长一致。
+- 解决方案：`resumeForeground` 增加 `resumedAt` 和 `maxPauseMs` 参数；暂停时长不超过 Timeline 最小时长时继续 active，超过时清空 paused 并让下一次采样重新开始；补充短暂停顿和长暂停两个单元测试。
+- 涉及文件：`src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：时间轴展示语义和统计聚合语义要分开处理；长时间系统暂停不能被渲染成连续前台活动。
+- 是否需更新技术文档：否。

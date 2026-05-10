@@ -248,8 +248,37 @@ export class TimelineRecorder {
     this.log({ stage: 'pause', message: 'Timeline foreground paused' });
   }
 
-  resumeForeground() {
-    if (this.paused.key) this.log({ stage: 'resume', message: 'Timeline foreground resumed' });
+  resumeForeground(resumedAt = Date.now(), maxPauseMs = this.options.minSegmentMs) {
+    if (!this.paused.key) return;
+    const pauseDurationMs = Math.max(0, resumedAt - this.paused.lastSeenAt);
+    if (pauseDurationMs <= maxPauseMs) {
+      this.active = {
+        ...this.paused,
+        lastSeenAt: resumedAt,
+      };
+      this.log({
+        stage: 'resume',
+        message: 'Timeline foreground resumed and continued',
+        appName: this.active.appName,
+        windowTitle: this.active.windowTitle,
+        url: this.active.url,
+        key: this.active.key,
+        durationMs: pauseDurationMs,
+        minSegmentMs: maxPauseMs,
+      });
+      this.paused = emptySegment();
+      return;
+    }
+    this.log({
+      stage: 'resume:split',
+      message: 'Timeline foreground resumed after long pause',
+      appName: this.paused.appName,
+      windowTitle: this.paused.windowTitle,
+      url: this.paused.url,
+      key: this.paused.key,
+      durationMs: pauseDurationMs,
+      minSegmentMs: maxPauseMs,
+    });
     this.paused = emptySegment();
   }
 

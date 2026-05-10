@@ -134,12 +134,43 @@ test('pauses foreground while still extending background markers', async () => {
     { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
     { type: 'music', name: 'NeteaseMusic', detail: 'playing' },
   ], 130_000);
-  recorder.resumeForeground();
+  recorder.resumeForeground(130_000, 60_000);
 
   const latest = persisted.at(-1);
   assert.equal(latest?.endedAt, 70_000);
   assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'music' && marker.name === 'NeteaseMusic'), true);
   assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'terminal' && marker.endedAt === new Date(130_000).toISOString()), true);
+});
+
+test('continues foreground after a short pause no longer than the minimum segment duration', async () => {
+  const { recorder, persisted, logs } = createHarness(360_000);
+
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 120_000);
+  await recorder.pauseForeground(120_000);
+  recorder.resumeForeground(300_000, 360_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 390_000);
+
+  assert.equal(persisted.length, 1);
+  assert.equal(persisted[0].startedAt, 0);
+  assert.equal(persisted[0].endedAt, 390_000);
+  assert.ok(logs.some((item) => item.stage === 'resume'));
+});
+
+test('splits foreground after a pause longer than the minimum segment duration', async () => {
+  const { recorder, persisted, logs } = createHarness(360_000);
+
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 120_000);
+  await recorder.pauseForeground(120_000);
+  recorder.resumeForeground(600_001, 360_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 600_001);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 960_001);
+
+  assert.equal(persisted.length, 1);
+  assert.equal(persisted[0].startedAt, 600_001);
+  assert.equal(persisted[0].endedAt, 960_001);
+  assert.ok(logs.some((item) => item.stage === 'resume:split'));
 });
 
 test('does not persist unsupported/error snapshots or below-threshold segments', async () => {
