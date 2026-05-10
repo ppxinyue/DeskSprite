@@ -663,7 +663,7 @@ function createPetWindow() {
 function showSettingsWindow() {
   windows.get('compact-chat')?.hide();
   broadcast('compact-chat:collapsed', {});
-  const bounds = centerBounds(0.62, 0.7);
+  const bounds = centerBounds(0.74, 0.78);
   const win = createWindow('settings', {
     ...bounds,
     title: '',

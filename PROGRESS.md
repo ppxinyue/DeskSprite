@@ -1414,3 +1414,14 @@
 - Mock：昨日示例调整为连续 3 小时 `pnpm electron:dev` 终端后台，以及 15 分钟、62 分钟两段 music 后台。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R182. Timeline 时长阈值、聚合与分心软件统计（2026-05-10）
+- 设置窗口：默认打开尺寸增大，减少内容横向显示不全。
+- 最近 14 天：左右按钮改为按 14 天日期窗口翻动，可一直向前查看历史，并向后翻到今天为止。
+- Timeline：冷启空态文案改为“暂无足够长的焦点窗口记录”；新增 1-20min 最小时长设置，默认 1min。
+- 采样：新增候选窗口逻辑，短切屏不会落库，也不会打断当前 app 的完整时段。
+- 展示：主 timeline 按连续同 app / 分类聚拢成完整色块，具体窗口标题、URL 作为详情列表展示。
+- 后台：hover 只保留自定义白色气泡，点击后台片段可展开该时间段内的音乐/终端详情；mock 改为 3 小时终端和两段音乐、多首歌。
+- 分心统计：专注模式记录分心 app、次数和估算时长，并在个人档案中列出。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, db.ts, settingsStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

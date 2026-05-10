@@ -2219,3 +2219,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：超过阈值才落库的采样系统不能把高频变化字段作为唯一 key；权限依赖也需要在 UI 流程中主动暴露，不能只在控制台里失败。
 - 是否需更新技术文档：否。
+
+## ISSUE-187
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Timeline 时长阈值、聚合与分心软件统计
+- 严重程度：重要
+- 问题现象：设置窗口默认尺寸仍偏窄；最近 14 天只能在固定 14 天范围内横滑；timeline 空态文案过于限定“今天”；后台 hover 同时出现浏览器原生 title 和自定义气泡；主 timeline 被短切屏打断；专注模式只记录分心次数，没有按软件统计。
+- 原因分析：设置窗口沿用较小比例；14 天图表只做容器滚动，没有日期窗口状态；后台 marker 使用 `title` 导致原生提示与自定义气泡重叠；timeline 采样遇到 key 切换立即结束当前段；分心统计模型只有每日总次数。
+- 解决方案：增大设置窗口默认 bounds；14 天按钮改为翻动统计日期窗口；移除后台 marker 原生 title；新增 timeline 最小时长设置和候选窗口逻辑；展示层按连续 app 聚合；新增 `distractionApps` 日统计，记录 app 次数和估算时长并展示。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/lib/db.ts`, `src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：时间轴采样需要区分“观测到短暂切换”和“确认切换”；hover 提示只能保留一套系统，避免浏览器原生 tooltip 干扰设计。
+- 是否需更新技术文档：否。

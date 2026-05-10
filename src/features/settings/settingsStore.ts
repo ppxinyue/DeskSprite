@@ -53,6 +53,7 @@ export interface AppSettings {
   speakRate: number;
   launchAtLogin: boolean;
   timelineRecordingEnabled: boolean;
+  timelineMinSegmentMinutes: number;
   hidePetDuringScreenShare: boolean;
   globalShortcut: string;
   screenshotShortcut: string;
@@ -105,6 +106,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   speakRate: 1.0,
   launchAtLogin: true,
   timelineRecordingEnabled: true,
+  timelineMinSegmentMinutes: 1,
   hidePetDuringScreenShare: true,
   globalShortcut: 'CommandOrControl+Shift+P',
   screenshotShortcut: 'CommandOrControl+Shift+S',
@@ -193,6 +195,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
                   ? Math.min(240, Math.max(1, parsed))
                 : key === 'distractionGraceSeconds' && typeof parsed === 'number'
                   ? Math.min(120, Math.max(0, parsed))
+                : key === 'timelineMinSegmentMinutes' && typeof parsed === 'number'
+                  ? Math.min(20, Math.max(1, parsed))
                 : (key === 'distractionBlockedApps' || key === 'distractionBlockedKeywords')
                   ? normalizeStringList(parsed, DEFAULT_SETTINGS[key])
                 : key === 'petMotions'

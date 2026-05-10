@@ -37,6 +37,7 @@ export type FocusStatsDay = {
   focusSessions: number;
   distractions: number;
   codingMs: number;
+  distractionApps: Record<string, { count: number; durationMs: number }>;
 };
 
 export type TimelineCategory = 'coding' | 'chat' | 'browser' | 'office' | 'entertainment' | 'other';
@@ -173,9 +174,10 @@ function ensureFocusStatsDay(store: Store, dateKey: string): FocusStatsDay {
   const existing = store.focusStats[dateKey];
   if (existing) {
     existing.codingMs ??= 0;
+    existing.distractionApps ??= {};
     return existing;
   }
-  const created = { date: dateKey, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0 };
+  const created = { date: dateKey, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0, distractionApps: {} };
   store.focusStats[dateKey] = created;
   return created;
 }
@@ -384,10 +386,16 @@ export async function recordFocusSession(startedAt: number, endedAt = Date.now()
   });
 }
 
-export async function recordDistraction(occurredAt = Date.now()) {
+export async function recordDistraction(occurredAt = Date.now(), appName = 'Unknown', durationMs = 0) {
   return mutate((store) => {
     const day = ensureFocusStatsDay(store, localDateKey(new Date(occurredAt)));
     day.distractions += 1;
+    const key = String(appName || 'Unknown').trim() || 'Unknown';
+    const current = day.distractionApps[key] ?? { count: 0, durationMs: 0 };
+    day.distractionApps[key] = {
+      count: current.count + 1,
+      durationMs: current.durationMs + Math.max(0, durationMs),
+    };
     return { ...day };
   });
 }
@@ -408,7 +416,9 @@ export async function getFocusStatsDays(days = 14, endDate = localDateKey()): Pr
   return Array.from({ length: count }, (_, index) => {
     const date = addDays(endDate, index - count + 1);
     const day = store.focusStats[date];
-    return day ? { ...day, codingMs: day.codingMs ?? 0 } : { date, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0 };
+    return day
+      ? { ...day, codingMs: day.codingMs ?? 0, distractionApps: day.distractionApps ?? {} }
+      : { date, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0, distractionApps: {} };
   });
 }
 

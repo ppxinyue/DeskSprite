@@ -212,6 +212,7 @@ function CollapsedUnavailableRow({ title, reason }: { title: string; reason: str
 
 function ProfileSection() {
   const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
+  const [chartEndDate, setChartEndDate] = useState(() => getLocalDateKey());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey(getLocalDateKey()));
   const [stats, setStats] = useState<FocusStatsDay[]>([]);
@@ -220,12 +221,15 @@ function ProfileSection() {
   const calendarRef = useRef<HTMLDivElement>(null);
   const statsScrollRef = useRef<HTMLDivElement>(null);
   const scrollStatsChart = (direction: -1 | 1) => {
-    statsScrollRef.current?.scrollBy({ left: direction * 240, behavior: 'smooth' });
+    setChartEndDate((date) => {
+      const next = shiftDateKey(date, direction * 14);
+      return next > getLocalDateKey() ? getLocalDateKey() : next;
+    });
   };
 
   const loadProfileData = useCallback(() => {
     Promise.all([
-      getFocusStatsDays(14, selectedDate),
+      getFocusStatsDays(14, chartEndDate),
       getTimelineEntries(selectedDate),
     ])
       .then(([nextStats, nextTimeline]) => {
@@ -242,7 +246,7 @@ function ProfileSection() {
         setStats([]);
         setTimelineEntries([]);
       });
-  }, [selectedDate]);
+  }, [chartEndDate, selectedDate]);
 
   useEffect(() => {
     loadProfileData();
@@ -277,7 +281,7 @@ function ProfileSection() {
     return () => { unlisten.then((fn) => fn()); };
   }, [loadProfileData, selectedDate]);
 
-  const selectedStats = stats[stats.length - 1] ?? { date: selectedDate, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0 };
+  const selectedStats = stats.find((day) => day.date === selectedDate) ?? stats[stats.length - 1] ?? { date: selectedDate, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0, distractionApps: {} };
   const maxFocusMs = Math.max(1, ...stats.map((day) => day.focusMs));
   const totalFocusMs = stats.reduce((sum, day) => sum + day.focusMs, 0);
   const totalSessions = stats.reduce((sum, day) => sum + day.focusSessions, 0);
@@ -292,7 +296,13 @@ function ProfileSection() {
           <button
             type="button"
             className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
-            onClick={() => setSelectedDate((date) => shiftDateKey(date, -1))}
+            onClick={() => {
+              setSelectedDate((date) => {
+                const next = shiftDateKey(date, -1);
+                setChartEndDate(next);
+                return next;
+              });
+            }}
             aria-label="前一天"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
@@ -310,7 +320,13 @@ function ProfileSection() {
           <button
             type="button"
             className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
-            onClick={() => setSelectedDate((date) => shiftDateKey(date, 1))}
+            onClick={() => {
+              setSelectedDate((date) => {
+                const next = shiftDateKey(date, 1);
+                setChartEndDate(next);
+                return next;
+              });
+            }}
             disabled={selectedDate >= todayKey}
             aria-label="后一天"
           >
@@ -324,6 +340,7 @@ function ProfileSection() {
               onMonthChange={setCalendarMonth}
               onSelect={(date) => {
                 setSelectedDate(date);
+                setChartEndDate(date);
                 setCalendarOpen(false);
               }}
             />
@@ -360,8 +377,9 @@ function ProfileSection() {
             </button>
             <button
               type="button"
-              className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
               onClick={() => scrollStatsChart(1)}
+              disabled={chartEndDate >= todayKey}
               aria-label="向右滑动最近 14 天图表"
             >
               <ChevronRight className="h-3.5 w-3.5" />
@@ -406,6 +424,8 @@ function ProfileSection() {
         </div>
       </SettingsGroup>
 
+      <DistractionAppsPanel apps={selectedStats.distractionApps ?? {}} />
+
       <TimelineSection
         date={selectedDate}
         entries={timelineEntries}
@@ -431,6 +451,36 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
       <div className="text-[11px] text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-[13px] font-semibold text-foreground">{value}</div>
     </div>
+  );
+}
+
+function DistractionAppsPanel({ apps }: { apps: Record<string, { count: number; durationMs: number }> }) {
+  const items = Object.entries(apps)
+    .map(([appName, value]) => ({ appName, ...value }))
+    .sort((a, b) => b.count - a.count || b.durationMs - a.durationMs)
+    .slice(0, 6);
+  if (items.length === 0) return null;
+  return (
+    <SettingsGroup className="px-4 py-4">
+      <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-foreground">
+        <Monitor className="h-4 w-4 text-muted-foreground" />
+        分心软件
+      </div>
+      <div className="space-y-2">
+        {items.map((item) => (
+          <div key={item.appName} className="grid grid-cols-[96px_1fr_72px] items-center gap-2 text-[11px]">
+            <div className="truncate font-medium text-[#3a3d40] dark:text-white/74">{item.appName}</div>
+            <div className="h-2 overflow-hidden rounded-full bg-[#eceef0] dark:bg-white/8">
+              <div
+                className="h-full rounded-full bg-[#ff5f57]/70"
+                style={{ width: `${Math.max(8, Math.min(100, item.count * 18))}%` }}
+              />
+            </div>
+            <div className="text-right text-[#687076]">{item.count} 次 · {formatTimelineDuration(item.durationMs)}</div>
+          </div>
+        ))}
+      </div>
+    </SettingsGroup>
   );
 }
 
@@ -461,9 +511,12 @@ function TimelineSection({
   onSelect: (id: number | null) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const selected = entries.find((entry) => entry.id === selectedId) ?? entries.at(-1) ?? null;
+  const [backgroundDetail, setBackgroundDetail] = useState<BackgroundMarkerWithTime[] | null>(null);
   const isMockPreview = entries.some((entry) => entry.id < 0);
-  const selectedGroup = selected ? getTimelineActivityGroup(entries, selected) : [];
+  const timelineBlocks = getTimelineBlocks(entries);
+  const selectedBlock = timelineBlocks.find((block) => block.entries.some((entry) => entry.id === selectedId)) ?? timelineBlocks.at(-1) ?? null;
+  const selected = selectedBlock?.entries[0] ?? null;
+  const selectedGroup = selectedBlock?.entries ?? [];
   const animationPlayedRef = useRef(false);
   const visibleCategories = (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[])
     .filter((category) => entries.some((entry) => entry.category === category));
@@ -521,7 +574,7 @@ function TimelineSection({
             )}
           </div>
           <div className="mt-1 text-[11px] text-muted-foreground">
-            记录超过 8 秒的前台窗口，浏览器会尽量保留当前网站
+            记录达到最小时长的前台窗口，浏览器会尽量保留当前网站
           </div>
         </div>
         <div className="text-right text-[11px] text-muted-foreground">
@@ -561,15 +614,15 @@ function TimelineSection({
               <div className="absolute inset-x-0 top-7 h-12 overflow-hidden rounded-[15px] border border-[#dde1e4] bg-[#edf0f2] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_10px_24px_rgba(28,32,36,0.04)] dark:border-white/10 dark:bg-white/8">
                 {entries.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-[12px] text-muted-foreground">
-                    今天还没有足够长的焦点窗口记录
+                    暂无足够长的焦点窗口记录
                   </div>
-                ) : entries.map((entry) => (
+                ) : timelineBlocks.map((block) => (
                   <TimelineSegment
-                    key={entry.id}
-                    entry={entry}
+                    key={block.id}
+                    block={block}
                     entries={entries}
-                    selected={entry.id === selected?.id}
-                    onSelect={() => onSelect(entry.id)}
+                    selected={selectedBlock?.id === block.id}
+                    onSelect={() => onSelect(block.entries[0]?.id ?? null)}
                   />
                 ))}
               </div>
@@ -582,6 +635,7 @@ function TimelineSection({
                     label="music"
                     icon="music"
                     markers={musicMarkers}
+                    onInspect={(marker) => setBackgroundDetail(getRelatedBackgroundMarkers(musicMarkers, marker))}
                   />
                 )}
                 {terminalMarkers.length > 0 && (
@@ -589,6 +643,7 @@ function TimelineSection({
                     label="terminal"
                     icon="terminal"
                     markers={terminalMarkers}
+                    onInspect={(marker) => setBackgroundDetail(getRelatedBackgroundMarkers(terminalMarkers, marker))}
                   />
                 )}
               </div>
@@ -613,8 +668,8 @@ function TimelineSection({
               {selected.url && <div className="mt-1 truncate text-[11px] text-[#687076]">{selected.url}</div>}
             </div>
             <div className="shrink-0 text-right text-[11px] text-muted-foreground">
-              <div>{formatTimelineClock(selected.startedAt)} - {formatTimelineClock(selected.endedAt)}</div>
-              <div className="mt-0.5 font-medium text-foreground">{formatTimelineDuration(getTimelineDurationMs(selected))}</div>
+              <div>{formatTimelineClock(selectedGroup[0]?.startedAt ?? selected.startedAt)} - {formatTimelineClock(selectedGroup.at(-1)?.endedAt ?? selected.endedAt)}</div>
+              <div className="mt-0.5 font-medium text-foreground">{formatTimelineDuration(selectedGroup.reduce((sum, entry) => sum + getTimelineDurationMs(entry), 0))}</div>
             </div>
           </div>
           <div className="space-y-1.5 border-t border-[#e6e8eb] pt-2 dark:border-white/10">
@@ -637,6 +692,26 @@ function TimelineSection({
                 </div>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {backgroundDetail && backgroundDetail.length > 0 && (
+        <div className="mt-3 rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035]">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="text-[12px] font-semibold text-foreground">后台详情</div>
+            <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground" onClick={() => setBackgroundDetail(null)}>收起</button>
+          </div>
+          <div className="space-y-1.5">
+            {backgroundDetail.map((marker, index) => {
+              const detail = marker.detail ? `${marker.name} · ${marker.detail}` : marker.name;
+              return (
+                <div key={`${marker.type}-${marker.startedAt}-${index}`} className="flex items-start justify-between gap-3 rounded-[9px] bg-[#eef0f2]/70 px-2 py-1.5 text-[11px] dark:bg-white/7">
+                  <div className="min-w-0 truncate font-medium text-[#3a3d40] dark:text-white/76">{detail}</div>
+                  <div className="shrink-0 text-[#8b8d98]">{formatTimelineClock(marker.startedAt)} - {formatTimelineClock(marker.endedAt)}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -679,11 +754,20 @@ function TimelineSection({
   );
 }
 
-function TimelineSegment({ entry, entries, selected, onSelect }: { entry: TimelineEntry; entries: TimelineEntry[]; selected: boolean; onSelect: () => void }) {
-  const meta = TIMELINE_CATEGORY_META[entry.category];
-  const left = `${getTimelineDayProgress(entry.startedAt) * 100}%`;
-  const width = `${Math.max(0.35, (getTimelineDurationMs(entry) / 86_400_000) * 100)}%`;
-  const topContent = getTopTimelineContent(entries, entry.appName);
+type TimelineBlock = {
+  id: string;
+  appName: string;
+  category: TimelineCategory;
+  startedAt: string;
+  endedAt: string;
+  entries: TimelineEntry[];
+};
+
+function TimelineSegment({ block, entries, selected, onSelect }: { block: TimelineBlock; entries: TimelineEntry[]; selected: boolean; onSelect: () => void }) {
+  const meta = TIMELINE_CATEGORY_META[block.category];
+  const left = `${getTimelineDayProgress(block.startedAt) * 100}%`;
+  const width = `${Math.max(0.35, ((new Date(block.endedAt).getTime() - new Date(block.startedAt).getTime()) / 86_400_000) * 100)}%`;
+  const topContent = getTopTimelineContent(entries, block.appName);
   return (
     <button
       type="button"
@@ -699,10 +783,9 @@ function TimelineSegment({ entry, entries, selected, onSelect }: { entry: Timeli
           : 'inset 1px 0 0 rgba(255,255,255,0.55), inset -1px 0 0 rgba(255,255,255,0.45)',
       }}
       onClick={onSelect}
-      title={`${entry.appName} · ${topContent}`}
     >
-      <span className="pointer-events-none absolute bottom-[56px] left-1 hidden w-60 rounded-[9px] border border-[#dfe3e6] bg-white p-2 text-left text-[11px] text-[#687076] shadow-[0_14px_40px_rgba(28,32,36,0.16)] group-hover:block dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70">
-        <span className="block font-semibold text-[#1c2024] dark:text-white">{entry.appName}</span>
+      <span className="pointer-events-none absolute bottom-[56px] left-1 hidden w-60 rounded-[12px] border border-[#dfe3e6] bg-white p-2.5 text-left text-[11px] text-[#687076] shadow-[0_14px_40px_rgba(28,32,36,0.16)] group-hover:block dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70">
+        <span className="block font-semibold text-[#1c2024] dark:text-white">{block.appName}</span>
         <span className="mt-1 block line-clamp-2">{topContent}</span>
       </span>
     </button>
@@ -719,10 +802,12 @@ function BackgroundTimelineTrack({
   label,
   icon,
   markers,
+  onInspect,
 }: {
   label: string;
   icon: 'music' | 'terminal';
   markers: BackgroundMarkerWithTime[];
+  onInspect: (marker: BackgroundMarkerWithTime) => void;
 }) {
   const Icon = icon === 'music' ? Music2 : Terminal;
   return (
@@ -736,6 +821,7 @@ function BackgroundTimelineTrack({
           key={`${marker.entryId}-${marker.type}-${marker.name}-${marker.startedAt}-${index}`}
           marker={marker}
           compactLabel={label}
+          onInspect={onInspect}
         />
       ))}
     </div>
@@ -745,18 +831,21 @@ function BackgroundTimelineTrack({
 function BackgroundTimelineMarker({
   marker,
   compactLabel,
+  onInspect,
 }: {
   marker: BackgroundMarkerWithTime;
   compactLabel: string;
+  onInspect: (marker: BackgroundMarkerWithTime) => void;
 }) {
   const left = `${getTimelineDayProgress(marker.startedAt) * 100}%`;
   const width = `${Math.max(1.2, ((new Date(marker.endedAt).getTime() - new Date(marker.startedAt).getTime()) / 86_400_000) * 100)}%`;
   const detail = marker.detail ? `${marker.name} · ${marker.detail}` : marker.name;
   return (
-    <div
+    <button
+      type="button"
       className="group/marker absolute top-1/2 h-3.5 -translate-y-1/2"
       style={{ left, width }}
-      title={`${detail} · ${formatTimelineClock(marker.startedAt)} - ${formatTimelineClock(marker.endedAt)}`}
+      onClick={() => onInspect(marker)}
     >
       <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-[#8b8d98]/36" />
       <div className="relative h-full min-w-[18px] rounded-full bg-[#8b8d98]/18 ring-1 ring-[#8b8d98]/16 transition-colors group-hover/marker:bg-[#8b8d98]/28 dark:ring-white/10" />
@@ -767,7 +856,7 @@ function BackgroundTimelineMarker({
           {formatTimelineClock(marker.startedAt)} - {formatTimelineClock(marker.endedAt)}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -807,7 +896,10 @@ function createMockTimelineEntries(dateKey: string): TimelineEntry[] {
 
   return [
     item(-1, '09:08', '09:44', 'Arc', 'Radix UI Colors - Usage · Browser', 'browser', 'https://www.radix-ui.com/colors/docs/palette-composition/composing-a-palette', [
-      { type: 'music', name: 'Music', detail: 'Nujabes - Aruarian Dance', startedAt: at('09:12'), endedAt: at('09:27') },
+      { type: 'music', name: 'Music', detail: 'Nujabes - Aruarian Dance', startedAt: at('09:12'), endedAt: at('09:16') },
+      { type: 'music', name: 'Music', detail: 'Uyama Hiroto - Waltz for Life Will Born', startedAt: at('09:16'), endedAt: at('09:20') },
+      { type: 'music', name: 'Music', detail: 'Haruka Nakamura - Lamp', startedAt: at('09:20'), endedAt: at('09:24') },
+      { type: 'music', name: 'Music', detail: 'Nujabes - Feather', startedAt: at('09:24'), endedAt: at('09:27') },
       { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev', startedAt: at('09:45'), endedAt: at('12:45') },
     ]),
     item(-2, '09:45', '10:28', 'Cursor', 'DeskSprite · SettingsPanel.tsx', 'coding'),
@@ -818,7 +910,10 @@ function createMockTimelineEntries(dateKey: string): TimelineEntry[] {
     item(-7, '13:51', '14:02', 'Safari', 'Transitions.dev - Number pop-in', 'browser', 'https://www.transitions.dev/docs/number-pop-in'),
     item(-8, '14:05', '14:42', 'Keynote', 'DeskSprite Timeline UI Review.key', 'office'),
     item(-9, '15:03', '15:37', 'Slack', 'Slack - design-system', 'chat', null, [
-      { type: 'music', name: 'Spotify', detail: 'Tycho - Awake', startedAt: at('15:03'), endedAt: at('16:05') },
+      { type: 'music', name: 'Spotify', detail: 'Tycho - Awake', startedAt: at('15:03'), endedAt: at('15:21') },
+      { type: 'music', name: 'Spotify', detail: 'Bonobo - Cirrus', startedAt: at('15:21'), endedAt: at('15:39') },
+      { type: 'music', name: 'Spotify', detail: 'Four Tet - Two Thousand and Seventeen', startedAt: at('15:39'), endedAt: at('15:54') },
+      { type: 'music', name: 'Spotify', detail: 'Kiasmos - Looped', startedAt: at('15:54'), endedAt: at('16:05') },
     ]),
     item(-10, '16:12', '16:54', 'Arc', 'YouTube - tiny desk concert', 'entertainment', 'https://www.youtube.com/watch?v=mock-preview'),
     item(-11, '17:10', '18:08', 'Visual Studio Code', 'timeline-renderer.tsx - DeskSprite', 'coding'),
@@ -1405,16 +1500,38 @@ function getTimelineDurationMs(entry: TimelineEntry): number {
   return Math.max(0, new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime());
 }
 
-function getTimelineActivityGroup(entries: TimelineEntry[], selected: TimelineEntry): TimelineEntry[] {
+function getTimelineBlocks(entries: TimelineEntry[]): TimelineBlock[] {
   const sorted = entries.slice().sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-  const selectedIndex = sorted.findIndex((entry) => entry.id === selected.id);
-  if (selectedIndex < 0) return [selected];
-  let start = selectedIndex;
-  let end = selectedIndex;
-  const sameActivity = (entry: TimelineEntry) => entry.appName === selected.appName && entry.category === selected.category;
-  while (start > 0 && sameActivity(sorted[start - 1])) start -= 1;
-  while (end < sorted.length - 1 && sameActivity(sorted[end + 1])) end += 1;
-  return sorted.slice(start, end + 1);
+  const blocks: TimelineBlock[] = [];
+  for (const entry of sorted) {
+    const previous = blocks.at(-1);
+    if (previous && previous.appName === entry.appName && previous.category === entry.category) {
+      previous.entries.push(entry);
+      previous.endedAt = entry.endedAt;
+      continue;
+    }
+    blocks.push({
+      id: `${entry.id}-${entry.appName}-${entry.startedAt}`,
+      appName: entry.appName,
+      category: entry.category,
+      startedAt: entry.startedAt,
+      endedAt: entry.endedAt,
+      entries: [entry],
+    });
+  }
+  return blocks;
+}
+
+function getRelatedBackgroundMarkers(markers: BackgroundMarkerWithTime[], selected: BackgroundMarkerWithTime): BackgroundMarkerWithTime[] {
+  const selectedStart = new Date(selected.startedAt).getTime();
+  const selectedEnd = new Date(selected.endedAt).getTime();
+  return markers
+    .filter((marker) => {
+      const start = new Date(marker.startedAt).getTime();
+      const end = new Date(marker.endedAt).getTime();
+      return start < selectedEnd && end > selectedStart;
+    })
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
 }
 
 function getTimelineDayProgress(iso: string): number {
@@ -2475,8 +2592,21 @@ function GeneralSection({
         <SettingRow label="开机自启" hint="登录 macOS 后自动启动 DeskSprite">
           <Switch checked={settings.launchAtLogin} onCheckedChange={updateLaunchAtLogin} />
         </SettingRow>
-        <SettingRow label="Timeline 记录" hint="不开专注模式也会全程记录超过 8 秒的前台窗口">
+        <SettingRow label="Timeline 记录" hint="不开专注模式也会全程记录达到最小时长的前台窗口">
           <Switch checked={settings.timelineRecordingEnabled} onCheckedChange={(v) => updateSetting('timelineRecordingEnabled', v)} />
+        </SettingRow>
+        <SettingRow label="Timeline 最小时长" hint="短于该时长的快速切屏不会记录，也不会打断当前 app 时段">
+          <div className="flex max-w-[260px] items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{settings.timelineMinSegmentMinutes}min</span>
+            <Slider
+              value={[settings.timelineMinSegmentMinutes]}
+              onValueChange={([v]) => updateSetting('timelineMinSegmentMinutes', v)}
+              min={1}
+              max={20}
+              step={1}
+              className="w-40"
+            />
+          </div>
         </SettingRow>
         <SettingRow label="共享屏幕时隐藏灵宠" hint="默认开启，防止共享屏幕时灵宠进入画面">
           <Switch checked={settings.hidePetDuringScreenShare} onCheckedChange={(v) => updateSetting('hidePetDuringScreenShare', v)} />

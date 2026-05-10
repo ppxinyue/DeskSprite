@@ -43,7 +43,6 @@ const PET_REST_ORBIT_LOOP_MS = 8_000;
 const DISTRACTION_CHECK_INTERVAL_MS = 3000;
 const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
 const TIMELINE_POLL_INTERVAL_MS = 3000;
-const TIMELINE_MIN_SEGMENT_MS = 8000;
 const LIVE_STATS_INTERVAL_MS = 60_000;
 const PET_PRESENCE_CHECK_INTERVAL_MS = 3000;
 
@@ -1537,12 +1536,12 @@ function PetWindow() {
         if (!result.supported || !result.matchedRule || !focusEndAtRef.current) return;
         if (Date.now() - focusWarningAtRef.current < DISTRACTION_WARNING_COOLDOWN_MS) return;
         focusWarningAtRef.current = Date.now();
-        recordDistraction()
+        const rule = result.matchedRule.replace(/^(app|keyword):/, '');
+        recordDistraction(Date.now(), result.appName || rule, DISTRACTION_CHECK_INTERVAL_MS)
           .then((day) => {
             if (day) emit('profile:data-updated', { kind: 'distraction', date: day.date }).catch(() => {});
           })
           .catch((e) => console.warn("Failed to record distraction stats:", e));
-        const rule = result.matchedRule.replace(/^(app|keyword):/, '');
         setPetState('work');
         setPetPrompt({
           id: 'focus-warning',
@@ -1606,9 +1605,27 @@ function PetWindow() {
       url: null,
       backgroundMarkers: [],
     };
+    const candidateRef: {
+      key: string;
+      firstSeenAt: number;
+      lastSeenAt: number;
+      appName: string;
+      windowTitle: string;
+      url: string | null;
+      backgroundMarkers: TimelineBackgroundMarker[];
+    } = {
+      key: '',
+      firstSeenAt: 0,
+      lastSeenAt: 0,
+      appName: '',
+      windowTitle: '',
+      url: null,
+      backgroundMarkers: [],
+    };
+    const minSegmentMs = Math.max(1, Math.min(20, settings.timelineMinSegmentMinutes)) * 60_000;
 
     const persistActive = async (endedAt = Date.now()) => {
-      if (!activeRef.key || endedAt - activeRef.firstSeenAt < TIMELINE_MIN_SEGMENT_MS) return;
+      if (!activeRef.key || endedAt - activeRef.firstSeenAt < minSegmentMs) return;
       const entry = await upsertTimelineEntry({
         id: activeRef.segmentId,
         startedAt: activeRef.firstSeenAt,
@@ -1622,6 +1639,25 @@ function PetWindow() {
         activeRef.segmentId = entry.id;
         emit('profile:data-updated', { kind: 'timeline', date: entry.date }).catch(() => {});
       }
+    };
+
+    const mergeBackgroundMarkers = (
+      existing: TimelineBackgroundMarker[],
+      next: TimelineBackgroundMarker[] | undefined,
+      checkedAt: number,
+    ) => {
+      if (!next || next.length === 0) return existing;
+      const checkedIso = new Date(checkedAt).toISOString();
+      const merged = existing.slice();
+      for (const marker of next) {
+        const previous = merged.at(-1);
+        if (previous && previous.type === marker.type && previous.name === marker.name && previous.detail === marker.detail) {
+          previous.endedAt = checkedIso;
+        } else {
+          merged.push({ ...marker, startedAt: checkedIso, endedAt: checkedIso });
+        }
+      }
+      return merged.slice(-24);
     };
 
     const readTimelineSnapshot = async () => {
@@ -1678,23 +1714,42 @@ function PetWindow() {
           activeRef.appName = appName;
           activeRef.windowTitle = windowTitle;
           activeRef.url = url;
-          activeRef.backgroundMarkers = result.background ?? [];
+          activeRef.backgroundMarkers = mergeBackgroundMarkers([], result.background, checkedAt);
           return;
         }
         if (activeRef.key !== key) {
-          await persistActive(activeRef.lastSeenAt);
-          activeRef.key = key;
-          activeRef.firstSeenAt = checkedAt;
+          if (candidateRef.key !== key) {
+            candidateRef.key = key;
+            candidateRef.firstSeenAt = checkedAt;
+            candidateRef.lastSeenAt = checkedAt;
+            candidateRef.appName = appName;
+            candidateRef.windowTitle = windowTitle;
+            candidateRef.url = url;
+            candidateRef.backgroundMarkers = mergeBackgroundMarkers([], result.background, checkedAt);
+            return;
+          }
+          candidateRef.lastSeenAt = checkedAt;
+          candidateRef.windowTitle = windowTitle;
+          candidateRef.url = url;
+          candidateRef.backgroundMarkers = mergeBackgroundMarkers(candidateRef.backgroundMarkers, result.background, checkedAt);
+          if (checkedAt - candidateRef.firstSeenAt < minSegmentMs) return;
+          await persistActive(candidateRef.firstSeenAt);
+          activeRef.key = candidateRef.key;
+          activeRef.firstSeenAt = candidateRef.firstSeenAt;
           activeRef.lastSeenAt = checkedAt;
           activeRef.segmentId = null;
-          activeRef.appName = appName;
-          activeRef.windowTitle = windowTitle;
-          activeRef.url = url;
-          activeRef.backgroundMarkers = result.background ?? [];
+          activeRef.appName = candidateRef.appName;
+          activeRef.windowTitle = candidateRef.windowTitle;
+          activeRef.url = candidateRef.url;
+          activeRef.backgroundMarkers = candidateRef.backgroundMarkers;
+          candidateRef.key = '';
           return;
         }
+        candidateRef.key = '';
         activeRef.lastSeenAt = checkedAt;
-        activeRef.backgroundMarkers = result.background ?? activeRef.backgroundMarkers;
+        activeRef.windowTitle = windowTitle;
+        activeRef.url = url;
+        activeRef.backgroundMarkers = mergeBackgroundMarkers(activeRef.backgroundMarkers, result.background, checkedAt);
         await persistActive(checkedAt);
       } catch (error) {
         if (!disposed) console.warn('Failed to record timeline:', error);
@@ -1708,7 +1763,7 @@ function PetWindow() {
       window.clearInterval(timer);
       persistActive(activeRef.lastSeenAt || Date.now()).catch(() => {});
     };
-  }, [settings.timelineRecordingEnabled]);
+  }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes]);
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
