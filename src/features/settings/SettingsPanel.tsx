@@ -347,32 +347,34 @@ function ProfileSection() {
           </div>
         </div>
 
-        <div className="flex h-48 items-end gap-2 border-b border-border/55 pb-3">
-          {stats.map((day) => {
-            const height = Math.max(day.focusMs > 0 ? 10 : 2, (day.focusMs / maxFocusMs) * 140);
-            const selected = day.date === selectedDate;
-            return (
-              <button
-                key={day.date}
-                type="button"
-                className="group flex min-w-0 flex-1 flex-col items-center justify-end gap-2"
-                onClick={() => setSelectedDate(day.date)}
-                title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
-              >
-                <div className="flex h-[144px] w-full items-end justify-center">
-                  <div
-                    className={`w-full max-w-8 rounded-t-[7px] transition-all duration-200 ${
-                      selected ? 'bg-foreground' : 'bg-foreground/24 group-hover:bg-foreground/42'
-                    }`}
-                    style={{ height }}
-                  />
-                </div>
-                <div className={`text-[10px] leading-none ${selected ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                  {formatWeekdayShort(day.date)}
-                </div>
-              </button>
-            );
-          })}
+        <div className="overflow-x-auto border-b border-border/55 pb-3">
+          <div className="flex h-48 min-w-[680px] items-end gap-2">
+            {stats.map((day) => {
+              const height = Math.max(day.focusMs > 0 ? 10 : 2, (day.focusMs / maxFocusMs) * 140);
+              const selected = day.date === selectedDate;
+              return (
+                <button
+                  key={day.date}
+                  type="button"
+                  className="group flex min-w-[40px] flex-1 flex-col items-center justify-end gap-2"
+                  onClick={() => setSelectedDate(day.date)}
+                  title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
+                >
+                  <div className="flex h-[144px] w-full items-end justify-center">
+                    <div
+                      className={`w-full max-w-8 rounded-t-[7px] transition-all duration-200 ${
+                        selected ? 'bg-foreground' : 'bg-foreground/24 group-hover:bg-foreground/42'
+                      }`}
+                      style={{ height }}
+                    />
+                  </div>
+                  <div className={`text-[10px] leading-none ${selected ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                    {formatWeekdayShort(day.date)}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -414,16 +416,15 @@ const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
   label: string;
   color: string;
   fill: string;
-  fillTop: string;
   soft: string;
   Icon: typeof Monitor;
 }> = {
-  coding: { label: 'Coding', color: '#0090ff', fill: '#8ec8ff', fillTop: '#d4efff', soft: 'rgba(0,144,255,0.12)', Icon: Terminal },
-  chat: { label: 'Chat', color: '#218358', fill: '#9dd9b3', fillTop: '#dff6e7', soft: 'rgba(33,131,88,0.11)', Icon: MessageSquareText },
-  browser: { label: '浏览器', color: '#697177', fill: '#c9cdd2', fillTop: '#f0f1f3', soft: 'rgba(105,113,119,0.12)', Icon: Globe2 },
-  office: { label: '办公', color: '#ad5700', fill: '#f3ba63', fillTop: '#fff1cf', soft: 'rgba(173,87,0,0.11)', Icon: BriefcaseBusiness },
-  entertainment: { label: '娱乐', color: '#cd1d8d', fill: '#f4a9d8', fillTop: '#ffe3f4', soft: 'rgba(205,29,141,0.11)', Icon: Gamepad2 },
-  other: { label: '其他', color: '#60646c', fill: '#b9bbc6', fillTop: '#eceef3', soft: 'rgba(96,100,108,0.11)', Icon: Monitor },
+  coding: { label: 'Coding', color: '#0090ff', fill: '#9ed0ff', soft: 'rgba(0,144,255,0.12)', Icon: Terminal },
+  chat: { label: 'Chat', color: '#218358', fill: '#a8ddb8', soft: 'rgba(33,131,88,0.11)', Icon: MessageSquareText },
+  browser: { label: '浏览器', color: '#697177', fill: '#d0d4d9', soft: 'rgba(105,113,119,0.12)', Icon: Globe2 },
+  office: { label: '办公', color: '#ad5700', fill: '#f2c36b', soft: 'rgba(173,87,0,0.11)', Icon: BriefcaseBusiness },
+  entertainment: { label: '娱乐', color: '#cd1d8d', fill: '#f5b4df', soft: 'rgba(205,29,141,0.11)', Icon: Gamepad2 },
+  other: { label: '其他', color: '#60646c', fill: '#c5c7d0', soft: 'rgba(96,100,108,0.11)', Icon: Monitor },
 };
 
 function TimelineSection({
@@ -551,12 +552,12 @@ function TimelineSection({
             </div>
 
             {backgroundMarkers.length > 0 && (
-              <div className="mt-3 rounded-[13px] border border-[#e1e4e8] bg-white/72 p-3 dark:border-white/10 dark:bg-white/[0.035]">
+              <div className="mt-2 rounded-[10px] bg-white/38 px-2.5 py-2 dark:bg-white/[0.025]">
                 <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-[#687076] dark:text-white/60">
                   <Music2 className="h-3.5 w-3.5" />
                   并行后台
                 </div>
-                <div className="space-y-2.5">
+                <div className="space-y-1.5">
                   {backgroundMarkers.slice(-5).map((marker, index) => (
                     <BackgroundTimelineMarker
                       key={`${marker.entryId}-${marker.type}-${marker.name}-${index}`}
@@ -666,7 +667,7 @@ function TimelineSegment({ entry, entries, selected, onSelect }: { entry: Timeli
       style={{
         left,
         width,
-        background: `linear-gradient(180deg, ${meta.fillTop} 0%, ${meta.fill} 100%)`,
+        backgroundColor: meta.fill,
         boxShadow: selected
           ? `inset 0 0 0 1px ${meta.color}, inset 0 1px 0 rgba(255,255,255,0.75)`
           : 'inset 1px 0 0 rgba(255,255,255,0.55), inset -1px 0 0 rgba(255,255,255,0.45)',
@@ -689,19 +690,24 @@ function BackgroundTimelineMarker({
 }) {
   const left = `${getTimelineDayProgress(marker.startedAt) * 100}%`;
   const width = `${Math.max(1.2, ((new Date(marker.endedAt).getTime() - new Date(marker.startedAt).getTime()) / 86_400_000) * 100)}%`;
+  const label = marker.type === 'music'
+    ? 'music'
+    : marker.detail
+      ? `${marker.name} · ${marker.detail}`
+      : marker.name;
   return (
-    <div className="grid grid-cols-[120px_1fr_92px] items-center gap-3">
+    <div className="grid grid-cols-[96px_1fr_82px] items-center gap-2">
       <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-medium text-[#687076] dark:text-white/58">
         {marker.type === 'music' ? <Music2 className="h-3 w-3 shrink-0" /> : <Terminal className="h-3 w-3 shrink-0" />}
-        <span className="truncate">{marker.name}{marker.detail ? ` · ${marker.detail}` : ''}</span>
+        <span className="truncate">{label}</span>
       </div>
-      <div className="relative h-4 rounded-full bg-[#eef0f2] dark:bg-white/8">
+      <div className="relative h-3 rounded-full bg-[#eef0f2]/70 dark:bg-white/7">
         <div
-          className="absolute top-1/2 h-px -translate-y-1/2 bg-[#8b8d98]/55"
+          className="absolute top-1/2 h-px -translate-y-1/2 bg-[#8b8d98]/38"
           style={{ left, width }}
         />
         <div
-          className="absolute top-1/2 h-2.5 -translate-y-1/2 rounded-full border border-[#8b8d98]/55 bg-white shadow-sm dark:bg-[#1c1c1f]"
+          className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[#8b8d98]/40"
           style={{ left, width }}
         />
       </div>

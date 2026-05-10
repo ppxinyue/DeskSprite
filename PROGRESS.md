@@ -1374,3 +1374,11 @@
 - Coding 时长：新增 `codingMs` 日统计，Coding 模式开启期间每 15 秒增量落库，个人档案第 4 张卡片改为读取真实 Coding 模式时长。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, db.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R177. 个人档案布局与 Timeline 轻量化（2026-05-10）
+- 设置窗口：左侧栏和主内容最大宽度收窄，减少打开设置时内容横向显示不全的概率。
+- 最近 14 天：专注柱状图增加横向滚动容器，窄窗口下不再挤压柱体。
+- Timeline：主时间段填充去掉渐变，改为纯色柔和色块。
+- 并行后台：后台轨道视觉减轻，Music 只标注 `music`，Terminal 保留进程内容和时间范围。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsLayout.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

@@ -2159,3 +2159,15 @@
 - 涉及文件：`src/App.tsx`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：跨窗口本地统计需要显式更新事件；模式时长应独立落库，不能用 app 分类时长替代。
 - 是否需更新技术文档：否。
+
+## ISSUE-182
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：个人档案布局与 Timeline 轻量化
+- 严重程度：中等
+- 问题现象：最近 14 天柱状图不支持左右滑动；timeline 色块使用渐变不符合用户预期；并行后台视觉过重且 music 信息冗余；设置窗口打开时内容有时过宽显示不全。
+- 原因分析：个人档案图表容器仍按固定宽度布局；timeline 使用渐变填充；后台轨道的边框、胶囊和文本都偏强；设置布局主内容最大宽度和侧边栏宽度偏大。
+- 解决方案：14 天柱状图增加横向滚动容器；timeline 改纯色柔和色块；并行后台降噪，music 只显示 music，terminal 保留详情；设置布局整体收窄。
+- 涉及文件：`src/components/layouts/SettingsLayout.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：桌面设置窗口要以最小可用宽度为约束设计，图表组件要优先保证窄窗口下的可读性。
+- 是否需更新技术文档：否。
