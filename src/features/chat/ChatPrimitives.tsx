@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Check, Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -140,21 +140,41 @@ export function Composer({
 
 function AudioWaveform({ level, compact }: { level: number; compact: boolean }) {
   const clamped = Math.max(0, Math.min(1, level));
-  const voiceAmount = clamped < 0.04 ? 0 : clamped;
-  const pattern = [0.48, 0.8, 1, 0.58, 0.9, 0.66, 0.96, 0.5, 0.74, 0.6, 0.86, 0.54];
-  const bars = Array.from({ length: 96 }, (_, index) => pattern[index % pattern.length]);
+  const voiceAmount = clamped < 0.035 ? 0 : clamped;
+  const barCount = compact ? 42 : 54;
+  const centerIndex = Math.floor(barCount * 0.52);
+  const [samples, setSamples] = useState<number[]>(() => Array.from({ length: centerIndex + 1 }, () => 0));
+  const shapedSamples = useMemo(
+    () => Array.from({ length: barCount }, (_, index) => {
+      if (index > centerIndex) return 0;
+      return samples[centerIndex - index] ?? 0;
+    }),
+    [barCount, centerIndex, samples],
+  );
   const silentHeight = compact ? 6 : 7;
   const voiceRange = compact ? 15 : 18;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setSamples((current) => {
+        const nextSample = voiceAmount;
+        const next = [nextSample, ...current];
+        return next.slice(0, centerIndex + 1);
+      });
+    }, 320);
+    return () => window.clearInterval(timer);
+  }, [centerIndex, voiceAmount]);
+
   return (
     <div className={`${compact ? 'h-7' : 'h-8'} relative min-w-0 flex-1 overflow-hidden rounded-[6px] bg-transparent`}>
-      <div className="pointer-events-none absolute inset-y-0 left-0 flex w-[220%] items-center justify-between px-2 chat-audio-wave" aria-hidden="true">
-        {bars.map((height, index) => (
+      <div className="pointer-events-none absolute inset-y-0 left-0 flex w-full items-center justify-between px-2" aria-hidden="true">
+        {shapedSamples.map((sample, index) => (
           <span
-            key={`${height}-${index}`}
-            className="block w-[2px] rounded-full bg-[var(--color-chat-text)] opacity-80 transition-[height,opacity] duration-75"
+            key={index}
+            className="block w-[2px] rounded-full bg-[var(--color-chat-text)] opacity-80 transition-[height,opacity] duration-300 ease-out"
             style={{
-              height: `${silentHeight + voiceAmount * voiceRange * height}px`,
-              opacity: 0.42 + voiceAmount * 0.42,
+              height: `${silentHeight + sample * voiceRange}px`,
+              opacity: 0.38 + sample * 0.46,
             }}
           />
         ))}

@@ -1749,3 +1749,10 @@
 - 流动：波形始终向左流动，速度从 1.45s 放慢到 2.35s；条数和宽度扩展到铺满输入框剩余区域，只避开右侧对号按钮。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：ChatPrimitives.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R227. 录音波形改为中线采样历史推进（2026-05-10）
+- 模型：波形不再整体按当前分贝缩放；改为固定采样节奏，把当前分贝写入中间柱，再把历史采样向左推进。
+- 静音：无声音时中间柱也是短柱，整条波形逐步回到统一短高度。
+- 速度：采样节奏放慢到 320ms，并用 300ms ease-out 过渡，接近常见录音控件的一格一格推进感。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：ChatPrimitives.tsx, index.css, ISSUES.md, PROGRESS.md

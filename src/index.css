@@ -739,13 +739,3 @@
   0%, 100% { filter: brightness(1); }
   50% { filter: brightness(1.22); }
 }
-
-.chat-audio-wave {
-  animation: chatAudioWaveSlide 2.35s linear infinite;
-  will-change: transform;
-}
-
-@keyframes chatAudioWaveSlide {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
