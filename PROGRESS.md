@@ -1628,3 +1628,10 @@
 - 语音模型：STT / TTS 的默认模型信息移到左侧标题下方，和 Chat 模型保持一致。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积与 dynamic import 提示。
 - 文件：switch.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R210. 设置下拉与 System Prompt 编辑按钮收紧（2026-05-10）
+- 下拉：全局 select 高度、字号、圆角和内边距收窄，去掉阴影，避免设置页下拉按钮显得过胖。
+- Prompt：System Prompt 文本框右下角的内置“修改”按钮删除，改为下方第一个按钮控制编辑流程。
+- 交互：System Prompt 下方第一个按钮默认是白色“修改”，进入编辑态后变为蓝色“保存”，保存后回到只读态。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
+- 文件：index.css, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

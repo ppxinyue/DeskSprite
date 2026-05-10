@@ -2555,3 +2555,15 @@
 - 涉及文件：`src/components/ui/switch.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：设置项应让“默认/自定义”的信息层级一致，默认态展示摘要，自定义态再展示可编辑配置。
 - 是否需更新技术文档：否。
+
+## ISSUE-215
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：设置下拉与 System Prompt 编辑按钮收紧
+- 严重程度：一般
+- 问题现象：设置中的下拉选择按钮过高过胖；System Prompt 文本框右下角已有修改按钮，同时下方还有保存按钮，交互重复。
+- 原因分析：全局 `select` 样式仍使用 40px 最小高度和较大的圆角/阴影；`EditableTextarea` 默认自带编辑按钮，System Prompt 没有接管编辑态。
+- 解决方案：压缩全局 select 尺寸并去掉阴影；为 `EditableTextarea` 增加可控编辑态和隐藏内置按钮能力，System Prompt 改由下方第一个按钮控制“修改/保存”。
+- 涉及文件：`src/index.css`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：同一编辑区域只能保留一个主要编辑入口，否则用户会分不清“完成”和“保存”的职责。
+- 是否需更新技术文档：否。

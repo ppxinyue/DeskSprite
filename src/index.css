@@ -139,14 +139,15 @@
   }
 
   select {
-    min-height: 40px;
-    border-radius: 10px;
+    min-height: 31px;
+    border-radius: 8px;
     border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
     background: var(--surface-raised);
     color: var(--color-foreground);
-    font-size: 13px;
-    line-height: 20px;
-    box-shadow: 0 1px 0 rgba(255,255,255,0.58) inset, 0 8px 22px rgba(52,64,84,0.045);
+    font-size: 12px;
+    line-height: 18px;
+    padding: 3px 24px 3px 9px;
+    box-shadow: none;
     outline: none;
     transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
   }

@@ -213,12 +213,20 @@ function EditableTextarea({
   value,
   onChange,
   className,
+  editing: controlledEditing,
+  onEditingChange,
+  hideEditButton = false,
   ...props
 }: Omit<ComponentProps<typeof Textarea>, 'value' | 'onChange'> & {
   value: string;
   onChange: (value: string) => void;
+  editing?: boolean;
+  onEditingChange?: (editing: boolean) => void;
+  hideEditButton?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [internalEditing, setInternalEditing] = useState(false);
+  const editing = controlledEditing ?? internalEditing;
+  const setEditing = onEditingChange ?? setInternalEditing;
 
   return (
     <div className="grid gap-2">
@@ -229,17 +237,19 @@ function EditableTextarea({
         onChange={(event) => onChange(event.target.value)}
         className={className}
       />
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-8 px-2.5 text-[12px]"
-          onClick={() => setEditing((next) => !next)}
-        >
-          {editing ? '完成' : '修改'}
-        </Button>
-      </div>
+      {!hideEditButton && (
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 px-2.5 text-[12px]"
+            onClick={() => setEditing(!editing)}
+          >
+            {editing ? '完成' : '修改'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -2451,6 +2461,7 @@ function AISection({
     codex: { checking: false, error: '' },
     claude: { checking: false, error: '' },
   });
+  const [systemPromptEditing, setSystemPromptEditing] = useState(false);
   const defaultConfig = configs.find((config) => config.isDefault) ?? configs[0] ?? null;
 
   const setCodingProviderEnabled = async (provider: CodingProvider, enabled: boolean) => {
@@ -2678,9 +2689,28 @@ function AISection({
               Orb 模式使用独立的 AI 助手 Prompt，不会覆盖灵宠模式的设定。
             </div>
           )}
-          <EditableTextarea value={displayedSystemPrompt} onChange={setDisplayedSystemPrompt} rows={6} className="font-mono" />
+          <EditableTextarea
+            value={displayedSystemPrompt}
+            onChange={setDisplayedSystemPrompt}
+            rows={6}
+            className="font-mono"
+            editing={systemPromptEditing}
+            onEditingChange={setSystemPromptEditing}
+            hideEditButton
+          />
           <div className="mt-3 flex gap-2">
-            <Button onClick={() => saveDisplayedSystemPrompt()}>保存</Button>
+            <Button
+              variant={systemPromptEditing ? 'default' : 'outline'}
+              onClick={() => {
+                if (!systemPromptEditing) {
+                  setSystemPromptEditing(true);
+                  return;
+                }
+                saveDisplayedSystemPrompt().then(() => setSystemPromptEditing(false));
+              }}
+            >
+              {systemPromptEditing ? '保存' : '修改'}
+            </Button>
             <Button variant="outline" onClick={resetDisplayedSystemPrompt}>重置为默认</Button>
           </div>
         </div>
