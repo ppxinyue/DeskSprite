@@ -1742,3 +1742,10 @@
 - Overflow：全局滚动条改为 6px、透明轨道、低对比圆角 thumb，横向/纵向 overflow 的视觉存在感更轻。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：ChatPrimitives.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R226. 录音波形流动与铺满修正（2026-05-10）
+- 静音态：无声音时所有竖柱统一保持短高度，不再出现错落的长短变化。
+- 有声态：检测到音量后才按分贝拉长竖柱，并保留轻微形态差异。
+- 流动：波形始终向左流动，速度从 1.45s 放慢到 2.35s；条数和宽度扩展到铺满输入框剩余区域，只避开右侧对号按钮。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：ChatPrimitives.tsx, index.css, ISSUES.md, PROGRESS.md

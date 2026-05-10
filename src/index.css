@@ -741,7 +741,7 @@
 }
 
 .chat-audio-wave {
-  animation: chatAudioWaveSlide 1.45s linear infinite;
+  animation: chatAudioWaveSlide 2.35s linear infinite;
   will-change: transform;
 }
 
