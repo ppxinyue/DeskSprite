@@ -166,7 +166,7 @@ function AudioWaveform({ level, compact }: { level: number; compact: boolean }) 
         const next = [nextSample, ...current];
         return next.slice(0, centerIndex + 1);
       });
-    }, 180);
+    }, 120);
     return () => window.clearInterval(timer);
   }, [centerIndex]);
 
@@ -176,7 +176,7 @@ function AudioWaveform({ level, compact }: { level: number; compact: boolean }) 
         {shapedSamples.map((sample, index) => (
           <span
             key={index}
-            className="block w-[2px] rounded-full bg-[var(--color-chat-text)] opacity-80 transition-[height,opacity] duration-200 ease-out"
+            className="block w-[2px] rounded-full bg-[var(--color-chat-text)] opacity-80 transition-[height,opacity] duration-150 ease-out"
             style={{
               height: `${silentHeight + sample * voiceRange}px`,
               opacity: 0.38 + sample * 0.46,

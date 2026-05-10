@@ -1777,3 +1777,9 @@
 - 速度：采样节奏调整为 180ms，配合 200ms 过渡，保持录音历史向左推进的可见动态。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：ChatPrimitives.tsx, ISSUES.md, PROGRESS.md
+
+### R231. 加快录音波形向左推进速度（2026-05-10）
+- 调整：`AudioWaveform` 的采样节奏从 180ms 提升到 120ms，让录音条向左推进更利落。
+- 视觉：柱高/透明度过渡从 200ms 缩短到 150ms，避免速度提升后出现拖沓感。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 485.75 kB，未触发 chunk 体积 warning。
+- 文件：ChatPrimitives.tsx, ISSUES.md, PROGRESS.md
