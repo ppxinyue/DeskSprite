@@ -1756,3 +1756,10 @@
 - 速度：采样节奏放慢到 320ms，并用 300ms ease-out 过渡，接近常见录音控件的一格一格推进感。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：ChatPrimitives.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R228. 英文模式自定义形象与灵宠动作翻译补全（2026-05-10）
+- 补全：英文模式下 `Custom Avatar` 和 `Pet Motion` 内的中文漏项已补，包括 Orb 折叠原因、状态标签、GIF/图片方案、数量单位、当前使用说明、动作标题/描述和 aria-label。
+- 动态：新增 `当前使用 n / m 个 GIF`、`n 张图片`、`（n 个）/（n 张）` 等组合文案的英文转换规则。
+- 结果：自定义形象卡片、图片网格、方案切换、恢复默认和动作控制区在英文模式下不再残留这些中文文案。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：i18n.ts, ISSUES.md, PROGRESS.md

@@ -14,6 +14,7 @@ const EN: Record<string, string> = {
   'AI 对话': 'AI Chat',
   '对话历史': 'Chat History',
   '加载中...': 'Loading...',
+  '加载中': 'Loading',
   '语言': 'Language',
   '界面语言': 'Interface Language',
   '选择界面显示语言': 'Choose the app display language',
@@ -54,6 +55,8 @@ const EN: Record<string, string> = {
   '自定义形象': 'Custom Avatar',
   '灵宠动作': 'Pet Motion',
   '灵宠形象使用 GIF 动图时，不叠加动作效果': 'GIF avatars do not use additional motion effects.',
+  'Orb 模式由程序绘制，图片与 GIF 设置已收起': 'Orb Mode is rendered in code, so image and GIF settings are hidden.',
+  'Orb 模式使用代码动效，不需要图片动作参数': 'Orb Mode uses code-based animation and does not need pet motion settings.',
   '休息提醒': 'Rest Reminders',
   '休息喝水提醒': 'Rest & Hydration Reminder',
   '提醒间隔': 'Reminder Interval',
@@ -193,8 +196,11 @@ const EN: Record<string, string> = {
   '次专注': 'focus sessions',
   '次分心': 'distractions',
   '动图': 'GIF',
+  'GIF 动图': 'GIF',
+  '常见图片格式': 'Common Image Formats',
   '图片方案只能上传 PNG、JPG、JPEG、WEBP 或 BMP。': 'Image mode supports PNG, JPG, JPEG, WEBP, or BMP only.',
   '方案只能上传 .gif 动图。': 'GIF mode supports .gif files only.',
+  'GIF 方案只能上传 .gif 动图。': 'GIF mode supports .gif files only.',
   '只能上传图片，请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 格式。': 'Upload an image in PNG, JPG, JPEG, WEBP, GIF, or BMP format.',
   '图片无法预览': 'Image preview unavailable',
   '确定要删除这个 GIF 吗？': 'Delete this GIF?',
@@ -205,6 +211,10 @@ const EN: Record<string, string> = {
   '至少需要保留一个正在使用的灵宠 GIF。': 'Keep at least one active pet GIF.',
   '至少需要保留一张正在使用的灵宠图片。': 'Keep at least one active pet image.',
   '上传': 'Upload',
+  '使用': 'Use',
+  '待机': 'Idle',
+  '休息': 'Rest',
+  '专注': 'Focus',
   '删除': 'Delete',
   '关闭': 'Off',
   '打开对话': 'Open Chat',
@@ -249,8 +259,13 @@ const EN: Record<string, string> = {
   '继承 session': 'Attach Session',
   '新建面板': 'New Panel',
   '跳动': 'Jump',
+  '跳动动作': 'Jump Motion',
+  '上下轻跳': 'Gentle Jump',
+  '摇摆': 'Wobble',
+  '摇摆动作': 'Wobble Motion',
   '左右轻晃': 'Wobble',
   '呼吸': 'Breathe',
+  '呼吸动作': 'Breathing Motion',
   '轻微缩放': 'Subtle Scale',
   '幅度': 'Amplitude',
   '速度': 'Speed',
@@ -360,6 +375,17 @@ function translateDynamicEnglish(text: string): string {
   next = next.replace(/(\d+)\s*次/g, '$1 times');
   next = next.replace(/(\d+)\s*段/g, '$1 segments');
   next = next.replace(/(\d+)\s*个\s*task/gi, '$1 tasks');
+  next = next.replace(/当前使用：/g, 'Current: ');
+  next = next.replace(/当前使用\s*(\d+)\s*\/\s*(\d+)\s*个\s*GIF/g, 'Using $1 / $2 GIFs');
+  next = next.replace(/当前使用\s*(\d+)\s*\/\s*(\d+)\s*张图片/g, 'Using $1 / $2 images');
+  next = next.replace(/（(\d+)\s*个）/g, ' ($1)');
+  next = next.replace(/（(\d+)\s*张）/g, ' ($1)');
+  next = next.replace(/\((\d+)\s*个\)/g, '($1)');
+  next = next.replace(/\((\d+)\s*张\)/g, '($1)');
+  next = next.replace(/(\d+)\s*个\s*GIF/g, '$1 GIFs');
+  next = next.replace(/(\d+)\s*个/g, '$1');
+  next = next.replace(/(\d+)\s*张图片/g, '$1 images');
+  next = next.replace(/(\d+)\s*张/g, '$1');
   next = next.replace(/周([日一二三四五六])/g, (_, day) => EN[day] ?? day);
   return next;
 }
