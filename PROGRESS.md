@@ -1679,3 +1679,8 @@
 - 性能：游戏中不再执行 Timeline 前台窗口 AppleScript 采样，降低全屏游戏时的轮询干扰。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：main.cjs, App.tsx, settingsStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R217. 游戏识别列表说明文案调整（2026-05-10）
+- 通用设置：“游戏识别列表”下方说明改为“当用户正在进行以下游戏时，会自动取消置顶，并暂停 Timeline 刷新监测，以保证游戏性能。”
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

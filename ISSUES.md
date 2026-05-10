@@ -2639,3 +2639,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：无法可靠从系统层枚举“所有游戏”时，应使用保守条件和可配置规则，避免误判普通应用。
 - 是否需更新技术文档：否。
+
+## ISSUE-222
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：游戏识别列表说明文案调整
+- 严重程度：轻微
+- 问题现象：“游戏识别列表”下方说明偏技术化，没有直接说明正在进行游戏时会保护性能。
+- 原因分析：原文案描述实现条件“全屏且命中关键词”，但设置页更需要解释用户可感知的结果。
+- 解决方案：改为用户语义文案，强调自动取消置顶、暂停 Timeline 刷新监测、保证游戏性能。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：设置页说明优先说用户结果，技术条件可以由实现兜底，不必暴露在主文案里。
+- 是否需更新技术文档：否。

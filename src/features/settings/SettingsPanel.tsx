@@ -2874,7 +2874,7 @@ function GeneralSection({
         <div className="border-b border-[#e6e8eb] px-3.5 py-3 dark:border-white/10">
           <div className="mb-1.5 text-[13px] font-medium text-foreground">游戏识别列表</div>
           <p className="mb-2 text-[11px] leading-4 text-muted-foreground">
-            前台窗口全屏且命中这些应用/标题时，会取消置顶并暂停 Timeline 刷新
+            当用户正在进行以下游戏时，会自动取消置顶，并暂停 Timeline 刷新监测，以保证游戏性能。
           </p>
           <RuleTokenEditor
             value={settings.gameAppKeywords}
