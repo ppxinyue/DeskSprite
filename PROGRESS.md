@@ -1671,3 +1671,11 @@
 - 结果：主 JS 从约 684 kB 降到 467.90 kB，低于 500 kB warning 阈值；构建不再输出 chunk 体积或 dynamic import warning。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建输出主包 `index-ClaEDNe2.js` 467.90 kB / gzip 144.13 kB，未出现 chunk 体积或 dynamic import warning。
 - 文件：App.tsx, ChatDialog.tsx, ChatPrimitives.tsx, HoverInputBar.tsx, petStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R216. 全屏游戏时暂停 Timeline 与取消置顶（2026-05-10）
+- 游戏识别：系统无法可靠枚举所有游戏，改为“全屏窗口 + 默认游戏关键词 + 用户游戏列表”的保守判断。
+- 通用设置：新增“游戏识别列表”，用户可补充游戏 App 名或窗口标题关键词。
+- 运行策略：检测到全屏游戏后取消灵宠/小窗置顶，并暂停 Timeline 前台刷新；游戏结束后恢复置顶策略和 Timeline 采样。
+- 性能：游戏中不再执行 Timeline 前台窗口 AppleScript 采样，降低全屏游戏时的轮询干扰。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：main.cjs, App.tsx, settingsStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

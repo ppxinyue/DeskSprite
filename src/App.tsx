@@ -1033,6 +1033,8 @@ function PetWindow() {
   const lastNowTickRef = useRef(Date.now());
   const autoHiddenForScreenShareRef = useRef(false);
   const topmostSuppressedForGameRef = useRef(false);
+  const timelinePausedForGameRef = useRef(false);
+  const gameStartedAtRef = useRef<number | null>(null);
   const autoFocusAfterRestRef = useRef(false);
   const restPresentationFrameRef = useRef<number | null>(null);
   const restPresentationSnapshotRef = useRef<RestPresentationSnapshot | null>(null);
@@ -1726,6 +1728,13 @@ function PetWindow() {
           });
           if (permission) timelineDebugLog({ stage: 'accessibility', message: `trusted=${permission.trusted}` });
         }
+        if (timelinePausedForGameRef.current) {
+          if (!foregroundPaused) {
+            foregroundPaused = true;
+            await recorder.pauseForeground(gameStartedAtRef.current ?? Date.now());
+          }
+          return;
+        }
         if (systemInactiveRef.current) {
           if (!foregroundPaused) {
             foregroundPaused = true;
@@ -1767,10 +1776,19 @@ function PetWindow() {
           supported: boolean;
           isFullscreenGame: boolean;
           isScreenSharing: boolean;
-        }>('read_pet_presence_context');
+        }>('read_pet_presence_context', { settings: settingsRef.current });
         if (disposed || !context.supported) return;
 
         const shouldSuppressTopmost = Boolean(settings.alwaysOnTop && context.isFullscreenGame);
+        if (context.isFullscreenGame && !timelinePausedForGameRef.current) {
+          timelinePausedForGameRef.current = true;
+          gameStartedAtRef.current = Date.now();
+          timelineDebugLog({ stage: 'game:pause', message: 'Fullscreen game detected; timeline sampler paused' });
+        } else if (!context.isFullscreenGame && timelinePausedForGameRef.current) {
+          timelinePausedForGameRef.current = false;
+          gameStartedAtRef.current = null;
+          timelineDebugLog({ stage: 'game:resume', message: 'Fullscreen game ended; timeline sampler resumed' });
+        }
         if (topmostSuppressedForGameRef.current !== shouldSuppressTopmost) {
           topmostSuppressedForGameRef.current = shouldSuppressTopmost;
           await invoke('set_topmost_suppressed', { suppressed: shouldSuppressTopmost });
@@ -1804,8 +1822,10 @@ function PetWindow() {
         topmostSuppressedForGameRef.current = false;
         invoke('set_topmost_suppressed', { suppressed: false }).catch(() => {});
       }
+      timelinePausedForGameRef.current = false;
+      gameStartedAtRef.current = null;
     };
-  }, [settings.alwaysOnTop, settings.hidePetDuringScreenShare]);
+  }, [settings.alwaysOnTop, settings.hidePetDuringScreenShare, settings.gameAppKeywords]);
 
   useEffect(() => {
     const unlisten = listen("compact-chat:collapsed", () => {

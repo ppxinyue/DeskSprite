@@ -2871,6 +2871,17 @@ function GeneralSection({
             />
           </div>
         </SettingRow>
+        <div className="border-b border-[#e6e8eb] px-3.5 py-3 dark:border-white/10">
+          <div className="mb-1.5 text-[13px] font-medium text-foreground">游戏识别列表</div>
+          <p className="mb-2 text-[11px] leading-4 text-muted-foreground">
+            前台窗口全屏且命中这些应用/标题时，会取消置顶并暂停 Timeline 刷新
+          </p>
+          <RuleTokenEditor
+            value={settings.gameAppKeywords}
+            onChange={(value) => updateSetting('gameAppKeywords', cleanRuleList(value))}
+            addLabel="添加游戏"
+          />
+        </div>
         <SettingRow label="共享屏幕时隐藏灵宠" hint="默认开启，防止共享屏幕时灵宠进入画面">
           <Switch checked={settings.hidePetDuringScreenShare} onCheckedChange={(v) => updateSetting('hidePetDuringScreenShare', v)} />
         </SettingRow>

@@ -2627,3 +2627,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/ChatPrimitives.tsx`, `src/features/chat/HoverInputBar.tsx`, `src/features/pet/petStore.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：多窗口 Electron 应用的入口应按窗口懒加载页面级模块；共享 shim 不适合在同一图里混用静态和动态 import。
 - 是否需更新技术文档：否。
+
+## ISSUE-221
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：全屏游戏时暂停 Timeline 与取消置顶
+- 严重程度：一般
+- 问题现象：用户全屏打游戏时，Timeline 仍按 3 秒轮询前台窗口，且置顶灵宠可能穿透到游戏上方，影响性能和体验。
+- 原因分析：现有全屏游戏判断只用于置顶抑制，Timeline 采样没有订阅该状态；游戏识别仅靠少量内置关键词，用户无法补充。
+- 解决方案：新增可配置游戏关键词列表；把列表传给主进程全屏游戏分类；前端检测到全屏游戏后同时取消置顶并暂停 Timeline 前台采样，结束后恢复。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：无法可靠从系统层枚举“所有游戏”时，应使用保守条件和可配置规则，避免误判普通应用。
+- 是否需更新技术文档：否。

@@ -618,12 +618,17 @@ function listContainsAny(text, keywords) {
   return keywords.some((keyword) => lower.includes(keyword));
 }
 
-function classifyPetPresenceContext({ appName, windowTitle, runningApps, fullscreen }) {
-  const gameKeywords = [
-    'steam', 'epic games', 'battle.net', 'riot client', 'league of legends',
-    'dota', 'minecraft', 'roblox', 'unity', 'unreal', 'godot', 'blizzard',
-    'world of warcraft', 'genshin', 'honkai', 'valorant', 'counter-strike',
-    'final fantasy', 'baldur', 'civilization', 'factorio',
+const DEFAULT_GAME_KEYWORDS = [
+  'steam', 'epic games', 'battle.net', 'riot client', 'league of legends',
+  'dota', 'minecraft', 'roblox', 'unity', 'unreal', 'godot', 'blizzard',
+  'world of warcraft', 'genshin', 'honkai', 'valorant', 'counter-strike',
+  'final fantasy', 'baldur', 'civilization', 'factorio',
+];
+
+function classifyPetPresenceContext({ appName, windowTitle, runningApps, fullscreen, gameKeywords }) {
+  const normalizedGameKeywords = [
+    ...DEFAULT_GAME_KEYWORDS,
+    ...normalizeRuleList(gameKeywords),
   ];
   const screenShareApps = [
     'zoom', 'zoom.us', 'microsoft teams', 'teams', '腾讯会议', 'tencent meeting',
@@ -635,7 +640,7 @@ function classifyPetPresenceContext({ appName, windowTitle, runningApps, fullscr
     '正在共享', '共享屏幕', '屏幕共享', 'presenting', '正在演示', '演示中',
   ];
   const activeText = `${appName} ${windowTitle}`;
-  const isFullscreenGame = Boolean(fullscreen && listContainsAny(activeText, gameKeywords));
+  const isFullscreenGame = Boolean(fullscreen && listContainsAny(activeText, normalizedGameKeywords));
   const screenShareAppRunning = listContainsAny(runningApps, screenShareApps);
   const screenShareByTitle = listContainsAny(activeText, screenShareKeywords);
   return {
@@ -644,7 +649,7 @@ function classifyPetPresenceContext({ appName, windowTitle, runningApps, fullscr
   };
 }
 
-function readPetPresenceContext() {
+function readPetPresenceContext({ settings } = {}) {
   if (process.platform !== 'darwin') {
     return Promise.resolve({ supported: false, isFullscreenGame: false, isScreenSharing: false });
   }
@@ -661,6 +666,7 @@ function readPetPresenceContext() {
         windowTitle: windowTitle.trim(),
         runningApps: runningAppsRaw.trim(),
         fullscreen,
+        gameKeywords: settings?.gameAppKeywords,
       });
       resolve({
         supported: true,
