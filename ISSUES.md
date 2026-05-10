@@ -2867,3 +2867,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/i18n.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：设置页拆目录后要再检查“同一用户意图”是否被拆散；国际化要对最终页面文案做反向扫描，而不是只补新增标题。
 - 是否需更新技术文档：否。
+
+## ISSUE-241
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：通用目录后置与发送快捷键设置
+- 严重程度：轻微
+- 问题现象：通用分组仍在设置左侧靠前位置；聊天发送快捷键不可配置，只能 Enter 发送。
+- 原因分析：设置侧边栏顺序仍沿用此前信息架构；普通聊天、独立大窗和 Coding 输入分别在各自组件里硬编码 Enter 发送。
+- 解决方案：将通用分组移动到侧边栏最后；新增 `messageSendShortcut` 设置和统一的 `shouldSubmitMessage` 判断函数，让所有聊天输入入口共用 Enter / Command-Control+Enter 规则。
+- 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `src/features/chat/sendShortcut.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/i18n.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：输入快捷键这类交互偏好必须抽成共享判断，避免普通 chat 和 coding chat 行为分叉。
+- 是否需更新技术文档：否。

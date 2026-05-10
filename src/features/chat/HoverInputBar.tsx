@@ -8,6 +8,7 @@ import { streamChat } from '@/features/ai/aiService';
 import { recordBuiltinUsage, resolveChatConfig } from '@/features/ai/defaultModel';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
 import { getConversations, createConversation, insertMessage } from '@/lib/db';
+import { shouldSubmitMessage } from './sendShortcut';
 
 interface HoverInputBarProps {
   petName: string;
@@ -92,7 +93,7 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (shouldSubmitMessage(e, settings.messageSendShortcut)) {
       e.preventDefault();
       handleSend();
     }

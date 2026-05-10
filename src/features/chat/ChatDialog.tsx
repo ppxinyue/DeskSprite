@@ -24,6 +24,7 @@ import {
   createConversation,
   getConversations,
 } from '@/lib/db';
+import { shouldSubmitMessage } from './sendShortcut';
 import type { ChatMessage } from './chatStore';
 
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
@@ -252,7 +253,7 @@ export function ChatDialog({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (shouldSubmitMessage(e, settings.messageSendShortcut)) {
       e.preventDefault();
       handleSend();
     }
@@ -731,6 +732,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
                 onInputChange={(value) => updatePanel(panel.id, { input: value })}
                 onModelChange={(modelId) => updatePanel(panel.id, { modelId })}
                 onPasteImage={(image) => updatePanel(panel.id, { selectedImage: image })}
+                messageSendShortcut={settings.messageSendShortcut}
                 onSubmit={() => sendFromPanel(panel.id)}
                 onVoiceInput={() => {
                   const activeStop = panelVoiceStopsRef.current.get(panel.id);
@@ -1048,6 +1050,7 @@ function StandaloneChatPanel({
   onInputChange,
   onModelChange,
   onPasteImage,
+  messageSendShortcut,
   speakRate,
   onSubmit,
   onVoiceInput,
@@ -1064,6 +1067,7 @@ function StandaloneChatPanel({
   onInputChange: (value: string) => void;
   onModelChange: (value: string) => void;
   onPasteImage: (image: SelectedImage) => void;
+  messageSendShortcut: AppSettings['messageSendShortcut'];
   onSubmit: () => void;
   onVoiceInput: () => void;
   onVoiceStop: () => void;
@@ -1091,7 +1095,7 @@ function StandaloneChatPanel({
   }, [panel.input]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (shouldSubmitMessage(e, messageSendShortcut)) {
       e.preventDefault();
       onSubmit();
     }

@@ -1812,3 +1812,11 @@
 - 英文：扫描 `SettingsPanel.tsx` 设置文案，补齐个人/基础/显示/快捷键/屏蔽列表/游戏识别/音乐识别/短暂切换/API 配置等英文映射，以及 `自定义：...`、`默认：...`、`对话 n` 等动态翻译。
 - 验证：`pnpm exec tsc -b --pretty false`、设置页中文残留扫描脚本、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 488.14 kB，未触发 chunk 体积 warning。
 - 文件：SettingsPanel.tsx, i18n.ts, ISSUES.md, PROGRESS.md
+
+### R236. 通用目录后置与发送快捷键设置（2026-05-11）
+- 目录：设置左侧将“通用”分组移动到最后，保留基础、Timeline、快捷键三个入口。
+- 设置：快捷键页新增“发送消息”下拉项，可选择 Enter 发送或 Command/Control + Enter 发送。
+- 行为：普通悬浮小窗、大聊天窗口、多面板聊天、Coding 小窗和 Coding 大窗统一使用该发送规则；Shift+Enter 仍保留换行。
+- 英文：补充“发送消息”和发送快捷键说明的英文映射，并复查设置页短中文文案无残留缺口。
+- 验证：`pnpm exec tsc -b --pretty false`、设置页中文残留扫描脚本、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 488.37 kB，未触发 chunk 体积 warning。
+- 文件：App.tsx, ChatDialog.tsx, HoverInputBar.tsx, sendShortcut.ts, SettingsPanel.tsx, settingsStore.ts, i18n.ts, ISSUES.md, PROGRESS.md

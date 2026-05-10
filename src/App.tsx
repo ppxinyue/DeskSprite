@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
 import { Composer, MessageBubble } from "@/features/chat/ChatPrimitives";
+import { shouldSubmitMessage } from "@/features/chat/sendShortcut";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
 import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
@@ -855,7 +856,7 @@ function CodingDialog({
                       isStreaming={isWorking}
                       onInputChange={setInput}
                       onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
+                        if (shouldSubmitMessage(event, settings.messageSendShortcut)) {
                           event.preventDefault();
                           send();
                         }
@@ -927,7 +928,7 @@ function CodingDialog({
             isStreaming={isWorking}
             onInputChange={setInput}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (shouldSubmitMessage(event, settings.messageSendShortcut)) {
                 event.preventDefault();
                 send();
               }

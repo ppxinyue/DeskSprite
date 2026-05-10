@@ -58,14 +58,6 @@ const SECTION_GROUPS: Array<{
     ],
   },
   {
-    label: '通用',
-    items: [
-      { id: 'general', label: '基础', icon: Settings2 },
-      { id: 'timeline', label: 'Timeline', icon: BarChart3 },
-      { id: 'shortcuts', label: '快捷键', icon: Keyboard },
-    ],
-  },
-  {
     label: '外观',
     items: [
       { id: 'appearance', label: '显示', icon: Palette },
@@ -90,6 +82,14 @@ const SECTION_GROUPS: Array<{
       { id: 'coding', label: 'Coding 模式', icon: Terminal },
       { id: 'chatModel', label: 'Chat 模型', icon: MessageSquareText },
       { id: 'voiceModel', label: '语音模型', icon: Music2 },
+    ],
+  },
+  {
+    label: '通用',
+    items: [
+      { id: 'general', label: '基础', icon: Settings2 },
+      { id: 'timeline', label: 'Timeline', icon: BarChart3 },
+      { id: 'shortcuts', label: '快捷键', icon: Keyboard },
     ],
   },
 ];
@@ -3089,6 +3089,16 @@ function GeneralSection({
             </SettingRow>
             <SettingRow label="截图快捷键">
               <EditableInput value={settings.screenshotShortcut} onChange={(value) => updateSetting('screenshotShortcut', value)} className="w-48" />
+            </SettingRow>
+            <SettingRow label="发送消息" hint="选择聊天输入框的发送快捷键">
+              <select
+                className="px-2.5 py-1"
+                value={settings.messageSendShortcut}
+                onChange={(e) => updateSetting('messageSendShortcut', e.target.value as typeof settings.messageSendShortcut)}
+              >
+                <option value="enter">Enter</option>
+                <option value="mod-enter">Command / Control + Enter</option>
+              </select>
             </SettingRow>
           </SettingsGroup>
         </>

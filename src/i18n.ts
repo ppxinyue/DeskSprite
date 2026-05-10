@@ -43,6 +43,8 @@ const EN: Record<string, string> = {
   '默认开启，防止共享屏幕时灵宠进入画面': 'Enabled by default to keep the pet out of screen shares',
   '全局唤起': 'Global Shortcut',
   '截图快捷键': 'Screenshot Shortcut',
+  '发送消息': 'Send Message',
+  '选择聊天输入框的发送快捷键': 'Choose the shortcut used to send chat messages',
   '清除所有对话历史': 'Clear All Chat History',
   '删除所有 API 配置': 'Delete All API Configs',
   '导出对话资料 (JSON)': 'Export Chat Data (JSON)',

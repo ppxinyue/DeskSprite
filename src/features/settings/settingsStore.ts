@@ -10,6 +10,7 @@ export type AvatarRenderMode = 'pet' | 'orb';
 export type CodingProvider = 'codex' | 'claude';
 export type CodingSessionMode = 'new' | 'inherit';
 export type AppLanguage = 'zh' | 'en';
+export type MessageSendShortcut = 'enter' | 'mod-enter';
 
 export interface PetMotionSetting {
   enabled: boolean;
@@ -61,6 +62,7 @@ export interface AppSettings {
   hidePetDuringScreenShare: boolean;
   globalShortcut: string;
   screenshotShortcut: string;
+  messageSendShortcut: MessageSendShortcut;
   restReminderEnabled: boolean;
   restReminderIntervalMinutes: number;
   restDurationSeconds: number;
@@ -135,6 +137,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   hidePetDuringScreenShare: true,
   globalShortcut: 'CommandOrControl+Shift+P',
   screenshotShortcut: 'CommandOrControl+Shift+S',
+  messageSendShortcut: 'enter',
   restReminderEnabled: true,
   restReminderIntervalMinutes: 60,
   restDurationSeconds: 60,
@@ -208,6 +211,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
                   ? 'codex'
                 : key === 'codingSessionMode' && !isCodingSessionMode(parsed)
                   ? 'new'
+                : key === 'messageSendShortcut' && !isMessageSendShortcut(parsed)
+                  ? 'enter'
                 : (key === 'voiceInputProvider' || key === 'voiceOutputProvider') && !isVoiceProviderMode(parsed)
                   ? 'system'
                 : key === 'dialogWidth' && typeof parsed === 'number'
@@ -273,6 +278,10 @@ function isVoiceProviderMode(value: unknown): value is VoiceProviderMode {
 
 function isAppLanguage(value: unknown): value is AppLanguage {
   return value === 'zh' || value === 'en';
+}
+
+function isMessageSendShortcut(value: unknown): value is MessageSendShortcut {
+  return value === 'enter' || value === 'mod-enter';
 }
 
 function isModelMode(value: unknown): value is ModelMode {
