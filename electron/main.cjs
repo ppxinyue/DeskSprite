@@ -243,6 +243,19 @@ function centerBounds(widthRatio, heightRatio = widthRatio) {
   };
 }
 
+function centerBoundsForSize(targetWidth, targetHeight) {
+  const display = screen.getPrimaryDisplay();
+  const work = display.workArea;
+  const width = Math.min(targetWidth, Math.round(work.width * 0.92));
+  const height = Math.min(targetHeight, Math.round(work.height * 0.86));
+  return {
+    width,
+    height,
+    x: Math.round(work.x + (work.width - width) / 2),
+    y: Math.round(work.y + (work.height - height) / 2),
+  };
+}
+
 function createWindow(label, options) {
   const existing = windows.get(label);
   if (existing && !existing.isDestroyed()) return existing;
@@ -781,7 +794,7 @@ function createPetWindow() {
 function showSettingsWindow() {
   windows.get('compact-chat')?.hide();
   broadcast('compact-chat:collapsed', {});
-  const bounds = centerBounds(0.74, 0.78);
+  const bounds = centerBoundsForSize(980, 760);
   const win = createWindow('settings', {
     ...bounds,
     title: '',

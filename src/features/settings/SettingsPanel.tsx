@@ -144,10 +144,10 @@ function SectionTitle({ children, muted = false }: { children: ReactNode; muted?
 
 function SettingRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[56px] items-center justify-between gap-4 border-b border-[#e6e8eb] px-4 py-3 last:border-0 dark:border-white/10">
+    <div className="flex min-h-[48px] items-center justify-between gap-3 border-b border-[#e6e8eb] px-3.5 py-2.5 last:border-0 dark:border-white/10">
       <div className="min-w-0">
         <span className="text-[13px] font-medium leading-5 text-foreground">{label}</span>
-        {hint && <p className="mt-1 max-w-[420px] text-[11px] leading-5 text-muted-foreground">{hint}</p>}
+        {hint && <p className="mt-0.5 max-w-[420px] text-[11px] leading-4 text-muted-foreground">{hint}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2">{children}</div>
     </div>
@@ -156,10 +156,10 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
 
 function AppearanceRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[56px] items-center justify-between gap-4 border-b border-[#e6e8eb] px-4 py-3 last:border-0 dark:border-white/10">
+    <div className="flex min-h-[48px] items-center justify-between gap-3 border-b border-[#e6e8eb] px-3.5 py-2.5 last:border-0 dark:border-white/10">
       <div className="min-w-0">
         <span className="text-[13px] font-medium leading-5 text-foreground">{label}</span>
-        {hint && <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{hint}</p>}
+        {hint && <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{hint}</p>}
       </div>
       <div className="min-w-0 shrink-0">{children}</div>
     </div>
@@ -168,7 +168,7 @@ function AppearanceRow({ label, hint, children }: { label: string; hint?: string
 
 function SettingsGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`mb-6 overflow-hidden rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd]/72 shadow-[0_1px_0_rgba(255,255,255,0.76)_inset,0_14px_38px_rgba(52,64,84,0.06)] backdrop-blur-[26px] dark:border-white/10 dark:bg-white/[0.045] ${className}`}>
+    <div className={`mb-4 overflow-hidden rounded-[12px] border border-[#dfe3e6] bg-[#fbfcfd]/72 shadow-[0_1px_0_rgba(255,255,255,0.64)_inset,0_8px_22px_rgba(52,64,84,0.045)] backdrop-blur-[24px] dark:border-white/10 dark:bg-white/[0.045] ${className}`}>
       {children}
     </div>
   );

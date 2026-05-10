@@ -2591,3 +2591,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：设置页文案需要和实际运行限制同步，否则用户会误以为 GIF 与 PNG 的动作叠加逻辑相同。
 - 是否需更新技术文档：否。
+
+## ISSUE-218
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：设置开关弹性动效与窗口尺寸收紧
+- 严重程度：一般
+- 问题现象：设置页开关切换缺少弹性动效；通用、外观、提醒事项、AI 对话中的设置条目外框偏高偏胖；设置窗口默认宽度过大，右侧出现留白。
+- 原因分析：Switch 使用普通 `transition-all` 线性观感；设置行统一 `min-h-[56px]` 和较大的外层卡片间距；设置窗口按屏幕比例 `0.74` 取宽，在大屏上超过内容最大宽度。
+- 解决方案：Switch 轨道和圆点改为弹性 cubic-bezier；设置行高度、内边距、卡片圆角和阴影收紧；设置窗口改为 980x760 的内容驱动默认尺寸并保留小屏约束。
+- 涉及文件：`electron/main.cjs`, `src/components/ui/switch.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：设置窗口宽度应该跟侧栏和内容最大宽度绑定，避免使用屏幕比例造成不同设备上的空白不一致。
+- 是否需更新技术文档：否。

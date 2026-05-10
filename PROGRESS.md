@@ -1649,3 +1649,10 @@
 - 灵宠动作：增加说明“灵宠形象使用 GIF 动图时，不叠加动作效果”。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R213. 设置开关弹性动效与窗口尺寸收紧（2026-05-10）
+- 开关：所有 Switch 轨道和圆点改为 `cubic-bezier(0.34,1.56,0.64,1)` 弹性缓动，切换更轻快。
+- 设置条目：通用、外观、提醒事项、AI 对话共用的设置行高度从 56px 收紧到 48px，外层卡片圆角、阴影和间距同步减小。
+- 设置窗口：默认尺寸改为内容驱动的 980x760 居中窗口，并在小屏上自动不超过工作区，减少右侧空白。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
+- 文件：main.cjs, switch.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
