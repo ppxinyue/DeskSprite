@@ -2291,3 +2291,15 @@
 - 涉及文件：`src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：采样器生命周期必须稳定，不能被无关状态刷新打断；自身窗口应视为不可记录噪声。
 - 是否需更新技术文档：否。
+
+## ISSUE-193
+- 发现时间：2026-05-10
+- 发现者：用户提供 terminal 日志
+- 相关任务：Timeline 增强采集拆分与后台音乐修复
+- 严重程度：重要
+- 问题现象：日志中 Codex / Edge / WeChat 已经 `persist:ok`，但仍持续输出 `timeline-script:error`；用户运行后台音乐时，timeline 没有明确记录音乐后台进程。
+- 原因分析：完整增强脚本失败后虽然会 fallback 到简单前台窗口，保住主 timeline 落库，但 fallback 返回 `background: []` 且没有 URL；因此浏览器 URL 和后台 music / terminal marker 都被丢弃。NeteaseMusic 也没有被单独识别为音乐后台来源。
+- 解决方案：彻底移除 `readTimelineActiveWindow` 对完整增强脚本的依赖；前台窗口、浏览器 URL、后台进程改为独立采集并并行合并。后台进程扫描支持 Terminal、iTerm2、Music、Spotify、NeteaseMusic，网易云无法稳定读曲名时以轻量 `playing` marker 记录。
+- 涉及文件：`electron/main.cjs`, `src/lib/db.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：增强信息采集不能和基础窗口采集耦合；任何 app-specific AppleScript 都应是可失败的小模块，失败后只损失该字段，不影响整条 timeline。
+- 是否需更新技术文档：否。

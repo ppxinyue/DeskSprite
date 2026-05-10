@@ -165,7 +165,7 @@ function classifyTimelineCategory(appName: string, windowTitle: string, url: str
     }
     return 'browser';
   }
-  if (/(music|spotify|steam|网易云|vlc|quicktime|tv|podcasts)/.test(app)) return 'entertainment';
+  if (/(music|neteasemusic|spotify|steam|网易云|vlc|quicktime|tv|podcasts)/.test(app)) return 'entertainment';
   if (/(pages|numbers|keynote|word|excel|powerpoint|preview|finder|notion|obsidian|figma|photoshop|illustrator)/.test(app)) return 'office';
   return 'other';
 }

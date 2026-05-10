@@ -315,45 +315,6 @@ return frontApp & linefeed & frontWindow
 `;
 }
 
-function timelineActiveWindowScript() {
-  return `
-set frontApp to ""
-set frontWindow to ""
-set pageUrl to ""
-set backgroundInfo to ""
-
-tell application "System Events"
-  set frontAppProcess to first application process whose frontmost is true
-  set frontApp to name of frontAppProcess
-  try
-    set frontWindow to name of front window of frontAppProcess
-  end try
-  try
-    if exists application process "Terminal" then
-      set backgroundInfo to backgroundInfo & "terminal|Terminal|running" & linefeed
-    end if
-  end try
-  try
-    if exists application process "iTerm2" then
-      set backgroundInfo to backgroundInfo & "terminal|iTerm2|running" & linefeed
-    end if
-  end try
-  try
-    if exists application process "Spotify" then
-      set backgroundInfo to backgroundInfo & "music-check|Spotify|" & linefeed
-    end if
-  end try
-  try
-    if exists application process "Music" then
-      set backgroundInfo to backgroundInfo & "music-check|Music|" & linefeed
-    end if
-  end try
-end tell
-
-return frontApp & linefeed & frontWindow & linefeed & pageUrl & linefeed & backgroundInfo
-`;
-}
-
 function browserUrlScript(appName) {
   switch (appName) {
     case 'Safari':
@@ -387,6 +348,42 @@ tell application "${appName}"
 end tell
 return ""
 `;
+}
+
+function backgroundProcessScript() {
+  return `
+set processNames to ""
+tell application "System Events"
+  repeat with proc in every application process
+    set processNames to processNames & (name of proc as text) & linefeed
+  end repeat
+end tell
+return processNames
+`;
+}
+
+function terminalDetailScript(appName) {
+  if (appName === 'Terminal') {
+    return `
+tell application "Terminal"
+  if (count of windows) > 0 then
+    return name of front window
+  end if
+end tell
+return "running"
+`;
+  }
+  if (appName === 'iTerm2') {
+    return `
+tell application "iTerm2"
+  if (count of windows) > 0 then
+    return name of current window
+  end if
+end tell
+return "running"
+`;
+  }
+  return '';
 }
 
 function petPresenceContextScript() {
@@ -439,28 +436,6 @@ function readActiveWindow() {
   });
 }
 
-function parseTimelineBackground(raw) {
-  return String(raw || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const [type = 'other', name = '', detail = ''] = line.split('|');
-      return { type, name, detail };
-    })
-    .filter((item) => item.type !== 'music-check')
-    .filter((item) => item.name);
-}
-
-function parseMusicChecks(raw) {
-  return String(raw || '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('music-check|'))
-    .map((line) => line.split('|')[1])
-    .filter(Boolean);
-}
-
 function parseTimelineMarkerLine(line) {
   const [type = '', name = '', detail = ''] = String(line || '').split('|');
   return type && name ? { type, name, detail } : null;
@@ -496,67 +471,97 @@ function readNowPlaying(appName) {
   });
 }
 
-function readTimelineActiveWindow() {
+function readRunningProcessNames() {
   if (process.platform !== 'darwin') {
-    return Promise.resolve({ supported: false, appName: '', windowTitle: '', url: '', background: [], error: 'unsupported' });
+    return Promise.resolve([]);
   }
   return new Promise((resolve) => {
-    execFile('/usr/bin/osascript', ['-e', timelineActiveWindowScript()], { timeout: 2500 }, async (error, stdout, stderr) => {
+    execFile('/usr/bin/osascript', ['-e', backgroundProcessScript()], { timeout: 1800 }, (error, stdout, stderr) => {
       if (error) {
         const detail = stderr || error.message || String(error);
-        timelineDebugLog({ stage: 'timeline-script:error', error: detail });
-        const fallback = await readActiveWindow();
-        if (fallback.supported && !fallback.error && (fallback.appName || fallback.windowTitle)) {
-          timelineDebugLog({
-            stage: 'timeline-script:fallback',
-            message: 'using simple active window snapshot',
-            appName: fallback.appName,
-            windowTitle: fallback.windowTitle,
-          });
-          resolve({
-            supported: true,
-            appName: fallback.appName,
-            windowTitle: fallback.windowTitle,
-            url: '',
-            background: [],
-            error: null,
-            checkedAt: Date.now(),
-          });
-          return;
-        }
-        resolve({ ...fallback, url: '', background: [], error: fallback.error || detail });
+        timelineDebugLog({ stage: 'background:error', error: detail });
+        resolve([]);
         return;
       }
-      const [appName = '', windowTitle = '', _url = '', ...backgroundParts] = String(stdout || '').trimEnd().split('\n');
-      const normalizedAppName = appName.trim();
-      const normalizedWindowTitle = windowTitle.trim();
-      const rawBackground = backgroundParts.join('\n');
-      Promise.all([
-        readBrowserUrl(normalizedAppName),
-        ...parseMusicChecks(rawBackground).map((musicAppName) => readNowPlaying(musicAppName)),
-      ]).then(([url, ...musicMarkers]) => {
-      const background = [
-        ...parseTimelineBackground(rawBackground),
-        ...musicMarkers.filter(Boolean),
-      ];
-      timelineDebugLog({
-        stage: 'osascript:sample',
-        appName: normalizedAppName,
-        windowTitle: normalizedWindowTitle,
-        url,
-      });
-      resolve({
-        supported: true,
-        appName: normalizedAppName,
-        windowTitle: normalizedWindowTitle,
-        url,
-        background,
-        error: null,
-        checkedAt: Date.now(),
-      });
-      });
+      resolve(String(stdout || '').split('\n').map((line) => line.trim()).filter(Boolean));
     });
   });
+}
+
+function readTerminalDetail(appName) {
+  const script = terminalDetailScript(appName);
+  if (!script) return Promise.resolve('running');
+  return new Promise((resolve) => {
+    execFile('/usr/bin/osascript', ['-e', script], { timeout: 1500 }, (error, stdout, stderr) => {
+      if (error) {
+        timelineDebugLog({ stage: 'terminal:error', appName, error: stderr || error.message || String(error) });
+        resolve('running');
+        return;
+      }
+      resolve(String(stdout || '').trim() || 'running');
+    });
+  });
+}
+
+function hasProcess(processNames, candidates) {
+  const names = new Set(processNames.map((name) => name.toLowerCase()));
+  return candidates.find((candidate) => names.has(candidate.toLowerCase())) || '';
+}
+
+async function readTimelineBackgroundMarkers() {
+  const processes = await readRunningProcessNames();
+  if (!processes.length) return [];
+
+  const markers = [];
+  const terminalApps = ['Terminal', 'iTerm2'].filter((name) => hasProcess(processes, [name]));
+  const terminalMarkers = await Promise.all(terminalApps.map(async (name) => ({
+    type: 'terminal',
+    name,
+    detail: await readTerminalDetail(name),
+  })));
+  markers.push(...terminalMarkers);
+
+  const musicApps = ['Music', 'Spotify'].filter((name) => hasProcess(processes, [name]));
+  const musicMarkers = await Promise.all(musicApps.map((name) => readNowPlaying(name)));
+  markers.push(...musicMarkers.filter(Boolean));
+
+  const netease = hasProcess(processes, ['NeteaseMusic', '网易云音乐']);
+  if (netease) {
+    markers.push({ type: 'music', name: netease, detail: 'playing' });
+  }
+
+  return markers;
+}
+
+async function readTimelineActiveWindow() {
+  if (process.platform !== 'darwin') {
+    return { supported: false, appName: '', windowTitle: '', url: '', background: [], error: 'unsupported' };
+  }
+  const active = await readActiveWindow();
+  if (!active.supported || active.error || (!active.appName && !active.windowTitle)) {
+    return { ...active, url: '', background: [], error: active.error || 'empty active window', checkedAt: Date.now() };
+  }
+
+  const [url, background] = await Promise.all([
+    readBrowserUrl(active.appName),
+    readTimelineBackgroundMarkers(),
+  ]);
+  timelineDebugLog({
+    stage: 'timeline:sample',
+    appName: active.appName,
+    windowTitle: active.windowTitle,
+    url,
+    message: `background=${background.length}`,
+  });
+  return {
+    supported: true,
+    appName: active.appName,
+    windowTitle: active.windowTitle,
+    url,
+    background,
+    error: null,
+    checkedAt: Date.now(),
+  };
 }
 
 function ensureAccessibilityPermission() {

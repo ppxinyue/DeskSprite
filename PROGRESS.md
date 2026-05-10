@@ -1464,3 +1464,12 @@
 - 测试：新增 “Electron foreground ignored” 单测，覆盖启动自身窗口不抢占 active 的场景。
 - 验证：`pnpm test:timeline`、`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, ISSUES.md, PROGRESS.md
+
+### R188. Timeline 增强采集拆分与后台音乐修复（2026-05-10）
+- 根因：前台 timeline 已通过简单 fallback 正常落库，但失败的增强 AppleScript 每次都会丢弃 URL 和后台 marker，因此后台音乐不会显示在 timeline 上。
+- 修复：`readTimelineActiveWindow` 不再调用失败的大脚本，改为简单前台窗口、浏览器 URL、后台进程三条独立采集链路。
+- 后台：新增独立后台进程扫描，Terminal / iTerm2 尽量读取窗口标题，Music / Spotify 读取正在播放曲目，NeteaseMusic 以 `music / playing` 轻量 marker 记录。
+- 分类：将 `NeteaseMusic` 归入 entertainment，避免网易云前台使用时落入 other。
+- 日志：采样成功统一打印 `timeline:sample ... background=N`，不再刷 `timeline-script:error`。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, db.ts, ISSUES.md, PROGRESS.md
