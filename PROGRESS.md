@@ -1358,3 +1358,11 @@
 - 顶部卡片：个人档案顶部新增第 4 张“Coding 模式时长”卡片，当前按 timeline 中 `coding` 分类累计展示。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R175. Timeline 视觉与后台轨道细化（2026-05-10）
+- 主 Timeline：分段色块改用更柔和的 Radix 色阶渐变和轻内描边，降低色块厚重感，整体更接近 Apple 风格。
+- 滚动动效：时间轴自动滚动只在组件首次进入视口时触发一次，点击色块不再触发从 0 点重新滑动。
+- 后台进程：并行后台从绝对定位小标签重做为清晰轨道，左侧显示进程、中央用时间范围胶囊对齐全天时间、右侧显示时间。
+- Mock 边界：示例数据严格只使用 app 名、窗口标题、浏览器 URL；聊天 app 不再 mock 具体聊天内容，VSCode 只展示窗口标题里的文件/项目名。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

@@ -409,15 +409,17 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
 const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
   label: string;
   color: string;
+  fill: string;
+  fillTop: string;
   soft: string;
   Icon: typeof Monitor;
 }> = {
-  coding: { label: 'Coding', color: '#3b9eff', soft: 'rgba(59,158,255,0.16)', Icon: Terminal },
-  chat: { label: 'Chat', color: '#30a46c', soft: 'rgba(48,164,108,0.14)', Icon: MessageSquareText },
-  browser: { label: '浏览器', color: '#8b8d98', soft: 'rgba(139,141,152,0.16)', Icon: Globe2 },
-  office: { label: '办公', color: '#ad7f58', soft: 'rgba(173,127,88,0.15)', Icon: BriefcaseBusiness },
-  entertainment: { label: '娱乐', color: '#e93d82', soft: 'rgba(233,61,130,0.13)', Icon: Gamepad2 },
-  other: { label: '其他', color: '#6f6f74', soft: 'rgba(111,111,116,0.12)', Icon: Monitor },
+  coding: { label: 'Coding', color: '#0090ff', fill: '#8ec8ff', fillTop: '#d4efff', soft: 'rgba(0,144,255,0.12)', Icon: Terminal },
+  chat: { label: 'Chat', color: '#218358', fill: '#9dd9b3', fillTop: '#dff6e7', soft: 'rgba(33,131,88,0.11)', Icon: MessageSquareText },
+  browser: { label: '浏览器', color: '#697177', fill: '#c9cdd2', fillTop: '#f0f1f3', soft: 'rgba(105,113,119,0.12)', Icon: Globe2 },
+  office: { label: '办公', color: '#ad5700', fill: '#f3ba63', fillTop: '#fff1cf', soft: 'rgba(173,87,0,0.11)', Icon: BriefcaseBusiness },
+  entertainment: { label: '娱乐', color: '#cd1d8d', fill: '#f4a9d8', fillTop: '#ffe3f4', soft: 'rgba(205,29,141,0.11)', Icon: Gamepad2 },
+  other: { label: '其他', color: '#60646c', fill: '#b9bbc6', fillTop: '#eceef3', soft: 'rgba(96,100,108,0.11)', Icon: Monitor },
 };
 
 function TimelineSection({
@@ -435,6 +437,7 @@ function TimelineSection({
   const selected = entries.find((entry) => entry.id === selectedId) ?? entries.at(-1) ?? null;
   const isMockPreview = entries.some((entry) => entry.id < 0);
   const selectedGroup = selected ? getTimelineActivityGroup(entries, selected) : [];
+  const animationPlayedRef = useRef(false);
   const visibleCategories = (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[])
     .filter((category) => entries.some((entry) => entry.category === category));
   const topApps = getTopTimelineApps(entries);
@@ -451,18 +454,29 @@ function TimelineSection({
   useEffect(() => {
     const node = scrollRef.current;
     if (!node) return;
+    if (animationPlayedRef.current) return;
     const progress = date === getLocalDateKey()
       ? getTimelineDayProgress(new Date().toISOString())
       : selected
         ? getTimelineDayProgress(selected.endedAt)
         : 0;
-    node.scrollLeft = 0;
-    const frame = window.requestAnimationFrame(() => {
-      const target = Math.max(0, progress * node.scrollWidth - node.clientWidth / 2);
-      node.scrollTo({ left: target, behavior: 'smooth' });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [date, selected?.id, entries.length]);
+    const animateIntoView = () => {
+      animationPlayedRef.current = true;
+      node.scrollLeft = 0;
+      window.requestAnimationFrame(() => {
+        const target = Math.max(0, progress * node.scrollWidth - node.clientWidth / 2);
+        node.scrollTo({ left: target, behavior: 'smooth' });
+      });
+    };
+    const observer = new IntersectionObserver((items) => {
+      if (items.some((item) => item.isIntersecting)) {
+        observer.disconnect();
+        animateIntoView();
+      }
+    }, { threshold: 0.45 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <SettingsGroup className="mt-4 px-4 py-4">
@@ -488,7 +502,7 @@ function TimelineSection({
 
       <div ref={scrollRef} className="overflow-x-auto pb-2">
         <div className="min-w-[960px]">
-          <div className="rounded-[14px] border border-[#dfe3e6] bg-[#f8f9fa] p-4 dark:border-white/10 dark:bg-white/[0.035]">
+          <div className="rounded-[16px] border border-[#dfe3e6] bg-[#f7f8f9] p-4 shadow-[0_1px_0_rgba(255,255,255,0.76)_inset] dark:border-white/10 dark:bg-white/[0.035]">
             <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
               {visibleCategories.map((category) => {
                 const meta = TIMELINE_CATEGORY_META[category];
@@ -515,7 +529,7 @@ function TimelineSection({
                 </div>
               ))}
 
-              <div className="absolute inset-x-0 top-7 h-12 overflow-hidden rounded-[14px] bg-[#eceef0] shadow-[0_1px_0_rgba(255,255,255,0.85)_inset] dark:bg-white/8">
+              <div className="absolute inset-x-0 top-7 h-12 overflow-hidden rounded-[15px] border border-[#dde1e4] bg-[#edf0f2] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_10px_24px_rgba(28,32,36,0.04)] dark:border-white/10 dark:bg-white/8">
                 {entries.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-[12px] text-muted-foreground">
                     今天还没有足够长的焦点窗口记录
@@ -533,14 +547,19 @@ function TimelineSection({
             </div>
 
             {backgroundMarkers.length > 0 && (
-              <div className="relative mt-3 min-h-[58px] rounded-[11px] bg-white/58 px-0 py-2 dark:bg-white/[0.035]">
-                {backgroundMarkers.slice(-8).map((marker, index) => (
-                  <BackgroundTimelineMarker
-                    key={`${marker.entryId}-${marker.type}-${marker.name}-${index}`}
-                    marker={marker}
-                    row={index % 2}
-                  />
-                ))}
+              <div className="mt-3 rounded-[13px] border border-[#e1e4e8] bg-white/72 p-3 dark:border-white/10 dark:bg-white/[0.035]">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-[#687076] dark:text-white/60">
+                  <Music2 className="h-3.5 w-3.5" />
+                  并行后台
+                </div>
+                <div className="space-y-2.5">
+                  {backgroundMarkers.slice(-5).map((marker, index) => (
+                    <BackgroundTimelineMarker
+                      key={`${marker.entryId}-${marker.type}-${marker.name}-${index}`}
+                      marker={marker}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -640,7 +659,14 @@ function TimelineSegment({ entry, entries, selected, onSelect }: { entry: Timeli
       className={`group absolute inset-y-0 overflow-visible transition-[filter,opacity] duration-150 ${
         selected ? 'z-10 brightness-[0.92]' : 'hover:z-20 hover:brightness-[0.96]'
       }`}
-      style={{ left, width, backgroundColor: meta.color, opacity: selected ? 0.72 : 0.46 }}
+      style={{
+        left,
+        width,
+        background: `linear-gradient(180deg, ${meta.fillTop} 0%, ${meta.fill} 100%)`,
+        boxShadow: selected
+          ? `inset 0 0 0 1px ${meta.color}, inset 0 1px 0 rgba(255,255,255,0.75)`
+          : 'inset 1px 0 0 rgba(255,255,255,0.55), inset -1px 0 0 rgba(255,255,255,0.45)',
+      }}
       onClick={onSelect}
       title={`${entry.appName} · ${topContent}`}
     >
@@ -654,19 +680,29 @@ function TimelineSegment({ entry, entries, selected, onSelect }: { entry: Timeli
 
 function BackgroundTimelineMarker({
   marker,
-  row,
 }: {
   marker: TimelineEntry['backgroundMarkers'][number] & { entryId: number; startedAt: string; endedAt: string };
-  row: number;
 }) {
   const left = `${getTimelineDayProgress(marker.startedAt) * 100}%`;
   const width = `${Math.max(1.2, ((new Date(marker.endedAt).getTime() - new Date(marker.startedAt).getTime()) / 86_400_000) * 100)}%`;
   return (
-    <div className="absolute" style={{ left, width, top: `${row * 24 + 6}px` }}>
-      <div className="h-3 border-x border-t border-[#c1c8cd] dark:border-white/18" />
-      <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] font-medium text-[#687076] dark:text-white/58">
+    <div className="grid grid-cols-[120px_1fr_92px] items-center gap-3">
+      <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-medium text-[#687076] dark:text-white/58">
         {marker.type === 'music' ? <Music2 className="h-3 w-3 shrink-0" /> : <Terminal className="h-3 w-3 shrink-0" />}
         <span className="truncate">{marker.name}{marker.detail ? ` · ${marker.detail}` : ''}</span>
+      </div>
+      <div className="relative h-4 rounded-full bg-[#eef0f2] dark:bg-white/8">
+        <div
+          className="absolute top-1/2 h-px -translate-y-1/2 bg-[#8b8d98]/55"
+          style={{ left, width }}
+        />
+        <div
+          className="absolute top-1/2 h-2.5 -translate-y-1/2 rounded-full border border-[#8b8d98]/55 bg-white shadow-sm dark:bg-[#1c1c1f]"
+          style={{ left, width }}
+        />
+      </div>
+      <div className="text-right text-[10px] tabular-nums text-[#8b8d98]">
+        {formatTimelineClock(marker.startedAt)} - {formatTimelineClock(marker.endedAt)}
       </div>
     </div>
   );
@@ -714,17 +750,17 @@ function createMockTimelineEntries(dateKey: string): TimelineEntry[] {
       { type: 'terminal', name: 'iTerm2', detail: 'pnpm electron:dev' },
       { type: 'music', name: 'Music', detail: 'Nujabes - Aruarian Dance' },
     ]),
-    item(-3, '10:31', '10:52', 'WeChat', '项目 UI 调整沟通', 'chat'),
+    item(-3, '10:31', '10:52', 'WeChat', 'WeChat', 'chat'),
     item(-4, '11:02', '11:38', 'Terminal', 'codex-electron-rewrite · pnpm build', 'coding'),
     item(-5, '13:16', '13:34', 'Safari', 'Apple Human Interface Guidelines', 'browser', 'https://developer.apple.com/design/human-interface-guidelines/'),
     item(-6, '13:34', '13:51', 'Safari', 'Radix UI Colors - Palette composition', 'browser', 'https://www.radix-ui.com/colors/docs/palette-composition/composing-a-palette'),
     item(-7, '13:51', '14:02', 'Safari', 'Transitions.dev - Number pop-in', 'browser', 'https://www.transitions.dev/docs/number-pop-in'),
     item(-8, '14:05', '14:42', 'Keynote', 'DeskSprite Timeline UI Review.key', 'office'),
-    item(-9, '15:03', '15:37', 'Slack', 'design-system / timeline mock', 'chat', null, [
+    item(-9, '15:03', '15:37', 'Slack', 'Slack - design-system', 'chat', null, [
       { type: 'music', name: 'Spotify', detail: 'Tycho - Awake' },
     ]),
     item(-10, '16:12', '16:54', 'Arc', 'YouTube - tiny desk concert', 'entertainment', 'https://www.youtube.com/watch?v=mock-preview'),
-    item(-11, '17:10', '18:08', 'Visual Studio Code', 'timeline-renderer.tsx', 'coding', null, [
+    item(-11, '17:10', '18:08', 'Visual Studio Code', 'timeline-renderer.tsx - DeskSprite', 'coding', null, [
       { type: 'terminal', name: 'Terminal', detail: 'vite build --watch' },
     ]),
   ];
