@@ -1351,3 +1351,10 @@
 - 统计：Top3 软件改成横向柱状图，新增全天各小时活跃度柱状图，合并成一个整体 Apple / Radix 风格统计面板。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R174. Timeline 默认今日与打开滚动动效（2026-05-10）
+- 个人档案：默认日期改回今天，避免真实采样写入今天后页面仍停留在昨天 mock。
+- Timeline：每次打开 / 切换日期时，横向时间轴先从 0 点开始，再平滑滚动到当前时刻居中；历史日期则滚到当前选中活动附近。
+- 顶部卡片：个人档案顶部新增第 4 张“Coding 模式时长”卡片，当前按 timeline 中 `coding` 分类累计展示。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

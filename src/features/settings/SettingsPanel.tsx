@@ -211,7 +211,7 @@ function CollapsedUnavailableRow({ title, reason }: { title: string; reason: str
 }
 
 function ProfileSection() {
-  const [selectedDate, setSelectedDate] = useState(() => shiftDateKey(getLocalDateKey(), -1));
+  const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey(getLocalDateKey()));
   const [stats, setStats] = useState<FocusStatsDay[]>([]);
@@ -271,6 +271,9 @@ function ProfileSection() {
   const totalFocusMs = stats.reduce((sum, day) => sum + day.focusMs, 0);
   const totalSessions = stats.reduce((sum, day) => sum + day.focusSessions, 0);
   const totalDistractions = stats.reduce((sum, day) => sum + day.distractions, 0);
+  const codingTimelineMs = timelineEntries
+    .filter((entry) => entry.category === 'coding')
+    .reduce((sum, entry) => sum + getTimelineDurationMs(entry), 0);
   const todayKey = getLocalDateKey();
 
   return (
@@ -320,10 +323,11 @@ function ProfileSection() {
         </div>
       </div>
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid gap-3 sm:grid-cols-4">
         <StatsCard label="专注时长" value={formatFocusDuration(selectedStats.focusMs)} accent />
         <StatsCard label="专注次数" value={`${selectedStats.focusSessions} 次`} />
         <StatsCard label="分心次数" value={`${selectedStats.distractions} 次`} />
+        <StatsCard label="Coding 模式时长" value={formatFocusDuration(codingTimelineMs)} />
       </div>
 
       <SettingsGroup className="px-4 py-4">
@@ -375,6 +379,7 @@ function ProfileSection() {
       </SettingsGroup>
 
       <TimelineSection
+        date={selectedDate}
         entries={timelineEntries}
         selectedId={selectedTimelineId}
         onSelect={setSelectedTimelineId}
@@ -416,14 +421,17 @@ const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
 };
 
 function TimelineSection({
+  date,
   entries,
   selectedId,
   onSelect,
 }: {
+  date: string;
   entries: TimelineEntry[];
   selectedId: number | null;
   onSelect: (id: number | null) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
   const selected = entries.find((entry) => entry.id === selectedId) ?? entries.at(-1) ?? null;
   const isMockPreview = entries.some((entry) => entry.id < 0);
   const selectedGroup = selected ? getTimelineActivityGroup(entries, selected) : [];
@@ -439,6 +447,22 @@ function TimelineSection({
     startedAt: entry.startedAt,
     endedAt: entry.endedAt,
   })));
+
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const progress = date === getLocalDateKey()
+      ? getTimelineDayProgress(new Date().toISOString())
+      : selected
+        ? getTimelineDayProgress(selected.endedAt)
+        : 0;
+    node.scrollLeft = 0;
+    const frame = window.requestAnimationFrame(() => {
+      const target = Math.max(0, progress * node.scrollWidth - node.clientWidth / 2);
+      node.scrollTo({ left: target, behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [date, selected?.id, entries.length]);
 
   return (
     <SettingsGroup className="mt-4 px-4 py-4">
@@ -462,7 +486,7 @@ function TimelineSection({
         </div>
       </div>
 
-      <div className="overflow-x-auto pb-2">
+      <div ref={scrollRef} className="overflow-x-auto pb-2">
         <div className="min-w-[960px]">
           <div className="rounded-[14px] border border-[#dfe3e6] bg-[#f8f9fa] p-4 dark:border-white/10 dark:bg-white/[0.035]">
             <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
