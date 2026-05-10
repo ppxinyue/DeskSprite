@@ -2843,3 +2843,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：浮层定位不能只靠视口夹紧，卡片自身尺寸也要随内容收缩。
 - 是否需更新技术文档：否。
+
+## ISSUE-239
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：设置页信息层级与目录重排
+- 严重程度：一般
+- 问题现象：设置页功能项过度集中在少数目录里，信息层级主要依赖边框，通用/提醒/AI 等页面同时承载多个沟通线程。
+- 原因分析：此前按功能大页组织，后续新增 Timeline、Coding、列表管理、语音模型等功能后，目录没有同步拆分；视觉上卡片和行都依赖 border，空间层级不足。
+- 解决方案：侧边栏按大类分组并拆出单一任务入口；设置卡片改用 elevation、模糊和间距建立层级，弱化硬边框；统一侧边栏图标、标签圆角和列表 token 节奏。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `src/components/layouts/SettingsLayout.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：设置页的信息架构应随着功能增长持续拆分，视觉层级优先用空间和 elevation，不应让 border 承担主要沟通。
+- 是否需更新技术文档：否。

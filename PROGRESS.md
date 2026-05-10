@@ -1797,3 +1797,10 @@
 - 定位：hover 定位使用估算后的实际宽度，靠右片段更容易完整显示；正文从 3 行收敛到 2 行并允许断词换行。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 486.44 kB，未触发 chunk 体积 warning。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R234. 设置页信息层级与目录重排（2026-05-10）
+- 目录：侧边栏改为大类分组，拆出基础、Timeline、游戏识别、音乐识别、快捷键、显示、自定义形象、灵宠动作、休息提醒、专注模式、屏蔽应用、屏蔽关键词、内置额度、Coding 模式、Chat 模型、语音模型。
+- 层级：设置卡片减少硬边框，改用半透明材质、模糊和 elevation 区分层级；行内分隔线弱化为细微 inset 线。
+- 节奏：侧边栏图标统一 16px，标签圆角统一为 8px；列表 token 和额度卡片也改成轻量 elevation。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 486.44 kB，未触发 chunk 体积 warning。
+- 文件：SettingsPanel.tsx, SettingsLayout.tsx, ISSUES.md, PROGRESS.md

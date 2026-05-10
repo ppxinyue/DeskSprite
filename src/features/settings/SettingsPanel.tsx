@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bot, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Gamepad2, Globe2, Loader2, MessageSquareText, Monitor, Music2, Palette, PawPrint, Pencil, Plus, Settings2, Terminal, Trash2, UserRound } from 'lucide-react';
+import { BarChart3, Bell, Bot, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Gamepad2, Globe2, Keyboard, Layers3, Loader2, MessageSquareText, Monitor, Music2, Palette, PawPrint, Pencil, Plus, Settings2, ShieldAlert, Sparkles, Terminal, Trash2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,18 +24,76 @@ import { emit, listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { ComponentProps, MouseEvent, ReactNode } from 'react';
 
-type SettingsSection = 'profile' | 'appearance' | 'reminders' | 'ai' | 'history' | 'general';
+type SettingsSection =
+  | 'profile'
+  | 'history'
+  | 'general'
+  | 'timeline'
+  | 'games'
+  | 'music'
+  | 'shortcuts'
+  | 'appearance'
+  | 'avatar'
+  | 'motion'
+  | 'rest'
+  | 'focus'
+  | 'blockedApps'
+  | 'blockedKeywords'
+  | 'aiQuota'
+  | 'coding'
+  | 'chatModel'
+  | 'voiceModel';
 const ALLOWED_STATIC_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp']);
 const ALLOWED_GIF_EXTENSIONS = new Set(['gif']);
 const MASKED_API_KEY = '••••••••';
 
-const SECTIONS: { id: SettingsSection; label: string; icon: typeof Palette }[] = [
-  { id: 'profile', label: '个人档案', icon: UserRound },
-  { id: 'general', label: '通用', icon: Settings2 },
-  { id: 'appearance', label: '外观', icon: Palette },
-  { id: 'reminders', label: '提醒事项', icon: Bell },
-  { id: 'ai', label: 'AI 对话', icon: Bot },
-  { id: 'history', label: '对话历史', icon: Clock3 },
+const SECTION_GROUPS: Array<{
+  label: string;
+  items: { id: SettingsSection; label: string; icon: typeof Palette }[];
+}> = [
+  {
+    label: '个人',
+    items: [
+      { id: 'profile', label: '个人档案', icon: UserRound },
+      { id: 'history', label: '对话历史', icon: Clock3 },
+    ],
+  },
+  {
+    label: '通用',
+    items: [
+      { id: 'general', label: '基础', icon: Settings2 },
+      { id: 'timeline', label: 'Timeline', icon: BarChart3 },
+      { id: 'games', label: '游戏识别', icon: Gamepad2 },
+      { id: 'music', label: '音乐识别', icon: Music2 },
+      { id: 'shortcuts', label: '快捷键', icon: Keyboard },
+    ],
+  },
+  {
+    label: '外观',
+    items: [
+      { id: 'appearance', label: '显示', icon: Palette },
+      { id: 'avatar', label: '自定义形象', icon: PawPrint },
+      { id: 'motion', label: '灵宠动作', icon: Sparkles },
+    ],
+  },
+  {
+    label: '专注与提醒',
+    items: [
+      { id: 'rest', label: '休息提醒', icon: Bell },
+      { id: 'focus', label: '专注模式', icon: BriefcaseBusiness },
+      { id: 'blockedApps', label: '屏蔽应用', icon: ShieldAlert },
+      { id: 'blockedKeywords', label: '屏蔽关键词', icon: Layers3 },
+    ],
+  },
+  {
+    label: 'AI',
+    items: [
+      { id: 'aiQuota', label: '内置额度', icon: Bot },
+      { id: 'coding', label: 'Coding 模式', icon: Terminal },
+      { id: 'chatModel', label: 'Chat 模型', icon: MessageSquareText },
+      { id: 'voiceModel', label: '语音模型', icon: Music2 },
+    ],
+  },
 ];
 
 export function SettingsPanel() {
@@ -60,37 +118,45 @@ export function SettingsPanel() {
 
   const sidebar = (
     <>
-      {SECTIONS.map((s) => {
-        const Icon = s.icon;
-        return (
-        <button
-          key={s.id}
-          className={`group flex h-9 w-full items-center gap-2 rounded-[9px] px-2.5 text-left text-[13px] font-medium transition-all duration-200 ${
-            activeSection === s.id
-              ? 'bg-background/72 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.72)_inset,0_8px_22px_rgba(42,38,31,0.06)]'
-              : 'text-muted-foreground hover:bg-background/42 hover:text-foreground'
-          }`}
-          onClick={() => setActiveSection(s.id)}
-        >
-          <Icon className={`h-[17px] w-[17px] transition-transform duration-200 ${activeSection === s.id ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground group-hover:scale-105'}`} />
-          <span>{s.label}</span>
-        </button>
-      );
-      })}
+      {SECTION_GROUPS.map((group, groupIndex) => (
+        <div key={group.label} className={groupIndex === 0 ? 'space-y-1' : 'mt-5 space-y-1'}>
+          <div className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.11em] text-muted-foreground/58">
+            {group.label}
+          </div>
+          {group.items.map((s) => {
+            const Icon = s.icon;
+            return (
+              <button
+                key={s.id}
+                className={`group flex h-8 w-full items-center gap-2 rounded-[8px] px-2.5 text-left text-[12px] font-medium transition-all duration-200 ${
+                  activeSection === s.id
+                    ? 'bg-white/64 text-foreground shadow-[0_8px_22px_rgba(52,64,84,0.075),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.075]'
+                    : 'text-muted-foreground hover:bg-white/34 hover:text-foreground dark:hover:bg-white/[0.055]'
+                }`}
+                onClick={() => setActiveSection(s.id)}
+              >
+                <Icon className={`h-4 w-4 shrink-0 transition-colors duration-200 ${activeSection === s.id ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
+                <span className="truncate">{s.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
     </>
   );
 
   return (
     <SettingsLayout sidebar={sidebar}>
       {activeSection === 'profile' && <ProfileSection />}
-      {activeSection === 'appearance' && (
-        <AppearanceSection settings={settings} updateSettings={updateSettings} />
+      {(['appearance', 'avatar', 'motion'] as SettingsSection[]).includes(activeSection) && (
+        <AppearanceSection settings={settings} updateSettings={updateSettings} view={activeSection as 'appearance' | 'avatar' | 'motion'} />
       )}
-      {activeSection === 'reminders' && (
-        <RemindersSection settings={settings} updateSettings={updateSettings} />
+      {(['rest', 'focus', 'blockedApps', 'blockedKeywords'] as SettingsSection[]).includes(activeSection) && (
+        <RemindersSection settings={settings} updateSettings={updateSettings} view={activeSection as 'rest' | 'focus' | 'blockedApps' | 'blockedKeywords'} />
       )}
-      {activeSection === 'ai' && (
+      {(['aiQuota', 'coding', 'chatModel', 'voiceModel'] as SettingsSection[]).includes(activeSection) && (
         <AISection
+          view={activeSection as 'aiQuota' | 'coding' | 'chatModel' | 'voiceModel'}
           settings={settings}
           updateSetting={updateSetting}
           updateSettings={updateSettings}
@@ -128,8 +194,8 @@ export function SettingsPanel() {
         />
       )}
       {activeSection === 'history' && <HistorySection />}
-      {activeSection === 'general' && (
-        <GeneralSection settings={settings} updateSetting={updateSetting} />
+      {(['general', 'timeline', 'games', 'music', 'shortcuts'] as SettingsSection[]).includes(activeSection) && (
+        <GeneralSection settings={settings} updateSetting={updateSetting} view={activeSection as 'general' | 'timeline' | 'games' | 'music' | 'shortcuts'} />
       )}
     </SettingsLayout>
   );
@@ -137,7 +203,7 @@ export function SettingsPanel() {
 
 function SectionTitle({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
   return (
-    <h2 className={`mb-2 text-[18px] font-semibold tracking-[-0.018em] ${muted ? 'text-muted-foreground/55' : 'text-foreground'}`}>
+    <h2 className={`mb-3 text-[20px] font-semibold leading-tight tracking-[-0.022em] ${muted ? 'text-muted-foreground/55' : 'text-foreground'}`}>
       {children}
     </h2>
   );
@@ -145,7 +211,7 @@ function SectionTitle({ children, muted = false }: { children: ReactNode; muted?
 
 function SettingRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[48px] items-center justify-between gap-3 border-b border-[#e6e8eb] px-3.5 py-2.5 last:border-0 dark:border-white/10">
+    <div className="relative flex min-h-[46px] items-center justify-between gap-3 px-3.5 py-2.5 after:absolute after:bottom-0 after:left-3.5 after:right-3.5 after:h-px after:bg-foreground/[0.055] last:after:hidden dark:after:bg-white/[0.065]">
       <div className="min-w-0">
         <span className="text-[13px] font-medium leading-5 text-foreground">{label}</span>
         {hint && <p className="mt-0.5 max-w-[420px] text-[11px] leading-4 text-muted-foreground">{hint}</p>}
@@ -157,7 +223,7 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
 
 function AppearanceRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[48px] items-center justify-between gap-3 border-b border-[#e6e8eb] px-3.5 py-2.5 last:border-0 dark:border-white/10">
+    <div className="relative flex min-h-[46px] items-center justify-between gap-3 px-3.5 py-2.5 after:absolute after:bottom-0 after:left-3.5 after:right-3.5 after:h-px after:bg-foreground/[0.055] last:after:hidden dark:after:bg-white/[0.065]">
       <div className="min-w-0">
         <span className="text-[13px] font-medium leading-5 text-foreground">{label}</span>
         {hint && <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{hint}</p>}
@@ -169,7 +235,7 @@ function AppearanceRow({ label, hint, children }: { label: string; hint?: string
 
 function SettingsGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`mb-4 overflow-hidden rounded-[12px] border border-[#dfe3e6] bg-[#fbfcfd]/72 shadow-[0_1px_0_rgba(255,255,255,0.64)_inset,0_8px_22px_rgba(52,64,84,0.045)] backdrop-blur-[24px] dark:border-white/10 dark:bg-white/[0.045] ${className}`}>
+    <div className={`mb-5 overflow-hidden rounded-[14px] bg-white/58 shadow-[0_18px_46px_rgba(52,64,84,0.075),0_1px_0_rgba(255,255,255,0.78)_inset] backdrop-blur-[28px] dark:bg-white/[0.055] dark:shadow-[0_18px_48px_rgba(0,0,0,0.22),0_1px_0_rgba(255,255,255,0.08)_inset] ${className}`}>
       {children}
     </div>
   );
@@ -286,13 +352,13 @@ function RuleTokenEditor({
   };
 
   return (
-    <div className="flex min-h-[86px] flex-wrap content-start gap-2 rounded-[14px] border border-input/75 bg-[var(--surface-raised)] p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.68)_inset,0_8px_22px_rgba(52,64,84,0.045)]">
+    <div className="flex min-h-[86px] flex-wrap content-start gap-2 rounded-[14px] bg-white/44 p-2.5 shadow-[0_12px_30px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.045]">
       {items.map((item, index) => {
         const empty = item.trim() === '';
         return (
           <div
             key={`rule-token-${index}`}
-            className="group flex h-8 items-center rounded-[9px] border border-[var(--glass-border)] bg-white/44 shadow-[0_1px_0_rgba(255,255,255,0.66)_inset] transition-colors focus-within:border-ring/55 focus-within:bg-[var(--glass-bg-strong)] dark:bg-white/[0.055]"
+            className="group flex h-8 items-center rounded-[8px] bg-white/58 shadow-[0_6px_16px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.68)_inset] transition-colors focus-within:bg-[var(--glass-bg-strong)] dark:bg-white/[0.07]"
           >
             <input
               value={item}
@@ -318,7 +384,7 @@ function RuleTokenEditor({
             />
             <button
               type="button"
-              className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] text-[14px] leading-none text-muted-foreground transition hover:bg-white/70 hover:text-foreground dark:hover:bg-white/10"
+              className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[8px] text-[14px] leading-none text-muted-foreground transition hover:bg-white/70 hover:text-foreground dark:hover:bg-white/10"
               onClick={() => deleteItem(index)}
               aria-label={`删除 ${item || addLabel}`}
             >
@@ -329,7 +395,7 @@ function RuleTokenEditor({
       })}
       <button
         type="button"
-        className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-dashed border-[#b8c0c6] bg-white/28 text-muted-foreground transition hover:border-[#2f8fff]/55 hover:bg-white/58 hover:text-[#2f8fff] dark:border-white/18 dark:bg-white/[0.035] dark:hover:bg-white/10"
+        className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-white/32 text-muted-foreground shadow-[0_6px_16px_rgba(52,64,84,0.045)] transition hover:bg-white/58 hover:text-[#2f8fff] dark:bg-white/[0.045] dark:hover:bg-white/10"
         onClick={addItem}
         aria-label={addLabel}
       >
@@ -1317,9 +1383,11 @@ function ProfileCalendar({
 function AppearanceSection({
   settings,
   updateSettings,
+  view,
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSettings: import('./settingsStore').SettingsState['updateSettings'];
+  view: 'appearance' | 'avatar' | 'motion';
 }) {
   const [draft, setDraft] = useState({
     petOpacity: settings.petOpacity,
@@ -1354,85 +1422,70 @@ function AppearanceSection({
 
   return (
     <>
-      <div className="mb-5">
-        <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.018em] text-foreground">外观设置</h1>
-      </div>
+      {view === 'appearance' && (
+        <>
+          <SectionTitle>显示</SectionTitle>
+          <SettingsGroup>
+            <AppearanceRow label="形象模式">
+              <AvatarModeSelect
+                value={draft.avatarRenderMode}
+                onChange={(avatarRenderMode) => update('avatarRenderMode', avatarRenderMode)}
+              />
+            </AppearanceRow>
+            <AppearanceRow label="主题">
+              <ThemeSelect
+                value={draft.theme}
+                onChange={(theme) => update('theme', theme)}
+              />
+            </AppearanceRow>
+            <AppearanceRow label="灵宠/悬浮球透明度">
+              <div className="flex max-w-[320px] items-center gap-3">
+                <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.petOpacity.toFixed(1)}</span>
+                <Slider value={[draft.petOpacity]} onValueChange={([v]) => update('petOpacity', v)} min={0.6} max={1} step={0.05} className="w-52" />
+              </div>
+            </AppearanceRow>
+            <AppearanceRow label="灵宠/悬浮球大小">
+              <div className="flex max-w-[320px] items-center gap-3">
+                <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.petScale.toFixed(1)}</span>
+                <Slider value={[draft.petScale]} onValueChange={([v]) => update('petScale', v)} min={0.5} max={2} step={0.1} className="w-52" />
+              </div>
+            </AppearanceRow>
+            <AppearanceRow label="对话框宽度">
+              <div className="flex max-w-[320px] items-center gap-3">
+                <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.dialogWidth}px</span>
+                <Slider value={[draft.dialogWidth]} onValueChange={([v]) => update('dialogWidth', v)} min={200} max={600} step={10} className="w-52" />
+              </div>
+            </AppearanceRow>
+            <AppearanceRow label="对话字号">
+              <div className="flex max-w-[320px] items-center gap-3">
+                <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.compactChatFontSize}px</span>
+                <Slider value={[draft.compactChatFontSize]} onValueChange={([v]) => update('compactChatFontSize', v)} min={11} max={15} step={1} className="w-52" />
+              </div>
+            </AppearanceRow>
+            <AppearanceRow label="始终置顶显示" hint="穿越全屏应用">
+              <Switch checked={draft.alwaysOnTop} onCheckedChange={(v) => update('alwaysOnTop', v)} />
+            </AppearanceRow>
+          </SettingsGroup>
+        </>
+      )}
 
-      <SettingsGroup>
-        <AppearanceRow label="形象模式">
-          <AvatarModeSelect
-            value={draft.avatarRenderMode}
-            onChange={(avatarRenderMode) => update('avatarRenderMode', avatarRenderMode)}
-          />
-        </AppearanceRow>
-      </SettingsGroup>
-
-      <SettingsGroup>
-        <AppearanceRow label="主题">
-          <ThemeSelect
-            value={draft.theme}
-            onChange={(theme) => update('theme', theme)}
-          />
-        </AppearanceRow>
-        <AppearanceRow label="灵宠/悬浮球透明度">
-          <div className="flex max-w-[320px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.petOpacity.toFixed(1)}</span>
-            <Slider
-              value={[draft.petOpacity]}
-              onValueChange={([v]) => update('petOpacity', v)}
-              min={0.6} max={1} step={0.05} className="w-52"
-            />
-          </div>
-        </AppearanceRow>
-        <AppearanceRow label="灵宠/悬浮球大小">
-          <div className="flex max-w-[320px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.petScale.toFixed(1)}</span>
-            <Slider
-              value={[draft.petScale]}
-              onValueChange={([v]) => update('petScale', v)}
-              min={0.5} max={2} step={0.1} className="w-52"
-            />
-          </div>
-        </AppearanceRow>
-        <AppearanceRow label="对话框宽度">
-          <div className="flex max-w-[320px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.dialogWidth}px</span>
-            <Slider
-              value={[draft.dialogWidth]}
-              onValueChange={([v]) => update('dialogWidth', v)}
-              min={200} max={600} step={10} className="w-52"
-            />
-          </div>
-        </AppearanceRow>
-        <AppearanceRow label="对话字号">
-          <div className="flex max-w-[320px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.compactChatFontSize}px</span>
-            <Slider
-              value={[draft.compactChatFontSize]}
-              onValueChange={([v]) => update('compactChatFontSize', v)}
-              min={11} max={15} step={1} className="w-52"
-            />
-          </div>
-        </AppearanceRow>
-        <AppearanceRow label="始终置顶显示" hint="穿越全屏应用">
-          <Switch
-            checked={draft.alwaysOnTop}
-            onCheckedChange={(v) => update('alwaysOnTop', v)}
-          />
-        </AppearanceRow>
-      </SettingsGroup>
-
-      {orbMode ? (
-        <CollapsedUnavailableSection title="自定义形象" reason="Orb 模式由程序绘制，图片与 GIF 设置已收起" />
+      {view === 'avatar' && (orbMode ? (
+        <>
+          <SectionTitle>自定义形象</SectionTitle>
+          <CollapsedUnavailableSection title="自定义形象" reason="Orb 模式由程序绘制，图片与 GIF 设置已收起" />
+        </>
       ) : (
         <>
           <SectionTitle>自定义形象</SectionTitle>
           <ImageSection />
         </>
-      )}
+      ))}
 
-      {orbMode ? (
-        <CollapsedUnavailableSection title="灵宠动作" reason="Orb 模式使用代码动效，不需要图片动作参数" />
+      {view === 'motion' && (orbMode ? (
+        <>
+          <SectionTitle>灵宠动作</SectionTitle>
+          <CollapsedUnavailableSection title="灵宠动作" reason="Orb 模式使用代码动效，不需要图片动作参数" />
+        </>
       ) : (
         <>
           <SectionTitle>灵宠动作</SectionTitle>
@@ -1448,7 +1501,7 @@ function AppearanceSection({
             </div>
           </SettingsGroup>
         </>
-      )}
+      ))}
 
     </>
   );
@@ -1457,9 +1510,11 @@ function AppearanceSection({
 function RemindersSection({
   settings,
   updateSettings,
+  view,
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSettings: import('./settingsStore').SettingsState['updateSettings'];
+  view: 'rest' | 'focus' | 'blockedApps' | 'blockedKeywords';
 }) {
   const [draft, setDraft] = useState({
     restReminderEnabled: settings.restReminderEnabled,
@@ -1529,97 +1584,90 @@ function RemindersSection({
     }
   };
 
+  const ApplyFooter = () => (
+    <div className="flex items-center justify-end gap-2 px-3.5 py-3">
+      {savedPulse && <span className="text-[11px] text-muted-foreground">已应用，前端计时已刷新</span>}
+      <Button
+        size="sm"
+        onClick={handleApply}
+        disabled={!dirty || saving}
+        className="h-8 rounded-[9px] px-3 text-[12px]"
+      >
+        {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}
+        确认
+      </Button>
+    </div>
+  );
+
   return (
     <>
-      <SectionTitle>休息提醒</SectionTitle>
-      <SettingsGroup>
-        <AppearanceRow label="休息喝水提醒">
-          <Switch
-            checked={draft.restReminderEnabled}
-            onCheckedChange={(v) => update('restReminderEnabled', v)}
-          />
-        </AppearanceRow>
-        <AppearanceRow label="提醒间隔">
-          <div className="flex max-w-[320px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.restReminderIntervalMinutes}min</span>
-            <Slider
-              value={[draft.restReminderIntervalMinutes]}
-              onValueChange={([v]) => update('restReminderIntervalMinutes', v)}
-              min={1} max={120} step={1} className="w-52"
-            />
-          </div>
-        </AppearanceRow>
-        <AppearanceRow label="休息时长">
-          <div className="flex max-w-[320px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{Math.round(draft.restDurationSeconds / 60)}min</span>
-            <Slider
-              value={[draft.restDurationSeconds]}
-              onValueChange={([v]) => update('restDurationSeconds', v)}
-              min={60} max={7200} step={60} className="w-52"
-            />
-          </div>
-        </AppearanceRow>
-      </SettingsGroup>
+      {view === 'rest' && (
+        <>
+          <SectionTitle>休息提醒</SectionTitle>
+          <SettingsGroup>
+            <AppearanceRow label="休息喝水提醒">
+              <Switch checked={draft.restReminderEnabled} onCheckedChange={(v) => update('restReminderEnabled', v)} />
+            </AppearanceRow>
+            <AppearanceRow label="提醒间隔">
+              <div className="flex max-w-[320px] items-center gap-3">
+                <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.restReminderIntervalMinutes}min</span>
+                <Slider value={[draft.restReminderIntervalMinutes]} onValueChange={([v]) => update('restReminderIntervalMinutes', v)} min={1} max={120} step={1} className="w-52" />
+              </div>
+            </AppearanceRow>
+            <AppearanceRow label="休息时长">
+              <div className="flex max-w-[320px] items-center gap-3">
+                <span className="w-12 text-right text-[11px] text-muted-foreground">{Math.round(draft.restDurationSeconds / 60)}min</span>
+                <Slider value={[draft.restDurationSeconds]} onValueChange={([v]) => update('restDurationSeconds', v)} min={60} max={7200} step={60} className="w-52" />
+              </div>
+            </AppearanceRow>
+            <ApplyFooter />
+          </SettingsGroup>
+        </>
+      )}
 
-      <SectionTitle>专注模式</SectionTitle>
-      <SettingsGroup>
-        <AppearanceRow label="专注时长">
-          <div className="flex max-w-[320px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.focusDurationMinutes}min</span>
-            <Slider
-              value={[draft.focusDurationMinutes]}
-              onValueChange={([v]) => update('focusDurationMinutes', v)}
-              min={1} max={120} step={1} className="w-52"
-            />
-          </div>
-        </AppearanceRow>
-        <AppearanceRow label="分心检测">
-          <Switch
-            checked={draft.distractionDetectionEnabled}
-            onCheckedChange={(v) => update('distractionDetectionEnabled', v)}
-          />
-        </AppearanceRow>
-        <AppearanceRow label="检测宽限期">
-          <div className="flex max-w-[320px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.distractionGraceSeconds}s</span>
-            <Slider
-              value={[draft.distractionGraceSeconds]}
-              onValueChange={([v]) => update('distractionGraceSeconds', v)}
-              min={0} max={60} step={1} className="w-52"
-            />
-          </div>
-        </AppearanceRow>
-        <div className="grid gap-3 px-4 py-4">
-          <div>
-            <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽应用</div>
-            <RuleTokenEditor
-              value={draft.distractionBlockedApps}
-              onChange={(value) => update('distractionBlockedApps', value)}
-              addLabel="添加应用"
-            />
-          </div>
-          <div>
-            <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽关键词</div>
-            <RuleTokenEditor
-              value={draft.distractionBlockedKeywords}
-              onChange={(value) => update('distractionBlockedKeywords', value)}
-              addLabel="添加关键词"
-            />
-          </div>
-        </div>
-        <div className="flex items-center justify-end gap-2 border-t border-border/45 py-3">
-          {savedPulse && <span className="text-[11px] text-muted-foreground">已应用，前端计时已刷新</span>}
-          <Button
-            size="sm"
-            onClick={handleApply}
-            disabled={!dirty || saving}
-            className="h-8 rounded-[9px] px-3 text-[12px]"
-          >
-            {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}
-            确认
-          </Button>
-        </div>
-      </SettingsGroup>
+      {view === 'focus' && (
+        <>
+          <SectionTitle>专注模式</SectionTitle>
+          <SettingsGroup>
+            <AppearanceRow label="专注时长">
+              <div className="flex max-w-[320px] items-center gap-3">
+                <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.focusDurationMinutes}min</span>
+                <Slider value={[draft.focusDurationMinutes]} onValueChange={([v]) => update('focusDurationMinutes', v)} min={1} max={120} step={1} className="w-52" />
+              </div>
+            </AppearanceRow>
+            <AppearanceRow label="分心检测">
+              <Switch checked={draft.distractionDetectionEnabled} onCheckedChange={(v) => update('distractionDetectionEnabled', v)} />
+            </AppearanceRow>
+            <AppearanceRow label="检测宽限期">
+              <div className="flex max-w-[320px] items-center gap-3">
+                <span className="w-12 text-right text-[11px] text-muted-foreground">{draft.distractionGraceSeconds}s</span>
+                <Slider value={[draft.distractionGraceSeconds]} onValueChange={([v]) => update('distractionGraceSeconds', v)} min={0} max={60} step={1} className="w-52" />
+              </div>
+            </AppearanceRow>
+            <ApplyFooter />
+          </SettingsGroup>
+        </>
+      )}
+
+      {view === 'blockedApps' && (
+        <>
+          <SectionTitle>屏蔽应用</SectionTitle>
+          <SettingsGroup className="p-4">
+            <RuleTokenEditor value={draft.distractionBlockedApps} onChange={(value) => update('distractionBlockedApps', value)} addLabel="添加应用" />
+            <ApplyFooter />
+          </SettingsGroup>
+        </>
+      )}
+
+      {view === 'blockedKeywords' && (
+        <>
+          <SectionTitle>屏蔽关键词</SectionTitle>
+          <SettingsGroup className="p-4">
+            <RuleTokenEditor value={draft.distractionBlockedKeywords} onChange={(value) => update('distractionBlockedKeywords', value)} addLabel="添加关键词" />
+            <ApplyFooter />
+          </SettingsGroup>
+        </>
+      )}
     </>
   );
 }
@@ -2480,11 +2528,13 @@ async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; mes
 }
 
 function AISection({
+  view,
   settings, updateSetting, systemPrompt, setSystemPrompt, orbSystemPrompt, setOrbSystemPrompt,
   updateSettings,
   configs, onAdd, onEdit, onDelete, onSetDefault, onTest, testResults, testingConfigId,
   isModalOpen, setIsModalOpen, editingConfig,
 }: {
+  view: 'aiQuota' | 'coding' | 'chatModel' | 'voiceModel';
   settings: import('./settingsStore').AppSettings;
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
   updateSettings: import('./settingsStore').SettingsState['updateSettings'];
@@ -2668,42 +2718,36 @@ function AISection({
 
   return (
     <>
-      <SectionTitle>内置额度</SectionTitle>
-      <SettingsGroup>
-        <div className="px-4 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <span className="font-medium text-[13px]">CloseAI 默认服务</span>
-              <span className="text-[11px] text-muted-foreground ml-2">Key: 内置隐藏</span>
+      {view === 'aiQuota' && (
+        <>
+          <SectionTitle>内置额度</SectionTitle>
+          <SettingsGroup>
+            <div className="px-4 py-4">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <span className="font-medium text-[13px]">CloseAI 默认服务</span>
+                  <span className="text-[11px] text-muted-foreground ml-2">Key: 内置隐藏</span>
+                </div>
+                <span className="rounded-[7px] bg-secondary px-2 py-1 text-[11px] text-secondary-foreground">本机额度</span>
+              </div>
+              <div className="grid gap-1 text-[11px] text-muted-foreground">
+                <div>Chat: {BUILTIN_CLOSEAI_CONFIG.model}</div>
+                <div>STT: {BUILTIN_STT_MODEL}</div>
+                <div>TTS: {BUILTIN_TTS_MODEL}</div>
+                <div>{BUILTIN_CLOSEAI_CONFIG.baseUrl}</div>
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <UsageMeter label="Chat" value={builtinUsage?.chat.percent ?? 0} detail={`${formatCompactNumber(builtinUsage?.chat.used ?? 0)} / ${formatCompactNumber(builtinUsage?.chat.limit ?? 100000)} token`} />
+                <UsageMeter label="STT" value={builtinUsage?.voice.stt.percent ?? 0} detail={`${formatDurationSeconds(builtinUsage?.voice.stt.used ?? 0)} / ${formatDurationSeconds(builtinUsage?.voice.stt.limit ?? 3600)}`} />
+                <UsageMeter label="TTS" value={builtinUsage?.voice.tts.percent ?? 0} detail={`${formatCompactNumber(builtinUsage?.voice.tts.used ?? 0)} / ${formatCompactNumber(builtinUsage?.voice.tts.limit ?? 100000)} 字符`} />
+              </div>
             </div>
-            <span className="rounded bg-secondary px-2 py-1 text-[11px] text-secondary-foreground">本机额度</span>
-          </div>
-          <div className="grid gap-1 text-[11px] text-muted-foreground">
-            <div>Chat: {BUILTIN_CLOSEAI_CONFIG.model}</div>
-            <div>STT: {BUILTIN_STT_MODEL}</div>
-            <div>TTS: {BUILTIN_TTS_MODEL}</div>
-            <div>{BUILTIN_CLOSEAI_CONFIG.baseUrl}</div>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <UsageMeter
-              label="Chat"
-              value={builtinUsage?.chat.percent ?? 0}
-              detail={`${formatCompactNumber(builtinUsage?.chat.used ?? 0)} / ${formatCompactNumber(builtinUsage?.chat.limit ?? 100000)} token`}
-            />
-            <UsageMeter
-              label="STT"
-              value={builtinUsage?.voice.stt.percent ?? 0}
-              detail={`${formatDurationSeconds(builtinUsage?.voice.stt.used ?? 0)} / ${formatDurationSeconds(builtinUsage?.voice.stt.limit ?? 3600)}`}
-            />
-            <UsageMeter
-              label="TTS"
-              value={builtinUsage?.voice.tts.percent ?? 0}
-              detail={`${formatCompactNumber(builtinUsage?.voice.tts.used ?? 0)} / ${formatCompactNumber(builtinUsage?.voice.tts.limit ?? 100000)} 字符`}
-            />
-          </div>
-        </div>
-      </SettingsGroup>
+          </SettingsGroup>
+        </>
+      )}
 
+      {view === 'coding' && (
+        <>
       <SectionTitle>Coding 模式</SectionTitle>
       <SettingsGroup>
         {([
@@ -2737,7 +2781,11 @@ function AISection({
           </SettingRow>
         ))}
       </SettingsGroup>
+        </>
+      )}
 
+      {view === 'chatModel' && (
+        <>
       <SectionTitle>Chat 模型</SectionTitle>
       <SettingsGroup>
         <SettingRow
@@ -2819,7 +2867,11 @@ function AISection({
           </div>
         </div>
       </SettingsGroup>
+        </>
+      )}
 
+      {view === 'voiceModel' && (
+        <>
       <SectionTitle>语音模型</SectionTitle>
       <SettingsGroup>
         <SettingRow
@@ -2908,6 +2960,8 @@ function AISection({
           </div>
         </SettingRow>
       </SettingsGroup>
+        </>
+      )}
 
       <ApiConfigModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editingConfig={editingConfig} />
     </>
@@ -2917,7 +2971,7 @@ function AISection({
 function UsageMeter({ label, value, detail }: { label: string; value: number; detail: string }) {
   const percent = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
   return (
-    <div className="rounded-md border border-border/70 bg-background/70 px-2.5 py-2">
+    <div className="rounded-[10px] bg-white/42 px-2.5 py-2 shadow-[0_8px_20px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.64)_inset] dark:bg-white/[0.055]">
       <div className="flex items-center justify-between gap-2 text-[11px]">
         <span className="font-medium">{label}</span>
         <span className="text-muted-foreground">{percent}%</span>
@@ -2942,10 +2996,11 @@ function formatDurationSeconds(seconds: number) {
 }
 
 function GeneralSection({
-  settings, updateSetting,
+  settings, updateSetting, view,
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
+  view: 'general' | 'timeline' | 'games' | 'music' | 'shortcuts';
 }) {
   useEffect(() => {
     invoke<boolean>('get_launch_at_login')
@@ -2962,77 +3017,82 @@ function GeneralSection({
 
   return (
     <>
-      <SectionTitle>通用</SectionTitle>
-
-      <SettingsGroup>
-        <SettingRow label="语言" hint="选择界面显示语言">
-          <LanguageSelect
-            value={settings.appLanguage}
-            onChange={(value) => updateSetting('appLanguage', value)}
-          />
-        </SettingRow>
-        <SettingRow label="开机自启" hint="登录 macOS 后自动启动 DeskSprite">
-          <Switch checked={settings.launchAtLogin} onCheckedChange={updateLaunchAtLogin} />
-        </SettingRow>
-        <SettingRow label="Timeline 记录" hint="不开专注模式也会全程记录达到最小时长的前台窗口">
-          <Switch checked={settings.timelineRecordingEnabled} onCheckedChange={(v) => updateSetting('timelineRecordingEnabled', v)} />
-        </SettingRow>
-        <SettingRow label="Timeline 最小时长" hint="短于该时长的快速切屏不会记录，也不会打断当前 app 时段">
-          <div className="flex max-w-[260px] items-center gap-3">
-            <span className="w-12 text-right text-[11px] text-muted-foreground">{settings.timelineMinSegmentMinutes}min</span>
-            <Slider
-              value={[settings.timelineMinSegmentMinutes]}
-              onValueChange={([v]) => updateSetting('timelineMinSegmentMinutes', v)}
-              min={1}
-              max={20}
-              step={1}
-              className="w-40"
-            />
+      {view === 'general' && (
+        <>
+          <SectionTitle>基础</SectionTitle>
+          <SettingsGroup>
+            <SettingRow label="语言" hint="选择界面显示语言">
+              <LanguageSelect value={settings.appLanguage} onChange={(value) => updateSetting('appLanguage', value)} />
+            </SettingRow>
+            <SettingRow label="开机自启" hint="登录 macOS 后自动启动 DeskSprite">
+              <Switch checked={settings.launchAtLogin} onCheckedChange={updateLaunchAtLogin} />
+            </SettingRow>
+            <SettingRow label="共享屏幕时隐藏灵宠" hint="默认开启，防止共享屏幕时灵宠进入画面">
+              <Switch checked={settings.hidePetDuringScreenShare} onCheckedChange={(v) => updateSetting('hidePetDuringScreenShare', v)} />
+            </SettingRow>
+          </SettingsGroup>
+          <div className="space-y-2 pt-1">
+            <Button variant="destructive" size="sm" disabled>清除所有对话历史</Button>
+            <Button variant="destructive" size="sm" disabled>删除所有 API 配置</Button>
+            <Button variant="outline" size="sm" disabled>导出对话资料 (JSON)</Button>
           </div>
-        </SettingRow>
-        <div className="border-b border-[#e6e8eb] px-3.5 py-3 dark:border-white/10">
-          <div className="mb-1.5 text-[13px] font-medium text-foreground">游戏识别列表</div>
-          <p className="mb-2 text-[11px] leading-4 text-muted-foreground">
-            当用户正在进行以下游戏时，会自动取消置顶，并暂停 Timeline 刷新监测，以保证游戏性能。
-          </p>
-          <RuleTokenEditor
-            value={settings.gameAppKeywords}
-            onChange={(value) => updateSetting('gameAppKeywords', cleanRuleList(value))}
-            addLabel="添加游戏"
-          />
-        </div>
-        <div className="border-b border-[#e6e8eb] px-3.5 py-3 dark:border-white/10">
-          <div className="mb-1.5 text-[13px] font-medium text-foreground">音乐软件列表</div>
-          <p className="mb-2 text-[11px] leading-4 text-muted-foreground">
-            只有这些音乐软件处于播放状态时，才会作为后台音乐标注到 Timeline。
-          </p>
-          <RuleTokenEditor
-            value={settings.musicAppKeywords}
-            onChange={(value) => updateSetting('musicAppKeywords', cleanRuleList(value))}
-            addLabel="添加音乐软件"
-          />
-        </div>
-        <SettingRow label="共享屏幕时隐藏灵宠" hint="默认开启，防止共享屏幕时灵宠进入画面">
-          <Switch checked={settings.hidePetDuringScreenShare} onCheckedChange={(v) => updateSetting('hidePetDuringScreenShare', v)} />
-        </SettingRow>
-      </SettingsGroup>
+        </>
+      )}
 
-      <SettingsGroup>
-        <SettingRow label="全局唤起">
-          <EditableInput value={settings.globalShortcut} onChange={(value) => updateSetting('globalShortcut', value)} className="w-48" />
-        </SettingRow>
-        <SettingRow label="截图快捷键">
-          <EditableInput value={settings.screenshotShortcut} onChange={(value) => updateSetting('screenshotShortcut', value)} className="w-48" />
-        </SettingRow>
-      </SettingsGroup>
+      {view === 'timeline' && (
+        <>
+          <SectionTitle>Timeline</SectionTitle>
+          <SettingsGroup>
+            <SettingRow label="Timeline 记录" hint="不开专注模式也会全程记录达到最小时长的前台窗口">
+              <Switch checked={settings.timelineRecordingEnabled} onCheckedChange={(v) => updateSetting('timelineRecordingEnabled', v)} />
+            </SettingRow>
+            <SettingRow label="Timeline 最小时长" hint="短于该时长的快速切屏不会记录，也不会打断当前 app 时段">
+              <div className="flex max-w-[260px] items-center gap-3">
+                <span className="w-12 text-right text-[11px] text-muted-foreground">{settings.timelineMinSegmentMinutes}min</span>
+                <Slider value={[settings.timelineMinSegmentMinutes]} onValueChange={([v]) => updateSetting('timelineMinSegmentMinutes', v)} min={1} max={20} step={1} className="w-40" />
+              </div>
+            </SettingRow>
+          </SettingsGroup>
+        </>
+      )}
 
-      <div className="space-y-3 pt-1">
-        <Button variant="destructive" size="sm" disabled>清除所有对话历史</Button>
-        <br />
-        <Button variant="destructive" size="sm" disabled>删除所有 API 配置</Button>
-        <br />
-        <Button variant="outline" size="sm" disabled>导出对话资料 (JSON)</Button>
-      </div>
+      {view === 'games' && (
+        <>
+          <SectionTitle>游戏识别</SectionTitle>
+          <SettingsGroup className="p-4">
+            <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
+              当用户正在进行以下游戏时，会自动取消置顶，并暂停 Timeline 刷新监测，以保证游戏性能。
+            </p>
+            <RuleTokenEditor value={settings.gameAppKeywords} onChange={(value) => updateSetting('gameAppKeywords', cleanRuleList(value))} addLabel="添加游戏" />
+          </SettingsGroup>
+        </>
+      )}
+
+      {view === 'music' && (
+        <>
+          <SectionTitle>音乐识别</SectionTitle>
+          <SettingsGroup className="p-4">
+            <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
+              只有这些音乐软件处于播放状态时，才会作为后台音乐标注到 Timeline。
+            </p>
+            <RuleTokenEditor value={settings.musicAppKeywords} onChange={(value) => updateSetting('musicAppKeywords', cleanRuleList(value))} addLabel="添加音乐软件" />
+          </SettingsGroup>
+        </>
+      )}
+
+      {view === 'shortcuts' && (
+        <>
+          <SectionTitle>快捷键</SectionTitle>
+          <SettingsGroup>
+            <SettingRow label="全局唤起">
+              <EditableInput value={settings.globalShortcut} onChange={(value) => updateSetting('globalShortcut', value)} className="w-48" />
+            </SettingRow>
+            <SettingRow label="截图快捷键">
+              <EditableInput value={settings.screenshotShortcut} onChange={(value) => updateSetting('screenshotShortcut', value)} className="w-48" />
+            </SettingRow>
+          </SettingsGroup>
+        </>
+      )}
     </>
   );
 }
