@@ -2303,3 +2303,15 @@
 - 涉及文件：`electron/main.cjs`, `src/lib/db.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：增强信息采集不能和基础窗口采集耦合；任何 app-specific AppleScript 都应是可失败的小模块，失败后只损失该字段，不影响整条 timeline。
 - 是否需更新技术文档：否。
+
+## ISSUE-194
+- 发现时间：2026-05-10
+- 发现者：用户提供 terminal 日志
+- 相关任务：Timeline 后台进程快照修复
+- 严重程度：一般
+- 问题现象：后台进程扫描偶发 `System Events ... 不能获得 item ... 无效的索引 (-1719)`，但前台窗口仍可正常采样。
+- 原因分析：AppleScript 遍历 `every application process` 时，macOS 进程列表是动态变化的；遍历期间有进程退出或新增会导致索引失效。
+- 解决方案：不再逐项遍历动态列表，改成一次性读取 `name of every application process` 快照并 join 输出。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：System Events 的动态集合不适合长循环遍历，能一次性取属性列表就不要逐项访问。
+- 是否需更新技术文档：否。

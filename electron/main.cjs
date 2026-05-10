@@ -352,13 +352,14 @@ return ""
 
 function backgroundProcessScript() {
   return `
-set processNames to ""
+set oldDelimiters to AppleScript's text item delimiters
+set AppleScript's text item delimiters to linefeed
 tell application "System Events"
-  repeat with proc in every application process
-    set processNames to processNames & (name of proc as text) & linefeed
-  end repeat
+  set processNames to name of every application process
 end tell
-return processNames
+set processText to processNames as text
+set AppleScript's text item delimiters to oldDelimiters
+return processText
 `;
 }
 

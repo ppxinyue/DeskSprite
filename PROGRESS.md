@@ -1473,3 +1473,9 @@
 - 日志：采样成功统一打印 `timeline:sample ... background=N`，不再刷 `timeline-script:error`。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, db.ts, ISSUES.md, PROGRESS.md
+
+### R189. Timeline 后台进程快照修复（2026-05-10）
+- 根因：后台扫描用 `repeat with proc in every application process` 遍历 System Events 动态进程列表，进程列表变化时会出现 “invalid index”。
+- 修复：改为一次性读取 `name of every application process` 快照，再用 linefeed join 成文本，避免遍历期间索引失效。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md
