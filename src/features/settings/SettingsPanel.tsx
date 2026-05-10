@@ -211,7 +211,7 @@ function CollapsedUnavailableRow({ title, reason }: { title: string; reason: str
 }
 
 function ProfileSection() {
-  const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
+  const [selectedDate, setSelectedDate] = useState(() => shiftDateKey(getLocalDateKey(), -1));
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey(getLocalDateKey()));
   const [stats, setStats] = useState<FocusStatsDay[]>([]);
@@ -225,9 +225,14 @@ function ProfileSection() {
       getTimelineEntries(selectedDate),
     ])
       .then(([nextStats, nextTimeline]) => {
+        const displayTimeline = nextTimeline.length > 0
+          ? nextTimeline
+          : selectedDate === shiftDateKey(getLocalDateKey(), -1)
+            ? createMockTimelineEntries(selectedDate)
+            : [];
         setStats(nextStats);
-        setTimelineEntries(nextTimeline);
-        setSelectedTimelineId((id) => nextTimeline.some((entry) => entry.id === id) ? id : nextTimeline.at(-1)?.id ?? null);
+        setTimelineEntries(displayTimeline);
+        setSelectedTimelineId((id) => displayTimeline.some((entry) => entry.id === id) ? id : displayTimeline.at(-1)?.id ?? null);
       })
       .catch(() => {
         setStats([]);
@@ -420,6 +425,7 @@ function TimelineSection({
   onSelect: (id: number | null) => void;
 }) {
   const selected = entries.find((entry) => entry.id === selectedId) ?? entries.at(-1) ?? null;
+  const isMockPreview = entries.some((entry) => entry.id < 0);
   const topApps = getTopTimelineApps(entries);
   const totalMs = entries.reduce((sum, entry) => sum + getTimelineDurationMs(entry), 0);
   const backgroundMarkers = entries.flatMap((entry) => entry.backgroundMarkers.map((marker) => ({
@@ -436,6 +442,11 @@ function TimelineSection({
           <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
             <Clock3 className="h-4 w-4 text-muted-foreground" />
             Timeline
+            {isMockPreview && (
+              <span className="rounded-full border border-[#dfe3e6] bg-white px-1.5 py-0.5 text-[10px] font-medium text-[#687076] dark:border-white/10 dark:bg-white/5 dark:text-white/60">
+                昨日示例
+              </span>
+            )}
           </div>
           <div className="mt-1 text-[11px] text-muted-foreground">
             记录超过 8 秒的前台窗口，浏览器会尽量保留当前网站
@@ -557,6 +568,62 @@ function TimelineSegment({ entry, selected, onSelect }: { entry: TimelineEntry; 
       </span>
     </button>
   );
+}
+
+function createMockTimelineEntries(dateKey: string): TimelineEntry[] {
+  const at = (time: string) => new Date(`${dateKey}T${time}:00`).toISOString();
+  const item = (
+    id: number,
+    startedAt: string,
+    endedAt: string,
+    appName: string,
+    windowTitle: string,
+    category: TimelineCategory,
+    url: string | null = null,
+    backgroundMarkers: TimelineEntry['backgroundMarkers'] = [],
+  ): TimelineEntry => {
+    let domain: string | null = null;
+    if (url) {
+      try {
+        domain = new URL(url).hostname.replace(/^www\./, '');
+      } catch {
+        domain = null;
+      }
+    }
+    return {
+      id,
+      date: dateKey,
+      startedAt: at(startedAt),
+      endedAt: at(endedAt),
+      appName,
+      windowTitle,
+      url,
+      domain,
+      category,
+      backgroundMarkers,
+    };
+  };
+
+  return [
+    item(-1, '09:08', '09:44', 'Arc', 'Radix UI Colors - Usage · Browser', 'browser', 'https://www.radix-ui.com/colors/docs/palette-composition/composing-a-palette', [
+      { type: 'music', name: 'Music', detail: 'Nujabes - Aruarian Dance' },
+    ]),
+    item(-2, '09:45', '10:28', 'Cursor', 'DeskSprite · SettingsPanel.tsx', 'coding', null, [
+      { type: 'terminal', name: 'iTerm2', detail: 'pnpm electron:dev' },
+      { type: 'music', name: 'Music', detail: 'Nujabes - Aruarian Dance' },
+    ]),
+    item(-3, '10:31', '10:52', 'WeChat', '项目 UI 调整沟通', 'chat'),
+    item(-4, '11:02', '11:38', 'Terminal', 'codex-electron-rewrite · pnpm build', 'coding'),
+    item(-5, '13:16', '13:58', 'Safari', 'Apple Human Interface Guidelines', 'browser', 'https://developer.apple.com/design/human-interface-guidelines/'),
+    item(-6, '14:05', '14:42', 'Keynote', 'DeskSprite Timeline UI Review.key', 'office'),
+    item(-7, '15:03', '15:37', 'Slack', 'design-system / timeline mock', 'chat', null, [
+      { type: 'music', name: 'Spotify', detail: 'Tycho - Awake' },
+    ]),
+    item(-8, '16:12', '16:54', 'Arc', 'YouTube - tiny desk concert', 'entertainment', 'https://www.youtube.com/watch?v=mock-preview'),
+    item(-9, '17:10', '18:08', 'Visual Studio Code', 'timeline-renderer.tsx', 'coding', null, [
+      { type: 'terminal', name: 'Terminal', detail: 'vite build --watch' },
+    ]),
+  ];
 }
 
 function ProfileCalendar({

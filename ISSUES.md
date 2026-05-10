@@ -2099,3 +2099,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：主进程新增 IPC 命令时，渲染端应考虑开发热更新期间的新旧版本错位，并给用户暴露可控开关。
 - 是否需更新技术文档：否。
+
+## ISSUE-177
+- 发现时间：2026-05-10
+- 发现者：用户请求
+- 相关任务：个人档案昨日 Timeline Mock 预览
+- 严重程度：轻微
+- 问题现象：真实 timeline 需要等待采样积累，不方便立即评审个人档案里的时间轴 UI 样式。
+- 原因分析：Timeline 展示依赖当天或所选日期已有记录；新功能刚接入时通常没有足够完整的历史数据。
+- 解决方案：个人档案默认打开昨天；如果昨天没有真实记录，则使用 UI 层 mock 数据展示，不写入数据库，并用“昨日示例”标签标明来源。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：新图表类 UI 评审可以提供非持久化 mock 数据，避免污染真实数据，同时让视觉验收更快。
+- 是否需更新技术文档：否。

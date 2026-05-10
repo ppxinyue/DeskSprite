@@ -1333,3 +1333,11 @@
 - 兼容：旧主进程尚未重启时，如果前端调用不到 `read_timeline_active_window`，会停止本轮采样，避免持续刷 Unknown command。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
+
+### R172. 个人档案昨日 Timeline Mock 预览（2026-05-10）
+- 个人档案：默认打开昨天，便于直接查看 timeline 样式。
+- Mock：如果昨天没有真实 timeline 记录，则展示一组只存在于设置 UI 状态中的示例数据，不写入本地数据库。
+- 示例覆盖：浏览器、Coding、Chat、办公、娱乐和其他分类，并包含音乐、终端等并行后台标记。
+- 标识：Timeline 标题旁增加“昨日示例”小标签，区分 mock 和真实记录。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
