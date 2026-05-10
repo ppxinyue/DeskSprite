@@ -2157,6 +2157,11 @@ const handlers = {
   can_start_speech_recognition: () => true,
   check_distraction: checkDistraction,
   read_timeline_active_window: readTimelineActiveWindow,
+  get_launch_at_login: () => app.getLoginItemSettings().openAtLogin,
+  set_launch_at_login: ({ enabled }) => {
+    app.setLoginItemSettings({ openAtLogin: Boolean(enabled), openAsHidden: false });
+    return app.getLoginItemSettings().openAtLogin;
+  },
   coding_get_state: () => publishCodingState(),
   coding_get_claude_state: () => publishClaudeCodingState(),
   coding_get_inherited_state: getInheritedCodingState,

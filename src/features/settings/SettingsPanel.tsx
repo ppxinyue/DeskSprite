@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bot, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Gamepad2, Globe2, Keyboard, Loader2, MessageSquareText, Monitor, Music2, Palette, PawPrint, Pencil, Plus, Shield, Terminal, Trash2, UserRound } from 'lucide-react';
+import { BarChart3, Bell, Bot, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Gamepad2, Globe2, Loader2, MessageSquareText, Monitor, Music2, Palette, PawPrint, Pencil, Plus, Settings2, Terminal, Trash2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,7 +24,7 @@ import { emit } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { ReactNode } from 'react';
 
-type SettingsSection = 'profile' | 'appearance' | 'reminders' | 'ai' | 'history' | 'shortcuts' | 'privacy';
+type SettingsSection = 'profile' | 'appearance' | 'reminders' | 'ai' | 'history' | 'general';
 const ALLOWED_STATIC_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp']);
 const ALLOWED_GIF_EXTENSIONS = new Set(['gif']);
 const MASKED_API_KEY = '••••••••';
@@ -35,8 +35,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: typeof Palette }[] =
   { id: 'reminders', label: '提醒事项', icon: Bell },
   { id: 'ai', label: 'AI 对话', icon: Bot },
   { id: 'history', label: '历史对话', icon: Clock3 },
-  { id: 'shortcuts', label: '快捷键', icon: Keyboard },
-  { id: 'privacy', label: '隐私与数据', icon: Shield },
+  { id: 'general', label: '通用', icon: Settings2 },
 ];
 
 export function SettingsPanel() {
@@ -127,11 +126,10 @@ export function SettingsPanel() {
           editingConfig={editingConfig}
         />
       )}
-      {activeSection === 'shortcuts' && (
-        <ShortcutsSection settings={settings} updateSetting={updateSetting} />
-      )}
       {activeSection === 'history' && <HistorySection />}
-      {activeSection === 'privacy' && <PrivacySection />}
+      {activeSection === 'general' && (
+        <GeneralSection settings={settings} updateSetting={updateSetting} />
+      )}
     </SettingsLayout>
   );
 }
@@ -2150,21 +2148,56 @@ function formatDurationSeconds(seconds: number) {
   return `${Math.round(minutes / 60)}h`;
 }
 
-function ShortcutsSection({
+function GeneralSection({
   settings, updateSetting,
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
 }) {
+  useEffect(() => {
+    invoke<boolean>('get_launch_at_login')
+      .then((enabled) => {
+        if (enabled !== settings.launchAtLogin) updateSetting('launchAtLogin', enabled).catch(() => {});
+      })
+      .catch(() => {});
+  }, []);
+
+  const updateLaunchAtLogin = async (enabled: boolean) => {
+    await updateSetting('launchAtLogin', enabled);
+    invoke('set_launch_at_login', { enabled }).catch((error) => console.warn('Failed to update login item:', error));
+  };
+
   return (
     <>
-      <SectionTitle>快捷键</SectionTitle>
-      <SettingRow label="全局唤起">
-        <Input value={settings.globalShortcut} onChange={(e) => updateSetting('globalShortcut', e.target.value)} className="w-48" readOnly />
-      </SettingRow>
-      <SettingRow label="截图快捷键">
-        <Input value={settings.screenshotShortcut} onChange={(e) => updateSetting('screenshotShortcut', e.target.value)} className="w-48" readOnly />
-      </SettingRow>
+      <SectionTitle>通用</SectionTitle>
+
+      <SettingsGroup>
+        <SettingRow label="开机自启" hint="登录 macOS 后自动启动 DeskSprite">
+          <Switch checked={settings.launchAtLogin} onCheckedChange={updateLaunchAtLogin} />
+        </SettingRow>
+        <SettingRow label="Timeline 记录" hint="不开专注模式也会全程记录超过 8 秒的前台窗口">
+          <Switch checked={settings.timelineRecordingEnabled} onCheckedChange={(v) => updateSetting('timelineRecordingEnabled', v)} />
+        </SettingRow>
+      </SettingsGroup>
+
+      <SettingsGroup>
+        <SettingRow label="全局唤起">
+          <Input value={settings.globalShortcut} onChange={(e) => updateSetting('globalShortcut', e.target.value)} className="w-48" readOnly />
+        </SettingRow>
+        <SettingRow label="截图快捷键">
+          <Input value={settings.screenshotShortcut} onChange={(e) => updateSetting('screenshotShortcut', e.target.value)} className="w-48" readOnly />
+        </SettingRow>
+      </SettingsGroup>
+
+      <SettingsGroup>
+        <div className="space-y-3 py-1">
+          <Button variant="destructive" size="sm" disabled>清除所有对话历史</Button>
+          <br />
+          <Button variant="destructive" size="sm" disabled>删除所有 API 配置</Button>
+          <br />
+          <Button variant="outline" size="sm" disabled>导出对话资料 (JSON)</Button>
+        </div>
+      </SettingsGroup>
     </>
   );
 }
@@ -2507,20 +2540,5 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function PrivacySection() {
-  return (
-    <>
-      <SectionTitle>隐私与数据</SectionTitle>
-      <div className="space-y-3">
-        <Button variant="destructive" size="sm" disabled>清除所有对话历史</Button>
-        <br />
-        <Button variant="destructive" size="sm" disabled>删除所有 API 配置</Button>
-        <br />
-        <Button variant="outline" size="sm" disabled>导出对话资料 (JSON)</Button>
-      </div>
-    </>
   );
 }

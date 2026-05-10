@@ -1538,8 +1538,10 @@ function PetWindow() {
   }, [dialogOpen, positionCompactChatWindow]);
 
   useEffect(() => {
+    if (!settings.timelineRecordingEnabled) return;
     if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
     let disposed = false;
+    let commandUnavailable = false;
     const activeRef: {
       key: string;
       firstSeenAt: number;
@@ -1617,7 +1619,13 @@ function PetWindow() {
         activeRef.backgroundMarkers = result.background ?? activeRef.backgroundMarkers;
         await persistActive(checkedAt);
       } catch (error) {
-        if (!disposed) console.warn('Failed to record timeline:', error);
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('Unknown command: read_timeline_active_window')) {
+          commandUnavailable = true;
+          disposed = true;
+          return;
+        }
+        if (!disposed && !commandUnavailable) console.warn('Failed to record timeline:', error);
       }
     };
 
@@ -1628,7 +1636,7 @@ function PetWindow() {
       window.clearInterval(timer);
       persistActive(activeRef.lastSeenAt || Date.now()).catch(() => {});
     };
-  }, []);
+  }, [settings.timelineRecordingEnabled]);
 
   useEffect(() => {
     const unlisten = listen("compact-chat:collapsed", () => {

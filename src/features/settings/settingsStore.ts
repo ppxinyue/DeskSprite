@@ -51,6 +51,8 @@ export interface AppSettings {
   wakeWordEnabled: boolean;
   autoSpeak: boolean;
   speakRate: number;
+  launchAtLogin: boolean;
+  timelineRecordingEnabled: boolean;
   globalShortcut: string;
   screenshotShortcut: string;
   restReminderEnabled: boolean;
@@ -100,6 +102,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   wakeWordEnabled: false,
   autoSpeak: false,
   speakRate: 1.0,
+  launchAtLogin: true,
+  timelineRecordingEnabled: true,
   globalShortcut: 'CommandOrControl+Shift+P',
   screenshotShortcut: 'CommandOrControl+Shift+S',
   restReminderEnabled: true,

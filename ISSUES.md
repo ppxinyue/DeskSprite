@@ -2087,3 +2087,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：即时检测和历史统计要分层处理，采样器负责稳定窗口聚合，UI 负责按天展示和聚合统计，避免把分心检测逻辑直接变成数据模型。
 - 是否需更新技术文档：否。
+
+## ISSUE-176
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Timeline 与开机自启迁入通用设置
+- 严重程度：中等
+- 问题现象：Timeline 记录和开机自启没有设置入口；快捷键、隐私与数据作为独立目录项过于分散；开发中旧主进程会对 `read_timeline_active_window` 返回 Unknown command 并刷屏。
+- 原因分析：上一轮只实现了默认行为和个人档案展示，没有补用户可控的全局设置；Electron 主进程 handler 变更需要重启才能生效，热更新期间前端会先于主进程调用新命令。
+- 解决方案：新增“通用”设置，合并快捷键和隐私数据，并加入 Timeline 记录、开机自启两个开关；前端采样器尊重 Timeline 开关；旧主进程缺少命令时停止本轮采样避免持续报错。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：主进程新增 IPC 命令时，渲染端应考虑开发热更新期间的新旧版本错位，并给用户暴露可控开关。
+- 是否需更新技术文档：否。

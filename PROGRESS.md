@@ -1325,3 +1325,11 @@
 - 风格：Timeline 采用 Apple / Radix 风格的低对比浅灰、细边框、柔和色块和基础分类图标。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, db.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R171. Timeline 与开机自启迁入通用设置（2026-05-10）
+- 设置结构：将快捷键、隐私与数据合并进新的“通用”左侧目录项，减少设置页分散入口。
+- Timeline：新增“Timeline 记录”开关，默认开启；不开专注模式也会全程记录，关闭后 pet 主窗口停止采样。
+- 开机自启：新增“开机自启”开关，默认开启，并通过 Electron `setLoginItemSettings` 实时同步 macOS 登录项状态。
+- 兼容：旧主进程尚未重启时，如果前端调用不到 `read_timeline_active_window`，会停止本轮采样，避免持续刷 Unknown command。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
