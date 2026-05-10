@@ -1735,3 +1735,10 @@
 - 控制：波形右侧新增小对号按钮，用户可手动结束录音；原有超时自动结束仍保留，结束后云端转写继续显示 loading。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：ChatPrimitives.tsx, ChatDialog.tsx, voiceService.ts, index.css, ISSUES.md, PROGRESS.md
+
+### R225. 录音波形与轻量滚动条优化（2026-05-10）
+- 录音动效：输入框内波形由锯齿线改为参考图风格的细竖向音频柱，保留从左向右滑动和随音量改变振幅。
+- 视觉：去掉录音区域底色块，让波形更像系统级轻量录音状态，而不是一块额外组件。
+- Overflow：全局滚动条改为 6px、透明轨道、低对比圆角 thumb，横向/纵向 overflow 的视觉存在感更轻。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：ChatPrimitives.tsx, index.css, ISSUES.md, PROGRESS.md

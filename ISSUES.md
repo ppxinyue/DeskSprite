@@ -2735,3 +2735,15 @@
 - 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/voice/voiceService.ts`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：录音交互要同时提供“正在采集”的可视反馈和“主动结束”的直接控制，自动超时只能作为兜底。
 - 是否需更新技术文档：否。
+
+## ISSUE-230
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：录音波形与轻量滚动条优化
+- 严重程度：轻微
+- 问题现象：输入框内锯齿线录音动画不够精致；部分 UI 的 overflow/滚动条视觉偏重。
+- 原因分析：锯齿 polyline 更像调试波形，缺少系统录音控件常见的克制感；滚动条由各处默认样式决定，在小窗和设置里会显得厚。
+- 解决方案：录音波形改成细竖向柱状音频条，透明背景、低对比度、振幅随音量变化；新增全局轻量 scrollbar 样式，统一降低 overflow 视觉重量。
+- 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：录音状态不需要复杂图形，少量细柱配合振幅变化更接近系统控件；滚动条应全局统一，否则每个容器都会暴露默认浏览器重量。
+- 是否需更新技术文档：否。

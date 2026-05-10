@@ -140,36 +140,22 @@ export function Composer({
 
 function AudioWaveform({ level, compact }: { level: number; compact: boolean }) {
   const clamped = Math.max(0, Math.min(1, level));
-  const amplitude = compact ? 5 + clamped * 14 : 7 + clamped * 18;
-  const mid = compact ? 14 : 17;
-  const points = Array.from({ length: 28 }, (_, i) => {
-    const x = i * 9;
-    const direction = i % 2 === 0 ? -1 : 1;
-    const local = 0.62 + ((i % 5) / 4) * 0.38;
-    return `${x},${mid + direction * amplitude * local}`;
-  }).join(' ');
+  const baseHeights = [0.42, 0.72, 0.96, 0.52, 0.86, 0.64, 0.98, 0.46, 0.76, 0.58, 0.9, 0.5];
+  const bars = [...baseHeights, ...baseHeights];
   return (
-    <div className={`${compact ? 'h-7' : 'h-8'} relative min-w-0 flex-1 overflow-hidden rounded-[6px] bg-[color-mix(in_srgb,var(--color-chat-accent)_7%,transparent)]`}>
-      <svg className="chat-audio-wave absolute inset-y-0 left-0 h-full w-[220%]" viewBox="0 0 252 34" preserveAspectRatio="none" aria-hidden="true">
-        <polyline
-          points={points}
-          fill="none"
-          stroke="var(--color-chat-accent)"
-          strokeOpacity={0.42 + clamped * 0.36}
-          strokeWidth={compact ? 1.4 : 1.7}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <polyline
-          points={points}
-          fill="none"
-          stroke="var(--color-chat-accent)"
-          strokeOpacity={0.14 + clamped * 0.2}
-          strokeWidth={compact ? 4 : 5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+    <div className={`${compact ? 'h-7' : 'h-8'} relative min-w-0 flex-1 overflow-hidden rounded-[6px] bg-transparent`}>
+      <div className="pointer-events-none absolute inset-y-0 left-0 flex w-[200%] items-center gap-[5px] px-2 chat-audio-wave" aria-hidden="true">
+        {bars.map((height, index) => (
+          <span
+            key={`${height}-${index}`}
+            className="block w-[2px] rounded-full bg-[var(--color-chat-text)] opacity-80 transition-[height,opacity] duration-75"
+            style={{
+              height: `${Math.max(5, (compact ? 15 : 18) * (0.36 + height * (0.44 + clamped * 0.72)))}px`,
+              opacity: 0.42 + clamped * 0.42,
+            }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
