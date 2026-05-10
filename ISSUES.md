@@ -2195,3 +2195,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：置顶策略需要按场景降级，尤其是游戏和共享屏幕这类用户明确不希望覆盖的上下文。
 - 是否需更新技术文档：否。
+
+## ISSUE-185
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：并行后台改为横向 Timeline 标注
+- 严重程度：轻微
+- 问题现象：并行后台仍然以纵向一条一条的列表方式展示，和主 timeline 的时间轴关系不够直接。
+- 原因分析：上一版虽然给每条后台进程增加了时间范围胶囊，但布局仍是垂直列表，没有真正沿用主 timeline 的横向时间坐标。
+- 解决方案：将后台进程改为横向轨道标注，按开始/结束时间绝对定位在同一时间轴上，使用轻量细线和小胶囊展示。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：时间关系强的信息应尽量共享同一坐标系，减少用户在视觉上二次映射。
+- 是否需更新技术文档：否。

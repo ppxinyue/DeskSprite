@@ -1397,3 +1397,10 @@
 - 设置：新增 `hidePetDuringScreenShare` 配置项，用户可手动关闭自动隐藏。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, settingsStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R180. 并行后台改为横向 Timeline 标注（2026-05-10）
+- Timeline：并行后台不再用纵向列表展示，改为和主 timeline 共用同一时间轴的横向标注轨道。
+- 视觉：后台轨道保持轻量低对比，使用细线和小胶囊表达后台进程持续时间。
+- 内容：music 仍只显示 `music`，terminal 继续显示进程内容，并通过 title 保留时间范围。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

@@ -552,16 +552,17 @@ function TimelineSection({
             </div>
 
             {backgroundMarkers.length > 0 && (
-              <div className="mt-2 rounded-[10px] bg-white/38 px-2.5 py-2 dark:bg-white/[0.025]">
-                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-[#687076] dark:text-white/60">
+              <div className="mt-2 rounded-[10px] bg-white/30 px-2.5 py-2 dark:bg-white/[0.022]">
+                <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-medium text-[#8b8d98] dark:text-white/50">
                   <Music2 className="h-3.5 w-3.5" />
                   并行后台
                 </div>
-                <div className="space-y-1.5">
+                <div className="relative h-11 rounded-[8px] bg-[#eef0f2]/45 dark:bg-white/[0.045]">
                   {backgroundMarkers.slice(-5).map((marker, index) => (
                     <BackgroundTimelineMarker
                       key={`${marker.entryId}-${marker.type}-${marker.name}-${index}`}
                       marker={marker}
+                      lane={index % 2}
                     />
                   ))}
                 </div>
@@ -685,8 +686,10 @@ function TimelineSegment({ entry, entries, selected, onSelect }: { entry: Timeli
 
 function BackgroundTimelineMarker({
   marker,
+  lane,
 }: {
   marker: TimelineEntry['backgroundMarkers'][number] & { entryId: number; startedAt: string; endedAt: string };
+  lane: number;
 }) {
   const left = `${getTimelineDayProgress(marker.startedAt) * 100}%`;
   const width = `${Math.max(1.2, ((new Date(marker.endedAt).getTime() - new Date(marker.startedAt).getTime()) / 86_400_000) * 100)}%`;
@@ -696,23 +699,15 @@ function BackgroundTimelineMarker({
       ? `${marker.name} · ${marker.detail}`
       : marker.name;
   return (
-    <div className="grid grid-cols-[96px_1fr_82px] items-center gap-2">
-      <div className="flex min-w-0 items-center gap-1.5 text-[10px] font-medium text-[#687076] dark:text-white/58">
+    <div
+      className="absolute"
+      style={{ left, width, top: `${lane * 18 + 6}px` }}
+      title={`${label} · ${formatTimelineClock(marker.startedAt)} - ${formatTimelineClock(marker.endedAt)}`}
+    >
+      <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-[#8b8d98]/34" />
+      <div className="relative flex h-3.5 min-w-[22px] items-center gap-1 overflow-hidden rounded-full bg-[#8b8d98]/16 px-1.5 text-[9px] font-medium leading-none text-[#687076] ring-1 ring-[#8b8d98]/18 dark:text-white/52 dark:ring-white/10">
         {marker.type === 'music' ? <Music2 className="h-3 w-3 shrink-0" /> : <Terminal className="h-3 w-3 shrink-0" />}
         <span className="truncate">{label}</span>
-      </div>
-      <div className="relative h-3 rounded-full bg-[#eef0f2]/70 dark:bg-white/7">
-        <div
-          className="absolute top-1/2 h-px -translate-y-1/2 bg-[#8b8d98]/38"
-          style={{ left, width }}
-        />
-        <div
-          className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[#8b8d98]/40"
-          style={{ left, width }}
-        />
-      </div>
-      <div className="text-right text-[10px] tabular-nums text-[#8b8d98]">
-        {formatTimelineClock(marker.startedAt)} - {formatTimelineClock(marker.endedAt)}
       </div>
     </div>
   );
