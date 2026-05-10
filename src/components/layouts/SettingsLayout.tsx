@@ -8,9 +8,9 @@ interface SettingsLayoutProps {
 
 export function SettingsLayout({ children, sidebar }: SettingsLayoutProps) {
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-[radial-gradient(circle_at_18%_0%,rgba(255,255,255,0.88),transparent_34%),linear-gradient(135deg,#f6f7f9_0%,#e8edf3_46%,#f7f8fa_100%)] text-foreground antialiased dark:bg-[radial-gradient(circle_at_16%_0%,rgba(255,255,255,0.10),transparent_34%),linear-gradient(135deg,#111318_0%,#171b21_48%,#0f1115_100%)]">
+    <div className="settings-window relative flex h-screen w-screen overflow-hidden bg-[radial-gradient(circle_at_18%_0%,rgba(255,255,255,0.88),transparent_34%),linear-gradient(135deg,#f6f7f9_0%,#e8edf3_46%,#f7f8fa_100%)] text-foreground antialiased dark:bg-[#1f1f1f]">
       <div className="app-drag-region fixed left-0 right-0 top-0 z-[9999] h-14" />
-      <aside className="flex w-[210px] shrink-0 flex-col bg-white/30 shadow-[18px_0_54px_rgba(52,64,84,0.065),1px_0_0_rgba(255,255,255,0.48)_inset] backdrop-blur-[34px] dark:bg-white/[0.035] dark:shadow-[18px_0_54px_rgba(0,0,0,0.20),1px_0_0_rgba(255,255,255,0.055)_inset]">
+      <aside className="settings-sidebar flex w-[210px] shrink-0 flex-col bg-white/30 shadow-[18px_0_54px_rgba(52,64,84,0.065),1px_0_0_rgba(255,255,255,0.48)_inset] backdrop-blur-[34px] dark:bg-[#252525] dark:shadow-[1px_0_0_rgba(255,255,255,0.08)]">
         <div className="h-14 shrink-0" />
         <nav className="app-no-drag flex-1 overflow-y-auto px-2.5 pb-5">
           {sidebar}

@@ -1826,3 +1826,10 @@
 - 透明度：倒计时背景和边框使用 `settings.petOpacity` 计算透明度，和灵宠/悬浮球透明度设置保持一致；文字本身保持清晰。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R238. 深色模式改为 macOS 中性灰阶（2026-05-11）
+- 配色：全局 dark tokens 从偏蓝黑/暖棕改为 macOS 系统设置风格的中性石墨灰，背景、侧栏、卡片、输入框和文字对比统一收敛。
+- 设置页：设置窗口增加专用作用域，深色下使用 #1f1f1f 主背景、#252525 侧栏、#2c2c2c 卡片面。
+- 高光：移除设置页深色模式中卡片、文本框、内容盒子的白色 inset 顶部高光条，保留低对比阴影和细分割线。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
+- 文件：index.css, SettingsLayout.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

@@ -233,7 +233,7 @@ function AppearanceRow({ label, hint, children }: { label: string; hint?: string
 
 function SettingsGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`mb-5 overflow-hidden rounded-[14px] bg-white/58 shadow-[0_18px_46px_rgba(52,64,84,0.075),0_1px_0_rgba(255,255,255,0.78)_inset] backdrop-blur-[28px] dark:bg-white/[0.055] dark:shadow-[0_18px_48px_rgba(0,0,0,0.22),0_1px_0_rgba(255,255,255,0.08)_inset] ${className}`}>
+    <div className={`settings-card mb-5 overflow-hidden rounded-[14px] bg-white/58 shadow-[0_18px_46px_rgba(52,64,84,0.075),0_1px_0_rgba(255,255,255,0.78)_inset] backdrop-blur-[28px] dark:bg-[#2c2c2c] dark:shadow-[0_14px_32px_rgba(0,0,0,0.22)] ${className}`}>
       {children}
     </div>
   );

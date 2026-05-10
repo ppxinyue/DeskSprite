@@ -2891,3 +2891,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：跟随灵宠显示的附属 UI 也应复用同一透明度语义，但不要把文字一起降透明，避免可读性下降。
 - 是否需更新技术文档：否。
+
+## ISSUE-243
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：深色模式改为 macOS 中性灰阶
+- 严重程度：一般
+- 问题现象：深色模式配色偏脏且不接近 macOS 系统设置；许多文本框和内容卡片顶部有明显白色高光条。
+- 原因分析：全局 dark token 混用了蓝黑和暖棕色；设置页大量卡片沿用浅色模式的 `inset 0 1px 0 rgba(255,255,255,...)` 高光，在深色背景上显得像白条。
+- 解决方案：重写 dark token 为中性石墨灰；给设置窗口加作用域并统一深色背景/侧栏/卡片色；在设置作用域内覆盖阴影，移除所有 inset 白色高光。
+- 涉及文件：`src/index.css`, `src/components/layouts/SettingsLayout.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：深色模式不能简单复用浅色模式的玻璃高光；macOS 风格更依赖低对比灰阶、细分割和柔和阴影。
+- 是否需更新技术文档：否。
