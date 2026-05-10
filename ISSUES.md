@@ -2819,3 +2819,15 @@
 - 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：录音波形的“速度感”主要来自采样时钟和过渡时长，需要两者一起调整。
 - 是否需更新技术文档：否。
+
+## ISSUE-237
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Timeline 短暂切屏明细与后台进程修正
+- 严重程度：一般
+- 问题现象：Timeline 靠右片段的 hover 卡片会被遮挡；主片段详情会把短暂切屏造成的同一项目拆得太碎；后台 terminal 有时没记录，暂停状态的音乐软件也可能被误记到时间轴。
+- 原因分析：hover 卡片只做了简单右侧偏移；未达最小时长的候选窗口之前直接丢弃，没有成为主片段的附属信息；网易云音乐此前只看进程是否存在，无法确认播放状态。
+- 解决方案：hover 卡片按视口动态选择左右位置；将短暂候选窗口写入主片段 `foreground-short` 明细并在详情页单独展示；音乐只记录可确认 `player state is playing` 的 Music/Spotify，并增加音乐软件列表；terminal 额外从系统进程中识别长跑开发命令。
+- 涉及文件：`src/App.tsx`, `electron/main.cjs`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Timeline 的主记录和短暂活动应分层保存；“进程存在”不能等同于“后台活动正在发生”，尤其是音乐播放状态。
+- 是否需更新技术文档：否。

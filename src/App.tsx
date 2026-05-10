@@ -1748,7 +1748,7 @@ function PetWindow() {
     const readTimelineSnapshot = async (): Promise<TimelineSnapshot> => {
       if (!useFallbackSnapshot) {
         try {
-          return await invoke<TimelineSnapshot>('read_timeline_active_window');
+          return await invoke<TimelineSnapshot>('read_timeline_active_window', { musicAppKeywords: settingsRef.current.musicAppKeywords });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (!message.includes('Unknown command: read_timeline_active_window')) throw error;
@@ -1795,7 +1795,7 @@ function PetWindow() {
             await recorder.pauseForeground(systemInactiveStartedAtRef.current ?? Date.now());
             saveTimelineRecorderState(recorder.getState(), minSegmentMs);
           }
-          const backgroundOnly = await invoke<{ supported: boolean; background: TimelineSnapshot['background']; error?: string | null }>('read_timeline_background_markers').catch(() => null);
+          const backgroundOnly = await invoke<{ supported: boolean; background: TimelineSnapshot['background']; error?: string | null }>('read_timeline_background_markers', { musicAppKeywords: settingsRef.current.musicAppKeywords }).catch(() => null);
           if (backgroundOnly?.supported) {
             await recorder.handleBackgroundMarkers(backgroundOnly.background, Date.now());
             saveTimelineRecorderState(recorder.getState(), minSegmentMs);
@@ -1826,7 +1826,7 @@ function PetWindow() {
         .then(() => saveTimelineRecorderState(recorder.getState(), minSegmentMs))
         .catch(() => saveTimelineRecorderState(recorder.getState(), minSegmentMs));
     };
-  }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes]);
+  }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes, settings.musicAppKeywords]);
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;

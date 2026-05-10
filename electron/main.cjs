@@ -517,14 +517,45 @@ function readTerminalDetail(appName) {
   });
 }
 
+function readShellProcessMarkers() {
+  if (process.platform !== 'darwin') return Promise.resolve([]);
+  return new Promise((resolve) => {
+    execFile('/bin/ps', ['-axo', 'pid=', '-o', 'command='], { timeout: 1800 }, (error, stdout) => {
+      if (error) {
+        timelineDebugLog({ stage: 'terminal-process:error', error: error.message || String(error) });
+        resolve([]);
+        return;
+      }
+      const ownPid = String(process.pid);
+      const lines = String(stdout || '').split('\n').map((line) => line.trim()).filter(Boolean);
+      const commands = [];
+      for (const line of lines) {
+        const match = line.match(/^(\d+)\s+(.+)$/);
+        if (!match || match[1] === ownPid) continue;
+        const command = match[2];
+        const lower = command.toLowerCase();
+        if (
+          !/(pnpm|npm|yarn|bun|vite|next|tsx|ts-node|electron:dev|cargo|uvicorn|python|node .*server)/.test(lower) ||
+          /(osascript|\/bin\/ps|electron\/main\.cjs)/.test(lower)
+        ) {
+          continue;
+        }
+        const normalized = command.replace(/^.*?(pnpm|npm|yarn|bun|cargo|python|node)\s+/, '$1 ').slice(0, 140);
+        if (!commands.includes(normalized)) commands.push(normalized);
+        if (commands.length >= 3) break;
+      }
+      resolve(commands.map((detail) => ({ type: 'terminal', name: 'Terminal', detail })));
+    });
+  });
+}
+
 function hasProcess(processNames, candidates) {
   const names = new Set(processNames.map((name) => name.toLowerCase()));
   return candidates.find((candidate) => names.has(candidate.toLowerCase())) || '';
 }
 
-async function readTimelineBackgroundMarkers() {
+async function readTimelineBackgroundMarkers({ musicAppKeywords } = {}) {
   const processes = await readRunningProcessNames();
-  if (!processes.length) return [];
 
   const markers = [];
   const terminalApps = ['Terminal', 'iTerm2'].filter((name) => hasProcess(processes, [name]));
@@ -534,22 +565,27 @@ async function readTimelineBackgroundMarkers() {
     detail: await readTerminalDetail(name),
   })));
   markers.push(...terminalMarkers);
+  const shellMarkers = await readShellProcessMarkers();
+  for (const marker of shellMarkers) {
+    if (!markers.some((existing) => existing.type === marker.type && existing.detail === marker.detail)) {
+      markers.push(marker);
+    }
+  }
 
-  const musicApps = ['Music', 'Spotify'].filter((name) => hasProcess(processes, [name]));
+  const configuredMusicApps = normalizeRuleList(musicAppKeywords);
+  const musicCandidates = ['Music', 'Spotify'].filter((name) => (
+    configuredMusicApps.length === 0 || configuredMusicApps.some((keyword) => name.toLowerCase().includes(keyword))
+  ));
+  const musicApps = musicCandidates.filter((name) => hasProcess(processes, [name]));
   const musicMarkers = await Promise.all(musicApps.map((name) => readNowPlaying(name)));
   markers.push(...musicMarkers.filter(Boolean));
-
-  const netease = hasProcess(processes, ['NeteaseMusic', '网易云音乐']);
-  if (netease) {
-    markers.push({ type: 'music', name: netease, detail: 'playing' });
-  }
 
   return markers;
 }
 
-async function readTimelineBackgroundOnly() {
+async function readTimelineBackgroundOnly({ musicAppKeywords } = {}) {
   if (process.platform !== 'darwin') return { supported: false, background: [], error: 'unsupported', checkedAt: Date.now() };
-  const background = await readTimelineBackgroundMarkers();
+  const background = await readTimelineBackgroundMarkers({ musicAppKeywords });
   return { supported: true, background, error: null, checkedAt: Date.now() };
 }
 
@@ -565,7 +601,7 @@ function readSystemActivityState() {
   };
 }
 
-async function readTimelineActiveWindow() {
+async function readTimelineActiveWindow({ musicAppKeywords } = {}) {
   if (process.platform !== 'darwin') {
     return { supported: false, appName: '', windowTitle: '', url: '', background: [], error: 'unsupported' };
   }
@@ -576,7 +612,7 @@ async function readTimelineActiveWindow() {
 
   const [url, background] = await Promise.all([
     readBrowserUrl(active.appName),
-    readTimelineBackgroundMarkers(),
+    readTimelineBackgroundMarkers({ musicAppKeywords }),
   ]);
   return {
     supported: true,

@@ -1783,3 +1783,11 @@
 - 视觉：柱高/透明度过渡从 200ms 缩短到 150ms，避免速度提升后出现拖沓感。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 485.75 kB，未触发 chunk 体积 warning。
 - 文件：ChatPrimitives.tsx, ISSUES.md, PROGRESS.md
+
+### R232. Timeline 短暂切屏明细与后台进程修正（2026-05-10）
+- Hover：Timeline 详情卡片靠右时会自动显示在鼠标左侧，并按视口上下边界夹紧，避免被窗口边缘遮挡。
+- 明细：未达到 Timeline 最小时长的短暂切屏不再丢弃，而是作为 `foreground-short` 附属明细保存到当前主片段；详情页主活动按 app + 标题/URL 聚合，短暂切屏单独列在下方。
+- 后台：网易云等仅有进程但无法确认播放状态的软件不再误记为音乐；新增音乐软件列表设置，并只对可确认播放状态的 Music/Spotify 记录后台音乐。
+- Terminal：补充从系统进程中识别长跑开发命令的后台 terminal 标记，覆盖没有被 Terminal/iTerm AppleScript 正确读到的场景。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；新增短暂切屏附属明细单测，生产构建主包 486.44 kB，未触发 chunk 体积 warning。
+- 文件：App.tsx, main.cjs, SettingsPanel.tsx, settingsStore.ts, timelineRecorder.ts, timelineRecorder.test.ts, ISSUES.md, PROGRESS.md

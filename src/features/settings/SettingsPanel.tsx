@@ -698,6 +698,8 @@ function TimelineSection({
   const selectedBlock = timelineBlocks.find((block) => block.entries.some((entry) => entry.id === selectedId)) ?? timelineBlocks.at(-1) ?? null;
   const selected = selectedBlock?.entries[0] ?? null;
   const selectedGroup = selectedBlock?.entries ?? [];
+  const selectedActivityRows = getTimelineDetailRows(selectedGroup);
+  const selectedShortRows = getShortForegroundRows(selectedGroup);
   const animationPlayedRef = useRef(false);
   const visibleCategories = (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[])
     .filter((category) => entries.some((entry) => entry.category === category));
@@ -860,25 +862,44 @@ function TimelineSection({
             </div>
           </div>
           <div className="space-y-1.5 border-t border-[#e6e8eb] pt-2 dark:border-white/10">
-            {selectedGroup.map((entry) => (
+            {selectedActivityRows.map((entry) => (
               <button
-                key={`detail-${entry.id}`}
+                key={`detail-${entry.id}-${entry.startedAt}`}
                 type="button"
                 className={`flex w-full items-start justify-between gap-3 rounded-[9px] px-2 py-1.5 text-left transition-colors ${
-                  entry.id === selected.id ? 'bg-[#eef0f2] dark:bg-white/8' : 'hover:bg-[#f1f3f5] dark:hover:bg-white/5'
+                  entry.entryIds.includes(selected.id) ? 'bg-[#eef0f2] dark:bg-white/8' : 'hover:bg-[#f1f3f5] dark:hover:bg-white/5'
                 }`}
-                onClick={() => onSelect(entry.id)}
+                onClick={() => onSelect(entry.entryIds[0] ?? null)}
               >
                 <div className="min-w-0">
                   <div className="truncate text-[12px] font-medium text-[#3a3d40] dark:text-white/76">{entry.domain || entry.appName}</div>
-                  <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[#687076] dark:text-white/54">{entry.windowTitle || entry.url || '无标题活动'}</div>
+                  <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[#687076] dark:text-white/54">{entry.title || entry.url || '无标题活动'}</div>
                 </div>
                 <div className="shrink-0 text-right text-[10px] leading-4 text-[#8b8d98]">
                   <div>{formatTimelineClock(entry.startedAt)}</div>
-                  <div>{formatTimelineDuration(getTimelineDurationMs(entry))}</div>
+                  <div>{formatTimelineDuration(new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime())}</div>
                 </div>
               </button>
             ))}
+            {selectedShortRows.length > 0 && (
+              <div className="mt-2 border-t border-[#e6e8eb] pt-2 dark:border-white/10">
+                <div className="mb-1 px-2 text-[10px] font-medium text-[#8b8d98]">短暂切换</div>
+                <div className="space-y-1.5">
+                  {selectedShortRows.map((entry, index) => (
+                    <div key={`short-${entry.startedAt}-${index}`} className="flex w-full items-start justify-between gap-3 rounded-[9px] bg-[#f5f6f7] px-2 py-1.5 text-left dark:bg-white/[0.045]">
+                      <div className="min-w-0">
+                        <div className="truncate text-[12px] font-medium text-[#3a3d40] dark:text-white/76">{entry.name}</div>
+                        <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[#687076] dark:text-white/54">{entry.detail || '短暂活动'}</div>
+                      </div>
+                      <div className="shrink-0 text-right text-[10px] leading-4 text-[#8b8d98]">
+                        <div>{formatTimelineClock(entry.startedAt)} - {formatTimelineClock(entry.endedAt)}</div>
+                        <div>{formatTimelineDuration(new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime())}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -966,6 +987,17 @@ type TimelineBlock = {
   startedAt: string;
   endedAt: string;
   entries: TimelineEntry[];
+};
+
+type TimelineDetailRow = {
+  id: string;
+  entryIds: number[];
+  appName: string;
+  title: string;
+  url: string | null;
+  domain: string | null;
+  startedAt: string;
+  endedAt: string;
 };
 
 function TimelineSegment({
@@ -1108,8 +1140,16 @@ function BackgroundTimelineMarker({
 
 function positionTimelineHoverCard(event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y'>): TimelineHoverCard {
   const width = 300;
-  const x = Math.min(window.innerWidth - width - 12, Math.max(12, event.clientX + 14));
-  const y = Math.min(window.innerHeight - 132, Math.max(12, event.clientY - 86));
+  const height = 148;
+  const margin = 12;
+  const gap = 16;
+  const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const hasRoomRight = event.clientX + gap + width <= viewportWidth - margin;
+  const x = hasRoomRight
+    ? event.clientX + gap
+    : Math.max(margin, event.clientX - width - gap);
+  const y = Math.min(viewportHeight - height - margin, Math.max(margin, event.clientY - height / 2));
   return { ...card, x, y };
 }
 
@@ -1792,6 +1832,53 @@ function getTimelineBlocks(entries: TimelineEntry[]): TimelineBlock[] {
     });
   }
   return blocks;
+}
+
+function getTimelineActivityKey(entry: TimelineEntry): string {
+  return [
+    entry.appName.trim().toLowerCase(),
+    entry.domain ?? '',
+    entry.url ?? '',
+    entry.windowTitle.trim().toLowerCase(),
+  ].join('\n');
+}
+
+function getTimelineDetailRows(entries: TimelineEntry[]): TimelineDetailRow[] {
+  const sorted = entries.slice().sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  const rows: TimelineDetailRow[] = [];
+  for (const entry of sorted) {
+    const key = getTimelineActivityKey(entry);
+    const previous = rows.at(-1);
+    if (previous?.id === key) {
+      previous.entryIds.push(entry.id);
+      previous.endedAt = entry.endedAt;
+      continue;
+    }
+    rows.push({
+      id: key,
+      entryIds: [entry.id],
+      appName: entry.appName,
+      title: entry.windowTitle,
+      url: entry.url,
+      domain: entry.domain,
+      startedAt: entry.startedAt,
+      endedAt: entry.endedAt,
+    });
+  }
+  return rows;
+}
+
+function getShortForegroundRows(entries: TimelineEntry[]): BackgroundMarkerWithTime[] {
+  return entries
+    .flatMap((entry) => entry.backgroundMarkers
+      .filter((marker) => marker.type === 'foreground-short')
+      .map((marker) => ({
+        ...marker,
+        entryId: entry.id,
+        startedAt: marker.startedAt ?? entry.startedAt,
+        endedAt: marker.endedAt ?? entry.endedAt,
+      })))
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
 }
 
 function getRelatedBackgroundMarkers(markers: BackgroundMarkerWithTime[], selected: BackgroundMarkerWithTime): BackgroundMarkerWithTime[] {
@@ -2901,6 +2988,17 @@ function GeneralSection({
             value={settings.gameAppKeywords}
             onChange={(value) => updateSetting('gameAppKeywords', cleanRuleList(value))}
             addLabel="添加游戏"
+          />
+        </div>
+        <div className="border-b border-[#e6e8eb] px-3.5 py-3 dark:border-white/10">
+          <div className="mb-1.5 text-[13px] font-medium text-foreground">音乐软件列表</div>
+          <p className="mb-2 text-[11px] leading-4 text-muted-foreground">
+            只有这些音乐软件处于播放状态时，才会作为后台音乐标注到 Timeline。
+          </p>
+          <RuleTokenEditor
+            value={settings.musicAppKeywords}
+            onChange={(value) => updateSetting('musicAppKeywords', cleanRuleList(value))}
+            addLabel="添加音乐软件"
           />
         </div>
         <SettingRow label="共享屏幕时隐藏灵宠" hint="默认开启，防止共享屏幕时灵宠进入画面">

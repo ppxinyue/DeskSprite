@@ -45,8 +45,30 @@ test('keeps a codex segment intact when user briefly switches to WeChat', async 
   assert.equal(persisted.every((item) => item.appName === 'Codex'), true);
   assert.equal(persisted.at(-1)?.startedAt, 0);
   assert.equal(persisted.at(-1)?.endedAt, 1_260_000);
+  const shortMarkers = persisted.at(-1)?.backgroundMarkers.filter((marker) => marker.type === 'foreground-short') ?? [];
+  assert.equal(shortMarkers.length, 1);
+  assert.equal(shortMarkers[0].name, 'WeChat');
   assert.equal(pushed.length, 3);
   assert.ok(logs.some((item) => item.stage === 'candidate:discard'));
+});
+
+test('keeps multiple short foreground switches as details on the active segment', async () => {
+  const { recorder, persisted } = createHarness(10 * 60_000);
+
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 10 * 60_000);
+  await recorder.handleSnapshot(snapshot('WeChat', '微信'), 11 * 60_000);
+  await recorder.handleSnapshot(snapshot('Arc', 'Docs', { url: 'https://example.com/docs' }), 15 * 60_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 20 * 60_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 21 * 60_000);
+
+  const latest = persisted.at(-1);
+  assert.equal(latest?.appName, 'Codex');
+  assert.equal(latest?.startedAt, 0);
+  assert.equal(latest?.endedAt, 21 * 60_000);
+  const shortMarkers = latest?.backgroundMarkers.filter((marker) => marker.type === 'foreground-short') ?? [];
+  assert.equal(shortMarkers.length, 2);
+  assert.deepEqual(shortMarkers.map((marker) => marker.name), ['WeChat', 'Arc']);
 });
 
 test('ignores DeskSprite/Electron foreground so startup chrome does not steal active segment', async () => {

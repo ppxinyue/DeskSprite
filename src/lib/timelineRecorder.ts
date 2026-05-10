@@ -101,6 +101,31 @@ function mergeBackgroundMarkers(
   return merged.slice(-24);
 }
 
+function appendShortForegroundMarker(
+  existing: TimelineBackgroundMarker[],
+  segment: TimelineSegmentState,
+  endedAt: number,
+) {
+  if (!segment.key) return existing;
+  const start = segment.firstSeenAt;
+  const end = Math.max(segment.lastSeenAt || start, endedAt);
+  if (end <= start) return existing;
+  const detail = segment.url || segment.windowTitle || segment.appName;
+  const marker: TimelineBackgroundMarker = {
+    type: 'foreground-short',
+    name: segment.appName,
+    detail,
+    startedAt: new Date(start).toISOString(),
+    endedAt: new Date(end).toISOString(),
+  };
+  const previous = existing.at(-1);
+  if (previous && previous.type === marker.type && previous.name === marker.name && previous.detail === marker.detail) {
+    previous.endedAt = marker.endedAt;
+    return existing.slice(-24);
+  }
+  return [...existing, marker].slice(-24);
+}
+
 export class TimelineRecorder {
   private active = emptySegment();
   private candidate = emptySegment();
@@ -178,6 +203,9 @@ export class TimelineRecorder {
 
     if (this.active.key !== key) {
       if (this.candidate.key !== key) {
+        if (this.candidate.key) {
+          this.active.backgroundMarkers = appendShortForegroundMarker(this.active.backgroundMarkers, this.candidate, checkedAt);
+        }
         this.candidate = {
           key,
           firstSeenAt: checkedAt,
@@ -221,6 +249,7 @@ export class TimelineRecorder {
         durationMs: this.candidate.lastSeenAt - this.candidate.firstSeenAt,
         minSegmentMs: this.options.minSegmentMs,
       });
+      this.active.backgroundMarkers = appendShortForegroundMarker(this.active.backgroundMarkers, this.candidate, checkedAt);
     }
 
     this.candidate = emptySegment();
