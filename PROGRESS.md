@@ -1580,3 +1580,9 @@
 - 规则区：屏蔽应用和屏蔽关键词 token 编辑器外层增加和普通设置行一致的水平留白。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R203. 个人档案打开时禁止纵向自动滚动（2026-05-10）
+- 修复：14 天专注图定位选中日期时，不再调用 `scrollIntoView`，避免打开个人档案时页面被带着向下滚动。
+- 实现：改为只计算并设置专注图横向容器的 `scrollLeft`，不触碰页面纵向滚动，也不触发 smooth 自动滑动。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

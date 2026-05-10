@@ -410,7 +410,8 @@ function ProfileSection() {
     if (!node) return;
     const selectedNode = node.querySelector<HTMLElement>(`[data-focus-date="${selectedDate}"]`);
     if (!selectedNode) return;
-    selectedNode.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    const target = selectedNode.offsetLeft - node.clientWidth / 2 + selectedNode.clientWidth / 2;
+    node.scrollLeft = Math.max(0, target);
   }, [selectedDate, stats]);
 
   useEffect(() => {

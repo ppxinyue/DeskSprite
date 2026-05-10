@@ -2471,3 +2471,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：输入舒适度不仅取决于控件自身 padding，也取决于外层 row 和 card 的容器留白。
 - 是否需更新技术文档：否。
+
+## ISSUE-208
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：个人档案打开时禁止纵向自动滚动
+- 严重程度：一般
+- 问题现象：打开个人档案时，页面会自动向下滑动，用户没有主动滚动也会偏离顶部。
+- 原因分析：14 天专注图为了让选中日期进入可视区使用了 `scrollIntoView`；该 API 会同时影响横向和纵向滚动容器，导致外层设置页被带着滚动。
+- 解决方案：移除 `scrollIntoView`，改为手动计算并设置专注图横向容器的 `scrollLeft`，只处理横向定位。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：嵌套滚动容器里不要用 `scrollIntoView` 做局部横向定位，容易意外影响父级纵向滚动。
+- 是否需更新技术文档：否。
