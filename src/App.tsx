@@ -56,6 +56,22 @@ function isCompactChatDismissed() {
   return localStorage.getItem(COMPACT_CHAT_DISMISSED_KEY) === "1";
 }
 
+function getTimelineSnapshotKey(appName: string, windowTitle: string, url: string | null) {
+  const normalizedApp = appName.trim().toLowerCase();
+  const normalizedUrl = url?.trim();
+  if (normalizedUrl) {
+    try {
+      const parsed = new URL(normalizedUrl);
+      return `${normalizedApp}\n${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return `${normalizedApp}\n${normalizedUrl}`;
+    }
+  }
+  const browserLike = /(safari|chrome|chromium|brave|edge|arc|firefox|vivaldi)/i.test(appName);
+  if (browserLike && windowTitle.trim()) return `${normalizedApp}\n${windowTitle.trim().toLowerCase()}`;
+  return normalizedApp;
+}
+
 function App() {
   const [windowLabel, setWindowLabel] = useState<string>(() => getCurrentWindow().label);
   const { settings, loaded, loadSettings } = useSettingsStore();
@@ -1570,6 +1586,7 @@ function PetWindow() {
     if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
     let disposed = false;
     let useFallbackSnapshot = false;
+    let accessibilityChecked = false;
     const activeRef: {
       key: string;
       firstSeenAt: number;
@@ -1642,12 +1659,16 @@ function PetWindow() {
 
     const runTimelineCheck = async () => {
       try {
+        if (!accessibilityChecked) {
+          accessibilityChecked = true;
+          await invoke('ensure_accessibility_permission').catch(() => {});
+        }
         const result = await readTimelineSnapshot();
         if (disposed || !result.supported || result.error) return;
         const appName = result.appName?.trim() || 'Unknown';
         const windowTitle = result.windowTitle?.trim() || '';
         const url = result.url?.trim() || null;
-        const key = `${appName}\n${windowTitle}\n${url ?? ''}`;
+        const key = getTimelineSnapshotKey(appName, windowTitle, url);
         const checkedAt = Date.now();
         if (!activeRef.key) {
           activeRef.key = key;

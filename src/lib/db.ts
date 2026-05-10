@@ -45,6 +45,8 @@ export type TimelineBackgroundMarker = {
   type: string;
   name: string;
   detail: string;
+  startedAt?: string;
+  endedAt?: string;
 };
 
 export type TimelineEntry = {

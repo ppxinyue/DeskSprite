@@ -2207,3 +2207,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：时间关系强的信息应尽量共享同一坐标系，减少用户在视觉上二次映射。
 - 是否需更新技术文档：否。
+
+## ISSUE-186
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：最近 14 天滑动与 Timeline 采样稳定性修复
+- 严重程度：重要
+- 问题现象：个人档案最近 14 天图表仍缺少明确左右滑动入口；用户试用后 Coding 模式时长已更新，但 timeline 仍为空。
+- 原因分析：最近 14 天图表虽然有横向 overflow，但内容宽度和交互入口不够明确；timeline 采样使用完整 `appName + windowTitle + url` 作为段 key，Codex、浏览器、编辑器等窗口标题可能几秒变化一次，导致每个段都未达到 8 秒阈值而被丢弃；同时缺少 Accessibility 授权提示，权限失败时容易表现为空白。
+- 解决方案：最近 14 天图表增加左右滑动按钮和 scroll snap；timeline 仅由 pet 主窗口采样；浏览器按 URL 稳定分段，其他 app 按应用名合并并更新标题详情；主进程新增辅助功能权限检查命令，采样首次运行时触发系统授权提示；并行后台改成 music / terminal 两条横向轨道，hover 才展开具体内容，并调整 mock 数据覆盖 3 小时终端和两段音乐。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：超过阈值才落库的采样系统不能把高频变化字段作为唯一 key；权限依赖也需要在 UI 流程中主动暴露，不能只在控制台里失败。
+- 是否需更新技术文档：否。

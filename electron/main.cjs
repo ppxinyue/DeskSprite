@@ -10,6 +10,7 @@ const {
   protocol,
   screen,
   shell,
+  systemPreferences,
   Tray,
 } = require('electron');
 const fs = require('node:fs');
@@ -473,6 +474,12 @@ function readTimelineActiveWindow() {
       });
     });
   });
+}
+
+function ensureAccessibilityPermission() {
+  if (process.platform !== 'darwin') return { supported: false, trusted: false };
+  const trusted = systemPreferences.isTrustedAccessibilityClient(true);
+  return { supported: true, trusted };
 }
 
 function listContainsAny(text, keywords) {
@@ -2256,6 +2263,7 @@ const handlers = {
   synthesize_speech: synthesizeSpeech,
   can_start_speech_recognition: () => true,
   check_distraction: checkDistraction,
+  ensure_accessibility_permission: ensureAccessibilityPermission,
   read_timeline_active_window: readTimelineActiveWindow,
   get_launch_at_login: () => app.getLoginItemSettings().openAtLogin,
   set_launch_at_login: ({ enabled }) => {

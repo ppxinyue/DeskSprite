@@ -1404,3 +1404,13 @@
 - 内容：music 仍只显示 `music`，terminal 继续显示进程内容，并通过 title 保留时间范围。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R181. 最近 14 天滑动与 Timeline 采样稳定性修复（2026-05-10）
+- 最近 14 天：专注柱状图增加左右滑动按钮、scroll snap 和更宽的横向内容宽度，窄窗口下可明确左右浏览。
+- Timeline 采样：只允许 pet 主窗口负责采样，避免设置/聊天窗口打开时参与写入导致记录源混乱。
+- 稳定键：采样段不再依赖完整窗口标题；浏览器优先按 URL，其他 app 按应用名合并，避免 Codex/编辑器标题频繁变化导致每段不足 8 秒被丢弃。
+- 权限：主进程新增 Accessibility 权限检查命令，timeline 采样首次运行时会触发 macOS 辅助功能授权提示，避免权限缺失时静默空白。
+- 并行后台：改成固定两条横向轨道，第一行 music、第二行 terminal；没有数据的轨道自动隐藏，hover 到片段时才展示歌曲列表/终端命令详情。
+- Mock：昨日示例调整为连续 3 小时 `pnpm electron:dev` 终端后台，以及 15 分钟、62 分钟两段 music 后台。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
