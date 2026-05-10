@@ -2915,3 +2915,15 @@
 - 涉及文件：`src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：暗色主题收口时要按作用域扫描“浅色 utility class”和“白色 inset shadow”两类残留，不能只改 design token。
 - 是否需更新技术文档：否。
+
+## ISSUE-245
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：深色模式首帧防闪烁
+- 严重程度：一般
+- 问题现象：深色模式下打开设置、聊天等窗口时，会先显示一瞬间浅色样式，再切换到深色样式。
+- 原因分析：主题 class 原本在 React 挂载后的 `useEffect` 中根据异步加载的设置写入；同时设置/聊天 BrowserWindow 创建后立即 show，导致首帧可能露出浅色默认背景。
+- 解决方案：在 HTML 头部同步读取 localStorage 中的设置并预先写入 `.dark`；settings/chat 非透明窗口增加首帧背景；Electron 侧等主页面加载完成后再显示设置和大聊天窗口。
+- 涉及文件：`index.html`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：主题类必须在首帧前落地，不能依赖 React effect；非透明 Electron 窗口也要避免在 renderer 尚未绘制完成时提前 show。
+- 是否需更新技术文档：否。

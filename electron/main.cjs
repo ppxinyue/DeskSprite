@@ -275,6 +275,23 @@ function createWindow(label, options) {
   return win;
 }
 
+function showWindowAfterInitialPaint(win, { focus = false } = {}) {
+  if (!win || win.isDestroyed()) return;
+  let shown = false;
+  const show = () => {
+    if (shown || win.isDestroyed()) return;
+    shown = true;
+    win.show();
+    if (focus) win.focus();
+  };
+  if (win.webContents.isLoadingMainFrame()) {
+    win.webContents.once('did-finish-load', () => setTimeout(show, 0));
+    win.webContents.once('did-fail-load', show);
+    return;
+  }
+  show();
+}
+
 function resolveAppIconPath(iconPath) {
   if (!iconPath || typeof iconPath !== 'string') return currentAppIconPath;
   if (iconPath.startsWith('assets/')) {
@@ -849,8 +866,7 @@ function showSettingsWindow() {
     backgroundColor: '#f7f3ed',
   });
   win.setBounds(bounds);
-  win.show();
-  win.focus();
+  showWindowAfterInitialPaint(win, { focus: true });
 }
 
 function showChatWindow() {
@@ -867,8 +883,7 @@ function showChatWindow() {
     backgroundColor: '#f7f3ed',
   });
   win.setBounds(bounds);
-  win.show();
-  win.focus();
+  showWindowAfterInitialPaint(win, { focus: true });
 }
 
 function showCompactChatWindow({ x, y, w, h }, show = true) {

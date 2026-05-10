@@ -5,6 +5,49 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title></title>
+    <script>
+      (() => {
+        const STORE_KEY = 'desksprite:electron-db:v1';
+        const root = document.documentElement;
+
+        const readTheme = () => {
+          try {
+            const raw = localStorage.getItem(STORE_KEY);
+            if (!raw) return 'system';
+            const store = JSON.parse(raw);
+            const value = store?.settings?.theme;
+            if (typeof value !== 'string') return 'system';
+            let parsed = value;
+            try {
+              parsed = JSON.parse(value);
+            } catch {
+              parsed = value;
+            }
+            return parsed === 'light' || parsed === 'dark' || parsed === 'system' ? parsed : 'system';
+          } catch {
+            return 'system';
+          }
+        };
+
+        const theme = readTheme();
+        const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+        const isDark = theme === 'dark' || (theme === 'system' && prefersDark);
+        root.classList.toggle('dark', isDark);
+        root.style.colorScheme = isDark ? 'dark' : 'light';
+        root.style.setProperty('--initial-window-bg', isDark ? '#1f1f1f' : '#f4f5f7');
+
+        const label = window.location.hash.replace(/^#/, '');
+        if (label === 'settings' || label === 'chat') {
+          root.classList.add('window-has-background');
+        }
+      })();
+    </script>
+    <style>
+      html.window-has-background,
+      html.window-has-background body {
+        background: var(--initial-window-bg, #f4f5f7) !important;
+      }
+    </style>
   </head>
   <body style="background: transparent;">
     <div id="root"></div>

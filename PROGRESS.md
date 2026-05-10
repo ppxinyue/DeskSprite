@@ -1840,3 +1840,10 @@
 - 交互：保留聊天输入框 focus ring，但改为低透明 accent 描边，避免深色模式下出现亮白边。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R240. 深色模式首帧防闪烁（2026-05-11）
+- 启动：在 `index.html` 头部同步读取本地设置 store，React 和 CSS 首次绘制前就给根节点写入 `.dark`、`color-scheme` 和窗口初始背景色。
+- 窗口：设置窗口和大聊天窗口改为等主页面完成首次加载后再显示，避免 Electron 的浅色 `backgroundColor` 在暗色主题中露出一帧。
+- 背景：对 settings/chat hash 增加首帧背景类，只影响非透明窗口；灵宠/悬浮球窗口继续保持透明背景。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
+- 文件：index.html, electron/main.cjs, ISSUES.md, PROGRESS.md
