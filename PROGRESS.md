@@ -1549,3 +1549,11 @@
 - 简化：移除专注图内部的 `chartEndDate` 状态，日期选择只负责切换选中日和 timeline 日期。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R199. 设置默认值与目录文案（2026-05-10）
+- 默认值：新安装/未保存设置时，Timeline 最小时长从 1min 改为 5min。
+- 默认值：休息提醒默认间隔从 25min 改为 60min。
+- 设置目录：通用移动到第二项；历史对话改名为对话历史。
+- 说明：仅调整默认值，不覆盖用户已经保存过的本地设置。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：settingsStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

@@ -31,11 +31,11 @@ const MASKED_API_KEY = '••••••••';
 
 const SECTIONS: { id: SettingsSection; label: string; icon: typeof Palette }[] = [
   { id: 'profile', label: '个人档案', icon: UserRound },
+  { id: 'general', label: '通用', icon: Settings2 },
   { id: 'appearance', label: '外观', icon: Palette },
   { id: 'reminders', label: '提醒事项', icon: Bell },
   { id: 'ai', label: 'AI 对话', icon: Bot },
-  { id: 'history', label: '历史对话', icon: Clock3 },
-  { id: 'general', label: '通用', icon: Settings2 },
+  { id: 'history', label: '对话历史', icon: Clock3 },
 ];
 
 export function SettingsPanel() {
@@ -2829,7 +2829,7 @@ function HistorySection() {
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <SectionTitle>历史对话</SectionTitle>
+        <SectionTitle>对话历史</SectionTitle>
         <button
           type="button"
           className="rounded-[8px] px-2 py-1 text-[12px] text-muted-foreground transition hover:bg-background/60 hover:text-foreground"
@@ -2841,7 +2841,7 @@ function HistorySection() {
       <div className="space-y-3">
         {items.length === 0 && (
           <div className="text-[13px] text-muted-foreground border border-border rounded-lg p-4">
-            暂无历史对话
+            暂无对话历史
           </div>
         )}
         {items.map((item) => (
