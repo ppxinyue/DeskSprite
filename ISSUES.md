@@ -2507,3 +2507,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：图表右侧数值标签应预留固定宽度并禁用换行，避免数据长度变化影响图形结构。
 - 是否需更新技术文档：否。
+
+## ISSUE-211
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：设置控件改为平面风格
+- 严重程度：一般
+- 问题现象：设置中的滑动条和部分蓝色按钮带有明显立体高光、投影效果，不符合用户希望的 Apple 常见平面控件风格。
+- 原因分析：Slider 轨道和 thumb 使用 inset 高光、渐变和较重投影；默认 Button、Switch 和部分局部蓝色状态也保留了玻璃/立体阴影。
+- 解决方案：移除 Slider、默认 Button、Switch、日历选中态、API 默认标签和用量条的立体阴影/内高光，保留平面蓝色与轻量交互反馈。
+- 涉及文件：`src/index.css`, `src/components/ui/button.tsx`, `src/components/ui/switch.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：玻璃质感适合容器背景，但可操作控件需要更克制，主色按钮和滑动条应优先保持清晰平面语义。
+- 是否需更新技术文档：否。

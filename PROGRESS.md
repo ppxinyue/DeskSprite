@@ -1599,3 +1599,10 @@
 - 布局：中间 bar 改为 `minmax(0,1fr)` 自适应缩短，给时间标签预留稳定空间。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积与 dynamic import 提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R206. 设置控件改为平面风格（2026-05-10）
+- 视觉：移除 Slider 轨道和 thumb 的内高光、立体渐变和大投影，改为平面蓝色进度与白色圆点。
+- 按钮：默认蓝色 Button 去掉玻璃内高光和投影，hover 只做轻微蓝色变化。
+- 开关与局部状态：Switch、日历选中态、API 默认标签和用量条去掉立体阴影，保持统一的 Apple 平面控件质感。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
+- 文件：index.css, button.tsx, switch.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

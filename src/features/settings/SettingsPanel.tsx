@@ -1236,7 +1236,7 @@ function ProfileCalendar({
               disabled={disabled}
               className={`flex h-8 items-center justify-center rounded-[8px] text-[12px] transition-all ${
                 selected
-                  ? 'bg-[#2f8fff] text-white shadow-[0_6px_14px_rgba(47,143,255,0.20)]'
+                  ? 'bg-[#2f8fff] text-white shadow-none'
                   : today
                     ? 'border border-border/70 text-foreground hover:bg-background/70'
                     : 'text-foreground hover:bg-background/70'
@@ -2611,7 +2611,7 @@ function AISection({
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-medium text-[13px]">{getProviderName(c.providerId || c.provider)}</span>
                     {c.isDefault && (
-                      <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-[0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
+                      <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
                     )}
                   </div>
                   <div className="text-[11px] text-muted-foreground mb-1">
@@ -2809,7 +2809,7 @@ function UsageMeter({ label, value, detail }: { label: string; value: number; de
         <span className="text-muted-foreground">{percent}%</span>
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-[#2f8fff]/78 shadow-[0_0_10px_rgba(47,143,255,0.18)]" style={{ width: `${percent}%` }} />
+        <div className="h-full rounded-full bg-[#2f8fff]/78 shadow-none" style={{ width: `${percent}%` }} />
       </div>
       <div className="mt-1.5 truncate text-[11px] text-muted-foreground">{detail}</div>
     </div>
