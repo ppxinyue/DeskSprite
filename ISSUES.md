@@ -2903,3 +2903,15 @@
 - 涉及文件：`src/index.css`, `src/components/layouts/SettingsLayout.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：深色模式不能简单复用浅色模式的玻璃高光；macOS 风格更依赖低对比灰阶、细分割和柔和阴影。
 - 是否需更新技术文档：否。
+
+## ISSUE-244
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：深色设置与聊天面板残留白底修正
+- 严重程度：一般
+- 问题现象：深色模式下设置右侧仍有不少白底/浅灰底内容；大小聊天框也残留浅色模式的 inset 高光条，视觉上和新版 dark palette 不一致。
+- 原因分析：此前深色覆盖主要处理了显式 `dark:bg-*` 和设置卡片，但右侧仍有纯 `bg-white/*`、浅灰 hex 背景；聊天组件的 composer 和气泡阴影还使用浅色玻璃高光。
+- 解决方案：在 settings 和 chat 作用域中补充深色背景覆盖，统一表单/面板底色，并移除 chat 内部白色 inset shadow，仅保留低透明 focus ring。
+- 涉及文件：`src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：暗色主题收口时要按作用域扫描“浅色 utility class”和“白色 inset shadow”两类残留，不能只改 design token。
+- 是否需更新技术文档：否。

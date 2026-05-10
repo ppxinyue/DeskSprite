@@ -1833,3 +1833,10 @@
 - 高光：移除设置页深色模式中卡片、文本框、内容盒子的白色 inset 顶部高光条，保留低对比阴影和细分割线。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
 - 文件：index.css, SettingsLayout.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R239. 深色设置与聊天面板残留白底修正（2026-05-11）
+- 设置页：补充覆盖深色模式右侧区域残留的 `bg-white/*`、浅灰 hex 背景和表单背景，统一回到 macOS 石墨灰卡片面。
+- 聊天 UI：大小聊天框统一深色面板和输入框底色，移除 message bubble、composer、panel 中残留的白色 inset 高光条。
+- 交互：保留聊天输入框 focus ring，但改为低透明 accent 描边，避免深色模式下出现亮白边。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
+- 文件：index.css, ISSUES.md, PROGRESS.md

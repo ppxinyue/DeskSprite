@@ -277,12 +277,45 @@
 
   .dark .settings-window .settings-card,
   .dark .settings-window .quiet-card,
+  .dark .settings-window [class*="bg-white"],
+  .dark .settings-window [class*="bg-[#e"],
+  .dark .settings-window [class*="bg-[#f"],
   .dark .settings-window [class*="dark:bg-white/"] {
-    background-color: #2c2c2c;
+    background-color: #2c2c2c !important;
   }
 
   .dark .settings-window [class*="after:bg-white"]::after {
     background-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .dark .settings-window input,
+  .dark .settings-window textarea,
+  .dark .settings-window select,
+  .dark .settings-window [role="textbox"] {
+    background-color: #343434 !important;
+    box-shadow: none !important;
+  }
+
+  .dark .chat-dialog,
+  .dark .chat-dialog [class*="bg-[var(--surface-flat)]"] {
+    background-color: #2c2c2c !important;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24) !important;
+  }
+
+  .dark .chat-dialog form,
+  .dark .chat-dialog textarea,
+  .dark .chat-dialog [class*="bg-background"],
+  .dark .chat-dialog [class*="bg-[var(--surface-flat)]"] {
+    background-color: #343434 !important;
+  }
+
+  .dark .chat-dialog [class*="_inset"],
+  .dark .chat-dialog [class*="shadow-"] {
+    box-shadow: none !important;
+  }
+
+  .dark .chat-dialog form:focus-within {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-chat-accent) 16%, transparent) !important;
   }
 
   .app-drag-region {
