@@ -1883,7 +1883,8 @@
 - 文件：App.tsx, main.cjs, startupTheme.ts, startupTheme.test.ts, windowLifecycle.cjs, windowLifecycle.test.cjs, package.json, ISSUES.md, PROGRESS.md
 
 ### R246. Timeline 图例实时 Coding 时长（2026-05-11）
-- UI：Timeline 上方分类图例右侧增加时长徽标；Coding 使用今日 `codingMs`，显示为“今日 X”，与个人档案中的 Coding 模式时长保持一致。
-- 行为：即使当天 Timeline 里暂时没有 Coding 色块，只要今日 Coding 模式有落库时长，也会显示 Coding 图例和实时统计。
-- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check` 通过。
-- 文件：SettingsPanel.tsx, PROGRESS.md, ISSUES.md
+- UI：Timeline 上方分类图例右侧增加时长徽标，统计口径改为当前 Timeline 主色块，不再使用个人档案 `codingMs`。
+- 修复：`getTimelineEntries(date)` 会纳入与当天有交集的后台 marker；若只有后台进程跨日而主前台不在当天，则只显示在后台轨道，不生成主色块。
+- 详情：跨日裁剪和短暂切换提取移动到 `timelineView.ts` 并补充单测，确保未达阈值的软件使用会作为“短暂切换”出现在点击详情里。
+- 验证：`pnpm test`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.99 kB，未触发 chunk 体积 warning。
+- 文件：SettingsPanel.tsx, db.ts, timelineView.ts, timelineView.test.ts, db.timeline.test.ts, package.json, PROGRESS.md, ISSUES.md

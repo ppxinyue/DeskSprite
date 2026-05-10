@@ -61,6 +61,7 @@ export type TimelineEntry = {
   domain: string | null;
   category: TimelineCategory;
   backgroundMarkers: TimelineBackgroundMarker[];
+  foregroundVisible?: boolean;
 };
 
 type Store = {
@@ -478,7 +479,13 @@ export async function getTimelineEntries(date = localDateKey()): Promise<Timelin
     .filter((entry) => {
       const startedAt = new Date(entry.startedAt).getTime();
       const endedAt = new Date(entry.endedAt).getTime();
-      return startedAt < dayEnd && endedAt > dayStart;
+      const foregroundOverlaps = startedAt < dayEnd && endedAt > dayStart;
+      if (foregroundOverlaps) return true;
+      return (entry.backgroundMarkers ?? []).some((marker) => {
+        const markerStartedAt = new Date(marker.startedAt ?? entry.startedAt).getTime();
+        const markerEndedAt = new Date(marker.endedAt ?? entry.endedAt).getTime();
+        return markerStartedAt < dayEnd && markerEndedAt > dayStart;
+      });
     })
     .sort((a, b) => {
       const aStart = Math.max(new Date(a.startedAt).getTime(), dayStart);

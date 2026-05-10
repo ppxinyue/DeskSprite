@@ -2991,11 +2991,11 @@
 ## ISSUE-251
 - 发现时间：2026-05-11
 - 发现者：用户反馈
-- 相关任务：Timeline 图例实时 Coding 时长
-- 严重程度：轻微
-- 问题现象：Timeline 上方 Coding、Chat 等图例只说明颜色/类型，没有展示今天 Coding 的总时长。
-- 原因分析：图例只由当前 Timeline entries 的 category 推导，未接入个人档案已落库的 `codingMs` 统计。
-- 解决方案：将今日 `codingMs` 传入 Timeline 图例，Coding 图例右侧显示“今日 X”；当今日 Coding 时长大于 0 时，即使当前日期 entries 没有 Coding 分类，也保留 Coding 图例。
-- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
-- 经验总结：图例既承担说明功能，也可以承载轻量统计；这类实时数据应优先复用已落库的统计源，避免用 Timeline 色块反推造成口径不一致。
+- 相关任务：Timeline 后台跨日、短暂切换与图例统计口径
+- 严重程度：一般
+- 问题现象：跨日逻辑修复后，今天 0 点起应显示的 terminal 后台进程没有出现；未达阈值的短暂使用需要出现在详情；图例右侧时长不应使用 `codingMs`，而应统计当前 Timeline 色块。
+- 原因分析：`getTimelineEntries(date)` 只判断主前台 entry 是否与当天相交，漏掉“主前台在昨天、后台 marker 跨到今天”的记录；图例统计误接入个人档案 coding 时长，和 Timeline 色块口径不一致。
+- 解决方案：查询层把 background marker 的时间交集也纳入；展示层将后台-only 记录标记为 `foregroundVisible: false`，只进入后台轨道；图例按当前可见主色块分类累计；新增 `timelineView` 和 DB 单测覆盖这些场景。
+- 涉及文件：`src/lib/db.ts`, `src/lib/timelineView.ts`, `src/lib/timelineView.test.ts`, `src/lib/db.timeline.test.ts`, `src/features/settings/SettingsPanel.tsx`, `package.json`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Timeline 的前台色块、后台轨道、统计图例必须有清晰分层；后台-only 记录不能靠伪造前台色块显示，否则统计和视觉都会串口径。
 - 是否需更新技术文档：否。

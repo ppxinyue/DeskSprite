@@ -16,6 +16,7 @@ import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
 import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getFocusStatsDays, getMessages, getSetting, getSystemPrompt, getTimelineEntries, setSetting, updateSystemPrompt, type FocusStatsDay, type TimelineCategory, type TimelineEntry } from '@/lib/db';
+import { clipTimelineEntriesToDate, getShortForegroundRows, getTimelineCategoryStats, getTimelineDurationMs, getVisibleTimelineCategories, type BackgroundMarkerWithTime } from '@/lib/timelineView';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, isBuiltinAsset, normalizePetMediaConfig, type PetStateMediaConfig } from '@/features/pet/animations';
 import { LANGUAGE_OPTIONS } from '@/i18n';
@@ -521,8 +522,6 @@ function ProfileSection() {
   const totalSessions = focusWindowStats.reduce((sum, day) => sum + day.focusSessions, 0);
   const totalDistractions = focusWindowStats.reduce((sum, day) => sum + day.distractions, 0);
   const todayKey = getLocalDateKey();
-  const todayStats = stats.find((day) => day.date === todayKey);
-
   return (
     <>
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -583,7 +582,6 @@ function ProfileSection() {
       <TimelineSection
         date={selectedDate}
         entries={timelineEntries}
-        codingMsToday={todayStats?.codingMs ?? 0}
         selectedId={selectedTimelineId}
         onSelect={setSelectedTimelineId}
       />
@@ -749,13 +747,11 @@ const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
 function TimelineSection({
   date,
   entries,
-  codingMsToday,
   selectedId,
   onSelect,
 }: {
   date: string;
   entries: TimelineEntry[];
-  codingMsToday: number;
   selectedId: number | null;
   onSelect: (id: number | null) => void;
 }) {
@@ -770,8 +766,8 @@ function TimelineSection({
   const selectedActivityRows = getTimelineDetailRows(selectedGroup);
   const selectedShortRows = getShortForegroundRows(selectedGroup);
   const animationPlayedRef = useRef(false);
-  const visibleCategories = getVisibleTimelineCategories(entries, codingMsToday);
-  const categoryStats = getTimelineCategoryStats(entries, codingMsToday);
+  const visibleCategories = getVisibleTimelineCategories(entries);
+  const categoryStats = getTimelineCategoryStats(entries);
   const topApps = getTopTimelineApps(entries);
   const hourlyCounts = getHourlyTaskCounts(entries);
   const maxHourlyCount = Math.max(1, ...hourlyCounts.map((item) => item.count));
@@ -846,7 +842,7 @@ function TimelineSection({
               <span>{meta.label}</span>
               {categoryStats[category] > 0 && (
                 <span className="rounded-full bg-white/45 px-1.5 py-0.5 text-[10px] font-semibold text-[#687076] shadow-[0_5px_14px_rgba(52,64,84,0.045)] dark:bg-white/[0.055] dark:text-white/58">
-                  {category === 'coding' ? '今日 ' : ''}{formatTimelineDuration(categoryStats[category])}
+                  {formatTimelineDuration(categoryStats[category])}
                 </span>
               )}
             </div>
@@ -1126,12 +1122,6 @@ function TimelineSegment({
     </button>
   );
 }
-
-type BackgroundMarkerWithTime = TimelineEntry['backgroundMarkers'][number] & {
-  entryId: number;
-  startedAt: string;
-  endedAt: string;
-};
 
 function BackgroundTimelineTrack({
   label,
@@ -1877,52 +1867,11 @@ function formatFocusDuration(ms: number): string {
   return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
 }
 
-function getTimelineDurationMs(entry: TimelineEntry): number {
-  return Math.max(0, new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime());
-}
-
-function getTimelineDayBounds(dateKey: string): { start: number; end: number } {
-  const start = new Date(`${dateKey}T00:00:00`).getTime();
-  return { start, end: start + 86_400_000 };
-}
-
-function clipTimelineEntriesToDate(dateKey: string, entries: TimelineEntry[]): TimelineEntry[] {
-  const { start: dayStart, end: dayEnd } = getTimelineDayBounds(dateKey);
-  const clippedEntries: TimelineEntry[] = [];
-  for (const entry of entries) {
-    const entryStart = new Date(entry.startedAt).getTime();
-    const entryEnd = new Date(entry.endedAt).getTime();
-    const clippedStart = Math.max(entryStart, dayStart);
-    const clippedEnd = Math.min(entryEnd, dayEnd);
-    if (clippedEnd <= clippedStart) continue;
-    const backgroundMarkers: TimelineEntry['backgroundMarkers'] = [];
-    for (const marker of entry.backgroundMarkers) {
-      const markerStart = new Date(marker.startedAt ?? entry.startedAt).getTime();
-      const markerEnd = new Date(marker.endedAt ?? entry.endedAt).getTime();
-      const clippedMarkerStart = Math.max(markerStart, dayStart);
-      const clippedMarkerEnd = Math.min(markerEnd, dayEnd);
-      if (clippedMarkerEnd <= clippedMarkerStart) continue;
-      backgroundMarkers.push({
-        ...marker,
-        startedAt: new Date(clippedMarkerStart).toISOString(),
-        endedAt: new Date(clippedMarkerEnd).toISOString(),
-      });
-    }
-    clippedEntries.push({
-      ...entry,
-      date: dateKey,
-      startedAt: new Date(clippedStart).toISOString(),
-      endedAt: new Date(clippedEnd).toISOString(),
-      backgroundMarkers,
-    });
-  }
-  return clippedEntries.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-}
-
 function getTimelineBlocks(entries: TimelineEntry[]): TimelineBlock[] {
   const sorted = entries.slice().sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   const blocks: TimelineBlock[] = [];
   for (const entry of sorted) {
+    if (entry.foregroundVisible === false) continue;
     const previous = blocks.at(-1);
     if (previous && previous.appName === entry.appName && previous.category === entry.category) {
       previous.entries.push(entry);
@@ -1975,19 +1924,6 @@ function getTimelineDetailRows(entries: TimelineEntry[]): TimelineDetailRow[] {
   return rows;
 }
 
-function getShortForegroundRows(entries: TimelineEntry[]): BackgroundMarkerWithTime[] {
-  return entries
-    .flatMap((entry) => entry.backgroundMarkers
-      .filter((marker) => marker.type === 'foreground-short')
-      .map((marker) => ({
-        ...marker,
-        entryId: entry.id,
-        startedAt: marker.startedAt ?? entry.startedAt,
-        endedAt: marker.endedAt ?? entry.endedAt,
-      })))
-    .sort((a, b) => a.startedAt.localeCompare(b.startedAt));
-}
-
 function getRelatedBackgroundMarkers(markers: BackgroundMarkerWithTime[], selected: BackgroundMarkerWithTime): BackgroundMarkerWithTime[] {
   const selectedStart = new Date(selected.startedAt).getTime();
   const selectedEnd = new Date(selected.endedAt).getTime();
@@ -2015,24 +1951,6 @@ function formatTimelineDuration(ms: number): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
-}
-
-function getVisibleTimelineCategories(entries: TimelineEntry[], codingMsToday: number): TimelineCategory[] {
-  return (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[])
-    .filter((category) => category === 'coding'
-      ? codingMsToday > 0 || entries.some((entry) => entry.category === category)
-      : entries.some((entry) => entry.category === category));
-}
-
-function getTimelineCategoryStats(entries: TimelineEntry[], codingMsToday: number): Record<TimelineCategory, number> {
-  const stats = Object.fromEntries(
-    (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[]).map((category) => [category, 0])
-  ) as Record<TimelineCategory, number>;
-  for (const entry of entries) {
-    stats[entry.category] += getTimelineDurationMs(entry);
-  }
-  stats.coding = codingMsToday;
-  return stats;
 }
 
 function getTopTimelineApps(entries: TimelineEntry[]): Array<{ appName: string; durationMs: number }> {
