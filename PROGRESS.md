@@ -1612,3 +1612,12 @@
 - 布局：Top 软件右侧时间 label 改为左对齐，并继续保持不换行。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R208. AI 对话设置重排与 Coding Provider 开关（2026-05-10）
+- 提醒事项：删除顶部重复的“提醒事项”标题，进入页面后直接从休息提醒开始。
+- AI 对话：按内置额度、Coding 模式、Chat 模型、语音模型重新排列；删除模型参数卡片。
+- Coding：新增 Codex / Claude Code 两个独立开关，开启时会快速测试本机命令配置，失败时在开关下方显示红字错误。
+- 联动：关闭某个 Coding 工具后，右键菜单、Coding 历史入口和大对话框 provider 切换都会隐藏对应选项；关闭当前 provider 时会自动切到另一个可用 provider，没有可用 provider 时退出 Coding 模式。
+- Chat/语音：Chat 模型卡片中先显示当前默认模型，API 添加按钮右对齐；System Prompt 和宠物名字合并在同一卡片；语音模型卡片按 STT、TTS、语音设置分组。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积与 dynamic import 提示。
+- 文件：main.cjs, App.tsx, PetAvatar.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md

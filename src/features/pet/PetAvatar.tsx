@@ -62,6 +62,8 @@ export function PetAvatar({
   onFocusToggle,
   codingModeEnabled = false,
   codingProvider = 'codex',
+  codingCodexEnabled = true,
+  codingClaudeEnabled = true,
   onCodingModeToggle,
 }: {
   opacity?: number;
@@ -79,6 +81,8 @@ export function PetAvatar({
   onFocusToggle?: () => void;
   codingModeEnabled?: boolean;
   codingProvider?: CodingProvider;
+  codingCodexEnabled?: boolean;
+  codingClaudeEnabled?: boolean;
   onCodingModeToggle?: (mode?: CodingSessionMode, provider?: CodingProvider) => void;
 }) {
   const { petState, mediaConfig, userFrames, userGifs, openChat, dialogOpen, loadUserFrames } = usePetStore();
@@ -466,7 +470,7 @@ export function PetAvatar({
           <button className="block w-full whitespace-nowrap rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding')}>
             退出 Coding 模式
           </button>
-        ) : (
+        ) : (codingCodexEnabled || codingClaudeEnabled) ? (
           <div className="group/coding relative">
             <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">Coding 模式</button>
             <div className={submenuBridgeClass} style={{ ...submenuBridgeStyle, height: 190 }} />
@@ -475,20 +479,28 @@ export function PetAvatar({
                 submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
               }`}
             >
-              <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                Codex{codingProvider === 'codex' ? ' · 当前' : ''}
-              </div>
-              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-inherit')}>继承当前 session</button>
-              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-new')}>开启新 session</button>
-              <div className="my-1 h-px bg-border/60" />
-              <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                Claude Code{codingProvider === 'claude' ? ' · 当前' : ''}
-              </div>
-              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-inherit')}>继承当前 session</button>
-              <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-new')}>开启新 session</button>
+              {codingCodexEnabled && (
+                <>
+                  <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                    Codex{codingProvider === 'codex' ? ' · 当前' : ''}
+                  </div>
+                  <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-inherit')}>继承当前 session</button>
+                  <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-new')}>开启新 session</button>
+                </>
+              )}
+              {codingCodexEnabled && codingClaudeEnabled && <div className="my-1 h-px bg-border/60" />}
+              {codingClaudeEnabled && (
+                <>
+                  <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                    Claude Code{codingProvider === 'claude' ? ' · 当前' : ''}
+                  </div>
+                  <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-inherit')}>继承当前 session</button>
+                  <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-new')}>开启新 session</button>
+                </>
+              )}
             </div>
           </div>
-        )}
+        ) : null}
         <div className="my-1 h-px bg-border/60" />
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>

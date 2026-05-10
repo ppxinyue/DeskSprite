@@ -2531,3 +2531,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：并排统计卡片应尽量匹配内容密度，数值列与图形列的对齐方式要服务可读性而不是单纯贴边。
 - 是否需更新技术文档：否。
+
+## ISSUE-213
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：AI 对话设置重排与 Coding Provider 开关
+- 严重程度：一般
+- 问题现象：提醒事项页顶部有重复标题；AI 对话设置顺序不符合当前使用路径，Coding 模式只能选择当前工具和总开关，不能分别控制 Codex / Claude Code 可用性。
+- 原因分析：早期 Coding 模式是单 provider 选择模型，后续增加 Claude Code 后没有把 provider 可用性抽象成独立设置；AI 对话里的模型参数、身份设置、语音设置也仍按旧结构分散展示。
+- 解决方案：新增 `codingCodexEnabled` / `codingClaudeEnabled` 持久化设置和快速连接测试；重排 AI 设置卡片；右键菜单、Coding 历史入口、大对话框 provider 切换都按可用 provider 过滤。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：新增 provider 时应区分“当前选中 provider”和“provider 是否可用”，否则设置、菜单和历史入口会互相耦合。
+- 是否需更新技术文档：否。

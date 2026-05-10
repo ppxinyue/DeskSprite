@@ -1111,6 +1111,43 @@ function getClaudeBinary() {
   return 'claude';
 }
 
+function checkExecutable(binary, args = ['--version']) {
+  return new Promise((resolve, reject) => {
+    execFile(binary, args, { timeout: 4000, env: getCodexEnv() }, (error, stdout, stderr) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(String(stdout || stderr || '').trim());
+    });
+  });
+}
+
+async function checkCodingProviderConfig({ provider }) {
+  const target = provider === 'claude' ? 'claude' : 'codex';
+  const binary = target === 'claude' ? getClaudeBinary() : getCodexBinary();
+  try {
+    const version = await checkExecutable(binary);
+    return {
+      ok: true,
+      provider: target,
+      binary,
+      message: version || `${target === 'claude' ? 'Claude Code' : 'Codex'} 可用`,
+    };
+  } catch (error) {
+    const label = target === 'claude' ? 'Claude code' : 'Codex';
+    const detail = error && error.code === 'ENOENT'
+      ? `未找到 ${binary}。`
+      : (error && error.message) || String(error);
+    return {
+      ok: false,
+      provider: target,
+      binary,
+      message: `无法连接到本机${label}配置：${detail}`,
+    };
+  }
+}
+
 function publishCodingState() {
   const { running, ...safeState } = codingState;
   const state = { ...safeState, provider: 'codex' };
@@ -2397,6 +2434,7 @@ const handlers = {
   coding_ack_inherited_sessions: ackInheritedCodingSessions,
   coding_get_claude_inherited_state: getInheritedClaudeCodingState,
   coding_ack_claude_inherited_sessions: ackInheritedClaudeCodingSessions,
+  coding_check_provider_config: checkCodingProviderConfig,
   coding_send_message: (args) => (args?.provider === 'claude' ? sendClaudeCodingMessage(args) : sendCodingMessage(args)),
   coding_clear: () => {
     codingState.messages = [];

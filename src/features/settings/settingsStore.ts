@@ -32,6 +32,8 @@ export interface AppSettings {
   alwaysOnTop: boolean;
   chatModelMode: ModelMode;
   codingModeEnabled: boolean;
+  codingCodexEnabled: boolean;
+  codingClaudeEnabled: boolean;
   codingProvider: CodingProvider;
   codingSessionMode: CodingSessionMode;
   temperature: number;
@@ -85,6 +87,8 @@ const DEFAULT_SETTINGS: AppSettings = {
   alwaysOnTop: true,
   chatModelMode: 'default',
   codingModeEnabled: false,
+  codingCodexEnabled: true,
+  codingClaudeEnabled: true,
   codingProvider: 'codex',
   codingSessionMode: 'new',
   temperature: 0.7,

@@ -253,6 +253,13 @@ function codingProviderLabel(provider: CodingProvider) {
   return provider === 'claude' ? 'Claude Code' : 'Codex';
 }
 
+function getEnabledCodingProviders(settings: Pick<AppSettings, 'codingCodexEnabled' | 'codingClaudeEnabled'>): CodingProvider[] {
+  const providers: CodingProvider[] = [];
+  if (settings.codingCodexEnabled) providers.push('codex');
+  if (settings.codingClaudeEnabled) providers.push('claude');
+  return providers;
+}
+
 function isInheritedCodingMode(settings: AppSettings) {
   return settings.codingSessionMode === 'inherit';
 }
@@ -450,12 +457,19 @@ function CodingDialog({
   const stickToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const enabledProviders = useMemo(() => getEnabledCodingProviders(settings), [settings.codingCodexEnabled, settings.codingClaudeEnabled]);
   const activeProvider = standalone ? standaloneProvider : settings.codingProvider;
   const effectiveSettings = useMemo(() => ({ ...settings, codingProvider: activeProvider }), [activeProvider, settings]);
   const codingLabel = codingProviderLabel(activeProvider);
   const inherited = !standalone && isInheritedCodingMode(effectiveSettings);
   const stateCommand = standalone ? codingNewStateCommand(activeProvider) : codingStateCommand(effectiveSettings);
   const inheritedStateCommand = codingInheritedStateCommand(activeProvider);
+
+  useEffect(() => {
+    if (!standalone) return;
+    if (enabledProviders.length === 0) return;
+    if (!enabledProviders.includes(standaloneProvider)) setStandaloneProvider(enabledProviders[0]);
+  }, [enabledProviders, standalone, standaloneProvider]);
 
   const applyCodingState = useCallback((next: CodingState | null | undefined) => {
     const resolved = next ?? DEFAULT_CODING_STATE;
@@ -738,7 +752,7 @@ function CodingDialog({
               <span>{codingLabel}</span>
             </div>
             <div className="flex rounded-[10px] border border-border/65 bg-background/45 p-1">
-              {(['codex', 'claude'] as const).map((provider) => (
+              {enabledProviders.map((provider) => (
                 <button
                   key={provider}
                   type="button"
@@ -2252,7 +2266,11 @@ function PetWindow() {
               onFocusToggle={toggleFocus}
               codingModeEnabled={settings.codingModeEnabled}
               codingProvider={settings.codingProvider}
+              codingCodexEnabled={settings.codingCodexEnabled}
+              codingClaudeEnabled={settings.codingClaudeEnabled}
               onCodingModeToggle={(mode, provider) => {
+                if (provider === 'codex' && !settings.codingCodexEnabled) return;
+                if (provider === 'claude' && !settings.codingClaudeEnabled) return;
                 const nextEnabled = mode ? true : !settings.codingModeEnabled;
                 const nextProvider = provider ?? settings.codingProvider;
                 const nextMode = mode;

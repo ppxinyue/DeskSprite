@@ -5,10 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SettingsLayout } from '@/components/layouts/SettingsLayout';
-import { useSettingsStore, type AvatarRenderMode, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
+import { useSettingsStore, type AvatarRenderMode, type CodingProvider, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG, getBuiltinUsageStats } from '@/features/ai/defaultModel';
@@ -93,6 +92,7 @@ export function SettingsPanel() {
         <AISection
           settings={settings}
           updateSetting={updateSetting}
+          updateSettings={updateSettings}
           systemPrompt={systemPrompt}
           setSystemPrompt={setSystemPrompt}
           orbSystemPrompt={orbSystemPrompt}
@@ -1466,10 +1466,6 @@ function RemindersSection({
 
   return (
     <>
-      <div className="mb-5">
-        <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.018em] text-foreground">提醒事项</h1>
-      </div>
-
       <SectionTitle>休息提醒</SectionTitle>
       <SettingsGroup>
         <AppearanceRow label="休息喝水提醒">
@@ -2406,11 +2402,13 @@ async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; mes
 
 function AISection({
   settings, updateSetting, systemPrompt, setSystemPrompt, orbSystemPrompt, setOrbSystemPrompt,
+  updateSettings,
   configs, onAdd, onEdit, onDelete, onSetDefault, onTest, testResults, testingConfigId,
   isModalOpen, setIsModalOpen, editingConfig,
 }: {
   settings: import('./settingsStore').AppSettings;
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
+  updateSettings: import('./settingsStore').SettingsState['updateSettings'];
   systemPrompt: string;
   setSystemPrompt: (v: string) => void;
   orbSystemPrompt: string;
@@ -2449,6 +2447,48 @@ function AISection({
     chat: Awaited<ReturnType<typeof getBuiltinUsageStats>>;
     voice: Awaited<ReturnType<typeof getBuiltinVoiceUsageStats>>;
   } | null>(null);
+  const [codingCheck, setCodingCheck] = useState<Record<CodingProvider, { checking: boolean; error: string }>>({
+    codex: { checking: false, error: '' },
+    claude: { checking: false, error: '' },
+  });
+  const defaultConfig = configs.find((config) => config.isDefault) ?? configs[0] ?? null;
+
+  const setCodingProviderEnabled = async (provider: CodingProvider, enabled: boolean) => {
+    const otherProvider: CodingProvider = provider === 'claude' ? 'codex' : 'claude';
+    const otherEnabled = otherProvider === 'claude' ? settings.codingClaudeEnabled : settings.codingCodexEnabled;
+    setCodingCheck((prev) => ({ ...prev, [provider]: { checking: enabled, error: '' } }));
+
+    if (enabled) {
+      const result = await invoke<{ ok: boolean; message?: string }>('coding_check_provider_config', { provider }).catch((error) => ({
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      }));
+      if (!result.ok) {
+        setCodingCheck((prev) => ({
+          ...prev,
+          [provider]: {
+            checking: false,
+            error: `无法连接到本机${provider === 'claude' ? 'Claude code' : 'Codex'}配置${result.message ? `：${result.message.replace(/^无法连接到本机(?:Codex|Claude code)配置：?/, '')}` : ''}`,
+          },
+        }));
+        return;
+      }
+      if (provider === 'claude') await updateSetting('codingClaudeEnabled', true);
+      else await updateSetting('codingCodexEnabled', true);
+      setCodingCheck((prev) => ({ ...prev, [provider]: { checking: false, error: '' } }));
+      return;
+    }
+
+    const updates: Partial<import('./settingsStore').AppSettings> = {};
+    if (provider === 'claude') updates.codingClaudeEnabled = false;
+    else updates.codingCodexEnabled = false;
+    if (settings.codingProvider === provider) {
+      if (otherEnabled) updates.codingProvider = otherProvider;
+      else updates.codingModeEnabled = false;
+    }
+    await updateSettings(updates);
+    setCodingCheck((prev) => ({ ...prev, [provider]: { checking: false, error: '' } }));
+  };
 
   useEffect(() => {
     let alive = true;
@@ -2464,60 +2504,168 @@ function AISection({
 
   return (
     <>
-      <SectionTitle>Coding 模式</SectionTitle>
+      <SectionTitle>内置额度</SectionTitle>
       <SettingsGroup>
-        <div className="px-4">
-          <SettingRow label="Coding 工具">
-            <div className="flex rounded-[10px] border border-border/65 bg-background/35 p-1">
-              {[
-                { id: 'codex' as const, label: 'Codex' },
-                { id: 'claude' as const, label: 'Claude Code' },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`rounded-[8px] px-3 py-1.5 text-[13px] font-medium transition ${
-                    settings.codingProvider === item.id
-                      ? 'bg-[#2f94ff] text-white shadow-sm'
-                      : 'text-muted-foreground hover:bg-background/60 hover:text-foreground'
-                  }`}
-                  onClick={() => {
-                    updateSetting('codingProvider', item.id);
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
+        <div className="px-4 py-4">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <span className="font-medium text-[13px]">CloseAI 默认服务</span>
+              <span className="text-[11px] text-muted-foreground ml-2">Key: 内置隐藏</span>
             </div>
-          </SettingRow>
-          <SettingRow
-            label="启用 Coding 模式"
-            hint={settings.codingProvider === 'claude'
-              ? '开启后，灵宠会继承最近活跃的 Claude Code session，并显示状态与输出'
-              : '开启后，灵宠右侧小对话框会显示 Codex 输出，并可直接向 Codex 发送输入'}
-          >
-            <Switch checked={settings.codingModeEnabled} onCheckedChange={(v) => updateSetting('codingModeEnabled', v)} />
-          </SettingRow>
+            <span className="rounded bg-secondary px-2 py-1 text-[11px] text-secondary-foreground">本机额度</span>
+          </div>
+          <div className="grid gap-1 text-[11px] text-muted-foreground">
+            <div>Chat: {BUILTIN_CLOSEAI_CONFIG.model}</div>
+            <div>STT: {BUILTIN_STT_MODEL}</div>
+            <div>TTS: {BUILTIN_TTS_MODEL}</div>
+            <div>{BUILTIN_CLOSEAI_CONFIG.baseUrl}</div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <UsageMeter
+              label="Chat"
+              value={builtinUsage?.chat.percent ?? 0}
+              detail={`${formatCompactNumber(builtinUsage?.chat.used ?? 0)} / ${formatCompactNumber(builtinUsage?.chat.limit ?? 100000)} token`}
+            />
+            <UsageMeter
+              label="STT"
+              value={builtinUsage?.voice.stt.percent ?? 0}
+              detail={`${formatDurationSeconds(builtinUsage?.voice.stt.used ?? 0)} / ${formatDurationSeconds(builtinUsage?.voice.stt.limit ?? 3600)}`}
+            />
+            <UsageMeter
+              label="TTS"
+              value={builtinUsage?.voice.tts.percent ?? 0}
+              detail={`${formatCompactNumber(builtinUsage?.voice.tts.used ?? 0)} / ${formatCompactNumber(builtinUsage?.voice.tts.limit ?? 100000)} 字符`}
+            />
+          </div>
         </div>
       </SettingsGroup>
 
-      <Separator className="my-6" />
-      <SectionTitle>身份设置</SectionTitle>
+      <SectionTitle>Coding 模式</SectionTitle>
       <SettingsGroup>
+        {([
+          {
+            provider: 'claude' as const,
+            label: 'Claude Code',
+            enabled: settings.codingClaudeEnabled,
+            hint: '开启后，Coding 模式中显示 Claude Code 继承 session 和新 session 入口',
+          },
+          {
+            provider: 'codex' as const,
+            label: 'Codex',
+            enabled: settings.codingCodexEnabled,
+            hint: '开启后，Coding 模式中显示 Codex 继承 session 和新 session 入口',
+          },
+        ]).map((item) => (
+          <SettingRow key={item.provider} label={item.label} hint={item.hint}>
+            <div className="flex min-w-[180px] flex-col items-end gap-1">
+              <Switch
+                checked={item.enabled}
+                disabled={codingCheck[item.provider].checking}
+                onCheckedChange={(value) => setCodingProviderEnabled(item.provider, value)}
+              />
+              {codingCheck[item.provider].checking && (
+                <span className="text-[11px] text-muted-foreground">正在测试连接...</span>
+              )}
+              {codingCheck[item.provider].error && (
+                <span className="max-w-[260px] text-right text-[11px] leading-4 text-red-600">{codingCheck[item.provider].error}</span>
+              )}
+            </div>
+          </SettingRow>
+        ))}
+      </SettingsGroup>
+
+      <SectionTitle>Chat 模型</SectionTitle>
+      <SettingsGroup>
+        <SettingRow label="模型">
+          <div className="min-w-0 text-right">
+            <select
+              className="px-2.5 py-1"
+              value={settings.chatModelMode}
+              onChange={(e) => updateSetting('chatModelMode', e.target.value as ModelMode)}
+            >
+              <option value="default">默认</option>
+              <option value="custom">自定义</option>
+            </select>
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              {settings.chatModelMode === 'custom' && defaultConfig
+                ? `${getProviderName(defaultConfig.providerId || defaultConfig.provider)} · ${defaultConfig.model}`
+                : BUILTIN_CLOSEAI_CONFIG.model}
+            </div>
+          </div>
+        </SettingRow>
+        <div className="flex items-center justify-between gap-3 border-b border-[#e6e8eb] px-4 py-3 dark:border-white/10">
+          <div>
+            <div className="text-[13px] font-medium leading-5 text-foreground">API 配置</div>
+            <div className="mt-1 text-[11px] leading-5 text-muted-foreground">自定义模式会使用标记为默认的模型</div>
+          </div>
+          <Button size="sm" onClick={onAdd}>
+            <Plus className="mr-1 h-4 w-4" />
+            添加 API
+          </Button>
+        </div>
+        <div className="space-y-3 px-4 py-4">
+          {configs.map((c) => {
+            const testResult = testResults[c.id];
+            const isTesting = testingConfigId === c.id;
+            return (
+              <div key={c.id} className="rounded-lg border border-border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className="font-medium text-[13px]">{getProviderName(c.providerId || c.provider)}</span>
+                      {c.isDefault && (
+                        <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
+                      )}
+                    </div>
+                    <div className="mb-1 text-[11px] text-muted-foreground">{c.providerId || c.provider} · {c.model}</div>
+                    <div className="truncate text-[11px] text-muted-foreground">{c.baseUrl}</div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">{describeApiKey(c.apiKey)}</div>
+                    {testResult && (
+                      <div className={`mt-1 text-[11px] ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                        {testResult.message}
+                        {testResult.latency !== undefined && ` (${testResult.latency}ms)`}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    {!c.isDefault && (
+                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onSetDefault(c.id)}>
+                        设为默认
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onTest(c)} disabled={isTesting}>
+                      {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : '测试'}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEdit(c)}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" onClick={() => onDelete(c.id, c.keyringRef)}>
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {configs.length === 0 && (
+            <div className="rounded-lg border border-border p-4 text-[13px] text-muted-foreground">
+              暂无 API 配置，点击“添加 API”添加
+            </div>
+          )}
+        </div>
+
         {orbMode ? (
           <div className="px-4">
             <CollapsedUnavailableRow title="宠物名字" reason="Orb 模式使用通用 AI 助手身份" />
           </div>
         ) : (
-          <div className="px-4">
-            <SettingRow label="宠物名字">
-              <EditableInput
-                value={settings.petName}
-                onChange={(value) => updateSetting('petName', value)}
-                className="w-48"
-              />
-            </SettingRow>
-          </div>
+          <SettingRow label="宠物名字">
+            <EditableInput
+              value={settings.petName}
+              onChange={(value) => updateSetting('petName', value)}
+              className="w-48"
+            />
+          </SettingRow>
         )}
         <div className="px-4 py-4">
           <div className="mb-2 text-[13px] font-medium leading-5 text-foreground">System Prompt</div>
@@ -2526,274 +2674,92 @@ function AISection({
               Orb 模式使用独立的 AI 助手 Prompt，不会覆盖灵宠模式的设定。
             </div>
           )}
-          <EditableTextarea
-            value={displayedSystemPrompt}
-            onChange={setDisplayedSystemPrompt}
-            rows={6}
-            className="font-mono"
-          />
-          <div className="flex gap-2 mt-3">
+          <EditableTextarea value={displayedSystemPrompt} onChange={setDisplayedSystemPrompt} rows={6} className="font-mono" />
+          <div className="mt-3 flex gap-2">
             <Button onClick={() => saveDisplayedSystemPrompt()}>保存</Button>
             <Button variant="outline" onClick={resetDisplayedSystemPrompt}>重置为默认</Button>
           </div>
         </div>
       </SettingsGroup>
 
-      <Separator className="my-6" />
-      <SectionTitle>内置额度</SectionTitle>
-      <div className="border border-border rounded-lg p-3 mb-6 bg-muted/40">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <span className="font-medium text-[13px]">CloseAI 默认服务</span>
-            <span className="text-[11px] text-muted-foreground ml-2">Key: 内置隐藏</span>
-          </div>
-          <span className="text-[11px] bg-secondary text-secondary-foreground px-2 py-1 rounded">本机额度</span>
-        </div>
-        <div className="grid gap-1 text-[11px] text-muted-foreground">
-          <div>Chat: {BUILTIN_CLOSEAI_CONFIG.model}</div>
-          <div>STT: {BUILTIN_STT_MODEL}</div>
-          <div>TTS: {BUILTIN_TTS_MODEL}</div>
-          <div>{BUILTIN_CLOSEAI_CONFIG.baseUrl}</div>
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          <UsageMeter
-            label="Chat"
-            value={builtinUsage?.chat.percent ?? 0}
-            detail={`${formatCompactNumber(builtinUsage?.chat.used ?? 0)} / ${formatCompactNumber(builtinUsage?.chat.limit ?? 100000)} token`}
-          />
-          <UsageMeter
-            label="STT"
-            value={builtinUsage?.voice.stt.percent ?? 0}
-            detail={`${formatDurationSeconds(builtinUsage?.voice.stt.used ?? 0)} / ${formatDurationSeconds(builtinUsage?.voice.stt.limit ?? 3600)}`}
-          />
-          <UsageMeter
-            label="TTS"
-            value={builtinUsage?.voice.tts.percent ?? 0}
-            detail={`${formatCompactNumber(builtinUsage?.voice.tts.used ?? 0)} / ${formatCompactNumber(builtinUsage?.voice.tts.limit ?? 100000)} 字符`}
-          />
-        </div>
-      </div>
-
-      <SectionTitle>Chat 模型</SectionTitle>
-      <SettingRow label="Chat 使用">
-        <select
-          className="px-2.5 py-1"
-          value={settings.chatModelMode}
-          onChange={(e) => updateSetting('chatModelMode', e.target.value as ModelMode)}
-        >
-          <option value="default">默认</option>
-          <option value="custom">自定义</option>
-        </select>
-      </SettingRow>
-      {settings.chatModelMode === 'custom' && (
-        <div className="mb-4 rounded-md border border-border bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-          Chat 自定义会使用下方 API 配置中标记为“默认”的模型；也可以在大聊天窗口中为单个面板临时选择其他模型。
-        </div>
-      )}
-
-      <div className="flex items-center justify-between mb-4">
-        <SectionTitle>Chat 自定义配置</SectionTitle>
-        <Button size="sm" onClick={onAdd}>
-          <Plus className="h-4 w-4 mr-1" />
-          添加配置
-        </Button>
-      </div>
-
-      <div className="space-y-3 mb-6">
-        {configs.map((c) => {
-          const testResult = testResults[c.id];
-          const isTesting = testingConfigId === c.id;
-
-          return (
-            <div key={c.id} className="border border-border rounded-lg p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-[13px]">{getProviderName(c.providerId || c.provider)}</span>
-                    {c.isDefault && (
-                      <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mb-1">
-                    {c.providerId || c.provider} · {c.model}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground truncate">{c.baseUrl}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">{describeApiKey(c.apiKey)}</div>
-                  {testResult && (
-                    <div className={`text-[11px] mt-1 ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
-                      {testResult.message}
-                      {testResult.latency !== undefined && ` (${testResult.latency}ms)`}
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  {!c.isDefault && (
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onSetDefault(c.id)}>
-                      设为默认
-                    </Button>
-                  )}
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onTest(c)} disabled={isTesting}>
-                    {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : '测试'}
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEdit(c)}>
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" onClick={() => onDelete(c.id, c.keyringRef)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-        {configs.length === 0 && (
-          <div className="text-[13px] text-muted-foreground border border-border rounded-lg p-4">
-            暂无 API 配置，点击"添加配置"按钮添加
+      <SectionTitle>语音模型</SectionTitle>
+      <SettingsGroup>
+        <SettingRow label="STT 模型" hint="默认和自定义都会在失败时回退到系统输入">
+          <select
+            className="px-2.5 py-1"
+            value={settings.voiceInputProvider}
+            onChange={(e) => updateSetting('voiceInputProvider', e.target.value as VoiceProviderMode)}
+          >
+            <option value="cloud-auto">默认</option>
+            <option value="user-cloud">自定义</option>
+            <option value="system">系统输入</option>
+          </select>
+        </SettingRow>
+        {settings.voiceInputProvider === 'user-cloud' && (
+          <div className="grid gap-3 border-b border-[#e6e8eb] bg-muted/20 p-3 dark:border-white/10">
+            <SettingRow label="STT Base URL">
+              <EditableInput value={settings.customSttBaseUrl} onChange={(value) => updateSetting('customSttBaseUrl', value.trim())} className="w-full max-w-md" placeholder="https://api.example.com/v1" />
+            </SettingRow>
+            <SettingRow label="STT 模型">
+              <EditableInput value={settings.customSttModel} onChange={(value) => updateSetting('customSttModel', value.trim())} className="w-full max-w-md" placeholder="gpt-4o-mini-transcribe" />
+            </SettingRow>
+            <SettingRow label="STT API Key">
+              <EditableInput type="password" value={settings.customSttApiKey} onChange={(value) => updateSetting('customSttApiKey', value)} className="w-full max-w-md" placeholder="sk-..." />
+            </SettingRow>
           </div>
         )}
-      </div>
-
-      <Separator className="my-6" />
-      <SectionTitle>模型参数</SectionTitle>
-      <SettingRow label="温度">
-        <span className="text-[11px] text-muted-foreground w-8">{settings.temperature.toFixed(1)}</span>
-        <Slider value={[settings.temperature]} onValueChange={([v]) => updateSetting('temperature', v)} min={0} max={2} step={0.1} className="w-32" />
-      </SettingRow>
-      <SettingRow label="最大 Token">
-        <EditableInput type="number" value={settings.maxTokens} onChange={(value) => updateSetting('maxTokens', Number(value))} className="w-24" />
-      </SettingRow>
-      <SettingRow label="流式输出">
-        <Switch checked={settings.streamOutput} onCheckedChange={(v) => updateSetting('streamOutput', v)} />
-      </SettingRow>
-
-      <Separator className="my-6" />
-      <SectionTitle>STT 模型</SectionTitle>
-      <SettingRow label="STT 使用" hint="默认和自定义都会在失败时回退到系统输入">
-        <select
-          className="px-2.5 py-1"
-          value={settings.voiceInputProvider}
-          onChange={(e) => updateSetting('voiceInputProvider', e.target.value as VoiceProviderMode)}
-        >
-          <option value="cloud-auto">默认</option>
-          <option value="user-cloud">自定义</option>
-          <option value="system">系统输入</option>
-        </select>
-      </SettingRow>
-      {settings.voiceInputProvider === 'user-cloud' && (
-        <div className="mb-4 grid gap-3 rounded-md border border-border bg-muted/30 p-3">
-          <SettingRow label="STT Base URL">
-            <EditableInput
-              value={settings.customSttBaseUrl}
-              onChange={(value) => updateSetting('customSttBaseUrl', value.trim())}
-              className="w-full max-w-md"
-              placeholder="https://api.example.com/v1"
-            />
-          </SettingRow>
-          <SettingRow label="STT 模型">
-            <EditableInput
-              value={settings.customSttModel}
-              onChange={(value) => updateSetting('customSttModel', value.trim())}
-              className="w-full max-w-md"
-              placeholder="gpt-4o-mini-transcribe"
-            />
-          </SettingRow>
-          <SettingRow label="STT API Key">
-            <EditableInput
-              type="password"
-              value={settings.customSttApiKey}
-              onChange={(value) => updateSetting('customSttApiKey', value)}
-              className="w-full max-w-md"
-              placeholder="sk-..."
-            />
-          </SettingRow>
-        </div>
-      )}
-      <SettingRow label="语音输入语言">
-        <select className="px-2.5 py-1"
-          value={settings.voiceInputLang} onChange={(e) => updateSetting('voiceInputLang', e.target.value)}>
-          <option value="system">跟随系统</option>
-          <option value="zh-CN">简体中文</option>
-          <option value="en-US">英文</option>
-        </select>
-      </SettingRow>
-
-      <Separator className="my-6" />
-      <SectionTitle>TTS 模型</SectionTitle>
-      <SettingRow label="语音输出">
-        <Switch checked={settings.voiceOutput} onCheckedChange={(v) => updateSetting('voiceOutput', v)} />
-      </SettingRow>
-      <SettingRow label="TTS 使用" hint="默认和自定义都会在失败时回退到系统朗读">
-        <select
-          className="px-2.5 py-1"
-          value={settings.voiceOutputProvider}
-          onChange={(e) => updateSetting('voiceOutputProvider', e.target.value as VoiceProviderMode)}
-        >
-          <option value="cloud-auto">默认</option>
-          <option value="user-cloud">自定义</option>
-          <option value="system">系统朗读</option>
-        </select>
-      </SettingRow>
-      {settings.voiceOutputProvider === 'user-cloud' && (
-        <div className="mb-4 grid gap-3 rounded-md border border-border bg-muted/30 p-3">
-          <SettingRow label="TTS Base URL">
-            <EditableInput
-              value={settings.customTtsBaseUrl}
-              onChange={(value) => updateSetting('customTtsBaseUrl', value.trim())}
-              className="w-full max-w-md"
-              placeholder="https://api.example.com/v1"
-            />
-          </SettingRow>
-          <SettingRow label="TTS 模型">
-            <EditableInput
-              value={settings.customTtsModel}
-              onChange={(value) => updateSetting('customTtsModel', value.trim())}
-              className="w-full max-w-md"
-              placeholder="tts-1"
-            />
-          </SettingRow>
-          <SettingRow label="TTS API Key">
-            <EditableInput
-              type="password"
-              value={settings.customTtsApiKey}
-              onChange={(value) => updateSetting('customTtsApiKey', value)}
-              className="w-full max-w-md"
-              placeholder="sk-..."
-            />
-          </SettingRow>
-        </div>
-      )}
-
-      <Separator className="my-6" />
-      <SectionTitle>语音设置</SectionTitle>
-      <SettingRow label="语音唤醒" hint="开启后，说出唤醒词即可唤醒灵宠对话">
-        <Switch checked={settings.wakeWordEnabled} onCheckedChange={(v) => updateSetting('wakeWordEnabled', v)} />
-      </SettingRow>
-      {settings.wakeWordEnabled && (
-        <SettingRow label="唤醒词">
-          <EditableInput
-            value={settings.wakeWord}
-            onChange={(value) => updateSetting('wakeWord', value.slice(0, 20))}
-            className="w-48"
-            maxLength={20}
-          />
+        <SettingRow label="语音输入语言">
+          <select className="px-2.5 py-1" value={settings.voiceInputLang} onChange={(e) => updateSetting('voiceInputLang', e.target.value)}>
+            <option value="system">跟随系统</option>
+            <option value="zh-CN">简体中文</option>
+            <option value="en-US">英文</option>
+          </select>
         </SettingRow>
-      )}
-      <SettingRow label="自动朗读 AI 回复">
-        <Switch checked={settings.autoSpeak} onCheckedChange={(v) => updateSetting('autoSpeak', v)} />
-      </SettingRow>
-      <SettingRow label="朗读语速">
-        <div className="flex items-center gap-3">
-          <span className="w-12 text-right text-[11px] text-muted-foreground">{settings.speakRate.toFixed(1)}x</span>
-          <Slider
-            value={[settings.speakRate]}
-            onValueChange={([v]) => updateSetting('speakRate', v)}
-            min={0.5}
-            max={2.0}
-            step={0.1}
-            className="w-32"
-          />
-        </div>
-      </SettingRow>
+        <SettingRow label="TTS 模型" hint="默认和自定义都会在失败时回退到系统朗读">
+          <select
+            className="px-2.5 py-1"
+            value={settings.voiceOutputProvider}
+            onChange={(e) => updateSetting('voiceOutputProvider', e.target.value as VoiceProviderMode)}
+          >
+            <option value="cloud-auto">默认</option>
+            <option value="user-cloud">自定义</option>
+            <option value="system">系统朗读</option>
+          </select>
+        </SettingRow>
+        {settings.voiceOutputProvider === 'user-cloud' && (
+          <div className="grid gap-3 border-b border-[#e6e8eb] bg-muted/20 p-3 dark:border-white/10">
+            <SettingRow label="TTS Base URL">
+              <EditableInput value={settings.customTtsBaseUrl} onChange={(value) => updateSetting('customTtsBaseUrl', value.trim())} className="w-full max-w-md" placeholder="https://api.example.com/v1" />
+            </SettingRow>
+            <SettingRow label="TTS 模型">
+              <EditableInput value={settings.customTtsModel} onChange={(value) => updateSetting('customTtsModel', value.trim())} className="w-full max-w-md" placeholder="tts-1" />
+            </SettingRow>
+            <SettingRow label="TTS API Key">
+              <EditableInput type="password" value={settings.customTtsApiKey} onChange={(value) => updateSetting('customTtsApiKey', value)} className="w-full max-w-md" placeholder="sk-..." />
+            </SettingRow>
+          </div>
+        )}
+        <SettingRow label="语音输出">
+          <Switch checked={settings.voiceOutput} onCheckedChange={(v) => updateSetting('voiceOutput', v)} />
+        </SettingRow>
+        <SettingRow label="语音唤醒" hint="开启后，说出唤醒词即可唤醒灵宠对话">
+          <Switch checked={settings.wakeWordEnabled} onCheckedChange={(v) => updateSetting('wakeWordEnabled', v)} />
+        </SettingRow>
+        {settings.wakeWordEnabled && (
+          <SettingRow label="唤醒词">
+            <EditableInput value={settings.wakeWord} onChange={(value) => updateSetting('wakeWord', value.slice(0, 20))} className="w-48" maxLength={20} />
+          </SettingRow>
+        )}
+        <SettingRow label="自动朗读 AI 回复">
+          <Switch checked={settings.autoSpeak} onCheckedChange={(v) => updateSetting('autoSpeak', v)} />
+        </SettingRow>
+        <SettingRow label="朗读语速">
+          <div className="flex items-center gap-3">
+            <span className="w-12 text-right text-[11px] text-muted-foreground">{settings.speakRate.toFixed(1)}x</span>
+            <Slider value={[settings.speakRate]} onValueChange={([v]) => updateSetting('speakRate', v)} min={0.5} max={2.0} step={0.1} className="w-32" />
+          </div>
+        </SettingRow>
+      </SettingsGroup>
 
       <ApiConfigModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} editingConfig={editingConfig} />
     </>
@@ -2898,7 +2864,8 @@ function GeneralSection({
 }
 
 function HistorySection() {
-  const { updateSetting } = useSettingsStore();
+  const { settings, updateSetting } = useSettingsStore();
+  const hasCodingHistoryEntry = settings.codingCodexEnabled || settings.codingClaudeEnabled;
   const [items, setItems] = useState<Array<{
     id: number;
     title: string | null;
@@ -2976,6 +2943,11 @@ function HistorySection() {
   };
 
   const openCodingHistory = async () => {
+    const nextProvider = settings.codingProvider === 'claude'
+      ? (settings.codingClaudeEnabled ? 'claude' : 'codex')
+      : (settings.codingCodexEnabled ? 'codex' : 'claude');
+    if ((nextProvider === 'codex' && !settings.codingCodexEnabled) || (nextProvider === 'claude' && !settings.codingClaudeEnabled)) return;
+    if (nextProvider !== settings.codingProvider) await updateSetting('codingProvider', nextProvider);
     await updateSetting('codingModeEnabled', true);
     await invoke('show_chat_window').catch((error) => {
       console.warn('Failed to open coding history:', error);
@@ -2986,13 +2958,15 @@ function HistorySection() {
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
         <SectionTitle>对话历史</SectionTitle>
-        <button
-          type="button"
-          className="rounded-[8px] px-2 py-1 text-[12px] text-muted-foreground transition hover:bg-background/60 hover:text-foreground"
-          onClick={openCodingHistory}
-        >
-          Coding 历史
-        </button>
+        {hasCodingHistoryEntry && (
+          <button
+            type="button"
+            className="rounded-[8px] px-2 py-1 text-[12px] text-muted-foreground transition hover:bg-background/60 hover:text-foreground"
+            onClick={openCodingHistory}
+          >
+            Coding 历史
+          </button>
+        )}
       </div>
       <div className="space-y-3">
         {items.length === 0 && (
