@@ -46,6 +46,8 @@ const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
 const TIMELINE_POLL_INTERVAL_MS = 3000;
 const LIVE_STATS_INTERVAL_MS = 60_000;
 const PET_PRESENCE_CHECK_INTERVAL_MS = 3000;
+const SYSTEM_ACTIVITY_POLL_INTERVAL_MS = 15_000;
+const SYSTEM_INACTIVE_THRESHOLD_MS = 60_000;
 
 type PetPrompt =
   | { id: 'rest-reminder'; message: string; variant: 'rest' }
@@ -996,6 +998,9 @@ function PetWindow() {
   const focusStatsStartedAtRef = useRef<number | null>(null);
   const focusWarningAtRef = useRef(0);
   const codingModeStatsStartedAtRef = useRef<number | null>(null);
+  const systemInactiveRef = useRef(false);
+  const systemInactiveStartedAtRef = useRef<number | null>(null);
+  const lastNowTickRef = useRef(Date.now());
   const autoHiddenForScreenShareRef = useRef(false);
   const topmostSuppressedForGameRef = useRef(false);
   const autoFocusAfterRestRef = useRef(false);
@@ -1072,7 +1077,22 @@ function PetWindow() {
   }, [settings.petScale]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const timer = window.setInterval(() => {
+      const nextNow = Date.now();
+      const gapMs = nextNow - lastNowTickRef.current;
+      lastNowTickRef.current = nextNow;
+      if (gapMs > SYSTEM_INACTIVE_THRESHOLD_MS && focusEndAtRef.current) {
+        const nextEndAt = focusEndAtRef.current + gapMs;
+        focusEndAtRef.current = nextEndAt;
+        setFocusEndAt(nextEndAt);
+        if (focusStartedAtRef.current) focusStartedAtRef.current += gapMs;
+        if (focusStatsStartedAtRef.current) focusStatsStartedAtRef.current = nextNow;
+      }
+      if (gapMs > SYSTEM_INACTIVE_THRESHOLD_MS && codingModeStatsStartedAtRef.current) {
+        codingModeStatsStartedAtRef.current = nextNow;
+      }
+      setNow(nextNow);
+    }, 1000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -1447,6 +1467,18 @@ function PetWindow() {
       .catch((e) => console.warn("Failed to record focus stats:", e));
   }, []);
 
+  const flushCodingModeStats = useCallback(async (endedAt = Date.now()) => {
+    const startedAt = codingModeStatsStartedAtRef.current;
+    if (!startedAt) return;
+    codingModeStatsStartedAtRef.current = endedAt;
+    try {
+      const day = await recordCodingModeTime(startedAt, endedAt);
+      if (day) await emit('profile:data-updated', { kind: 'coding', date: day.date });
+    } catch (error) {
+      console.warn('Failed to record coding mode stats:', error);
+    }
+  }, []);
+
   const endFocus = useCallback(() => {
     recordCurrentFocusSession();
     setFocusEndAt(null);
@@ -1614,6 +1646,7 @@ function PetWindow() {
     let disposed = false;
     let useFallbackSnapshot = false;
     let accessibilityChecked = false;
+    let foregroundPaused = false;
     const minSegmentMs = Math.max(1, Math.min(20, settings.timelineMinSegmentMinutes)) * 60_000;
     timelineDebugLog({ stage: 'start', message: 'Timeline sampler started', minSegmentMs });
 
@@ -1662,6 +1695,19 @@ function PetWindow() {
             return null;
           });
           if (permission) timelineDebugLog({ stage: 'accessibility', message: `trusted=${permission.trusted}` });
+        }
+        if (systemInactiveRef.current) {
+          if (!foregroundPaused) {
+            foregroundPaused = true;
+            await recorder.pauseForeground(systemInactiveStartedAtRef.current ?? Date.now());
+          }
+          const backgroundOnly = await invoke<{ supported: boolean; background: TimelineSnapshot['background']; error?: string | null }>('read_timeline_background_markers').catch(() => null);
+          if (backgroundOnly?.supported) await recorder.handleBackgroundMarkers(backgroundOnly.background, Date.now());
+          return;
+        }
+        if (foregroundPaused) {
+          foregroundPaused = false;
+          recorder.resumeForeground();
         }
         const result = await readTimelineSnapshot();
         if (disposed) return;
@@ -1743,18 +1789,6 @@ function PetWindow() {
   }, [closeChat]);
 
   useEffect(() => {
-    const flushCodingModeStats = async (endedAt = Date.now()) => {
-      const startedAt = codingModeStatsStartedAtRef.current;
-      if (!startedAt) return;
-      codingModeStatsStartedAtRef.current = endedAt;
-      try {
-        const day = await recordCodingModeTime(startedAt, endedAt);
-        if (day) await emit('profile:data-updated', { kind: 'coding', date: day.date });
-      } catch (error) {
-        console.warn('Failed to record coding mode stats:', error);
-      }
-    };
-
     if (!settings.codingModeEnabled) {
       flushCodingModeStats().catch(() => {});
       codingModeStatsStartedAtRef.current = null;
@@ -1769,7 +1803,64 @@ function PetWindow() {
       window.clearInterval(timer);
       flushCodingModeStats().catch(() => {});
     };
-  }, [settings.codingModeEnabled]);
+  }, [flushCodingModeStats, settings.codingModeEnabled]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    const pauseLiveStats = (startedAt = Date.now()) => {
+      if (systemInactiveRef.current) return;
+      systemInactiveRef.current = true;
+      systemInactiveStartedAtRef.current = startedAt;
+      if (focusStatsStartedAtRef.current) {
+        recordCurrentFocusSession(startedAt);
+        focusStatsStartedAtRef.current = null;
+      }
+      if (codingModeStatsStartedAtRef.current) {
+        flushCodingModeStats(startedAt).catch(() => {});
+        codingModeStatsStartedAtRef.current = null;
+      }
+    };
+
+    const resumeLiveStats = (resumedAt = Date.now()) => {
+      if (!systemInactiveRef.current) return;
+      const startedAt = systemInactiveStartedAtRef.current ?? resumedAt;
+      const pauseMs = Math.max(0, resumedAt - startedAt);
+      systemInactiveRef.current = false;
+      systemInactiveStartedAtRef.current = null;
+      if (pauseMs >= SYSTEM_INACTIVE_THRESHOLD_MS && focusEndAtRef.current) {
+        const nextEndAt = focusEndAtRef.current + pauseMs;
+        focusEndAtRef.current = nextEndAt;
+        setFocusEndAt(nextEndAt);
+        if (focusStartedAtRef.current) focusStartedAtRef.current += pauseMs;
+      }
+      if (focusEndAtRef.current) focusStatsStartedAtRef.current = resumedAt;
+      if (settingsRef.current.codingModeEnabled) codingModeStatsStartedAtRef.current = resumedAt;
+    };
+
+    const checkActivity = async () => {
+      try {
+        const state = await invoke<{ supported: boolean; inactive: boolean; idleSeconds: number; state: string }>('read_system_activity_state');
+        if (disposed || !state.supported) return;
+        if (state.inactive || state.idleSeconds >= 60 || state.state !== 'active') pauseLiveStats(Date.now());
+        else resumeLiveStats(Date.now());
+      } catch {
+        resumeLiveStats(Date.now());
+      }
+    };
+
+    checkActivity();
+    const timer = window.setInterval(checkActivity, SYSTEM_ACTIVITY_POLL_INTERVAL_MS);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') checkActivity();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [flushCodingModeStats, recordCurrentFocusSession]);
 
   useEffect(() => {
     compactConversationIdRef.current = chatConversationId;

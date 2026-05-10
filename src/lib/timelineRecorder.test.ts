@@ -120,6 +120,28 @@ test('records background music and terminal markers without blocking foreground 
   assert.equal(markers.some((marker) => marker.type === 'music' && marker.detail === 'Track B - Artist'), true);
 });
 
+test('pauses foreground while still extending background markers', async () => {
+  const { recorder, persisted } = createHarness();
+
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex', {
+    background: [{ type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' }],
+  }), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex', {
+    background: [{ type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' }],
+  }), 65_000);
+  await recorder.pauseForeground(70_000);
+  await recorder.handleBackgroundMarkers([
+    { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
+    { type: 'music', name: 'NeteaseMusic', detail: 'playing' },
+  ], 130_000);
+  recorder.resumeForeground();
+
+  const latest = persisted.at(-1);
+  assert.equal(latest?.endedAt, 70_000);
+  assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'music' && marker.name === 'NeteaseMusic'), true);
+  assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'terminal' && marker.endedAt === new Date(130_000).toISOString()), true);
+});
+
 test('does not persist unsupported/error snapshots or below-threshold segments', async () => {
   const { recorder, persisted, logs } = createHarness();
 

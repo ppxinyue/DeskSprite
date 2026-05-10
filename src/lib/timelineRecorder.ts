@@ -98,6 +98,7 @@ function mergeBackgroundMarkers(
 export class TimelineRecorder {
   private active = emptySegment();
   private candidate = emptySegment();
+  private paused = emptySegment();
   private readonly options: {
     minSegmentMs: number;
     persist: (payload: TimelinePersistPayload) => Promise<TimelinePersistResult>;
@@ -209,6 +210,29 @@ export class TimelineRecorder {
   async stop(endedAt = Date.now()) {
     this.log({ stage: 'stop', message: 'Timeline sampler stopped' });
     await this.persistActive(this.active.lastSeenAt || endedAt);
+    if (this.paused.key) await this.persistPaused();
+  }
+
+  async pauseForeground(endedAt = Date.now()) {
+    if (this.active.key) {
+      this.active.lastSeenAt = endedAt;
+      await this.persistActive(endedAt);
+      this.paused = { ...this.active };
+    }
+    this.active = emptySegment();
+    this.candidate = emptySegment();
+    this.log({ stage: 'pause', message: 'Timeline foreground paused' });
+  }
+
+  resumeForeground() {
+    if (this.paused.key) this.log({ stage: 'resume', message: 'Timeline foreground resumed' });
+    this.paused = emptySegment();
+  }
+
+  async handleBackgroundMarkers(markers: TimelineBackgroundMarker[] | undefined, checkedAt = Date.now()) {
+    if (!markers || markers.length === 0 || !this.paused.key) return;
+    this.paused.backgroundMarkers = mergeBackgroundMarkers(this.paused.backgroundMarkers, markers, checkedAt);
+    await this.persistPaused();
   }
 
   private async persistActive(endedAt: number) {
@@ -264,6 +288,19 @@ export class TimelineRecorder {
         minSegmentMs: this.options.minSegmentMs,
       });
     }
+  }
+
+  private async persistPaused() {
+    if (!this.paused.key || !this.paused.segmentId) return;
+    await this.options.persist({
+      id: this.paused.segmentId,
+      startedAt: this.paused.firstSeenAt,
+      endedAt: this.paused.lastSeenAt,
+      appName: this.paused.appName,
+      windowTitle: this.paused.windowTitle,
+      url: this.paused.url,
+      backgroundMarkers: this.paused.backgroundMarkers,
+    });
   }
 
   private log(payload: TimelineDebugPayload) {

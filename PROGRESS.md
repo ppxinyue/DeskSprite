@@ -1487,3 +1487,13 @@
 - 保留日志：start、accessibility、active start、candidate start/confirm/discard、首个 persist ok、周期性 persist ok、真实错误。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R191. 休眠暂停计时与 Timeline 视图修复（2026-05-10）
+- 系统活动：主进程新增 `read_system_activity_state`，基于 Electron powerMonitor 判断 idle / locked / inactive。
+- 计时暂停：屏幕熄灭、锁屏或休眠超过 1 分钟后，专注时长和 Coding 模式时长先 flush 当前片段再暂停；恢复后从恢复时刻继续累计。
+- 专注倒计时：休眠/熄屏恢复后自动顺延专注结束时间，避免用户离开期间直接完成专注。
+- Timeline：系统 inactive 时暂停前台 task 采样，后台 music / terminal marker 继续延展到暂停前的 entry。
+- 视图：主 timeline 时间戳改为每 2 小时一个标签；主 task / 后台 tooltip 增加可展示空间；顶部分类图例移出横向滚动区；后台 music / terminal 标签改为 sticky 固定在左侧。
+- 测试：新增 timeline 暂停前台但延展后台 marker 的单元测试。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

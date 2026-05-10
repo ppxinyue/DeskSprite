@@ -582,26 +582,26 @@ function TimelineSection({
         </div>
       </div>
 
-      <div ref={scrollRef} className="overflow-x-auto pb-2">
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {visibleCategories.map((category) => {
+          const meta = TIMELINE_CATEGORY_META[category];
+          const Icon = meta.Icon;
+          return (
+            <div key={category} className="flex items-center gap-1.5 text-[11px] font-medium text-[#687076] dark:text-white/62">
+              <span className="flex h-4 w-4 items-center justify-center rounded-[5px]" style={{ backgroundColor: meta.soft }}>
+                <Icon className="h-3 w-3" style={{ color: meta.color }} />
+              </span>
+              {meta.label}
+            </div>
+          );
+        })}
+      </div>
+
+      <div ref={scrollRef} className="overflow-x-auto pb-20 pt-24">
         <div className="min-w-[960px]">
           <div className="rounded-[16px] border border-[#dfe3e6] bg-[#f7f8f9] p-4 shadow-[0_1px_0_rgba(255,255,255,0.76)_inset] dark:border-white/10 dark:bg-white/[0.035]">
-            <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-              {visibleCategories.map((category) => {
-                const meta = TIMELINE_CATEGORY_META[category];
-                const Icon = meta.Icon;
-                return (
-                  <div key={category} className="flex items-center gap-1.5 text-[11px] font-medium text-[#687076] dark:text-white/62">
-                    <span className="flex h-4 w-4 items-center justify-center rounded-[5px]" style={{ backgroundColor: meta.soft }}>
-                      <Icon className="h-3 w-3" style={{ color: meta.color }} />
-                    </span>
-                    {meta.label}
-                  </div>
-                );
-              })}
-            </div>
-
             <div className="relative h-[74px]">
-              {[0, 6, 12, 18, 24].map((hour) => (
+              {Array.from({ length: 13 }, (_, index) => index * 2).map((hour) => (
                 <div
                   key={hour}
                   className="absolute top-0 h-[66px] border-l border-[#e6e8eb] text-[10px] text-[#8b8d98] dark:border-white/7"
@@ -611,7 +611,7 @@ function TimelineSection({
                 </div>
               ))}
 
-              <div className="absolute inset-x-0 top-7 h-12 overflow-hidden rounded-[15px] border border-[#dde1e4] bg-[#edf0f2] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_10px_24px_rgba(28,32,36,0.04)] dark:border-white/10 dark:bg-white/8">
+              <div className="absolute inset-x-0 top-7 h-12 overflow-visible rounded-[15px] border border-[#dde1e4] bg-[#edf0f2] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_10px_24px_rgba(28,32,36,0.04)] dark:border-white/10 dark:bg-white/8">
                 {entries.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-[12px] text-muted-foreground">
                     暂无足够长的焦点窗口记录
@@ -811,10 +811,12 @@ function BackgroundTimelineTrack({
 }) {
   const Icon = icon === 'music' ? Music2 : Terminal;
   return (
-    <div className="group/track relative h-7 rounded-[8px] bg-[#eef0f2]/32 dark:bg-white/[0.035]">
-      <div className="pointer-events-none absolute left-1.5 top-1/2 z-10 flex -translate-y-1/2 items-center gap-1 text-[9px] font-medium uppercase tracking-[0.04em] text-[#8b8d98] dark:text-white/42">
-        <Icon className="h-3 w-3" />
-        {label}
+    <div className="group/track relative h-7 overflow-visible rounded-[8px] bg-[#eef0f2]/32 dark:bg-white/[0.035]">
+      <div className="pointer-events-none sticky left-1.5 z-20 flex h-full w-fit items-center">
+        <span className="flex items-center gap-1 rounded-[6px] bg-[#f7f8f9]/92 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.04em] text-[#8b8d98] shadow-[8px_0_14px_rgba(247,248,249,0.92)] dark:bg-[#171719]/92 dark:text-white/42 dark:shadow-[8px_0_14px_rgba(23,23,25,0.92)]">
+          <Icon className="h-3 w-3" />
+          {label}
+        </span>
       </div>
       {markers.map((marker, index) => (
         <BackgroundTimelineMarker

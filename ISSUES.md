@@ -2327,3 +2327,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：采样类功能的 debug 日志需要按“状态变化”和“异常”输出，不能按采样频率输出。
 - 是否需更新技术文档：否。
+
+## ISSUE-196
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：休眠暂停计时与 Timeline 视图修复
+- 严重程度：重要
+- 问题现象：电脑休眠或熄屏超过 1 分钟时，专注时长、Coding 模式时长和 timeline 前台 task 仍可能继续累计；timeline 时间刻度过疏；hover 内容框被裁切；分类和后台轨道图标会随横向滚动离开左侧。
+- 原因分析：计时逻辑只按 wall-clock 增量落库，没有系统 idle / locked 状态门控；timeline tooltip 位于横向滚动和圆角轨道内部，容易被 overflow 裁切；图例和轨道 label 放在滚动内容内部，横向滚动时自然跟随移动。
+- 解决方案：新增 powerMonitor 活动状态命令；renderer 统一暂停/恢复专注与 Coding 统计并顺延专注倒计时；TimelineRecorder 支持暂停前台并在暂停期间继续延展后台 marker；时间刻度改为 2 小时间隔；图例移到滚动区外，后台 label 改为 sticky；为 tooltip 增加滚动区上下留白并解除轨道 overflow 裁切。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：统计类计时不能只看 wall-clock，必须把系统休眠/锁屏视为暂停；时间轴的标签和 tooltip 应该独立于滚动内容的裁切层。
+- 是否需更新技术文档：否。

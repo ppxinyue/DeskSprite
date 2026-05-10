@@ -8,6 +8,7 @@ const {
   Menu,
   nativeImage,
   protocol,
+  powerMonitor,
   screen,
   shell,
   systemPreferences,
@@ -531,6 +532,24 @@ async function readTimelineBackgroundMarkers() {
   }
 
   return markers;
+}
+
+async function readTimelineBackgroundOnly() {
+  if (process.platform !== 'darwin') return { supported: false, background: [], error: 'unsupported', checkedAt: Date.now() };
+  const background = await readTimelineBackgroundMarkers();
+  return { supported: true, background, error: null, checkedAt: Date.now() };
+}
+
+function readSystemActivityState() {
+  if (!powerMonitor) return { supported: false, idleSeconds: 0, state: 'unknown', inactive: false };
+  const idleSeconds = powerMonitor.getSystemIdleTime();
+  const state = powerMonitor.getSystemIdleState(60);
+  return {
+    supported: true,
+    idleSeconds,
+    state,
+    inactive: state !== 'active' || idleSeconds >= 60,
+  };
 }
 
 async function readTimelineActiveWindow() {
@@ -2365,6 +2384,8 @@ const handlers = {
   ensure_accessibility_permission: ensureAccessibilityPermission,
   timeline_debug_log: timelineDebugLog,
   read_timeline_active_window: readTimelineActiveWindow,
+  read_timeline_background_markers: readTimelineBackgroundOnly,
+  read_system_activity_state: readSystemActivityState,
   get_launch_at_login: () => app.getLoginItemSettings().openAtLogin,
   set_launch_at_login: ({ enabled }) => {
     app.setLoginItemSettings({ openAtLogin: Boolean(enabled), openAsHidden: false });
