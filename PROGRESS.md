@@ -1853,3 +1853,10 @@
 - 背景：将设置窗口浅色/深色背景收敛到 `.settings-window` 作用域；深色下 root、main 和 Radix ScrollArea viewport/content 都强制使用 #1f1f1f。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
 - 文件：SettingsLayout.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R242. 深色设置磨砂玻璃质感（2026-05-11）
+- 背景：深色设置窗口从纯平面黑改为低对比暗色材质，加入非常轻的径向光感和系统灰渐变，避免“死黑”。
+- 材质：侧栏、卡片和内容盒子统一使用半透明深灰、blur/saturate 和低对比边缘，接近 macOS 深色设置窗口的 visual effect 质感。
+- 控件：输入框和选择器改成半透明暗灰面，保留清晰对比但去掉厚重实心感。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
+- 文件：index.css, ISSUES.md, PROGRESS.md

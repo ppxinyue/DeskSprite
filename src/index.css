@@ -61,7 +61,7 @@
   --font-mono: ui-monospace, Consolas, monospace;
 }
 
-.dark {
+  .dark {
   --color-background: #1f1f1f;
   --color-foreground: #e7e7e7;
   --color-muted: #303030;
@@ -82,14 +82,14 @@
   --color-destructive-foreground: #fafafa;
   --color-ring: #a9a49a;
 
-  --glass-bg: rgba(44, 44, 44, 0.76);
-  --glass-bg-strong: rgba(50, 50, 50, 0.92);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-highlight: rgba(255, 255, 255, 0.06);
-  --glass-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
-  --glass-shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.22);
-  --surface-flat: rgba(44, 44, 44, 0.90);
-  --surface-raised: rgba(54, 54, 54, 0.92);
+  --glass-bg: rgba(46, 46, 46, 0.66);
+  --glass-bg-strong: rgba(54, 54, 54, 0.76);
+  --glass-border: rgba(255, 255, 255, 0.105);
+  --glass-highlight: rgba(255, 255, 255, 0.055);
+  --glass-shadow: 0 18px 54px rgba(0, 0, 0, 0.34);
+  --glass-shadow-soft: 0 10px 30px rgba(0, 0, 0, 0.24);
+  --surface-flat: rgba(44, 44, 44, 0.78);
+  --surface-raised: rgba(58, 58, 58, 0.72);
   --surface-subtle: rgba(255, 255, 255, 0.06);
   --color-pet-dialog-bg: rgba(26, 25, 22, 0.74);
   --color-pet-bubble-user: rgba(255, 255, 255, 0.075);
@@ -268,27 +268,55 @@
       linear-gradient(135deg, #f6f7f9 0%, #e8edf3 46%, #f7f8fa 100%);
   }
 
+  .settings-window::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: transparent;
+  }
+
+  .settings-window > * {
+    position: relative;
+    z-index: 1;
+  }
+
   .settings-main {
     background: transparent;
   }
 
   .dark .settings-window {
-    background: #1f1f1f !important;
+    background:
+      radial-gradient(circle at 58% -12%, rgba(255,255,255,0.075), transparent 36%),
+      radial-gradient(circle at 86% 10%, rgba(118, 136, 156, 0.11), transparent 32%),
+      linear-gradient(135deg, #202020 0%, #242424 46%, #1d1d1d 100%) !important;
+  }
+
+  .dark .settings-window::before {
+    background:
+      linear-gradient(90deg, rgba(255,255,255,0.025), transparent 42%),
+      radial-gradient(circle at 48% 38%, rgba(255,255,255,0.025), transparent 44%);
+    backdrop-filter: blur(28px) saturate(1.08);
+    -webkit-backdrop-filter: blur(28px) saturate(1.08);
   }
 
   .dark .settings-window .settings-main,
   .dark .settings-window [data-radix-scroll-area-viewport],
   .dark .settings-window [data-radix-scroll-area-content] {
-    background: #1f1f1f !important;
+    background: transparent !important;
   }
 
   .dark .settings-window [class*="shadow-"] {
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22) !important;
+    box-shadow: 0 18px 54px rgba(0, 0, 0, 0.28) !important;
   }
 
   .dark .settings-window .settings-sidebar,
   .dark .settings-window .settings-sidebar [class*="shadow-"] {
-    box-shadow: 1px 0 0 rgba(255, 255, 255, 0.08) !important;
+    background: rgba(37, 37, 37, 0.72) !important;
+    backdrop-filter: blur(34px) saturate(1.18);
+    -webkit-backdrop-filter: blur(34px) saturate(1.18);
+    box-shadow: 1px 0 0 rgba(255, 255, 255, 0.07), 18px 0 48px rgba(0, 0, 0, 0.16) !important;
   }
 
   .dark .settings-window .settings-card,
@@ -297,7 +325,14 @@
   .dark .settings-window [class*="bg-[#e"],
   .dark .settings-window [class*="bg-[#f"],
   .dark .settings-window [class*="dark:bg-white/"] {
-    background-color: #2c2c2c !important;
+    background: rgba(45, 45, 45, 0.72) !important;
+    backdrop-filter: blur(26px) saturate(1.16);
+    -webkit-backdrop-filter: blur(26px) saturate(1.16);
+  }
+
+  .dark .settings-window .settings-card,
+  .dark .settings-window .quiet-card {
+    border: 1px solid rgba(255, 255, 255, 0.085);
   }
 
   .dark .settings-window [class*="after:bg-white"]::after {
@@ -308,7 +343,7 @@
   .dark .settings-window textarea,
   .dark .settings-window select,
   .dark .settings-window [role="textbox"] {
-    background-color: #343434 !important;
+    background: rgba(58, 58, 58, 0.68) !important;
     box-shadow: none !important;
   }
 
