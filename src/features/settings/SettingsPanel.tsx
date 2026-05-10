@@ -20,7 +20,7 @@ import { getConversations, getFocusStatsDays, getMessages, getSetting, getSystem
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, isBuiltinAsset, normalizePetMediaConfig, type PetStateMediaConfig } from '@/features/pet/animations';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
-import { emit } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { ReactNode } from 'react';
 
@@ -266,14 +266,18 @@ function ProfileSection() {
     };
   }, [calendarOpen]);
 
-  const selectedStats = stats[stats.length - 1] ?? { date: selectedDate, focusMs: 0, focusSessions: 0, distractions: 0 };
+  useEffect(() => {
+    const unlisten = listen<{ date?: string }>('profile:data-updated', ({ payload }) => {
+      if (!payload?.date || payload.date === selectedDate) loadProfileData();
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [loadProfileData, selectedDate]);
+
+  const selectedStats = stats[stats.length - 1] ?? { date: selectedDate, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0 };
   const maxFocusMs = Math.max(1, ...stats.map((day) => day.focusMs));
   const totalFocusMs = stats.reduce((sum, day) => sum + day.focusMs, 0);
   const totalSessions = stats.reduce((sum, day) => sum + day.focusSessions, 0);
   const totalDistractions = stats.reduce((sum, day) => sum + day.distractions, 0);
-  const codingTimelineMs = timelineEntries
-    .filter((entry) => entry.category === 'coding')
-    .reduce((sum, entry) => sum + getTimelineDurationMs(entry), 0);
   const todayKey = getLocalDateKey();
 
   return (
@@ -327,7 +331,7 @@ function ProfileSection() {
         <StatsCard label="专注时长" value={formatFocusDuration(selectedStats.focusMs)} accent />
         <StatsCard label="专注次数" value={`${selectedStats.focusSessions} 次`} />
         <StatsCard label="分心次数" value={`${selectedStats.distractions} 次`} />
-        <StatsCard label="Coding 模式时长" value={formatFocusDuration(codingTimelineMs)} />
+        <StatsCard label="Coding 模式时长" value={formatFocusDuration(selectedStats.codingMs ?? 0)} />
       </div>
 
       <SettingsGroup className="px-4 py-4">

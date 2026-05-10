@@ -36,6 +36,7 @@ export type FocusStatsDay = {
   focusMs: number;
   focusSessions: number;
   distractions: number;
+  codingMs: number;
 };
 
 export type TimelineCategory = 'coding' | 'chat' | 'browser' | 'office' | 'entertainment' | 'other';
@@ -168,8 +169,11 @@ function classifyTimelineCategory(appName: string, windowTitle: string, url: str
 
 function ensureFocusStatsDay(store: Store, dateKey: string): FocusStatsDay {
   const existing = store.focusStats[dateKey];
-  if (existing) return existing;
-  const created = { date: dateKey, focusMs: 0, focusSessions: 0, distractions: 0 };
+  if (existing) {
+    existing.codingMs ??= 0;
+    return existing;
+  }
+  const created = { date: dateKey, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0 };
   store.focusStats[dateKey] = created;
   return created;
 }
@@ -370,17 +374,29 @@ export async function getAllSettings() {
 export async function recordFocusSession(startedAt: number, endedAt = Date.now()) {
   const duration = Math.max(0, endedAt - startedAt);
   if (duration < 1000) return;
-  mutate((store) => {
+  return mutate((store) => {
     const day = ensureFocusStatsDay(store, localDateKey(new Date(endedAt)));
     day.focusMs += duration;
     day.focusSessions += 1;
+    return { ...day };
   });
 }
 
 export async function recordDistraction(occurredAt = Date.now()) {
-  mutate((store) => {
+  return mutate((store) => {
     const day = ensureFocusStatsDay(store, localDateKey(new Date(occurredAt)));
     day.distractions += 1;
+    return { ...day };
+  });
+}
+
+export async function recordCodingModeTime(startedAt: number, endedAt = Date.now()) {
+  const duration = Math.max(0, endedAt - startedAt);
+  if (duration < 1000) return;
+  return mutate((store) => {
+    const day = ensureFocusStatsDay(store, localDateKey(new Date(endedAt)));
+    day.codingMs += duration;
+    return { ...day };
   });
 }
 
@@ -390,7 +406,7 @@ export async function getFocusStatsDays(days = 14, endDate = localDateKey()): Pr
   return Array.from({ length: count }, (_, index) => {
     const date = addDays(endDate, index - count + 1);
     const day = store.focusStats[date];
-    return day ? { ...day } : { date, focusMs: 0, focusSessions: 0, distractions: 0 };
+    return day ? { ...day, codingMs: day.codingMs ?? 0 } : { date, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0 };
   });
 }
 

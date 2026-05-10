@@ -10,7 +10,7 @@ import { ChatDialog, Composer, MessageBubble } from "@/features/chat/ChatDialog"
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
-import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordDistraction, recordFocusSession, upsertTimelineEntry, type TimelineBackgroundMarker } from "@/lib/db";
+import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry, type TimelineBackgroundMarker } from "@/lib/db";
 import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
 import "./index.css";
@@ -44,6 +44,7 @@ const DISTRACTION_CHECK_INTERVAL_MS = 3000;
 const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
 const TIMELINE_POLL_INTERVAL_MS = 3000;
 const TIMELINE_MIN_SEGMENT_MS = 8000;
+const CODING_MODE_STATS_INTERVAL_MS = 15_000;
 
 type PetPrompt =
   | { id: 'rest-reminder'; message: string; variant: 'rest' }
@@ -960,6 +961,7 @@ function PetWindow() {
   const restEndAtRef = useRef<number | null>(null);
   const focusStartedAtRef = useRef<number | null>(null);
   const focusWarningAtRef = useRef(0);
+  const codingModeStatsStartedAtRef = useRef<number | null>(null);
   const autoFocusAfterRestRef = useRef(false);
   const restPresentationFrameRef = useRef<number | null>(null);
   const restPresentationSnapshotRef = useRef<RestPresentationSnapshot | null>(null);
@@ -1395,7 +1397,11 @@ function PetWindow() {
   const recordCurrentFocusSession = useCallback((endedAt = Date.now()) => {
     const startedAt = focusStartedAtRef.current;
     if (!startedAt) return;
-    recordFocusSession(startedAt, endedAt).catch((e) => console.warn("Failed to record focus stats:", e));
+    recordFocusSession(startedAt, endedAt)
+      .then((day) => {
+        if (day) emit('profile:data-updated', { kind: 'focus', date: day.date }).catch(() => {});
+      })
+      .catch((e) => console.warn("Failed to record focus stats:", e));
   }, []);
 
   const endFocus = useCallback(() => {
@@ -1505,7 +1511,11 @@ function PetWindow() {
         if (!result.supported || !result.matchedRule || !focusEndAtRef.current) return;
         if (Date.now() - focusWarningAtRef.current < DISTRACTION_WARNING_COOLDOWN_MS) return;
         focusWarningAtRef.current = Date.now();
-        recordDistraction().catch((e) => console.warn("Failed to record distraction stats:", e));
+        recordDistraction()
+          .then((day) => {
+            if (day) emit('profile:data-updated', { kind: 'distraction', date: day.date }).catch(() => {});
+          })
+          .catch((e) => console.warn("Failed to record distraction stats:", e));
         const rule = result.matchedRule.replace(/^(app|keyword):/, '');
         setPetState('work');
         setPetPrompt({
@@ -1541,7 +1551,7 @@ function PetWindow() {
     if (!settings.timelineRecordingEnabled) return;
     if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
     let disposed = false;
-    let commandUnavailable = false;
+    let useFallbackSnapshot = false;
     const activeRef: {
       key: string;
       firstSeenAt: number;
@@ -1573,19 +1583,48 @@ function PetWindow() {
         url: activeRef.url,
         backgroundMarkers: activeRef.backgroundMarkers,
       });
-      if (entry) activeRef.segmentId = entry.id;
+      if (entry) {
+        activeRef.segmentId = entry.id;
+        emit('profile:data-updated', { kind: 'timeline', date: entry.date }).catch(() => {});
+      }
+    };
+
+    const readTimelineSnapshot = async () => {
+      if (!useFallbackSnapshot) {
+        try {
+          return await invoke<{
+            supported: boolean;
+            appName: string;
+            windowTitle: string;
+            url?: string | null;
+            background?: TimelineBackgroundMarker[];
+            error?: string | null;
+          }>('read_timeline_active_window');
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (!message.includes('Unknown command: read_timeline_active_window')) throw error;
+          useFallbackSnapshot = true;
+        }
+      }
+      const fallback = await invoke<{
+        supported: boolean;
+        appName: string;
+        windowTitle: string;
+        error?: string | null;
+      }>('check_distraction', { settings });
+      return {
+        supported: fallback.supported,
+        appName: fallback.appName,
+        windowTitle: fallback.windowTitle,
+        url: null,
+        background: [],
+        error: fallback.error,
+      };
     };
 
     const runTimelineCheck = async () => {
       try {
-        const result = await invoke<{
-          supported: boolean;
-          appName: string;
-          windowTitle: string;
-          url?: string | null;
-          background?: TimelineBackgroundMarker[];
-          error?: string | null;
-        }>('read_timeline_active_window');
+        const result = await readTimelineSnapshot();
         if (disposed || !result.supported || result.error) return;
         const appName = result.appName?.trim() || 'Unknown';
         const windowTitle = result.windowTitle?.trim() || '';
@@ -1619,13 +1658,7 @@ function PetWindow() {
         activeRef.backgroundMarkers = result.background ?? activeRef.backgroundMarkers;
         await persistActive(checkedAt);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (message.includes('Unknown command: read_timeline_active_window')) {
-          commandUnavailable = true;
-          disposed = true;
-          return;
-        }
-        if (!disposed && !commandUnavailable) console.warn('Failed to record timeline:', error);
+        if (!disposed) console.warn('Failed to record timeline:', error);
       }
     };
 
@@ -1648,6 +1681,35 @@ function PetWindow() {
     });
     return () => { unlisten.then((fn) => fn()); };
   }, [closeChat]);
+
+  useEffect(() => {
+    const flushCodingModeStats = async (endedAt = Date.now()) => {
+      const startedAt = codingModeStatsStartedAtRef.current;
+      if (!startedAt) return;
+      codingModeStatsStartedAtRef.current = endedAt;
+      try {
+        const day = await recordCodingModeTime(startedAt, endedAt);
+        if (day) await emit('profile:data-updated', { kind: 'coding', date: day.date });
+      } catch (error) {
+        console.warn('Failed to record coding mode stats:', error);
+      }
+    };
+
+    if (!settings.codingModeEnabled) {
+      flushCodingModeStats().catch(() => {});
+      codingModeStatsStartedAtRef.current = null;
+      return;
+    }
+
+    codingModeStatsStartedAtRef.current = Date.now();
+    const timer = window.setInterval(() => {
+      flushCodingModeStats().catch(() => {});
+    }, CODING_MODE_STATS_INTERVAL_MS);
+    return () => {
+      window.clearInterval(timer);
+      flushCodingModeStats().catch(() => {});
+    };
+  }, [settings.codingModeEnabled]);
 
   useEffect(() => {
     compactConversationIdRef.current = chatConversationId;

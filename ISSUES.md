@@ -2147,3 +2147,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：时间轴交互动效要和选择状态解耦；mock 数据应遵守真实采集边界，否则会误导后续产品判断。
 - 是否需更新技术文档：否。
+
+## ISSUE-181
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：个人档案实时刷新链路修复
+- 严重程度：重要
+- 问题现象：用户使用一段时间后，个人档案中的今天 Timeline、专注时长和 Coding 模式时长都没有刷新。
+- 原因分析：Timeline 采样依赖新主进程命令，开发热更新时旧主进程可能缺少该命令；设置页只靠轮询读取本地 storage，没有收到写入事件；Coding 模式时长上一版使用 timeline 的 coding 分类近似统计，不是真正的 Coding 模式开启时长。
+- 解决方案：Timeline 新命令不可用时降级到 `check_distraction`；Timeline / 专注 / 分心 / Coding 统计写入后广播 `profile:data-updated`；新增 `codingMs` 日统计并在 Coding 模式开启期间每 15 秒落库。
+- 涉及文件：`src/App.tsx`, `src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：跨窗口本地统计需要显式更新事件；模式时长应独立落库，不能用 app 分类时长替代。
+- 是否需更新技术文档：否。

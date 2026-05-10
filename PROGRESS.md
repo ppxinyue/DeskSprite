@@ -1366,3 +1366,11 @@
 - Mock 边界：示例数据严格只使用 app 名、窗口标题、浏览器 URL；聊天 app 不再 mock 具体聊天内容，VSCode 只展示窗口标题里的文件/项目名。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R176. 个人档案实时刷新链路修复（2026-05-10）
+- Timeline：采样写入后广播 `profile:data-updated`，设置页收到当天更新后立即重新加载，不再只依赖 30 秒轮询。
+- 兼容：如果主进程还没重启导致 `read_timeline_active_window` 不可用，采样会降级使用既有 `check_distraction` 前台窗口接口，至少记录 app 名和窗口标题。
+- 专注统计：专注/分心写入后同步广播更新事件，个人档案可即时刷新；专注时长仍按专注结束结算。
+- Coding 时长：新增 `codingMs` 日统计，Coding 模式开启期间每 15 秒增量落库，个人档案第 4 张卡片改为读取真实 Coding 模式时长。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, db.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
