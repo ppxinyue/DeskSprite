@@ -2483,3 +2483,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：嵌套滚动容器里不要用 `scrollIntoView` 做局部横向定位，容易意外影响父级纵向滚动。
 - 是否需更新技术文档：否。
+
+## ISSUE-209
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：设置按钮色彩统一
+- 严重程度：一般
+- 问题现象：设置页里仍有很多黑色按钮或黑色选中态，和当前 Apple/Radix 玻璃风格不一致。
+- 原因分析：基础 Button 默认 variant 仍使用 `bg-primary text-primary-foreground`；部分设置局部 UI 直接使用 `bg-foreground` / `bg-primary` 写死了深色样式。
+- 解决方案：将默认 Button 主操作改为 Vite 蓝玻璃按钮；把日历选中态、API 默认标签和用量条统一为浅蓝低对比样式。
+- 涉及文件：`src/components/ui/button.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：设置页主操作颜色应收敛到基础组件，局部状态样式避免绕过设计 token 直接使用 foreground。
+- 是否需更新技术文档：否。

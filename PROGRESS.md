@@ -1586,3 +1586,10 @@
 - 实现：改为只计算并设置专注图横向容器的 `scrollLeft`，不触碰页面纵向滚动，也不触发 smooth 自动滑动。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R204. 设置按钮色彩统一（2026-05-10）
+- 视觉：默认 Button 从黑色 primary 改为 Vite 蓝玻璃按钮，统一保存、添加、确认等主操作按钮的色彩风格。
+- 修复：个人档案日历选中态、API 默认标签、用量进度条不再使用黑色 foreground/primary，改为同一套浅蓝低对比风格。
+- 范围：保留 destructive 按钮的红色警示语义，避免危险操作和普通主按钮混淆。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
+- 文件：button.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
