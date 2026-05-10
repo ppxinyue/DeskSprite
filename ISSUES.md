@@ -2351,3 +2351,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：hover 详情不应通过增加布局留白解决遮挡，应该脱离裁切层作为浮层展示。
 - 是否需更新技术文档：否。
+
+## ISSUE-198
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：全天活跃度坐标轴对齐
+- 严重程度：一般
+- 问题现象：全天活跃度图中 0、6、12、18 这些 x 轴标签在 bar 容器内占据高度，导致带标签的柱子起点和其他柱子不一致。
+- 原因分析：bar 和 x 轴 label 被放在同一个 flex column 中，label 会参与该小时柱子的布局高度计算。
+- 解决方案：将柱状图拆成独立 bar row 和 label row，bar 统一从底线开始；x 轴标签下移并改为每 2 小时显示一次。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：图表轴标签不能参与数据图形的尺寸流，应该放在独立轴层。
+- 是否需更新技术文档：否。

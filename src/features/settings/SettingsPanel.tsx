@@ -743,17 +743,25 @@ function TimelineSection({
         </div>
         <div>
           <div className="mb-2 text-[12px] font-semibold text-foreground">全天活跃度</div>
-          <div className="flex h-20 items-end gap-1.5 rounded-[10px] bg-[#f8f9fa] px-2 pb-2 pt-3 dark:bg-white/[0.035]">
-            {hourlyCounts.map((item) => (
-              <div key={item.hour} className="group flex min-w-0 flex-1 flex-col items-center gap-1">
-                <div
-                  className="w-full rounded-t-[5px] bg-[#c1c8cd] transition-colors group-hover:bg-[#8b8d98]"
-                  style={{ height: `${Math.max(item.count > 0 ? 8 : 2, (item.count / maxHourlyCount) * 48)}px` }}
-                  title={`${String(item.hour).padStart(2, '0')}:00 · ${item.count} 个 task`}
-                />
-                {item.hour % 6 === 0 && <div className="text-[9px] leading-none text-[#8b8d98]">{item.hour}</div>}
-              </div>
-            ))}
+          <div className="rounded-[10px] bg-[#f8f9fa] px-2 pb-2 pt-3 dark:bg-white/[0.035]">
+            <div className="flex h-14 items-end gap-1.5">
+              {hourlyCounts.map((item) => (
+                <div key={`bar-${item.hour}`} className="group flex min-w-0 flex-1 items-end">
+                  <div
+                    className="w-full rounded-t-[5px] bg-[#c1c8cd] transition-colors group-hover:bg-[#8b8d98]"
+                    style={{ height: `${Math.max(item.count > 0 ? 8 : 2, (item.count / maxHourlyCount) * 48)}px` }}
+                    title={`${String(item.hour).padStart(2, '0')}:00 · ${item.count} 个 task`}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-1.5 flex gap-1.5">
+              {hourlyCounts.map((item) => (
+                <div key={`label-${item.hour}`} className="min-w-0 flex-1 text-center text-[9px] leading-none text-[#8b8d98]">
+                  {item.hour % 2 === 0 ? item.hour : ''}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -1505,3 +1505,9 @@
 - Hover：主 task 和后台进程的 hover 详情改为 fixed 浮层覆盖显示，不再依赖轨道内部空间，避免被滚动容器或圆角条带裁切。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R193. 全天活跃度坐标轴对齐（2026-05-10）
+- 修复：全天活跃度柱状图拆成 bar 层和 x 轴 label 层，所有 bar 从同一底线开始。
+- 坐标：x 轴标签从 0/6/12/18 改为每 2 小时一个标签，并下移到柱图下方独立显示。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
