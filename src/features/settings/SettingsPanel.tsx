@@ -144,7 +144,7 @@ function SectionTitle({ children, muted = false }: { children: ReactNode; muted?
 
 function SettingRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-border/45 px-0 py-2 last:border-0">
+    <div className="flex min-h-[56px] items-center justify-between gap-4 border-b border-[#e6e8eb] px-4 py-3 last:border-0 dark:border-white/10">
       <div className="min-w-0">
         <span className="text-[13px] font-medium leading-5 text-foreground">{label}</span>
         {hint && <p className="mt-1 max-w-[420px] text-[11px] leading-5 text-muted-foreground">{hint}</p>}
@@ -156,7 +156,7 @@ function SettingRow({ label, hint, children }: { label: string; hint?: string; c
 
 function AppearanceRow({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[44px] items-center justify-between gap-3 border-b border-border/45 px-0 py-2 last:border-0">
+    <div className="flex min-h-[56px] items-center justify-between gap-4 border-b border-[#e6e8eb] px-4 py-3 last:border-0 dark:border-white/10">
       <div className="min-w-0">
         <span className="text-[13px] font-medium leading-5 text-foreground">{label}</span>
         {hint && <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{hint}</p>}
@@ -168,7 +168,7 @@ function AppearanceRow({ label, hint, children }: { label: string; hint?: string
 
 function SettingsGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`mb-6 overflow-hidden rounded-[16px] border border-[var(--glass-border)] bg-white/38 shadow-[0_1px_0_rgba(255,255,255,0.74)_inset,0_14px_38px_rgba(52,64,84,0.07)] backdrop-blur-[26px] dark:bg-white/[0.045] ${className}`}>
+    <div className={`mb-6 overflow-hidden rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd]/72 shadow-[0_1px_0_rgba(255,255,255,0.76)_inset,0_14px_38px_rgba(52,64,84,0.06)] backdrop-blur-[26px] dark:border-white/10 dark:bg-white/[0.045] ${className}`}>
       {children}
     </div>
   );
@@ -352,7 +352,7 @@ function CollapsedUnavailableRow({ title, reason }: { title: string; reason: str
     <button
       type="button"
       disabled
-      className="flex min-h-[44px] w-full cursor-not-allowed items-center justify-between gap-3 border-b border-border/45 px-0 py-2 text-left last:border-0"
+      className="flex min-h-[56px] w-full cursor-not-allowed items-center justify-between gap-4 border-b border-[#e6e8eb] px-4 py-3 text-left last:border-0 dark:border-white/10"
       aria-expanded={false}
     >
       <div className="min-w-0">
@@ -1527,7 +1527,7 @@ function RemindersSection({
             />
           </div>
         </AppearanceRow>
-        <div className="grid gap-3 px-0 py-3">
+        <div className="grid gap-3 px-4 py-4">
           <div>
             <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽应用</div>
             <RuleTokenEditor

@@ -1573,3 +1573,10 @@
 - 保存：应用设置前自动 trim 并清理空白规则，避免空 token 进入配置。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：input.tsx, textarea.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R202. 设置分组卡片边距修正（2026-05-10）
+- 卡片：通用、外观、提醒事项、AI 对话里的 SettingsGroup 改为复用个人档案浅色卡片边框、底色和内高光效果。
+- 行距：SettingRow / AppearanceRow / 不可用行统一增加左右内边距，避免文字贴住卡片左右边线。
+- 规则区：屏蔽应用和屏蔽关键词 token 编辑器外层增加和普通设置行一致的水平留白。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

@@ -2459,3 +2459,15 @@
 - 涉及文件：`src/components/ui/input.tsx`, `src/components/ui/textarea.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：数组型配置应使用 token/chip 编辑器，而不是让用户维护换行文本。
 - 是否需更新技术文档：否。
+
+## ISSUE-207
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：设置分组卡片边距修正
+- 严重程度：一般
+- 问题现象：通用、外观、提醒事项、AI 对话中的设置行文字仍贴近卡片左右边框，整体不像个人档案卡片那样有舒适留白。
+- 原因分析：上一轮主要调整了 Input/Textarea 的内部 padding，但 SettingsRow / AppearanceRow 仍是 `px-0`，导致行内容直接从卡片边缘开始。
+- 解决方案：SettingsGroup 改为个人档案式浅色卡片边框和底色；SettingRow、AppearanceRow、不可用行以及分心规则区域统一增加水平内边距。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：输入舒适度不仅取决于控件自身 padding，也取决于外层 row 和 card 的容器留白。
+- 是否需更新技术文档：否。
