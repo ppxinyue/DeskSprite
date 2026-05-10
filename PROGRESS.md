@@ -1684,3 +1684,10 @@
 - 通用设置：“游戏识别列表”下方说明改为“当用户正在进行以下游戏时，会自动取消置顶，并暂停 Timeline 刷新监测，以保证游戏性能。”
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R218. 中英文界面基础支持（2026-05-10）
+- 设置：新增 `appLanguage` 设置项，默认中文；通用设置第一项增加“语言”选择，支持中文 / English 切换。
+- 翻译：新增轻量 i18n 层，英文模式下翻译设置、聊天、右键菜单、个人档案等核心 UI 的可见文本、placeholder、title 和 aria-label。
+- 保护：聊天消息正文标记为不翻译，避免用户/AI 内容被界面语言层误处理。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：App.tsx, i18n.ts, ChatPrimitives.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md

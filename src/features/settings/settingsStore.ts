@@ -9,6 +9,7 @@ export type ModelMode = 'default' | 'custom';
 export type AvatarRenderMode = 'pet' | 'orb';
 export type CodingProvider = 'codex' | 'claude';
 export type CodingSessionMode = 'new' | 'inherit';
+export type AppLanguage = 'zh' | 'en';
 
 export interface PetMotionSetting {
   enabled: boolean;
@@ -19,6 +20,7 @@ export interface PetMotionSetting {
 export type PetMotionSettings = Record<PetMotionName, PetMotionSetting>;
 
 export interface AppSettings {
+  appLanguage: AppLanguage;
   theme: Theme;
   petOpacity: number;
   petScale: number;
@@ -71,6 +73,7 @@ export interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
+  appLanguage: 'zh',
   theme: 'system',
   petOpacity: 1.0,
   petScale: 1.0,
@@ -197,6 +200,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
             (loaded as Record<string, unknown>)[key] =
               key === 'theme' && !['system', 'light', 'dark'].includes(String(parsed))
                 ? 'system'
+                : key === 'appLanguage' && !isAppLanguage(parsed)
+                  ? 'zh'
                 : key === 'chatModelMode' && !isModelMode(parsed)
                   ? 'default'
                 : key === 'avatarRenderMode' && !isAvatarRenderMode(parsed)
@@ -266,6 +271,10 @@ function tryParse(value: string): unknown {
 
 function isVoiceProviderMode(value: unknown): value is VoiceProviderMode {
   return value === 'system' || value === 'cloud-auto' || value === 'user-cloud';
+}
+
+function isAppLanguage(value: unknown): value is AppLanguage {
+  return value === 'zh' || value === 'en';
 }
 
 function isModelMode(value: unknown): value is ModelMode {

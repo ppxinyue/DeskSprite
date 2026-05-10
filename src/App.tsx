@@ -11,6 +11,7 @@ import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
 import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
 import { TimelineRecorder, type TimelineSnapshot } from "@/lib/timelineRecorder";
+import { installDocumentTranslator } from "@/i18n";
 import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
 import "./index.css";
@@ -144,6 +145,11 @@ function App() {
       return () => mq.removeEventListener("change", handler);
     }
   }, [settings.theme]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    return installDocumentTranslator(settings.appLanguage);
+  }, [loaded, settings.appLanguage]);
 
   useEffect(() => {
     const unlisten = listen("shortcut:chat-focus", () => {

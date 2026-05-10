@@ -2651,3 +2651,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：设置页说明优先说用户结果，技术条件可以由实现兜底，不必暴露在主文案里。
 - 是否需更新技术文档：否。
+
+## ISSUE-223
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：中英文界面基础支持
+- 严重程度：一般
+- 问题现象：App 只有中文界面，没有语言选择入口，英文用户无法切换到专业清晰的英文 UI。
+- 原因分析：设置模型缺少语言字段；各窗口文案分散在设置页、聊天组件、灵宠右键菜单和个人档案中，没有统一翻译层。
+- 解决方案：新增 `appLanguage` 设置并放在通用第一项；增加轻量 i18n 翻译层，在英文模式下统一翻译核心 UI 文案和常见可访问属性；聊天消息正文显式排除，避免误翻译用户内容。
+- 涉及文件：`src/App.tsx`, `src/i18n.ts`, `src/features/chat/ChatPrimitives.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：多窗口 Electron 应用的国际化入口应先落在设置和全局渲染层，保留中文源文案，后续再按模块补充更细粒度 key。
+- 是否需更新技术文档：否。

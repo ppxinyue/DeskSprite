@@ -170,9 +170,9 @@ export function MessageBubble({
         {isPending ? (
           <PulseDot className="text-[var(--color-chat-muted)]" />
         ) : isUser ? (
-          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{cleanChatText(message.content)}</p>
+          <p data-i18n-ignore="true" className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{cleanChatText(message.content)}</p>
         ) : (
-          <div className="chat-markdown max-w-full overflow-hidden [overflow-wrap:anywhere]">
+          <div data-i18n-ignore="true" className="chat-markdown max-w-full overflow-hidden [overflow-wrap:anywhere]">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {cleanChatText(message.content)}
             </ReactMarkdown>

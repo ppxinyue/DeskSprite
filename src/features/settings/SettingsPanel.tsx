@@ -7,7 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SettingsLayout } from '@/components/layouts/SettingsLayout';
-import { useSettingsStore, type AvatarRenderMode, type CodingProvider, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
+import { useSettingsStore, type AppLanguage, type AvatarRenderMode, type CodingProvider, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG, getBuiltinUsageStats } from '@/features/ai/defaultModel';
@@ -18,6 +18,7 @@ import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getFocusStatsDays, getMessages, getSetting, getSystemPrompt, getTimelineEntries, setSetting, updateSystemPrompt, type FocusStatsDay, type TimelineCategory, type TimelineEntry } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, isBuiltinAsset, normalizePetMediaConfig, type PetStateMediaConfig } from '@/features/pet/animations';
+import { LANGUAGE_OPTIONS } from '@/i18n';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -1883,6 +1884,28 @@ function ThemeSelect({
   );
 }
 
+function LanguageSelect({
+  value,
+  onChange,
+}: {
+  value: AppLanguage;
+  onChange: (language: AppLanguage) => void;
+}) {
+  return (
+    <div className="min-w-0 text-right">
+      <select
+        className="px-2.5 py-1"
+        value={value}
+        onChange={(event) => onChange(event.target.value as AppLanguage)}
+      >
+        {LANGUAGE_OPTIONS.map((option) => (
+          <option key={option.id} value={option.id}>{option.label}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function AvatarModeSelect({
   value,
   onChange,
@@ -2852,6 +2875,12 @@ function GeneralSection({
       <SectionTitle>通用</SectionTitle>
 
       <SettingsGroup>
+        <SettingRow label="语言" hint="选择界面显示语言">
+          <LanguageSelect
+            value={settings.appLanguage}
+            onChange={(value) => updateSetting('appLanguage', value)}
+          />
+        </SettingRow>
         <SettingRow label="开机自启" hint="登录 macOS 后自动启动 DeskSprite">
           <Switch checked={settings.launchAtLogin} onCheckedChange={updateLaunchAtLogin} />
         </SettingRow>
