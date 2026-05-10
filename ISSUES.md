@@ -2951,3 +2951,15 @@
 - 涉及文件：`src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：修复主题漏底时不要最终停在纯色兜底；macOS 风格需要“低亮度、低饱和、半透明材质”的组合，而不是简单提高亮度。
 - 是否需更新技术文档：否。
+
+## ISSUE-248
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：首帧主题与灵宠初始布局稳定化
+- 严重程度：一般
+- 问题现象：设置/大聊天窗口仍会先闪出浅色模式再切到深色；灵宠首次加载时会先出现在靠右下位置，再跳动到稳定位置。
+- 原因分析：HTML 虽然预置了 `.dark`，但 React theme effect 在设置尚未加载时会用默认 `system` 重新计算主题，导致系统浅色时短暂移除 `.dark`；设置/聊天窗口也只等页面 load 事件而非真实设置完成。灵宠窗口则有 fallback show，且首次显示可能早于真实设置驱动的首个稳定 layout。
+- 解决方案：主题 effect 增加 `loaded` 门槛；settings/chat renderer 在设置加载后主动通知 main 再显示窗口；pet 窗口移除 fallback 抢先显示，启动和手动显示都等 `pet_window_layout_ready` 后再显示。
+- 涉及文件：`src/App.tsx`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：首帧体验要以“真实设置加载完成”为 ready 标准；窗口不能仅靠 DOM load 或 fallback timer 提前显示，否则默认值和真实设置之间的差异会被用户看见。
+- 是否需更新技术文档：否。

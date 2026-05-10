@@ -1860,3 +1860,10 @@
 - 控件：输入框和选择器改成半透明暗灰面，保留清晰对比但去掉厚重实心感。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
 - 文件：index.css, ISSUES.md, PROGRESS.md
+
+### R243. 首帧主题与灵宠初始布局稳定化（2026-05-11）
+- 主题：`App` 的主题 effect 改为等真实设置加载完成后才运行，避免 HTML 预置的 `.dark` 被默认 `system` 设置临时覆盖成浅色。
+- 窗口：设置窗口和大聊天窗口不再只等 `did-finish-load`，而是等 renderer 在真实设置加载完成后发送 `renderer_window_ready` 再显示。
+- 灵宠：移除 pet 窗口 1.8s fallback 抢先显示；首次启动和手动显示都必须等首个稳定 layout 完成并发送 `pet_window_layout_ready` 后再 `showInactive`。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.82 kB，未触发 chunk 体积 warning。
+- 文件：App.tsx, electron/main.cjs, ISSUES.md, PROGRESS.md

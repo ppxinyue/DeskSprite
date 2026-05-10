@@ -24,8 +24,12 @@ const { execFile, spawn } = require('node:child_process');
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
 const windows = new Map();
+const rendererReadyWindows = new WeakSet();
+const pendingWindowShows = new WeakMap();
 let topmostGuard = null;
 let topmostSuppressed = false;
+let petWindowLayoutReady = false;
+let pendingPetShow = true;
 let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'png', 'idle.png');
 let tray = null;
 let currentAppIcon = null;
@@ -277,19 +281,32 @@ function createWindow(label, options) {
 
 function showWindowAfterInitialPaint(win, { focus = false } = {}) {
   if (!win || win.isDestroyed()) return;
+  if (rendererReadyWindows.has(win)) {
+    win.show();
+    if (focus) win.focus();
+    return;
+  }
+  const existing = pendingWindowShows.get(win);
+  if (existing?.timer) clearTimeout(existing.timer);
   let shown = false;
   const show = () => {
     if (shown || win.isDestroyed()) return;
     shown = true;
+    pendingWindowShows.delete(win);
     win.show();
     if (focus) win.focus();
   };
-  if (win.webContents.isLoadingMainFrame()) {
-    win.webContents.once('did-finish-load', () => setTimeout(show, 0));
-    win.webContents.once('did-fail-load', show);
-    return;
-  }
-  show();
+  const timer = setTimeout(show, 3500);
+  pendingWindowShows.set(win, { show, timer });
+}
+
+function markRendererReady(win) {
+  if (!win || win.isDestroyed()) return;
+  rendererReadyWindows.add(win);
+  const pending = pendingWindowShows.get(win);
+  if (!pending) return;
+  if (pending.timer) clearTimeout(pending.timer);
+  setTimeout(pending.show, 0);
 }
 
 function resolveAppIconPath(iconPath) {
@@ -769,12 +786,18 @@ function isPetVisible() {
 function showPetWindow() {
   const win = windows.get('pet') || createPetWindow();
   applyFloatingFullscreenBehavior(win, { force: true });
+  pendingPetShow = true;
+  if (!petWindowLayoutReady) {
+    send(win, 'pet:request-initial-layout', {});
+    return;
+  }
   win.showInactive();
   applyFloatingFullscreenBehavior(win, { force: true });
   win.moveTop();
 }
 
 function hidePetWindow() {
+  pendingPetShow = false;
   windows.get('pet')?.hide();
   windows.get('compact-chat')?.hide();
 }
@@ -811,6 +834,8 @@ function ensureTopmostGuard() {
 }
 
 function createPetWindow() {
+  petWindowLayoutReady = false;
+  pendingPetShow = true;
   const display = screen.getPrimaryDisplay();
   const work = display.workArea;
   const initialWidth = 220;
@@ -835,14 +860,10 @@ function createPetWindow() {
   });
   applyFloatingFullscreenBehavior(win, { force: true });
   win.setIgnoreMouseEvents(false, { forward: true });
-  const showPetInactive = () => {
-    if (win.isDestroyed() || win.isVisible()) return;
-    applyFloatingFullscreenBehavior(win, { force: true });
-    win.showInactive();
-    applyFloatingFullscreenBehavior(win, { force: true });
-  };
-  const fallbackShowTimer = setTimeout(showPetInactive, 1800);
-  win.once('closed', () => clearTimeout(fallbackShowTimer));
+  win.once('closed', () => {
+    petWindowLayoutReady = false;
+    pendingPetShow = true;
+  });
   win.webContents.once('did-finish-load', () => {
     setTimeout(() => send(win, 'pet:request-initial-layout', {}), 40);
   });
@@ -2468,6 +2489,9 @@ const handlers = {
   import_pet_image: importPetImage,
   list_pet_images: listPetImages,
   pick_chat_image: (_args, event) => pickChatImage(event),
+  renderer_window_ready: (_args, event) => {
+    markRendererReady(BrowserWindow.fromWebContents(event.sender));
+  },
   delete_pet_image: async ({ filePath }) => {
     ensureUserAsset(filePath);
     await fsp.unlink(filePath);
@@ -2475,10 +2499,13 @@ const handlers = {
   read_pet_image_data_url: readPetImageDataUrl,
   pet_window_layout_ready: (_args, event) => {
     const win = BrowserWindow.fromWebContents(event.sender) || windows.get('pet');
-    if (!win || win.isDestroyed() || win.isVisible()) return;
+    petWindowLayoutReady = true;
+    if (!win || win.isDestroyed() || win.isVisible() || !pendingPetShow) return;
+    pendingPetShow = false;
     applyFloatingFullscreenBehavior(win, { force: true });
     win.showInactive();
     applyFloatingFullscreenBehavior(win, { force: true });
+    win.moveTop();
   },
   resize_compact_chat_window: ({ height }) => {
     const win = windows.get('compact-chat');

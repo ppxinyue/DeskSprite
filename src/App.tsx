@@ -173,6 +173,7 @@ function App() {
 
   useEffect(() => {
     const root = document.documentElement;
+    if (!loaded) return;
     if (settings.theme === "dark") root.classList.add("dark");
     else if (settings.theme === "light") root.classList.remove("dark");
     else {
@@ -182,12 +183,18 @@ function App() {
       mq.addEventListener("change", handler);
       return () => mq.removeEventListener("change", handler);
     }
-  }, [settings.theme]);
+  }, [loaded, settings.theme]);
 
   useEffect(() => {
     if (!loaded) return;
     return installDocumentTranslator(settings.appLanguage);
   }, [loaded, settings.appLanguage]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (windowLabel !== "settings" && windowLabel !== "chat") return;
+    invoke("renderer_window_ready").catch(() => {});
+  }, [loaded, windowLabel]);
 
   useEffect(() => {
     const unlisten = listen("shortcut:chat-focus", () => {
