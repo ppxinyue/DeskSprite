@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
+import { Check, Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ export function Composer({
   onPasteImage,
   onSubmit,
   onVoiceInput,
+  onVoiceStop,
   selectedImage,
   textareaRef,
   compact = false,
@@ -48,6 +49,7 @@ export function Composer({
   onPasteImage?: (image: SelectedImage) => void;
   onSubmit: () => void;
   onVoiceInput?: () => void;
+  onVoiceStop?: () => void;
   selectedImage?: SelectedImage | null;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   compact?: boolean;
@@ -82,32 +84,50 @@ export function Composer({
         <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'ml-0.5 h-7 w-7 rounded-[6px]'} p-0 text-[var(--text-secondary)] transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]`} title="上传图片" aria-label="上传图片" onClick={onImagePick}>
           <ImagePlus className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'}`} />
         </Button>
-        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'h-7 w-7 rounded-[6px]'} relative overflow-hidden p-0 transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${(isListening || isVoiceLoading) ? 'text-[var(--color-chat-accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
-          {isListening && <VoiceRipple level={voiceLevel} compact={compact} />}
+        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'h-7 w-7 rounded-[6px]'} relative overflow-hidden p-0 transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${(isListening || isVoiceLoading) ? 'text-[var(--color-chat-accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput} disabled={isStreaming || isVoiceLoading}>
           {isVoiceLoading ? (
             <Loader2 className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'} animate-spin`} />
           ) : (
             <Mic className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'} relative z-10`} />
           )}
         </Button>
-        <Textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => onInputChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          onPaste={handlePaste}
-          onMouseDown={() => {
-            if (compact) invoke('focus_compact_chat_window').catch(() => {});
-          }}
-          placeholder="输入消息..."
-          className={`${compact ? 'min-h-[28px] px-1.5 py-1.5 leading-[1.35] overflow-hidden' : 'min-h-[34px] px-2 py-1.5 text-[14px] leading-[1.45] overflow-y-auto'} max-h-[112px] min-w-0 flex-1 resize-none border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
-          style={{ fontSize: compact ? compactFontSize : undefined }}
-          rows={1}
-          disabled={isStreaming}
-        />
-        <Button size="sm" type="submit" disabled={isStreaming} className={`${compact ? 'h-6 rounded-[5px] px-2 text-[10px]' : 'h-7 rounded-[6px] px-2.5 text-[11px]'} shrink-0 ${(!input.trim() && !selectedImage) ? 'opacity-55' : ''}`}>
-          发送
-        </Button>
+        {isListening ? (
+          <>
+            <AudioWaveform level={voiceLevel} compact={compact} />
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'h-7 w-7 rounded-[6px]'} shrink-0 p-0 text-[var(--color-chat-accent)] hover:bg-[color-mix(in_srgb,var(--color-chat-accent)_10%,transparent)]`}
+              title="结束录音"
+              aria-label="结束录音"
+              onClick={onVoiceStop}
+            >
+              <Check className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'}`} />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => onInputChange(e.target.value)}
+              onKeyDown={onKeyDown}
+              onPaste={handlePaste}
+              onMouseDown={() => {
+                if (compact) invoke('focus_compact_chat_window').catch(() => {});
+              }}
+              placeholder={isVoiceLoading ? '正在识别...' : '输入消息...'}
+              className={`${compact ? 'min-h-[28px] px-1.5 py-1.5 leading-[1.35] overflow-hidden' : 'min-h-[34px] px-2 py-1.5 text-[14px] leading-[1.45] overflow-y-auto'} max-h-[112px] min-w-0 flex-1 resize-none border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
+              style={{ fontSize: compact ? compactFontSize : undefined }}
+              rows={1}
+              disabled={isStreaming || isVoiceLoading}
+            />
+            <Button size="sm" type="submit" disabled={isStreaming || isVoiceLoading} className={`${compact ? 'h-6 rounded-[5px] px-2 text-[10px]' : 'h-7 rounded-[6px] px-2.5 text-[11px]'} shrink-0 ${(!input.trim() && !selectedImage) ? 'opacity-55' : ''}`}>
+              发送
+            </Button>
+          </>
+        )}
       </form>
       {error && (
         <p className="mt-2 px-1 text-[11px] leading-5 text-destructive">
@@ -118,22 +138,39 @@ export function Composer({
   );
 }
 
-function VoiceRipple({ level, compact }: { level: number; compact: boolean }) {
+function AudioWaveform({ level, compact }: { level: number; compact: boolean }) {
   const clamped = Math.max(0, Math.min(1, level));
-  const base = compact ? 18 : 22;
-  const sizeA = base + clamped * 12;
-  const sizeB = base * 0.72 + clamped * 9;
+  const amplitude = compact ? 5 + clamped * 14 : 7 + clamped * 18;
+  const mid = compact ? 14 : 17;
+  const points = Array.from({ length: 28 }, (_, i) => {
+    const x = i * 9;
+    const direction = i % 2 === 0 ? -1 : 1;
+    const local = 0.62 + ((i % 5) / 4) * 0.38;
+    return `${x},${mid + direction * amplitude * local}`;
+  }).join(' ');
   return (
-    <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <span
-        className="absolute rounded-full bg-[var(--color-chat-accent)]/14 transition-[height,width,opacity] duration-75"
-        style={{ width: sizeA, height: sizeA, opacity: 0.16 + clamped * 0.34 }}
-      />
-      <span
-        className="absolute rounded-full border border-[var(--color-chat-accent)]/45 transition-[height,width,opacity] duration-75"
-        style={{ width: sizeB, height: sizeB, opacity: 0.28 + clamped * 0.42 }}
-      />
-    </span>
+    <div className={`${compact ? 'h-7' : 'h-8'} relative min-w-0 flex-1 overflow-hidden rounded-[6px] bg-[color-mix(in_srgb,var(--color-chat-accent)_7%,transparent)]`}>
+      <svg className="chat-audio-wave absolute inset-y-0 left-0 h-full w-[220%]" viewBox="0 0 252 34" preserveAspectRatio="none" aria-hidden="true">
+        <polyline
+          points={points}
+          fill="none"
+          stroke="var(--color-chat-accent)"
+          strokeOpacity={0.42 + clamped * 0.36}
+          strokeWidth={compact ? 1.4 : 1.7}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <polyline
+          points={points}
+          fill="none"
+          stroke="var(--color-chat-accent)"
+          strokeOpacity={0.14 + clamped * 0.2}
+          strokeWidth={compact ? 4 : 5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
   );
 }
 

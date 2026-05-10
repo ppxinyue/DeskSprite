@@ -43,6 +43,7 @@ interface SpeechRecognitionLike {
   onend: (() => void) | null;
   onerror: ((event: Event) => void) | null;
   start: () => void;
+  stop: () => void;
 }
 
 export function ChatDialog({
@@ -78,6 +79,7 @@ export function ChatDialog({
   const stickToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const voiceStopRef = useRef<(() => void) | null>(null);
 
   const {
     messages,
@@ -277,19 +279,31 @@ export function ChatDialog({
   }
 
   function handleVoiceInput() {
+    if (voiceStopRef.current) {
+      voiceStopRef.current();
+      return;
+    }
     const lang = settings.voiceInputLang === 'system' ? (navigator.language || 'zh-CN') : settings.voiceInputLang;
     startSpeechInput(
       (text) => setInput((value) => `${value}${value ? ' ' : ''}${text}`),
       (phase) => {
         setIsListening(phase === 'recording');
         setIsVoiceLoading(phase === 'loading');
-        if (phase === 'idle') setVoiceLevel(0);
+        if (phase === 'idle') {
+          setVoiceLevel(0);
+          voiceStopRef.current = null;
+        }
       },
       lang,
       settings.voiceInputProvider,
       settings,
       setVoiceLevel,
+      (stop) => { voiceStopRef.current = stop; },
     );
+  }
+
+  function handleVoiceStop() {
+    voiceStopRef.current?.();
   }
 
   useEffect(() => {
@@ -388,6 +402,7 @@ export function ChatDialog({
           onPasteImage={handlePasteImage}
           onSubmit={handleSend}
           onVoiceInput={handleVoiceInput}
+          onVoiceStop={handleVoiceStop}
           selectedImage={selectedImage}
           textareaRef={textareaRef}
           compact
@@ -446,6 +461,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
   const [panels, setPanels] = useState<StandalonePanel[]>(() => [createPanel()]);
   const [activePanelId, setActivePanelId] = useState<number>(() => panelCounter);
   const [layout, setLayout] = useState<LayoutMode>('single');
+  const panelVoiceStopsRef = useRef(new Map<number, () => void>());
   const { configs, getDefaultConfig, loadConfigs } = useApiConfigStore();
   const { settings } = useSettingsStore();
 
@@ -717,20 +733,30 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
                 onPasteImage={(image) => updatePanel(panel.id, { selectedImage: image })}
                 onSubmit={() => sendFromPanel(panel.id)}
                 onVoiceInput={() => {
+                  const activeStop = panelVoiceStopsRef.current.get(panel.id);
+                  if (activeStop) {
+                    activeStop();
+                    return;
+                  }
                   const lang = settings.voiceInputLang === 'system' ? (navigator.language || 'zh-CN') : settings.voiceInputLang;
                   startSpeechInput(
                     (text) => updatePanel(panel.id, (current) => ({ ...current, input: `${current.input}${current.input ? ' ' : ''}${text}` })),
-                    (phase) => updatePanel(panel.id, {
-                      isListening: phase === 'recording',
-                      isVoiceLoading: phase === 'loading',
-                      ...(phase === 'idle' ? { voiceLevel: 0 } : {}),
-                    }),
+                    (phase) => {
+                      if (phase === 'idle') panelVoiceStopsRef.current.delete(panel.id);
+                      updatePanel(panel.id, {
+                        isListening: phase === 'recording',
+                        isVoiceLoading: phase === 'loading',
+                        ...(phase === 'idle' ? { voiceLevel: 0 } : {}),
+                      });
+                    },
                     lang,
                     settings.voiceInputProvider,
                     settings,
                     (level) => updatePanel(panel.id, { voiceLevel: level }),
+                    (stop) => { panelVoiceStopsRef.current.set(panel.id, stop); },
                   );
                 }}
+                onVoiceStop={() => panelVoiceStopsRef.current.get(panel.id)?.()}
               />
             ))}
           </div>
@@ -860,6 +886,7 @@ async function startSpeechInput(
   providerMode: VoiceProviderMode = 'system',
   settings?: AppSettings,
   onLevel?: (level: number) => void,
+  onStopReady?: (stop: () => void) => void,
 ) {
   const finish = () => {
     setPhase('idle');
@@ -872,6 +899,7 @@ async function startSpeechInput(
       const text = await transcribeWithCloudVoice(providerMode, lang || (navigator.language || 'zh-CN'), settings, {
         onPhase: setPhase,
         onLevel,
+        onStopReady,
       });
       finish();
       if (text) {
@@ -923,7 +951,10 @@ async function startSpeechInput(
     }
   }
 
+  let stopped = false;
   const stopRecording = () => {
+    if (stopped) return;
+    stopped = true;
     stopLevelMonitor?.();
     stopLevelMonitor = null;
     finish();
@@ -944,6 +975,13 @@ async function startSpeechInput(
   recognition.lang = lang || (navigator.language || 'zh-CN');
   recognition.interimResults = true;
   recognition.continuous = false;
+  onStopReady?.(() => {
+    try {
+      recognition.stop();
+    } catch {
+      stopRecording();
+    }
+  });
 
   recognition.onresult = (event) => {
     const results = event.results;
@@ -1013,6 +1051,7 @@ function StandaloneChatPanel({
   speakRate,
   onSubmit,
   onVoiceInput,
+  onVoiceStop,
 }: {
   panel: StandalonePanel;
   active: boolean;
@@ -1027,6 +1066,7 @@ function StandaloneChatPanel({
   onPasteImage: (image: SelectedImage) => void;
   onSubmit: () => void;
   onVoiceInput: () => void;
+  onVoiceStop: () => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
@@ -1107,6 +1147,7 @@ function StandaloneChatPanel({
             onPasteImage={onPasteImage}
             onSubmit={onSubmit}
             onVoiceInput={onVoiceInput}
+            onVoiceStop={onVoiceStop}
             selectedImage={panel.selectedImage}
             textareaRef={textareaRef}
           />

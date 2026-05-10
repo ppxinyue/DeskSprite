@@ -2723,3 +2723,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：全屏 Space 中的系统 dialog 需要继承浮窗父窗口的 fullscreen-visible 属性；透明浮窗首次显示应等待真实布局完成，否则用户会看到布局约束的中间态。
 - 是否需更新技术文档：否。
+
+## ISSUE-229
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：语音输入框内锯齿波与手动结束
+- 严重程度：轻微
+- 问题现象：录音动效只在麦克风按钮上显示，不够像输入状态；用户也不能主动结束录音，只能等待自动超时。
+- 原因分析：语音输入状态只暴露 `recording/loading/idle` 和音量值，没有把当前 MediaRecorder 或系统 SpeechRecognition 的 stop 控制权暴露给 UI。
+- 解决方案：语音服务增加 `onStopReady` 回调，录音开始后把 stop 函数交给聊天层；Composer 在录音时用输入框内锯齿波形替代 textarea，并在右侧提供对号按钮调用 stop。
+- 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/voice/voiceService.ts`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：录音交互要同时提供“正在采集”的可视反馈和“主动结束”的直接控制，自动超时只能作为兜底。
+- 是否需更新技术文档：否。

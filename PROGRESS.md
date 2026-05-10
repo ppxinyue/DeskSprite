@@ -1728,3 +1728,10 @@
 - 兼容：保留 1.8s fallback 显示，防止极端加载失败时窗口完全不出现。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R224. 语音输入框内锯齿波与手动结束（2026-05-10）
+- UI：录音时不再在麦克风按钮上显示圆形波纹，改为在输入框区域显示从左向右滑动的锯齿状音频波形。
+- 音量：波形振幅由 AudioContext RMS 分贝驱动，声音越大振幅越明显。
+- 控制：波形右侧新增小对号按钮，用户可手动结束录音；原有超时自动结束仍保留，结束后云端转写继续显示 loading。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：ChatPrimitives.tsx, ChatDialog.tsx, voiceService.ts, index.css, ISSUES.md, PROGRESS.md

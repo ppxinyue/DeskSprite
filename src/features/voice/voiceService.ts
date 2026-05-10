@@ -30,6 +30,7 @@ export interface VoiceInputOptions {
   maxMs?: number;
   onPhase?: (phase: VoiceInputPhase) => void;
   onLevel?: (level: number) => void;
+  onStopReady?: (stop: () => void) => void;
 }
 
 let currentVoiceAudio: HTMLAudioElement | null = null;
@@ -93,7 +94,7 @@ export async function transcribeWithCloudVoice(
   }
 
   options.onPhase?.('recording');
-  const { blob, durationMs } = await recordAudioClip(options.maxMs ?? 8_000, options.onLevel);
+  const { blob, durationMs } = await recordAudioClip(options.maxMs ?? 8_000, options.onLevel, options.onStopReady);
   options.onPhase?.('loading');
   const audioBase64 = await blobToBase64(blob);
   const text = await invoke<string>('transcribe_audio', {
@@ -160,7 +161,11 @@ export async function getBuiltinVoiceUsageStats() {
   };
 }
 
-async function recordAudioClip(maxMs: number, onLevel?: (level: number) => void): Promise<{ blob: Blob; durationMs: number }> {
+async function recordAudioClip(
+  maxMs: number,
+  onLevel?: (level: number) => void,
+  onStopReady?: (stop: () => void) => void,
+): Promise<{ blob: Blob; durationMs: number }> {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('当前系统不支持麦克风输入。');
   }
@@ -176,14 +181,21 @@ async function recordAudioClip(maxMs: number, onLevel?: (level: number) => void)
   const startedAt = Date.now();
 
   return new Promise((resolve, reject) => {
+    let cleaned = false;
     const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
       stopLevelMonitor();
       stream.getTracks().forEach((track) => track.stop());
       onLevel?.(0);
     };
-    const timer = window.setTimeout(() => {
+    const stopRecording = () => {
       if (recorder.state !== 'inactive') recorder.stop();
+    };
+    const timer = window.setTimeout(() => {
+      stopRecording();
     }, maxMs);
+    onStopReady?.(stopRecording);
 
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunks.push(event.data);
