@@ -1541,3 +1541,11 @@
 - 统计：平均每日专注、最高单日专注、平均分心次数统一按选中日及前 6 天窗口计算。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R198. 14 天专注标题与今天右边界（2026-05-10）
+- 标题：个人档案专注图标题从“7 天专注”改为“14 天专注”。
+- 统计窗口：摘要、平均、最高和平均分心次数改为按选中日及前 13 天计算。
+- 横滑边界：专注图历史带固定加载到今天，右滑最多停在今天，不再因为选中旧日期而提前截断。
+- 简化：移除专注图内部的 `chartEndDate` 状态，日期选择只负责切换选中日和 timeline 日期。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

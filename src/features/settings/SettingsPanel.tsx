@@ -212,7 +212,6 @@ function CollapsedUnavailableRow({ title, reason }: { title: string; reason: str
 
 function ProfileSection() {
   const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
-  const [chartEndDate, setChartEndDate] = useState(() => getLocalDateKey());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey(getLocalDateKey()));
   const [stats, setStats] = useState<FocusStatsDay[]>([]);
@@ -223,7 +222,7 @@ function ProfileSection() {
 
   const loadProfileData = useCallback(() => {
     Promise.all([
-      getFocusStatsDays(90, chartEndDate),
+      getFocusStatsDays(365, getLocalDateKey()),
       getTimelineEntries(selectedDate),
     ])
       .then(([nextStats, nextTimeline]) => {
@@ -240,7 +239,7 @@ function ProfileSection() {
         setStats([]);
         setTimelineEntries([]);
       });
-  }, [chartEndDate, selectedDate]);
+  }, [selectedDate]);
 
   useEffect(() => {
     loadProfileData();
@@ -284,7 +283,7 @@ function ProfileSection() {
   }, [loadProfileData, selectedDate]);
 
   const selectedStats = stats.find((day) => day.date === selectedDate) ?? stats[stats.length - 1] ?? { date: selectedDate, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0, distractionApps: {} };
-  const focusWindowStart = shiftDateKey(selectedDate, -6);
+  const focusWindowStart = shiftDateKey(selectedDate, -13);
   const focusWindowStats = stats.filter((day) => day.date >= focusWindowStart && day.date <= selectedDate);
   const maxFocusMs = Math.max(1, ...stats.map((day) => day.focusMs));
   const totalFocusMs = focusWindowStats.reduce((sum, day) => sum + day.focusMs, 0);
@@ -303,7 +302,6 @@ function ProfileSection() {
             onClick={() => {
               setSelectedDate((date) => {
                 const next = shiftDateKey(date, -1);
-                setChartEndDate(next);
                 return next;
               });
             }}
@@ -327,7 +325,6 @@ function ProfileSection() {
             onClick={() => {
               setSelectedDate((date) => {
                 const next = shiftDateKey(date, 1);
-                setChartEndDate(next);
                 return next;
               });
             }}
@@ -344,7 +341,6 @@ function ProfileSection() {
               onMonthChange={setCalendarMonth}
               onSelect={(date) => {
                 setSelectedDate(date);
-                setChartEndDate(date);
                 setCalendarOpen(false);
               }}
             />
@@ -373,7 +369,7 @@ function ProfileSection() {
           <div>
             <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              7 天专注
+              14 天专注
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground">
               {formatDateHeading(focusWindowStart)} - {formatDateHeading(selectedDate)} · 共 {formatFocusDuration(totalFocusMs)} · {totalSessions} 次专注 · {totalDistractions} 次分心
@@ -399,7 +395,6 @@ function ProfileSection() {
                   }`}
                   onClick={() => {
                     setSelectedDate(day.date);
-                    setChartEndDate(day.date > todayKey ? todayKey : day.date);
                   }}
                   title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
                 >
