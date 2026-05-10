@@ -2987,3 +2987,15 @@
 - 涉及文件：`src/App.tsx`, `electron/main.cjs`, `src/lib/startupTheme.ts`, `src/lib/startupTheme.test.ts`, `electron/windowLifecycle.cjs`, `electron/windowLifecycle.test.cjs`, `package.json`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：启动首帧和窗口显示问题必须用状态机测试保护；否则视觉 bug 只靠手测很容易反复回归。
 - 是否需更新技术文档：否。
+
+## ISSUE-251
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：Timeline 图例实时 Coding 时长
+- 严重程度：轻微
+- 问题现象：Timeline 上方 Coding、Chat 等图例只说明颜色/类型，没有展示今天 Coding 的总时长。
+- 原因分析：图例只由当前 Timeline entries 的 category 推导，未接入个人档案已落库的 `codingMs` 统计。
+- 解决方案：将今日 `codingMs` 传入 Timeline 图例，Coding 图例右侧显示“今日 X”；当今日 Coding 时长大于 0 时，即使当前日期 entries 没有 Coding 分类，也保留 Coding 图例。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：图例既承担说明功能，也可以承载轻量统计；这类实时数据应优先复用已落库的统计源，避免用 Timeline 色块反推造成口径不一致。
+- 是否需更新技术文档：否。

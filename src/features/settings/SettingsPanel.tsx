@@ -521,6 +521,7 @@ function ProfileSection() {
   const totalSessions = focusWindowStats.reduce((sum, day) => sum + day.focusSessions, 0);
   const totalDistractions = focusWindowStats.reduce((sum, day) => sum + day.distractions, 0);
   const todayKey = getLocalDateKey();
+  const todayStats = stats.find((day) => day.date === todayKey);
 
   return (
     <>
@@ -582,6 +583,7 @@ function ProfileSection() {
       <TimelineSection
         date={selectedDate}
         entries={timelineEntries}
+        codingMsToday={todayStats?.codingMs ?? 0}
         selectedId={selectedTimelineId}
         onSelect={setSelectedTimelineId}
       />
@@ -747,11 +749,13 @@ const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
 function TimelineSection({
   date,
   entries,
+  codingMsToday,
   selectedId,
   onSelect,
 }: {
   date: string;
   entries: TimelineEntry[];
+  codingMsToday: number;
   selectedId: number | null;
   onSelect: (id: number | null) => void;
 }) {
@@ -766,8 +770,8 @@ function TimelineSection({
   const selectedActivityRows = getTimelineDetailRows(selectedGroup);
   const selectedShortRows = getShortForegroundRows(selectedGroup);
   const animationPlayedRef = useRef(false);
-  const visibleCategories = (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[])
-    .filter((category) => entries.some((entry) => entry.category === category));
+  const visibleCategories = getVisibleTimelineCategories(entries, codingMsToday);
+  const categoryStats = getTimelineCategoryStats(entries, codingMsToday);
   const topApps = getTopTimelineApps(entries);
   const hourlyCounts = getHourlyTaskCounts(entries);
   const maxHourlyCount = Math.max(1, ...hourlyCounts.map((item) => item.count));
@@ -839,7 +843,12 @@ function TimelineSection({
               <span className="flex h-4 w-4 items-center justify-center rounded-[5px]" style={{ backgroundColor: meta.soft }}>
                 <Icon className="h-3 w-3" style={{ color: meta.color }} />
               </span>
-              {meta.label}
+              <span>{meta.label}</span>
+              {categoryStats[category] > 0 && (
+                <span className="rounded-full bg-white/45 px-1.5 py-0.5 text-[10px] font-semibold text-[#687076] shadow-[0_5px_14px_rgba(52,64,84,0.045)] dark:bg-white/[0.055] dark:text-white/58">
+                  {category === 'coding' ? '今日 ' : ''}{formatTimelineDuration(categoryStats[category])}
+                </span>
+              )}
             </div>
           );
         })}
@@ -2006,6 +2015,24 @@ function formatTimelineDuration(ms: number): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
+}
+
+function getVisibleTimelineCategories(entries: TimelineEntry[], codingMsToday: number): TimelineCategory[] {
+  return (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[])
+    .filter((category) => category === 'coding'
+      ? codingMsToday > 0 || entries.some((entry) => entry.category === category)
+      : entries.some((entry) => entry.category === category));
+}
+
+function getTimelineCategoryStats(entries: TimelineEntry[], codingMsToday: number): Record<TimelineCategory, number> {
+  const stats = Object.fromEntries(
+    (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[]).map((category) => [category, 0])
+  ) as Record<TimelineCategory, number>;
+  for (const entry of entries) {
+    stats[entry.category] += getTimelineDurationMs(entry);
+  }
+  stats.coding = codingMsToday;
+  return stats;
 }
 
 function getTopTimelineApps(entries: TimelineEntry[]): Array<{ appName: string; durationMs: number }> {

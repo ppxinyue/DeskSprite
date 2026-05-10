@@ -1881,3 +1881,9 @@
 - 集成：`App` 使用 `getThemeClassAction`，main 进程使用可测 window lifecycle controller，`pnpm test` 同时运行 timeline 和 startup 测试。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.99 kB，未触发 chunk 体积 warning。
 - 文件：App.tsx, main.cjs, startupTheme.ts, startupTheme.test.ts, windowLifecycle.cjs, windowLifecycle.test.cjs, package.json, ISSUES.md, PROGRESS.md
+
+### R246. Timeline 图例实时 Coding 时长（2026-05-11）
+- UI：Timeline 上方分类图例右侧增加时长徽标；Coding 使用今日 `codingMs`，显示为“今日 X”，与个人档案中的 Coding 模式时长保持一致。
+- 行为：即使当天 Timeline 里暂时没有 Coding 色块，只要今日 Coding 模式有落库时长，也会显示 Coding 图例和实时统计。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check` 通过。
+- 文件：SettingsPanel.tsx, PROGRESS.md, ISSUES.md
