@@ -2267,3 +2267,15 @@
 - 涉及文件：`src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `package.json`, `tsconfig.app.json`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：时间序列状态机必须先抽成纯逻辑，再用确定性时间戳单测，UI 层只负责采样和持久化回调。
 - 是否需更新技术文档：否。
+
+## ISSUE-191
+- 发现时间：2026-05-10
+- 发现者：用户提供 terminal 日志
+- 相关任务：Timeline 脚本失败降级与错误日志增强
+- 严重程度：重要
+- 问题现象：Timeline 日志仍然输出 `sample:skip unsupported or error error="Command failed: /usr/bin/osascript -e "`，没有真实 stderr，且采样失败时整条 timeline 仍为空。
+- 原因分析：`execFile` 回调只使用了 `error.message`，丢失 stderr；完整采样脚本失败后没有降级路径，即使简单前台窗口脚本可用，也不会记录基础 app/window。
+- 解决方案：采样错误优先记录 stderr；完整 timeline 脚本失败时自动调用简单 active window 脚本，成功则以无 URL/无后台 marker 的基础快照继续进入状态机。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：增强采集必须可失败，基础前台窗口记录应作为最低可用路径保住。
+- 是否需更新技术文档：否。

@@ -417,14 +417,14 @@ function readActiveWindow() {
     return Promise.resolve({ supported: false, appName: '', windowTitle: '', error: 'unsupported' });
   }
   return new Promise((resolve) => {
-    execFile('/usr/bin/osascript', ['-e', activeWindowScript()], { timeout: 2500 }, (error, stdout) => {
+    execFile('/usr/bin/osascript', ['-e', activeWindowScript()], { timeout: 2500 }, (error, stdout, stderr) => {
       if (error) {
-        timelineDebugLog({ stage: 'osascript:error', error: error.message || String(error) });
+        timelineDebugLog({ stage: 'osascript:error', error: stderr || error.message || String(error) });
         resolve({
           supported: true,
           appName: '',
           windowTitle: '',
-          error: error.message || String(error),
+          error: stderr || error.message || String(error),
         });
         return;
       }
@@ -501,16 +501,30 @@ function readTimelineActiveWindow() {
     return Promise.resolve({ supported: false, appName: '', windowTitle: '', url: '', background: [], error: 'unsupported' });
   }
   return new Promise((resolve) => {
-    execFile('/usr/bin/osascript', ['-e', timelineActiveWindowScript()], { timeout: 2500 }, (error, stdout) => {
+    execFile('/usr/bin/osascript', ['-e', timelineActiveWindowScript()], { timeout: 2500 }, async (error, stdout, stderr) => {
       if (error) {
-        resolve({
-          supported: true,
-          appName: '',
-          windowTitle: '',
-          url: '',
-          background: [],
-          error: error.message || String(error),
-        });
+        const detail = stderr || error.message || String(error);
+        timelineDebugLog({ stage: 'timeline-script:error', error: detail });
+        const fallback = await readActiveWindow();
+        if (fallback.supported && !fallback.error && (fallback.appName || fallback.windowTitle)) {
+          timelineDebugLog({
+            stage: 'timeline-script:fallback',
+            message: 'using simple active window snapshot',
+            appName: fallback.appName,
+            windowTitle: fallback.windowTitle,
+          });
+          resolve({
+            supported: true,
+            appName: fallback.appName,
+            windowTitle: fallback.windowTitle,
+            url: '',
+            background: [],
+            error: null,
+            checkedAt: Date.now(),
+          });
+          return;
+        }
+        resolve({ ...fallback, url: '', background: [], error: fallback.error || detail });
         return;
       }
       const [appName = '', windowTitle = '', _url = '', ...backgroundParts] = String(stdout || '').trimEnd().split('\n');

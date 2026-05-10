@@ -1449,3 +1449,10 @@
 - 前端推送：测试 harness 模拟 persist 成功后推送 `profile:data-updated`，确保落库路径可触发前端刷新。
 - 验证：`pnpm test:timeline`、`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, package.json, tsconfig.app.json, ISSUES.md, PROGRESS.md
+
+### R186. Timeline 脚本失败降级与错误日志增强（2026-05-10）
+- 降级：完整 timeline AppleScript 失败时自动调用简单 `readActiveWindow()`，至少记录前台 app/window，不再因为 URL/后台增强采集失败导致整条 timeline 为空。
+- 日志：`readTimelineActiveWindow` 和 `readActiveWindow` 现在优先打印 stderr，避免只看到 `Command failed: /usr/bin/osascript -e` 这种无效错误。
+- 行为：如果降级成功，日志会出现 `timeline-script:fallback`，后续仍进入正常 `sample` / `active:start` / `persist:ok` 状态机。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md
