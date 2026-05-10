@@ -788,9 +788,10 @@ function createPetWindow() {
     win.showInactive();
     applyFloatingFullscreenBehavior(win, { force: true });
   };
-  win.once('ready-to-show', showPetInactive);
+  const fallbackShowTimer = setTimeout(showPetInactive, 1800);
+  win.once('closed', () => clearTimeout(fallbackShowTimer));
   win.webContents.once('did-finish-load', () => {
-    setTimeout(showPetInactive, 80);
+    setTimeout(() => send(win, 'pet:request-initial-layout', {}), 40);
   });
   win.on('show', updateTrayMenu);
   win.on('hide', updateTrayMenu);
@@ -2415,12 +2416,19 @@ const handlers = {
   },
   import_pet_image: importPetImage,
   list_pet_images: listPetImages,
-  pick_chat_image: pickChatImage,
+  pick_chat_image: (_args, event) => pickChatImage(event),
   delete_pet_image: async ({ filePath }) => {
     ensureUserAsset(filePath);
     await fsp.unlink(filePath);
   },
   read_pet_image_data_url: readPetImageDataUrl,
+  pet_window_layout_ready: (_args, event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) || windows.get('pet');
+    if (!win || win.isDestroyed() || win.isVisible()) return;
+    applyFloatingFullscreenBehavior(win, { force: true });
+    win.showInactive();
+    applyFloatingFullscreenBehavior(win, { force: true });
+  },
   resize_compact_chat_window: ({ height }) => {
     const win = windows.get('compact-chat');
     if (!win || win.isDestroyed()) return;
@@ -2481,7 +2489,7 @@ const handlers = {
 ipcMain.handle('desksprite:invoke', async (_event, command, args) => {
   const handler = handlers[command];
   if (!handler) throw new Error(`Unknown command: ${command}`);
-  return handler(args || {});
+  return handler(args || {}, _event);
 });
 
 ipcMain.handle('desksprite:emit', (_event, channel, payload) => {
@@ -2534,8 +2542,12 @@ ipcMain.handle('desksprite:open-dialog', async (event, options) => {
   return options.multiple ? result.filePaths : result.filePaths[0] || null;
 });
 
-async function pickChatImage() {
-  const result = await dialog.showOpenDialog(undefined, {
+async function pickChatImage(event) {
+  const parent = event?.sender ? BrowserWindow.fromWebContents(event.sender) : windows.get('pet');
+  if (parent && !parent.isDestroyed()) {
+    applyFloatingFullscreenBehavior(parent, { force: true });
+  }
+  const result = await dialog.showOpenDialog(parent && !parent.isDestroyed() ? parent : undefined, {
     properties: ['openFile'],
     filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
   });
@@ -2551,7 +2563,7 @@ async function pickChatImage() {
   };
 }
 
-ipcMain.handle('desksprite:pick-chat-image', async () => pickChatImage());
+ipcMain.handle('desksprite:pick-chat-image', async (event) => pickChatImage(event));
 
 function registerProtocols() {
   protocol.handle('desksprite-app', async (request) => {

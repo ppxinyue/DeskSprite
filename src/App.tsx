@@ -1113,6 +1113,7 @@ function PetWindow() {
   const layoutRef = useRef(layout);
   const movedTimerRef = useRef<number | null>(null);
   const layoutApplyingRef = useRef(false);
+  const initialLayoutReadyRef = useRef(false);
   const dragSessionRef = useRef<BoundedDragSession | null>(null);
   const dragFrameRef = useRef<number | null>(null);
   const pendingDragPointRef = useRef<{ screenX: number; screenY: number } | null>(null);
@@ -1217,6 +1218,10 @@ function PetWindow() {
         previousLayout: layoutRef.current,
         applyLayout: applyLayoutState,
       });
+      if (!initialLayoutReadyRef.current) {
+        initialLayoutReadyRef.current = true;
+        invoke("pet_window_layout_ready").catch(() => {});
+      }
     } finally {
       window.setTimeout(() => {
         layoutApplyingRef.current = false;

@@ -1721,3 +1721,10 @@
 - 覆盖：普通小聊天窗口和展开的大聊天窗口共用同一套语音动画状态，系统语音输入也会启动本地音量监听。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：main.cjs, ChatDialog.tsx, ChatPrimitives.tsx, voiceService.ts, ISSUES.md, PROGRESS.md
+
+### R223. 全屏图片选择与启动初始位置稳定（2026-05-10）
+- 全屏上传：图片选择器重新绑定到当前 pet/compact chat 浮窗父窗口，打开前强制应用 `visibleOnFullScreen` 和 screen-saver 级置顶，避免全屏 Space 中上传窗口切到其他桌面。
+- 初始位置：pet/orb 窗口不再 `ready-to-show` 后立即显示；改为前端按已加载设置完成第一次布局后通知主进程显示，避免启动时先出现在偏下位置再上跳。
+- 兼容：保留 1.8s fallback 显示，防止极端加载失败时窗口完全不出现。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md

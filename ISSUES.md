@@ -2711,3 +2711,15 @@
 - 涉及文件：`electron/main.cjs`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/ChatPrimitives.tsx`, `src/features/voice/voiceService.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：浮窗里的系统文件选择更适合走主进程原生 dialog；语音交互要把采集和识别两个等待阶段拆开，否则用户会误以为点击没有响应。
 - 是否需更新技术文档：否。
+
+## ISSUE-228
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：全屏图片选择与启动初始位置稳定
+- 严重程度：一般
+- 问题现象：灵宠悬浮在全屏窗口上时，点击上传图片会把文件选择窗口切到另一个桌面；每次启动时灵宠/悬浮球初始位置偏下，随后抖动上跳。
+- 原因分析：图片选择器为了修复拖动问题改成 detached dialog，但 detached dialog 没有继承当前全屏 Space 的置顶/跨全屏属性；pet 窗口在前端按真实设置完成布局前就 `showInactive`，较大缩放或 orb 布局会在首次布局时重新约束位置。
+- 解决方案：图片选择器改为以当前浮窗为 parent，并在打开前强制应用全屏置顶行为；pet/orb 首次显示延后到 renderer 完成第一次布局后再通知主进程显示，同时保留 fallback。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：全屏 Space 中的系统 dialog 需要继承浮窗父窗口的 fullscreen-visible 属性；透明浮窗首次显示应等待真实布局完成，否则用户会看到布局约束的中间态。
+- 是否需更新技术文档：否。
