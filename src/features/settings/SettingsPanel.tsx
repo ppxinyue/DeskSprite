@@ -426,7 +426,12 @@ function TimelineSection({
 }) {
   const selected = entries.find((entry) => entry.id === selectedId) ?? entries.at(-1) ?? null;
   const isMockPreview = entries.some((entry) => entry.id < 0);
+  const selectedGroup = selected ? getTimelineActivityGroup(entries, selected) : [];
+  const visibleCategories = (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[])
+    .filter((category) => entries.some((entry) => entry.category === category));
   const topApps = getTopTimelineApps(entries);
+  const hourlyCounts = getHourlyTaskCounts(entries);
+  const maxHourlyCount = Math.max(1, ...hourlyCounts.map((item) => item.count));
   const totalMs = entries.reduce((sum, entry) => sum + getTimelineDurationMs(entry), 0);
   const backgroundMarkers = entries.flatMap((entry) => entry.backgroundMarkers.map((marker) => ({
     ...marker,
@@ -459,54 +464,68 @@ function TimelineSection({
 
       <div className="overflow-x-auto pb-2">
         <div className="min-w-[960px]">
-          <div className="relative h-[108px] rounded-[10px] border border-[#dfe3e6] bg-[#f8f9fa] px-3 py-3 dark:border-white/10 dark:bg-white/[0.035]">
-            <div className="absolute inset-x-3 top-1/2 h-px bg-[#d7dbdf] dark:bg-white/10" />
-            {[0, 6, 12, 18, 24].map((hour) => (
-              <div
-                key={hour}
-                className="absolute top-3 h-[78px] border-l border-[#eceef0] text-[10px] text-[#8b8d98] dark:border-white/7"
-                style={{ left: `calc(12px + ${(hour / 24) * 100}% - ${(hour === 24 ? 24 : 0)}px)` }}
-              >
-                <span className="ml-1">{String(hour).padStart(2, '0')}:00</span>
-              </div>
-            ))}
+          <div className="rounded-[14px] border border-[#dfe3e6] bg-[#f8f9fa] p-4 dark:border-white/10 dark:bg-white/[0.035]">
+            <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+              {visibleCategories.map((category) => {
+                const meta = TIMELINE_CATEGORY_META[category];
+                const Icon = meta.Icon;
+                return (
+                  <div key={category} className="flex items-center gap-1.5 text-[11px] font-medium text-[#687076] dark:text-white/62">
+                    <span className="flex h-4 w-4 items-center justify-center rounded-[5px]" style={{ backgroundColor: meta.soft }}>
+                      <Icon className="h-3 w-3" style={{ color: meta.color }} />
+                    </span>
+                    {meta.label}
+                  </div>
+                );
+              })}
+            </div>
 
-            {entries.length === 0 ? (
-              <div className="absolute inset-0 flex items-center justify-center text-[12px] text-muted-foreground">
-                今天还没有足够长的焦点窗口记录
-              </div>
-            ) : entries.map((entry) => (
-              <TimelineSegment
-                key={entry.id}
-                entry={entry}
-                selected={entry.id === selected?.id}
-                onSelect={() => onSelect(entry.id)}
-              />
-            ))}
-          </div>
+            <div className="relative h-[74px]">
+              {[0, 6, 12, 18, 24].map((hour) => (
+                <div
+                  key={hour}
+                  className="absolute top-0 h-[66px] border-l border-[#e6e8eb] text-[10px] text-[#8b8d98] dark:border-white/7"
+                  style={{ left: `${(hour / 24) * 100}%` }}
+                >
+                  <span className="ml-1">{String(hour).padStart(2, '0')}:00</span>
+                </div>
+              ))}
 
-          {backgroundMarkers.length > 0 && (
-            <div className="mt-2 flex min-h-7 items-center gap-2 rounded-[9px] border border-[#e6e8eb] bg-[#fbfcfd] px-3 py-1.5 dark:border-white/10 dark:bg-white/[0.03]">
-              <Music2 className="h-3.5 w-3.5 text-[#8b8d98]" />
-              <div className="flex min-w-0 flex-wrap gap-1.5">
-                {backgroundMarkers.slice(-8).map((marker, index) => (
-                  <span
-                    key={`${marker.entryId}-${marker.type}-${marker.name}-${index}`}
-                    className="max-w-[220px] truncate rounded-full border border-[#dfe3e6] bg-white px-2 py-0.5 text-[10px] text-[#687076] shadow-[0_1px_0_rgba(255,255,255,0.8)_inset] dark:border-white/10 dark:bg-white/5 dark:text-white/60"
-                    title={`${marker.name} · ${marker.detail}`}
-                  >
-                    {marker.name}{marker.detail ? ` · ${marker.detail}` : ''}
-                  </span>
+              <div className="absolute inset-x-0 top-7 h-12 overflow-hidden rounded-[14px] bg-[#eceef0] shadow-[0_1px_0_rgba(255,255,255,0.85)_inset] dark:bg-white/8">
+                {entries.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-[12px] text-muted-foreground">
+                    今天还没有足够长的焦点窗口记录
+                  </div>
+                ) : entries.map((entry) => (
+                  <TimelineSegment
+                    key={entry.id}
+                    entry={entry}
+                    entries={entries}
+                    selected={entry.id === selected?.id}
+                    onSelect={() => onSelect(entry.id)}
+                  />
                 ))}
               </div>
             </div>
-          )}
+
+            {backgroundMarkers.length > 0 && (
+              <div className="relative mt-3 min-h-[58px] rounded-[11px] bg-white/58 px-0 py-2 dark:bg-white/[0.035]">
+                {backgroundMarkers.slice(-8).map((marker, index) => (
+                  <BackgroundTimelineMarker
+                    key={`${marker.entryId}-${marker.type}-${marker.name}-${index}`}
+                    marker={marker}
+                    row={index % 2}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {selected && (
-        <div className="mt-3 rounded-[10px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035]">
-          <div className="flex items-start justify-between gap-3">
+        <div className="mt-3 rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035]">
+          <div className="mb-2 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
                 {(() => {
@@ -524,49 +543,108 @@ function TimelineSection({
               <div className="mt-0.5 font-medium text-foreground">{formatTimelineDuration(getTimelineDurationMs(selected))}</div>
             </div>
           </div>
+          <div className="space-y-1.5 border-t border-[#e6e8eb] pt-2 dark:border-white/10">
+            {selectedGroup.map((entry) => (
+              <button
+                key={`detail-${entry.id}`}
+                type="button"
+                className={`flex w-full items-start justify-between gap-3 rounded-[9px] px-2 py-1.5 text-left transition-colors ${
+                  entry.id === selected.id ? 'bg-[#eef0f2] dark:bg-white/8' : 'hover:bg-[#f1f3f5] dark:hover:bg-white/5'
+                }`}
+                onClick={() => onSelect(entry.id)}
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-[12px] font-medium text-[#3a3d40] dark:text-white/76">{entry.domain || entry.appName}</div>
+                  <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[#687076] dark:text-white/54">{entry.windowTitle || entry.url || '无标题活动'}</div>
+                </div>
+                <div className="shrink-0 text-right text-[10px] leading-4 text-[#8b8d98]">
+                  <div>{formatTimelineClock(entry.startedAt)}</div>
+                  <div>{formatTimelineDuration(getTimelineDurationMs(entry))}</div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-        {topApps.length > 0 ? topApps.map((item, index) => (
-          <MiniMetric key={item.appName} label={`Top ${index + 1} · ${item.appName}`} value={formatTimelineDuration(item.durationMs)} />
-        )) : (
-          <>
-            <MiniMetric label="Top 1 软件" value="暂无" />
-            <MiniMetric label="Top 2 软件" value="暂无" />
-            <MiniMetric label="Top 3 软件" value="暂无" />
-          </>
-        )}
+      <div className="mt-3 grid gap-3 rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035] md:grid-cols-[1fr_1.2fr]">
+        <div>
+          <div className="mb-2 text-[12px] font-semibold text-foreground">Top 软件</div>
+          <div className="space-y-2">
+            {(topApps.length > 0 ? topApps : [{ appName: '暂无', durationMs: 0 }]).map((item, index) => (
+              <div key={`${item.appName}-${index}`} className="grid grid-cols-[72px_1fr_54px] items-center gap-2 text-[11px]">
+                <div className="truncate font-medium text-[#3a3d40] dark:text-white/74">{item.appName}</div>
+                <div className="h-2 overflow-hidden rounded-full bg-[#eceef0] dark:bg-white/8">
+                  <div
+                    className="h-full rounded-full bg-[#8b8d98]"
+                    style={{ width: `${topApps[0]?.durationMs ? Math.max(4, (item.durationMs / topApps[0].durationMs) * 100) : 0}%` }}
+                  />
+                </div>
+                <div className="text-right text-[#687076]">{item.durationMs ? formatTimelineDuration(item.durationMs) : '-'}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="mb-2 text-[12px] font-semibold text-foreground">全天活跃度</div>
+          <div className="flex h-20 items-end gap-1.5 rounded-[10px] bg-[#f8f9fa] px-2 pb-2 pt-3 dark:bg-white/[0.035]">
+            {hourlyCounts.map((item) => (
+              <div key={item.hour} className="group flex min-w-0 flex-1 flex-col items-center gap-1">
+                <div
+                  className="w-full rounded-t-[5px] bg-[#c1c8cd] transition-colors group-hover:bg-[#8b8d98]"
+                  style={{ height: `${Math.max(item.count > 0 ? 8 : 2, (item.count / maxHourlyCount) * 48)}px` }}
+                  title={`${String(item.hour).padStart(2, '0')}:00 · ${item.count} 个 task`}
+                />
+                {item.hour % 6 === 0 && <div className="text-[9px] leading-none text-[#8b8d98]">{item.hour}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </SettingsGroup>
   );
 }
 
-function TimelineSegment({ entry, selected, onSelect }: { entry: TimelineEntry; selected: boolean; onSelect: () => void }) {
+function TimelineSegment({ entry, entries, selected, onSelect }: { entry: TimelineEntry; entries: TimelineEntry[]; selected: boolean; onSelect: () => void }) {
   const meta = TIMELINE_CATEGORY_META[entry.category];
   const left = `${getTimelineDayProgress(entry.startedAt) * 100}%`;
-  const width = `${Math.max(0.7, (getTimelineDurationMs(entry) / 86_400_000) * 100)}%`;
-  const Icon = meta.Icon;
+  const width = `${Math.max(0.35, (getTimelineDurationMs(entry) / 86_400_000) * 100)}%`;
+  const topContent = getTopTimelineContent(entries, entry.appName);
   return (
     <button
       type="button"
-      className={`group absolute top-[38px] h-9 min-w-[10px] overflow-visible rounded-[7px] border transition-all duration-150 ${
-        selected ? 'border-[#1c2024] shadow-[0_8px_22px_rgba(28,32,36,0.14)]' : 'border-white/70 hover:border-[#c1c8cd] hover:shadow-[0_7px_18px_rgba(28,32,36,0.10)]'
+      className={`group absolute inset-y-0 overflow-visible transition-[filter,opacity] duration-150 ${
+        selected ? 'z-10 brightness-[0.92]' : 'hover:z-20 hover:brightness-[0.96]'
       }`}
-      style={{ left, width, backgroundColor: meta.soft }}
+      style={{ left, width, backgroundColor: meta.color, opacity: selected ? 0.72 : 0.46 }}
       onClick={onSelect}
-      title={`${entry.appName} · ${formatTimelineClock(entry.startedAt)} - ${formatTimelineClock(entry.endedAt)}`}
+      title={`${entry.appName} · ${topContent}`}
     >
-      <span className="flex h-full min-w-0 items-center gap-1.5 px-2 text-left">
-        <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: meta.color }} />
-        <span className="truncate text-[11px] font-medium text-[#3a3d40] dark:text-white/74">{entry.domain || entry.appName}</span>
-      </span>
-      <span className="pointer-events-none absolute bottom-[42px] left-1 hidden w-60 rounded-[9px] border border-[#dfe3e6] bg-white p-2 text-left text-[11px] text-[#687076] shadow-[0_14px_40px_rgba(28,32,36,0.16)] group-hover:block dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70">
+      <span className="pointer-events-none absolute bottom-[56px] left-1 hidden w-60 rounded-[9px] border border-[#dfe3e6] bg-white p-2 text-left text-[11px] text-[#687076] shadow-[0_14px_40px_rgba(28,32,36,0.16)] group-hover:block dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70">
         <span className="block font-semibold text-[#1c2024] dark:text-white">{entry.appName}</span>
-        <span className="mt-1 block line-clamp-2">{entry.windowTitle || '无窗口标题'}</span>
-        <span className="mt-1 block">{formatTimelineClock(entry.startedAt)} - {formatTimelineClock(entry.endedAt)} · {formatTimelineDuration(getTimelineDurationMs(entry))}</span>
+        <span className="mt-1 block line-clamp-2">{topContent}</span>
       </span>
     </button>
+  );
+}
+
+function BackgroundTimelineMarker({
+  marker,
+  row,
+}: {
+  marker: TimelineEntry['backgroundMarkers'][number] & { entryId: number; startedAt: string; endedAt: string };
+  row: number;
+}) {
+  const left = `${getTimelineDayProgress(marker.startedAt) * 100}%`;
+  const width = `${Math.max(1.2, ((new Date(marker.endedAt).getTime() - new Date(marker.startedAt).getTime()) / 86_400_000) * 100)}%`;
+  return (
+    <div className="absolute" style={{ left, width, top: `${row * 24 + 6}px` }}>
+      <div className="h-3 border-x border-t border-[#c1c8cd] dark:border-white/18" />
+      <div className="mt-0.5 flex items-center gap-1 truncate text-[10px] font-medium text-[#687076] dark:text-white/58">
+        {marker.type === 'music' ? <Music2 className="h-3 w-3 shrink-0" /> : <Terminal className="h-3 w-3 shrink-0" />}
+        <span className="truncate">{marker.name}{marker.detail ? ` · ${marker.detail}` : ''}</span>
+      </div>
+    </div>
   );
 }
 
@@ -614,13 +692,15 @@ function createMockTimelineEntries(dateKey: string): TimelineEntry[] {
     ]),
     item(-3, '10:31', '10:52', 'WeChat', '项目 UI 调整沟通', 'chat'),
     item(-4, '11:02', '11:38', 'Terminal', 'codex-electron-rewrite · pnpm build', 'coding'),
-    item(-5, '13:16', '13:58', 'Safari', 'Apple Human Interface Guidelines', 'browser', 'https://developer.apple.com/design/human-interface-guidelines/'),
-    item(-6, '14:05', '14:42', 'Keynote', 'DeskSprite Timeline UI Review.key', 'office'),
-    item(-7, '15:03', '15:37', 'Slack', 'design-system / timeline mock', 'chat', null, [
+    item(-5, '13:16', '13:34', 'Safari', 'Apple Human Interface Guidelines', 'browser', 'https://developer.apple.com/design/human-interface-guidelines/'),
+    item(-6, '13:34', '13:51', 'Safari', 'Radix UI Colors - Palette composition', 'browser', 'https://www.radix-ui.com/colors/docs/palette-composition/composing-a-palette'),
+    item(-7, '13:51', '14:02', 'Safari', 'Transitions.dev - Number pop-in', 'browser', 'https://www.transitions.dev/docs/number-pop-in'),
+    item(-8, '14:05', '14:42', 'Keynote', 'DeskSprite Timeline UI Review.key', 'office'),
+    item(-9, '15:03', '15:37', 'Slack', 'design-system / timeline mock', 'chat', null, [
       { type: 'music', name: 'Spotify', detail: 'Tycho - Awake' },
     ]),
-    item(-8, '16:12', '16:54', 'Arc', 'YouTube - tiny desk concert', 'entertainment', 'https://www.youtube.com/watch?v=mock-preview'),
-    item(-9, '17:10', '18:08', 'Visual Studio Code', 'timeline-renderer.tsx', 'coding', null, [
+    item(-10, '16:12', '16:54', 'Arc', 'YouTube - tiny desk concert', 'entertainment', 'https://www.youtube.com/watch?v=mock-preview'),
+    item(-11, '17:10', '18:08', 'Visual Studio Code', 'timeline-renderer.tsx', 'coding', null, [
       { type: 'terminal', name: 'Terminal', detail: 'vite build --watch' },
     ]),
   ];
@@ -1206,6 +1286,18 @@ function getTimelineDurationMs(entry: TimelineEntry): number {
   return Math.max(0, new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime());
 }
 
+function getTimelineActivityGroup(entries: TimelineEntry[], selected: TimelineEntry): TimelineEntry[] {
+  const sorted = entries.slice().sort((a, b) => a.startedAt.localeCompare(b.startedAt));
+  const selectedIndex = sorted.findIndex((entry) => entry.id === selected.id);
+  if (selectedIndex < 0) return [selected];
+  let start = selectedIndex;
+  let end = selectedIndex;
+  const sameActivity = (entry: TimelineEntry) => entry.appName === selected.appName && entry.category === selected.category;
+  while (start > 0 && sameActivity(sorted[start - 1])) start -= 1;
+  while (end < sorted.length - 1 && sameActivity(sorted[end + 1])) end += 1;
+  return sorted.slice(start, end + 1);
+}
+
 function getTimelineDayProgress(iso: string): number {
   const date = new Date(iso);
   return ((date.getHours() * 60 + date.getMinutes()) * 60 + date.getSeconds()) / 86_400;
@@ -1232,6 +1324,28 @@ function getTopTimelineApps(entries: TimelineEntry[]): Array<{ appName: string; 
     .map(([appName, durationMs]) => ({ appName, durationMs }))
     .sort((a, b) => b.durationMs - a.durationMs)
     .slice(0, 3);
+}
+
+function getTopTimelineContent(entries: TimelineEntry[], appName: string): string {
+  const top = entries
+    .filter((entry) => entry.appName === appName)
+    .sort((a, b) => getTimelineDurationMs(b) - getTimelineDurationMs(a))[0];
+  return top?.domain || top?.windowTitle || top?.url || '无标题活动';
+}
+
+function getHourlyTaskCounts(entries: TimelineEntry[]): Array<{ hour: number; count: number }> {
+  return Array.from({ length: 24 }, (_, hour) => ({
+    hour,
+    count: entries.filter((entry) => {
+      const start = new Date(entry.startedAt);
+      const end = new Date(entry.endedAt);
+      const hourStart = new Date(start);
+      hourStart.setHours(hour, 0, 0, 0);
+      const hourEnd = new Date(hourStart);
+      hourEnd.setHours(hour + 1, 0, 0, 0);
+      return start < hourEnd && end > hourStart;
+    }).length,
+  }));
 }
 
 const THEME_OPTIONS: { id: import('./settingsStore').Theme; title: string; description: string }[] = [

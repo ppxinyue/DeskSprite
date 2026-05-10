@@ -1341,3 +1341,13 @@
 - 标识：Timeline 标题旁增加“昨日示例”小标签，区分 mock 和真实记录。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R173. Timeline UI 整体化重构（2026-05-10）
+- 主 Timeline：从白底上的独立小圆角块改为一条连续大圆角时间带，按任务时间段直接分段填色。
+- 图例：分类图标和颜色移到时间轴上方统一说明，主时间带内部不再放图标，避免短任务挤压变形。
+- 后台标记：音乐、终端等并行后台进程改为时间轴下方的范围线标注，直接对齐主时间轴时间段。
+- 详情：点击某段后，详情区按同一 app / 分类的连续活动组列出完整时间顺序，浏览器连续访问多个网站时可逐条查看。
+- Hover：主时间带 hover 只展示软件名和该软件耗时 Top1 内容，不再展示时间段和时长。
+- 统计：Top3 软件改成横向柱状图，新增全天各小时活跃度柱状图，合并成一个整体 Apple / Radix 风格统计面板。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
