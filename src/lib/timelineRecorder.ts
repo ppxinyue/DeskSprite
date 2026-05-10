@@ -34,6 +34,8 @@ export type TimelineDebugPayload = Record<string, unknown> & {
   stage: string;
 };
 
+const IGNORED_TIMELINE_APPS = new Set(['desksprite', 'pawpal', 'electron']);
+
 type TimelineSegmentState = {
   key: string;
   firstSeenAt: number;
@@ -119,6 +121,10 @@ export class TimelineRecorder {
     const appName = snapshot.appName?.trim() || 'Unknown';
     const windowTitle = snapshot.windowTitle?.trim() || '';
     const url = snapshot.url?.trim() || null;
+    if (IGNORED_TIMELINE_APPS.has(appName.toLowerCase())) {
+      this.log({ stage: 'sample:ignore', message: 'own app foreground ignored', appName, windowTitle });
+      return;
+    }
     const key = getTimelineSnapshotKey(appName, windowTitle, url);
 
     this.log({

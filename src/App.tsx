@@ -975,6 +975,7 @@ function PetWindow() {
   const restPresentationSnapshotRef = useRef<RestPresentationSnapshot | null>(null);
   const visualPetScaleRef = useRef(settings.petScale);
   const restPresentationActiveRef = useRef(false);
+  const settingsRef = useRef(settings);
 
   const orbMode = settings.avatarRenderMode === 'orb';
   const petSize = Math.round(150 * visualPetScale);
@@ -1015,6 +1016,10 @@ function PetWindow() {
     layoutRef.current = nextLayout;
     setLayout(nextLayout);
   }, []);
+
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   useEffect(() => {
     layoutRef.current = layout;
@@ -1609,7 +1614,7 @@ function PetWindow() {
         appName: string;
         windowTitle: string;
         error?: string | null;
-      }>('check_distraction', { settings });
+      }>('check_distraction', { settings: settingsRef.current });
       return {
         supported: fallback.supported,
         appName: fallback.appName,
@@ -1646,7 +1651,7 @@ function PetWindow() {
       window.clearInterval(timer);
       recorder.stop(Date.now()).catch(() => {});
     };
-  }, [settings, settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes]);
+  }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes]);
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;

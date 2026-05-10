@@ -2279,3 +2279,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：增强采集必须可失败，基础前台窗口记录应作为最低可用路径保住。
 - 是否需更新技术文档：否。
+
+## ISSUE-192
+- 发现时间：2026-05-10
+- 发现者：用户提供 terminal 日志
+- 相关任务：Timeline 忽略自身窗口并稳定采样器生命周期
+- 严重程度：重要
+- 问题现象：启动后 Electron 自己先被记录为 active，Codex 变成 candidate；设置同步时出现 start/stop，采样器状态被重置，导致真实活动很难达到最小时长落库。
+- 原因分析：TimelineRecorder 没有过滤 DeskSprite / Electron 自身窗口；React effect 依赖整个 `settings` 对象，任意设置对象刷新都会销毁并重建 recorder。
+- 解决方案：在 recorder 中忽略 DeskSprite / PawPal / Electron；App 中用 `settingsRef` 给 fallback 调用读取最新设置，同时把 timeline effect 依赖收窄到实际会影响采样器生命周期的两个设置项。
+- 涉及文件：`src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：采样器生命周期必须稳定，不能被无关状态刷新打断；自身窗口应视为不可记录噪声。
+- 是否需更新技术文档：否。

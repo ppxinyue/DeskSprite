@@ -49,6 +49,19 @@ test('keeps a codex segment intact when user briefly switches to WeChat', async 
   assert.ok(logs.some((item) => item.stage === 'candidate:discard'));
 });
 
+test('ignores DeskSprite/Electron foreground so startup chrome does not steal active segment', async () => {
+  const { recorder, persisted, logs } = createHarness();
+
+  await recorder.handleSnapshot(snapshot('Electron', ''), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 3_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 64_000);
+
+  assert.equal(persisted.length, 1);
+  assert.equal(persisted[0].appName, 'Codex');
+  assert.equal(persisted[0].startedAt, 3_000);
+  assert.ok(logs.some((item) => item.stage === 'sample:ignore'));
+});
+
 test('confirms a new app only after it passes the minimum duration', async () => {
   const { recorder, persisted, logs } = createHarness();
 

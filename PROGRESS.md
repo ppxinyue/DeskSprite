@@ -1456,3 +1456,11 @@
 - 行为：如果降级成功，日志会出现 `timeline-script:fallback`，后续仍进入正常 `sample` / `active:start` / `persist:ok` 状态机。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R187. Timeline 忽略自身窗口并稳定采样器生命周期（2026-05-10）
+- 根因：启动时 Electron / DeskSprite 自己可能先成为 active，导致真实 Codex 窗口被放入 candidate；同时 App effect 依赖整个 `settings` 对象，设置同步时会 stop/start，重置采样状态。
+- 修复：TimelineRecorder 过滤 DeskSprite / PawPal / Electron 自身窗口，不让它们进入 active/candidate。
+- 生命周期：App 中新增 `settingsRef`，fallback 分心检测读取 ref，timeline effect 依赖收窄到 `timelineRecordingEnabled` 和 `timelineMinSegmentMinutes`，避免普通设置更新重启采样器。
+- 测试：新增 “Electron foreground ignored” 单测，覆盖启动自身窗口不抢占 active 的场景。
+- 验证：`pnpm test:timeline`、`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, ISSUES.md, PROGRESS.md
