@@ -2501,6 +2501,90 @@ function AISection({
     setCodingCheck((prev) => ({ ...prev, [provider]: { checking: false, error: '' } }));
   };
 
+  const applyVoiceConfig = async (target: 'stt' | 'tts', config: ApiConfig) => {
+    const apiKey = config.apiKey?.trim();
+    const partial: Partial<import('./settingsStore').AppSettings> = target === 'stt'
+      ? {
+          customSttBaseUrl: config.baseUrl,
+          customSttModel: config.model,
+          ...(apiKey ? { customSttApiKey: apiKey } : {}),
+        }
+      : {
+          customTtsBaseUrl: config.baseUrl,
+          customTtsModel: config.model,
+          ...(apiKey ? { customTtsApiKey: apiKey } : {}),
+        };
+    await updateSettings(partial);
+  };
+
+  const isVoiceConfigActive = (target: 'stt' | 'tts', config: ApiConfig) => {
+    return target === 'stt'
+      ? settings.customSttBaseUrl === config.baseUrl && settings.customSttModel === config.model
+      : settings.customTtsBaseUrl === config.baseUrl && settings.customTtsModel === config.model;
+  };
+
+  const renderApiConfigList = (target: 'chat' | 'stt' | 'tts') => (
+    <div className="space-y-3 px-4 py-4">
+      {configs.map((c) => {
+        const testResult = testResults[c.id];
+        const isTesting = testingConfigId === c.id;
+        const activeVoiceConfig = target !== 'chat' && isVoiceConfigActive(target, c);
+        return (
+          <div key={`${target}-${c.id}`} className="rounded-lg border border-border p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex items-center gap-2">
+                  <span className="font-medium text-[13px]">{getProviderName(c.providerId || c.provider)}</span>
+                  {target === 'chat' && c.isDefault && (
+                    <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
+                  )}
+                  {activeVoiceConfig && (
+                    <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">使用中</span>
+                  )}
+                </div>
+                <div className="mb-1 text-[11px] text-muted-foreground">Model: {c.model}</div>
+                <div className="truncate text-[11px] text-muted-foreground">Base URL: {c.baseUrl}</div>
+                <div className="mt-1 text-[11px] text-muted-foreground">API Key: {describeApiKey(c.apiKey)}</div>
+                {testResult && (
+                  <div className={`mt-1 text-[11px] ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                    {testResult.message}
+                    {testResult.latency !== undefined && ` (${testResult.latency}ms)`}
+                  </div>
+                )}
+              </div>
+              <div className="flex shrink-0 gap-1">
+                {target === 'chat' && !c.isDefault && (
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onSetDefault(c.id)}>
+                    设为默认
+                  </Button>
+                )}
+                {target !== 'chat' && !activeVoiceConfig && (
+                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => applyVoiceConfig(target, c)}>
+                    使用此配置
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onTest(c)} disabled={isTesting}>
+                  {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : '测试'}
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEdit(c)}>
+                  <Pencil className="h-3 w-3" />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" onClick={() => onDelete(c.id, c.keyringRef)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {configs.length === 0 && (
+        <div className="rounded-lg border border-border p-4 text-[13px] text-muted-foreground">
+          暂无 API 配置，点击“添加 API Key”添加
+        </div>
+      )}
+    </div>
+  );
+
   useEffect(() => {
     let alive = true;
     async function loadUsage() {
@@ -2613,59 +2697,10 @@ function AISection({
               </div>
               <Button size="sm" onClick={onAdd}>
                 <Plus className="mr-1 h-4 w-4" />
-                添加 API
+                添加 API Key
               </Button>
             </div>
-            <div className="space-y-3 px-4 py-4">
-              {configs.map((c) => {
-                const testResult = testResults[c.id];
-                const isTesting = testingConfigId === c.id;
-                return (
-                  <div key={c.id} className="rounded-lg border border-border p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center gap-2">
-                          <span className="font-medium text-[13px]">{getProviderName(c.providerId || c.provider)}</span>
-                          {c.isDefault && (
-                            <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
-                          )}
-                        </div>
-                        <div className="mb-1 text-[11px] text-muted-foreground">Model: {c.model}</div>
-                        <div className="truncate text-[11px] text-muted-foreground">Base URL: {c.baseUrl}</div>
-                        <div className="mt-1 text-[11px] text-muted-foreground">API Key: {describeApiKey(c.apiKey)}</div>
-                        {testResult && (
-                          <div className={`mt-1 text-[11px] ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
-                            {testResult.message}
-                            {testResult.latency !== undefined && ` (${testResult.latency}ms)`}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        {!c.isDefault && (
-                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onSetDefault(c.id)}>
-                            设为默认
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onTest(c)} disabled={isTesting}>
-                          {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : '测试'}
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEdit(c)}>
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" onClick={() => onDelete(c.id, c.keyringRef)}>
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-              {configs.length === 0 && (
-                <div className="rounded-lg border border-border p-4 text-[13px] text-muted-foreground">
-                  暂无 API 配置，点击“添加 API”添加
-                </div>
-              )}
-            </div>
+            {renderApiConfigList('chat')}
           </>
         )}
 
@@ -2737,16 +2772,18 @@ function AISection({
           </select>
         </SettingRow>
         {settings.voiceInputProvider === 'user-cloud' && (
-          <div className="grid gap-3 border-b border-[#e6e8eb] bg-muted/20 p-3 dark:border-white/10">
-            <SettingRow label="STT Base URL">
-              <EditableInput value={settings.customSttBaseUrl} onChange={(value) => updateSetting('customSttBaseUrl', value.trim())} className="w-full max-w-md" placeholder="https://api.example.com/v1" />
-            </SettingRow>
-            <SettingRow label="STT 模型">
-              <EditableInput value={settings.customSttModel} onChange={(value) => updateSetting('customSttModel', value.trim())} className="w-full max-w-md" placeholder="gpt-4o-mini-transcribe" />
-            </SettingRow>
-            <SettingRow label="STT API Key">
-              <EditableInput type="password" value={settings.customSttApiKey} onChange={(value) => updateSetting('customSttApiKey', value)} className="w-full max-w-md" placeholder="sk-..." />
-            </SettingRow>
+          <div className="border-b border-[#e6e8eb] dark:border-white/10">
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <div className="text-[13px] font-medium leading-5 text-foreground">STT 自定义配置</div>
+                <div className="mt-1 text-[11px] leading-5 text-muted-foreground">Base URL、Model、API Key；选择“使用此配置”后用于语音输入</div>
+              </div>
+              <Button size="sm" onClick={onAdd}>
+                <Plus className="mr-1 h-4 w-4" />
+                添加 API Key
+              </Button>
+            </div>
+            {renderApiConfigList('stt')}
           </div>
         )}
         <SettingRow label="语音输入语言">
@@ -2775,16 +2812,18 @@ function AISection({
           </select>
         </SettingRow>
         {settings.voiceOutputProvider === 'user-cloud' && (
-          <div className="grid gap-3 border-b border-[#e6e8eb] bg-muted/20 p-3 dark:border-white/10">
-            <SettingRow label="TTS Base URL">
-              <EditableInput value={settings.customTtsBaseUrl} onChange={(value) => updateSetting('customTtsBaseUrl', value.trim())} className="w-full max-w-md" placeholder="https://api.example.com/v1" />
-            </SettingRow>
-            <SettingRow label="TTS 模型">
-              <EditableInput value={settings.customTtsModel} onChange={(value) => updateSetting('customTtsModel', value.trim())} className="w-full max-w-md" placeholder="tts-1" />
-            </SettingRow>
-            <SettingRow label="TTS API Key">
-              <EditableInput type="password" value={settings.customTtsApiKey} onChange={(value) => updateSetting('customTtsApiKey', value)} className="w-full max-w-md" placeholder="sk-..." />
-            </SettingRow>
+          <div className="border-b border-[#e6e8eb] dark:border-white/10">
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <div className="text-[13px] font-medium leading-5 text-foreground">TTS 自定义配置</div>
+                <div className="mt-1 text-[11px] leading-5 text-muted-foreground">Base URL、Model、API Key；选择“使用此配置”后用于语音输出</div>
+              </div>
+              <Button size="sm" onClick={onAdd}>
+                <Plus className="mr-1 h-4 w-4" />
+                添加 API Key
+              </Button>
+            </div>
+            {renderApiConfigList('tts')}
           </div>
         )}
         <SettingRow label="语音输出">

@@ -2567,3 +2567,15 @@
 - 涉及文件：`src/index.css`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：同一编辑区域只能保留一个主要编辑入口，否则用户会分不清“完成”和“保存”的职责。
 - 是否需更新技术文档：否。
+
+## ISSUE-216
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：STT/TTS 自定义配置复用 API 弹窗
+- 严重程度：一般
+- 问题现象：STT/TTS 选择自定义后仍直接展开 Base URL、Model、API Key 三个输入框，和 Chat 模型的 API 配置弹窗交互不一致。
+- 原因分析：语音自定义字段仍保存在 `customStt*` / `customTts*` 设置中，UI 没有复用共享 API 配置列表。
+- 解决方案：抽出共享 API 配置列表渲染；STT/TTS 自定义态显示“添加 API Key”按钮和同一套弹窗配置，并通过“使用此配置”同步到实际语音运行字段。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：共享 API 凭据应统一入口创建，再由具体模块显式选择使用，避免多个地方维护重复密钥表单。
+- 是否需更新技术文档：否。

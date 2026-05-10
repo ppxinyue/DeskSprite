@@ -1635,3 +1635,10 @@
 - 交互：System Prompt 下方第一个按钮默认是白色“修改”，进入编辑态后变为蓝色“保存”，保存后回到只读态。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
 - 文件：index.css, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R211. STT/TTS 自定义配置复用 API 弹窗（2026-05-10）
+- 语音模型：STT / TTS 选择自定义后，不再直接展示 Base URL / Model / API Key 输入框。
+- 复用：STT / TTS 自定义区域改为和 Chat 模型一致的 API 配置列表与“添加 API Key”按钮，使用同一个 API 配置弹窗填写。
+- 生效：语音自定义配置列表增加“使用此配置”，点击后把该配置同步到对应 STT/TTS 实际运行字段，并显示“使用中”。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
