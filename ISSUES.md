@@ -2315,3 +2315,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：System Events 的动态集合不适合长循环遍历，能一次性取属性列表就不要逐项访问。
 - 是否需更新技术文档：否。
+
+## ISSUE-195
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Timeline Debug 日志降噪
+- 严重程度：一般
+- 问题现象：Timeline 功能已正常落库，但 terminal 每 3 秒输出大量 sample / persist skip / persist ok；Edge 刚切前台时偶发 `browser-url:error`，随后又能正常读到 URL。
+- 原因分析：调试期日志没有分级过滤，常规采样和低于阈值状态也全部输出；Chromium 系浏览器刚激活时 active tab 尚未稳定，短暂 URL 读取失败属于可恢复状态，不应按错误噪声打印。
+- 解决方案：浏览器 URL 读取失败静默降级为空 URL，后续采样继续补齐；renderer 端过滤高频 sample / hold / below-minimum 日志，persist ok 改为首次和每 60 秒摘要输出。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：采样类功能的 debug 日志需要按“状态变化”和“异常”输出，不能按采样频率输出。
+- 是否需更新技术文档：否。

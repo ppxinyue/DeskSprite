@@ -56,7 +56,35 @@ function isCompactChatDismissed() {
   return localStorage.getItem(COMPACT_CHAT_DISMISSED_KEY) === "1";
 }
 
+const timelineLogLastByKey = new Map<string, number>();
+const TIMELINE_PERSIST_LOG_INTERVAL_MS = 60_000;
+
+function shouldPrintTimelineDebug(payload: Record<string, unknown>) {
+  const stage = String(payload.stage || '');
+  if (!stage) return false;
+  if (stage.includes('error') || stage === 'disabled' || stage === 'unsupported') return true;
+  if (stage === 'sample' || stage === 'sample:ignore' || stage === 'candidate:hold') return false;
+  if (stage === 'persist:skip' && payload.message === 'active segment below minimum') return false;
+  if (stage === 'accessibility') return !timelineLogLastByKey.has('accessibility');
+  if (stage === 'start') return !timelineLogLastByKey.has('start');
+  if (stage === 'persist:ok') {
+    const durationMs = typeof payload.durationMs === 'number' ? payload.durationMs : 0;
+    const minSegmentMs = typeof payload.minSegmentMs === 'number' ? payload.minSegmentMs : 0;
+    const key = `persist:ok:${String(payload.message || payload.key || '')}`;
+    const lastDuration = timelineLogLastByKey.get(key);
+    if (lastDuration === undefined || durationMs <= minSegmentMs + 5_000 || durationMs - lastDuration >= TIMELINE_PERSIST_LOG_INTERVAL_MS) {
+      timelineLogLastByKey.set(key, durationMs);
+      return true;
+    }
+    return false;
+  }
+  return true;
+}
+
 function timelineDebugLog(payload: Record<string, unknown>) {
+  if (!shouldPrintTimelineDebug(payload)) return;
+  if (payload.stage === 'accessibility') timelineLogLastByKey.set('accessibility', Date.now());
+  if (payload.stage === 'start') timelineLogLastByKey.set('start', Date.now());
   invoke('timeline_debug_log', payload).catch(() => {});
 }
 

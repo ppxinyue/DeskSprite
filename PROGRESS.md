@@ -1479,3 +1479,11 @@
 - 修复：改为一次性读取 `name of every application process` 快照，再用 linefeed join 成文本，避免遍历期间索引失效。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R190. Timeline Debug 日志降噪（2026-05-10）
+- 浏览器 URL：Edge / Chromium 刚切前台时短暂拿不到 active tab 不再打印 error，后续采样成功后仍会正常带 URL 落库。
+- 主进程：去掉每 3 秒 `timeline:sample` 成功日志，只保留真正错误。
+- Renderer：过滤高频 `sample`、`candidate:hold`、低于阈值的 `persist:skip`；`persist:ok` 只在首次落库和每 60 秒摘要打印一次。
+- 保留日志：start、accessibility、active start、candidate start/confirm/discard、首个 persist ok、周期性 persist ok、真实错误。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md

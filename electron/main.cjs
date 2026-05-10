@@ -448,7 +448,6 @@ function readBrowserUrl(appName) {
   return new Promise((resolve) => {
     execFile('/usr/bin/osascript', ['-e', script], { timeout: 1800 }, (error, stdout) => {
       if (error) {
-        timelineDebugLog({ stage: 'browser-url:error', appName, error: error.message || String(error) });
         resolve('');
         return;
       }
@@ -547,13 +546,6 @@ async function readTimelineActiveWindow() {
     readBrowserUrl(active.appName),
     readTimelineBackgroundMarkers(),
   ]);
-  timelineDebugLog({
-    stage: 'timeline:sample',
-    appName: active.appName,
-    windowTitle: active.windowTitle,
-    url,
-    message: `background=${background.length}`,
-  });
   return {
     supported: true,
     appName: active.appName,
