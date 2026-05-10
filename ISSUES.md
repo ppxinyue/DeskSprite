@@ -2243,3 +2243,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：跨进程采集功能必须有可观测性，尤其是依赖系统权限和时间阈值的记录逻辑。
 - 是否需更新技术文档：否。
+
+## ISSUE-189
+- 发现时间：2026-05-10
+- 发现者：用户提供 terminal 日志
+- 相关任务：Timeline AppleScript 采样脚本修复
+- 严重程度：严重
+- 问题现象：Timeline 日志持续输出 `sample:skip unsupported or error`，错误为 AppleScript `syntax error: 预期是行的结尾，却找到属性。(-2741)`，导致今天 timeline 无法记录。
+- 原因分析：主 `timelineActiveWindowScript` 同时包含 Chromium 浏览器 URL 采集和 Music/Spotify 播放状态采集，这些语句依赖各自应用字典；AppleScript 会在执行前编译整段脚本，即使分支不执行也会解析失败。
+- 解决方案：主采样脚本只保留 System Events；浏览器 URL、Music、Spotify 信息改为按实际 app 拆分成独立 osascript 调用，并将失败降级为缺少 URL/音乐详情，不再阻断前台窗口 timeline。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：AppleScript 中 app-specific dictionary 语句不要混在一条通用脚本里；应把可选增强信息拆成独立、可失败的采集步骤。
+- 是否需更新技术文档：否。

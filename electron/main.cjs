@@ -321,8 +321,6 @@ set frontApp to ""
 set frontWindow to ""
 set pageUrl to ""
 set backgroundInfo to ""
-set musicRunning to false
-set spotifyRunning to false
 
 tell application "System Events"
   set frontAppProcess to first application process whose frontmost is true
@@ -341,46 +339,53 @@ tell application "System Events"
     end if
   end try
   try
-    set musicRunning to exists application process "Music"
+    if exists application process "Spotify" then
+      set backgroundInfo to backgroundInfo & "music-check|Spotify|" & linefeed
+    end if
   end try
   try
-    set spotifyRunning to exists application process "Spotify"
+    if exists application process "Music" then
+      set backgroundInfo to backgroundInfo & "music-check|Music|" & linefeed
+    end if
   end try
 end tell
 
-try
-  if frontApp is "Safari" then
-    tell application "Safari"
-      set pageUrl to URL of front document
-    end tell
-  else if frontApp is "Google Chrome" or frontApp is "Chromium" or frontApp is "Brave Browser" or frontApp is "Microsoft Edge" or frontApp is "Vivaldi" or frontApp is "Arc" then
-    tell application frontApp
-      set pageUrl to URL of active tab of front window
-    end tell
-  end if
-end try
-
-try
-  if musicRunning then
-    tell application "Music"
-      if player state is playing then
-        set backgroundInfo to backgroundInfo & "music|Music|" & name of current track & " - " & artist of current track & linefeed
-      end if
-    end tell
-  end if
-end try
-
-try
-  if spotifyRunning then
-    tell application "Spotify"
-      if player state is playing then
-        set backgroundInfo to backgroundInfo & "music|Spotify|" & name of current track & " - " & artist of current track & linefeed
-      end if
-    end tell
-  end if
-end try
-
 return frontApp & linefeed & frontWindow & linefeed & pageUrl & linefeed & backgroundInfo
+`;
+}
+
+function browserUrlScript(appName) {
+  switch (appName) {
+    case 'Safari':
+      return 'tell application "Safari" to return URL of front document';
+    case 'Google Chrome':
+      return 'tell application "Google Chrome" to return URL of active tab of front window';
+    case 'Chromium':
+      return 'tell application "Chromium" to return URL of active tab of front window';
+    case 'Brave Browser':
+      return 'tell application "Brave Browser" to return URL of active tab of front window';
+    case 'Microsoft Edge':
+      return 'tell application "Microsoft Edge" to return URL of active tab of front window';
+    case 'Vivaldi':
+      return 'tell application "Vivaldi" to return URL of active tab of front window';
+    case 'Arc':
+      return 'tell application "Arc" to return URL of active tab of front window';
+    default:
+      return '';
+  }
+}
+
+function musicStatusScript(appName) {
+  if (appName !== 'Music' && appName !== 'Spotify') return '';
+  return `
+tell application "${appName}"
+  if player state is playing then
+    set trackName to (name of current track)
+    set trackArtist to (artist of current track)
+    return "music|${appName}|" & trackName & " - " & trackArtist
+  end if
+end tell
+return ""
 `;
 }
 
@@ -443,7 +448,52 @@ function parseTimelineBackground(raw) {
       const [type = 'other', name = '', detail = ''] = line.split('|');
       return { type, name, detail };
     })
+    .filter((item) => item.type !== 'music-check')
     .filter((item) => item.name);
+}
+
+function parseMusicChecks(raw) {
+  return String(raw || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('music-check|'))
+    .map((line) => line.split('|')[1])
+    .filter(Boolean);
+}
+
+function parseTimelineMarkerLine(line) {
+  const [type = '', name = '', detail = ''] = String(line || '').split('|');
+  return type && name ? { type, name, detail } : null;
+}
+
+function readBrowserUrl(appName) {
+  const script = browserUrlScript(appName);
+  if (!script) return Promise.resolve('');
+  return new Promise((resolve) => {
+    execFile('/usr/bin/osascript', ['-e', script], { timeout: 1800 }, (error, stdout) => {
+      if (error) {
+        timelineDebugLog({ stage: 'browser-url:error', appName, error: error.message || String(error) });
+        resolve('');
+        return;
+      }
+      resolve(String(stdout || '').trim());
+    });
+  });
+}
+
+function readNowPlaying(appName) {
+  const script = musicStatusScript(appName);
+  if (!script) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    execFile('/usr/bin/osascript', ['-e', script], { timeout: 1800 }, (error, stdout) => {
+      if (error) {
+        timelineDebugLog({ stage: 'music:error', appName, error: error.message || String(error) });
+        resolve(null);
+        return;
+      }
+      resolve(parseTimelineMarkerLine(String(stdout || '').trim()));
+    });
+  });
 }
 
 function readTimelineActiveWindow() {
@@ -463,21 +513,33 @@ function readTimelineActiveWindow() {
         });
         return;
       }
-      const [appName = '', windowTitle = '', url = '', ...backgroundParts] = String(stdout || '').trimEnd().split('\n');
+      const [appName = '', windowTitle = '', _url = '', ...backgroundParts] = String(stdout || '').trimEnd().split('\n');
+      const normalizedAppName = appName.trim();
+      const normalizedWindowTitle = windowTitle.trim();
+      const rawBackground = backgroundParts.join('\n');
+      Promise.all([
+        readBrowserUrl(normalizedAppName),
+        ...parseMusicChecks(rawBackground).map((musicAppName) => readNowPlaying(musicAppName)),
+      ]).then(([url, ...musicMarkers]) => {
+      const background = [
+        ...parseTimelineBackground(rawBackground),
+        ...musicMarkers.filter(Boolean),
+      ];
       timelineDebugLog({
         stage: 'osascript:sample',
-        appName: appName.trim(),
-        windowTitle: windowTitle.trim(),
-        url: url.trim(),
+        appName: normalizedAppName,
+        windowTitle: normalizedWindowTitle,
+        url,
       });
       resolve({
         supported: true,
-        appName: appName.trim(),
-        windowTitle: windowTitle.trim(),
-        url: url.trim(),
-        background: parseTimelineBackground(backgroundParts.join('\n')),
+        appName: normalizedAppName,
+        windowTitle: normalizedWindowTitle,
+        url,
+        background,
         error: null,
         checkedAt: Date.now(),
+      });
       });
     });
   });
@@ -499,7 +561,10 @@ function timelineDebugLog(payload = {}) {
   const key = payload.key ? ` key=${JSON.stringify(payload.key)}` : '';
   const duration = typeof payload.durationMs === 'number' ? ` duration=${Math.round(payload.durationMs / 1000)}s` : '';
   const min = typeof payload.minSegmentMs === 'number' ? ` min=${Math.round(payload.minSegmentMs / 1000)}s` : '';
-  const error = payload.error ? ` error=${JSON.stringify(payload.error)}` : '';
+  const errorText = payload.error
+    ? String(payload.error).split('\n').filter((line) => line.includes('syntax error') || line.includes('execution error') || line.includes('Command failed')).slice(-2).join(' ') || String(payload.error).slice(0, 220)
+    : '';
+  const error = errorText ? ` error=${JSON.stringify(errorText)}` : '';
   console.log(`[timeline ${nowLabel}] ${stage}${message ? ` ${message}` : ''}${appName}${title}${url}${key}${duration}${min}${error}`);
   return true;
 }

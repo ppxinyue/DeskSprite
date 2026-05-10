@@ -1434,3 +1434,10 @@
 - 当前真实方案：每 3 秒采样；同 app/URL 维持 active；不同 app/URL 先进入 candidate；candidate 连续达到设置的最小时长才确认切换；短切屏被丢弃且不打断 active。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
+
+### R184. Timeline AppleScript 采样脚本修复（2026-05-10）
+- 根因：前台窗口主采样脚本混入了浏览器、Music、Spotify 的应用字典语句，AppleScript 会在编译阶段解析所有分支，导致 `active tab of front window` / `player state` 报语法错误，整次采样失败。
+- 修复：主采样脚本改为只使用 System Events 采 app/window/后台进程存在性；浏览器 URL 和音乐播放信息拆成独立小脚本，按实际 app 单独调用，失败不会影响前台窗口记录。
+- 日志：保留 `browser-url:error`、`music:error`，但前台 app/window 采样可继续成功。
+- 验证：主采样脚本已通过 `/usr/bin/osacompile` 编译；`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md
