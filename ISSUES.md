@@ -2495,3 +2495,15 @@
 - 涉及文件：`src/components/ui/button.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：设置页主操作颜色应收敛到基础组件，局部状态样式避免绕过设计 token 直接使用 foreground。
 - 是否需更新技术文档：否。
+
+## ISSUE-210
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Top 软件时间标签防换行
+- 严重程度：一般
+- 问题现象：个人档案 Top 软件图表里，右侧时长 label 较长时会自动换行，破坏柱状图对齐。
+- 原因分析：Top 软件行的 grid 时间列只有 54px，无法稳定容纳 `1h 20min` 等较长文本，且没有设置 `whitespace-nowrap`。
+- 解决方案：将时间列加宽到 82px，并对时间 label 设置不换行；bar 列使用 `minmax(0,1fr)` 自适应缩短。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：图表右侧数值标签应预留固定宽度并禁用换行，避免数据长度变化影响图形结构。
+- 是否需更新技术文档：否。

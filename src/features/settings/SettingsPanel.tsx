@@ -897,7 +897,7 @@ function TimelineSection({
           <div className="mb-2 text-[12px] font-semibold text-foreground">Top 软件</div>
           <div className="space-y-2">
             {(topApps.length > 0 ? topApps : [{ appName: '暂无', durationMs: 0 }]).map((item, index) => (
-              <div key={`${item.appName}-${index}`} className="grid grid-cols-[72px_1fr_54px] items-center gap-2 text-[11px]">
+              <div key={`${item.appName}-${index}`} className="grid grid-cols-[72px_minmax(0,1fr)_82px] items-center gap-2 text-[11px]">
                 <div className="truncate font-medium text-[#3a3d40] dark:text-white/74">{item.appName}</div>
                 <div className="h-2 overflow-hidden rounded-full bg-[#eceef0] dark:bg-white/8">
                   <div
@@ -905,7 +905,7 @@ function TimelineSection({
                     style={{ width: `${topApps[0]?.durationMs ? Math.max(4, (item.durationMs / topApps[0].durationMs) * 100) : 0}%` }}
                   />
                 </div>
-                <div className="text-right text-[#687076]">{item.durationMs ? formatTimelineDuration(item.durationMs) : '-'}</div>
+                <div className="whitespace-nowrap text-right text-[#687076]">{item.durationMs ? formatTimelineDuration(item.durationMs) : '-'}</div>
               </div>
             ))}
           </div>

@@ -1593,3 +1593,9 @@
 - 范围：保留 destructive 按钮的红色警示语义，避免危险操作和普通主按钮混淆。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
 - 文件：button.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R205. Top 软件时间标签防换行（2026-05-10）
+- 修复：个人档案 Top 软件柱状图右侧时间标签列加宽，并强制不换行，避免较长时长挤到下一行。
+- 布局：中间 bar 改为 `minmax(0,1fr)` 自适应缩短，给时间标签预留稳定空间。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积与 dynamic import 提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
