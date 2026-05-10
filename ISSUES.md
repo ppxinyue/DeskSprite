@@ -2963,3 +2963,15 @@
 - 涉及文件：`src/App.tsx`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：首帧体验要以“真实设置加载完成”为 ready 标准；窗口不能仅靠 DOM load 或 fallback timer 提前显示，否则默认值和真实设置之间的差异会被用户看见。
 - 是否需更新技术文档：否。
+
+## ISSUE-249
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：Timeline 跨日片段裁剪
+- 严重程度：一般
+- 问题现象：一段昨天 23:51 到今天 00:45 的 Codex 使用记录，在今天 Timeline 上没有显示 00:00-00:45，反而显示为 23:51-24:00。
+- 原因分析：Timeline 查询按 `entry.date` 过滤，而 `entry.date` 由结束时间决定；前端拿到跨日记录后直接用原始 `startedAt/endedAt` 计算当天位置，没有按所选日期裁剪。
+- 解决方案：数据库查询改为取与所选日期有时间交集的记录；前端渲染前把主记录和后台 marker 都裁剪到当天 00:00-24:00 范围。
+- 涉及文件：`src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：时间轴渲染不能假设记录完全落在单日内；查询负责找交集，渲染负责按当前视图窗口裁剪。
+- 是否需更新技术文档：否。

@@ -455,8 +455,9 @@ function ProfileSection() {
       getTimelineEntries(selectedDate),
     ])
       .then(([nextStats, nextTimeline]) => {
-        const displayTimeline = nextTimeline.length > 0
-          ? nextTimeline
+        const clippedTimeline = clipTimelineEntriesToDate(selectedDate, nextTimeline);
+        const displayTimeline = clippedTimeline.length > 0
+          ? clippedTimeline
           : selectedDate === shiftDateKey(getLocalDateKey(), -1)
             ? createMockTimelineEntries(selectedDate)
             : [];
@@ -1869,6 +1870,44 @@ function formatFocusDuration(ms: number): string {
 
 function getTimelineDurationMs(entry: TimelineEntry): number {
   return Math.max(0, new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime());
+}
+
+function getTimelineDayBounds(dateKey: string): { start: number; end: number } {
+  const start = new Date(`${dateKey}T00:00:00`).getTime();
+  return { start, end: start + 86_400_000 };
+}
+
+function clipTimelineEntriesToDate(dateKey: string, entries: TimelineEntry[]): TimelineEntry[] {
+  const { start: dayStart, end: dayEnd } = getTimelineDayBounds(dateKey);
+  const clippedEntries: TimelineEntry[] = [];
+  for (const entry of entries) {
+    const entryStart = new Date(entry.startedAt).getTime();
+    const entryEnd = new Date(entry.endedAt).getTime();
+    const clippedStart = Math.max(entryStart, dayStart);
+    const clippedEnd = Math.min(entryEnd, dayEnd);
+    if (clippedEnd <= clippedStart) continue;
+    const backgroundMarkers: TimelineEntry['backgroundMarkers'] = [];
+    for (const marker of entry.backgroundMarkers) {
+      const markerStart = new Date(marker.startedAt ?? entry.startedAt).getTime();
+      const markerEnd = new Date(marker.endedAt ?? entry.endedAt).getTime();
+      const clippedMarkerStart = Math.max(markerStart, dayStart);
+      const clippedMarkerEnd = Math.min(markerEnd, dayEnd);
+      if (clippedMarkerEnd <= clippedMarkerStart) continue;
+      backgroundMarkers.push({
+        ...marker,
+        startedAt: new Date(clippedMarkerStart).toISOString(),
+        endedAt: new Date(clippedMarkerEnd).toISOString(),
+      });
+    }
+    clippedEntries.push({
+      ...entry,
+      date: dateKey,
+      startedAt: new Date(clippedStart).toISOString(),
+      endedAt: new Date(clippedEnd).toISOString(),
+      backgroundMarkers,
+    });
+  }
+  return clippedEntries.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
 }
 
 function getTimelineBlocks(entries: TimelineEntry[]): TimelineBlock[] {

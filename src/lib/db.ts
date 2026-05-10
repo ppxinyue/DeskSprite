@@ -472,9 +472,19 @@ export async function upsertTimelineEntry({
 }
 
 export async function getTimelineEntries(date = localDateKey()): Promise<TimelineEntry[]> {
+  const dayStart = new Date(`${date}T00:00:00`).getTime();
+  const dayEnd = dayStart + 24 * 60 * 60 * 1000;
   return loadStore().timelineEntries
-    .filter((entry) => entry.date === date)
-    .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+    .filter((entry) => {
+      const startedAt = new Date(entry.startedAt).getTime();
+      const endedAt = new Date(entry.endedAt).getTime();
+      return startedAt < dayEnd && endedAt > dayStart;
+    })
+    .sort((a, b) => {
+      const aStart = Math.max(new Date(a.startedAt).getTime(), dayStart);
+      const bStart = Math.max(new Date(b.startedAt).getTime(), dayStart);
+      return aStart - bStart;
+    })
     .map((entry) => ({
       ...entry,
       backgroundMarkers: Array.isArray(entry.backgroundMarkers)

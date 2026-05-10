@@ -1867,3 +1867,10 @@
 - 灵宠：移除 pet 窗口 1.8s fallback 抢先显示；首次启动和手动显示都必须等首个稳定 layout 完成并发送 `pet_window_layout_ready` 后再 `showInactive`。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.82 kB，未触发 chunk 体积 warning。
 - 文件：App.tsx, electron/main.cjs, ISSUES.md, PROGRESS.md
+
+### R244. Timeline 跨日片段裁剪（2026-05-11）
+- 查询：`getTimelineEntries(date)` 不再只按落库日期过滤，改为返回与所选日期 00:00-24:00 有交集的所有记录。
+- 渲染：设置页 Timeline 在显示前按当前日期边界裁剪主 task 和后台 marker，跨日记录会分别在昨天/今天显示各自对应时段。
+- 修复：例如 23:51-00:45 的 Codex 记录，昨天显示 23:51-24:00，今天显示 00:00-00:45，不再错误画到今天 23:51-24:00。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.82 kB，未触发 chunk 体积 warning。
+- 文件：db.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
