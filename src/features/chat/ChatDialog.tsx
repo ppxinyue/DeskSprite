@@ -11,7 +11,12 @@ import { streamChat } from '@/features/ai/aiService';
 import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
 import { getProviderName } from '@/features/ai/providers';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
-import { speakWithCloudVoice, transcribeWithCloudVoice } from '@/features/voice/voiceService';
+import {
+  speakWithCloudVoice,
+  startAudioLevelMonitor,
+  transcribeWithCloudVoice,
+  type VoiceInputPhase,
+} from '@/features/voice/voiceService';
 import type { ApiConfig } from '@/features/ai/types';
 import {
   getMessages,
@@ -21,7 +26,6 @@ import {
 } from '@/lib/db';
 import type { ChatMessage } from './chatStore';
 
-const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']);
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
 
 interface HistoryItem {
@@ -64,6 +68,8 @@ export function ChatDialog({
   const [input, setInput] = useState('');
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [isVoiceLoading, setIsVoiceLoading] = useState(false);
+  const [voiceLevel, setVoiceLevel] = useState(0);
   const [mode, setMode] = useState<'chat' | 'history'>(initialMode === 'history' ? 'history' : 'chat');
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [composerError, setComposerError] = useState<string | null>(null);
@@ -274,10 +280,15 @@ export function ChatDialog({
     const lang = settings.voiceInputLang === 'system' ? (navigator.language || 'zh-CN') : settings.voiceInputLang;
     startSpeechInput(
       (text) => setInput((value) => `${value}${value ? ' ' : ''}${text}`),
-      setIsListening,
+      (phase) => {
+        setIsListening(phase === 'recording');
+        setIsVoiceLoading(phase === 'loading');
+        if (phase === 'idle') setVoiceLevel(0);
+      },
       lang,
       settings.voiceInputProvider,
       settings,
+      setVoiceLevel,
     );
   }
 
@@ -382,6 +393,8 @@ export function ChatDialog({
           compact
           compactFontSize={compactFontSize}
           isListening={isListening}
+          isVoiceLoading={isVoiceLoading}
+          voiceLevel={voiceLevel}
           error={composerError}
           shakeKey={composerShakeKey}
         />
@@ -404,6 +417,8 @@ interface StandalonePanel {
   isStreaming: boolean;
   selectedImage: SelectedImage | null;
   isListening: boolean;
+  isVoiceLoading: boolean;
+  voiceLevel: number;
 }
 
 let panelCounter = 0;
@@ -421,6 +436,8 @@ function createPanel(title = '新对话'): StandalonePanel {
     isStreaming: false,
     selectedImage: null,
     isListening: false,
+    isVoiceLoading: false,
+    voiceLevel: 0,
   };
 }
 
@@ -506,6 +523,9 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
         input: '',
         selectedImage: null,
         isStreaming: false,
+        isListening: false,
+        isVoiceLoading: false,
+        voiceLevel: 0,
         messages: msgs.map((m) => ({
           id: `msg-${m.id}`,
           role: m.role as 'user' | 'assistant' | 'system',
@@ -700,10 +720,15 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
                   const lang = settings.voiceInputLang === 'system' ? (navigator.language || 'zh-CN') : settings.voiceInputLang;
                   startSpeechInput(
                     (text) => updatePanel(panel.id, (current) => ({ ...current, input: `${current.input}${current.input ? ' ' : ''}${text}` })),
-                    (listening) => updatePanel(panel.id, { isListening: listening }),
+                    (phase) => updatePanel(panel.id, {
+                      isListening: phase === 'recording',
+                      isVoiceLoading: phase === 'loading',
+                      ...(phase === 'idle' ? { voiceLevel: 0 } : {}),
+                    }),
                     lang,
                     settings.voiceInputProvider,
                     settings,
+                    (level) => updatePanel(panel.id, { voiceLevel: level }),
                   );
                 }}
               />
@@ -787,52 +812,21 @@ function messageImageFields(imagePath: string | null | undefined): Partial<Pick<
 }
 
 async function pickImage(): Promise<SelectedImage | null> {
-  const file = await new Promise<File | null>((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/png,image/jpeg,image/webp,image/gif,image/bmp';
-    input.onchange = () => resolve(input.files?.[0] ?? null);
-    input.click();
+  const picked = await invoke<SelectedImage | null>('pick_chat_image').catch((error) => {
+    console.warn('Native image picker failed:', error);
+    return null;
   });
-  if (!file) return null;
-  if (!isAllowedImageFile(file)) {
+  if (!picked) return null;
+  if (!picked.dataUrl?.startsWith('data:image/') && !isAllowedImageName(picked.name)) {
     window.alert('只能上传图片，请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 格式。');
     return null;
   }
-  return fileToSelectedImage(file);
+  return picked;
 }
 
-async function fileToSelectedImage(file: File, fallbackName = '图片'): Promise<SelectedImage> {
-  if (!isAllowedImageFile(file)) {
-    throw new Error('Unsupported image type');
-  }
-  return {
-    path: '',
-    name: file.name || `${fallbackName}.${imageExtensionFromType(file.type)}`,
-    dataUrl: await fileToDataUrl(file),
-  };
-}
-
-function isAllowedImageFile(file: File) {
-  const typeAllowed = file.type ? ALLOWED_IMAGE_MIME_TYPES.has(file.type.toLowerCase()) : false;
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  return typeAllowed || ALLOWED_IMAGE_EXTENSIONS.has(ext);
-}
-
-function imageExtensionFromType(type: string) {
-  const subtype = type.split('/')[1]?.toLowerCase();
-  if (!subtype) return 'png';
-  if (subtype === 'jpeg') return 'jpg';
-  return subtype.replace(/[^a-z0-9]/g, '') || 'png';
-}
-
-function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+function isAllowedImageName(name: string) {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  return ALLOWED_IMAGE_EXTENSIONS.has(ext);
 }
 
 function supportsImageOrFileInput(config: ApiConfig) {
@@ -861,24 +855,32 @@ function supportsImageOrFileInput(config: ApiConfig) {
 
 async function startSpeechInput(
   onText: (text: string) => void,
-  setListening: (listening: boolean) => void,
+  setPhase: (phase: VoiceInputPhase) => void,
   lang?: string,
   providerMode: VoiceProviderMode = 'system',
   settings?: AppSettings,
+  onLevel?: (level: number) => void,
 ) {
+  const finish = () => {
+    setPhase('idle');
+    onLevel?.(0);
+  };
+
   if (providerMode !== 'system') {
-    setListening(true);
     try {
       if (!settings) throw new Error('missing voice settings');
-      const text = await transcribeWithCloudVoice(providerMode, lang || (navigator.language || 'zh-CN'), settings);
-      setListening(false);
+      const text = await transcribeWithCloudVoice(providerMode, lang || (navigator.language || 'zh-CN'), settings, {
+        onPhase: setPhase,
+        onLevel,
+      });
+      finish();
       if (text) {
         onText(text);
         return;
       }
     } catch (e) {
       console.warn('Cloud speech recognition failed, falling back to system speech:', e);
-      setListening(false);
+      finish();
       if (providerMode === 'cloud-auto') {
         window.alert('内置语音输入额度已用完或云端识别暂不可用，已切换到系统语音输入。');
       } else if (providerMode === 'user-cloud') {
@@ -887,7 +889,7 @@ async function startSpeechInput(
     }
   }
 
-  setListening(true);
+  setPhase('recording');
   let canStart = true;
   try {
     canStart = await invoke<boolean>('can_start_speech_recognition');
@@ -895,21 +897,37 @@ async function startSpeechInput(
     console.warn('Failed to check speech recognition availability:', e);
   }
   if (!canStart) {
-    setListening(false);
+    finish();
     window.alert('当前运行环境缺少系统语音识别权限说明，已阻止启动以避免 macOS 闪退。请使用打包后的 .app 版本。');
     return;
   }
 
-  if (navigator.mediaDevices?.getUserMedia) {
+  let stopLevelMonitor: (() => void) | null = null;
+  const canReadMicrophone = typeof navigator.mediaDevices?.getUserMedia === 'function';
+  if (canReadMicrophone && onLevel) {
+    try {
+      stopLevelMonitor = await startAudioLevelMonitor(onLevel);
+    } catch {
+      finish();
+      onText('请允许麦克风权限以使用语音输入。');
+      return;
+    }
+  } else if (canReadMicrophone) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
     } catch {
-      setListening(false);
+      finish();
       onText('请允许麦克风权限以使用语音输入。');
       return;
     }
   }
+
+  const stopRecording = () => {
+    stopLevelMonitor?.();
+    stopLevelMonitor = null;
+    finish();
+  };
 
   const win = window as unknown as {
     SpeechRecognition?: new () => SpeechRecognitionLike;
@@ -917,7 +935,7 @@ async function startSpeechInput(
   };
   const Recognition = win.SpeechRecognition ?? win.webkitSpeechRecognition;
   if (!Recognition) {
-    setListening(false);
+    stopRecording();
     window.alert('当前系统 WebView 没有暴露系统语音识别接口，无法直接启动语音输入。');
     return;
   }
@@ -939,17 +957,17 @@ async function startSpeechInput(
     }
   };
 
-  recognition.onend = () => setListening(false);
+  recognition.onend = stopRecording;
   recognition.onerror = (e) => {
     console.error('Speech recognition error:', e);
-    setListening(false);
+    stopRecording();
   };
 
   try {
     recognition.start();
   } catch (e) {
     console.error('Failed to start speech recognition:', e);
-    setListening(false);
+    stopRecording();
     onText('无法启动系统语音输入。');
   }
 }
@@ -1081,6 +1099,8 @@ function StandaloneChatPanel({
             input={panel.input}
             isStreaming={panel.isStreaming}
             isListening={panel.isListening}
+            isVoiceLoading={panel.isVoiceLoading}
+            voiceLevel={panel.voiceLevel}
             onImagePick={onImagePick}
             onInputChange={onInputChange}
             onKeyDown={handleKeyDown}

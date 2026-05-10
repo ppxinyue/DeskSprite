@@ -24,6 +24,14 @@ interface SynthesizeSpeechResponse {
   mimeType: string;
 }
 
+export type VoiceInputPhase = 'idle' | 'recording' | 'loading';
+
+export interface VoiceInputOptions {
+  maxMs?: number;
+  onPhase?: (phase: VoiceInputPhase) => void;
+  onLevel?: (level: number) => void;
+}
+
 let currentVoiceAudio: HTMLAudioElement | null = null;
 
 export function stopCloudVoice() {
@@ -76,7 +84,7 @@ export async function transcribeWithCloudVoice(
   mode: VoiceProviderMode,
   lang: string,
   settings: VoiceSettings,
-  maxMs = 8_000,
+  options: VoiceInputOptions = {},
 ): Promise<string> {
   const config = await resolveVoiceCloudConfig('stt', mode, settings);
   if (!config) throw new Error('cloud voice disabled');
@@ -84,7 +92,9 @@ export async function transcribeWithCloudVoice(
     throw new Error('内置语音输入额度已用完');
   }
 
-  const { blob, durationMs } = await recordAudioClip(maxMs);
+  options.onPhase?.('recording');
+  const { blob, durationMs } = await recordAudioClip(options.maxMs ?? 8_000, options.onLevel);
+  options.onPhase?.('loading');
   const audioBase64 = await blobToBase64(blob);
   const text = await invoke<string>('transcribe_audio', {
       request: {
@@ -150,7 +160,7 @@ export async function getBuiltinVoiceUsageStats() {
   };
 }
 
-async function recordAudioClip(maxMs: number): Promise<{ blob: Blob; durationMs: number }> {
+async function recordAudioClip(maxMs: number, onLevel?: (level: number) => void): Promise<{ blob: Blob; durationMs: number }> {
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error('当前系统不支持麦克风输入。');
   }
@@ -159,13 +169,18 @@ async function recordAudioClip(maxMs: number): Promise<{ blob: Blob; durationMs:
   }
 
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const stopLevelMonitor = createAudioLevelMonitor(stream, onLevel);
   const mimeType = pickRecordingMimeType();
   const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
   const chunks: BlobPart[] = [];
   const startedAt = Date.now();
 
   return new Promise((resolve, reject) => {
-    const cleanup = () => stream.getTracks().forEach((track) => track.stop());
+    const cleanup = () => {
+      stopLevelMonitor();
+      stream.getTracks().forEach((track) => track.stop());
+      onLevel?.(0);
+    };
     const timer = window.setTimeout(() => {
       if (recorder.state !== 'inactive') recorder.stop();
     }, maxMs);
@@ -198,6 +213,50 @@ async function recordAudioClip(maxMs: number): Promise<{ blob: Blob; durationMs:
       reject(e instanceof Error ? e : new Error('无法启动录音。'));
     }
   });
+}
+
+export async function startAudioLevelMonitor(onLevel: (level: number) => void): Promise<() => void> {
+  if (!navigator.mediaDevices?.getUserMedia) return () => {};
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const stopAnalyser = createAudioLevelMonitor(stream, onLevel);
+  return () => {
+    stopAnalyser();
+    stream.getTracks().forEach((track) => track.stop());
+    onLevel(0);
+  };
+}
+
+function createAudioLevelMonitor(stream: MediaStream, onLevel?: (level: number) => void): () => void {
+  if (!onLevel) return () => {};
+  const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return () => {};
+  const context = new AudioContextClass();
+  const source = context.createMediaStreamSource(stream);
+  const analyser = context.createAnalyser();
+  analyser.fftSize = 256;
+  source.connect(analyser);
+  const data = new Uint8Array(analyser.fftSize);
+  let raf = 0;
+
+  const tick = () => {
+    analyser.getByteTimeDomainData(data);
+    let sum = 0;
+    for (const value of data) {
+      const normalized = (value - 128) / 128;
+      sum += normalized * normalized;
+    }
+    const rms = Math.sqrt(sum / data.length);
+    onLevel(Math.min(1, rms * 7));
+    raf = window.requestAnimationFrame(tick);
+  };
+  tick();
+
+  return () => {
+    if (raf) window.cancelAnimationFrame(raf);
+    source.disconnect();
+    analyser.disconnect();
+    context.close().catch(() => {});
+  };
 }
 
 function pickRecordingMimeType() {

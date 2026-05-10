@@ -1714,3 +1714,10 @@
 - 结果：`共 2 小时 · 3 次专注 · 1 次分心`、`累计 15 分钟`、`5月10日`、`3 个 task` 等文本会在英文模式下转换为自然英文表达。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：i18n.ts, ISSUES.md, PROGRESS.md
+
+### R222. 聊天图片选择与语音输入反馈优化（2026-05-10）
+- 图片输入：聊天图片按钮改走主进程原生独立文件选择器，并由主进程读取图片为 data URL，避免隐藏 DOM file input 在浮窗里触发的拖动/层级异常。
+- 语音输入：新增 `recording / loading / idle` 三阶段状态；录音时麦克风按钮显示随分贝 RMS 波动的双层波纹，云端转写等待时切换为加载 spinner。
+- 覆盖：普通小聊天窗口和展开的大聊天窗口共用同一套语音动画状态，系统语音输入也会启动本地音量监听。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：main.cjs, ChatDialog.tsx, ChatPrimitives.tsx, voiceService.ts, ISSUES.md, PROGRESS.md

@@ -2415,6 +2415,7 @@ const handlers = {
   },
   import_pet_image: importPetImage,
   list_pet_images: listPetImages,
+  pick_chat_image: pickChatImage,
   delete_pet_image: async ({ filePath }) => {
     ensureUserAsset(filePath);
     await fsp.unlink(filePath);
@@ -2524,13 +2525,33 @@ ipcMain.handle('desksprite:current-monitor', (event) => {
 
 ipcMain.handle('desksprite:open-dialog', async (event, options) => {
   const win = BrowserWindow.fromWebContents(event.sender);
-  const result = await dialog.showOpenDialog(win || undefined, {
+  const parent = options.detached ? undefined : (win || undefined);
+  const result = await dialog.showOpenDialog(parent, {
     properties: options.multiple ? ['openFile', 'multiSelections'] : ['openFile'],
     filters: options.filters || [],
   });
   if (result.canceled) return null;
   return options.multiple ? result.filePaths : result.filePaths[0] || null;
 });
+
+async function pickChatImage() {
+  const result = await dialog.showOpenDialog(undefined, {
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const filePath = result.filePaths[0];
+  const ext = path.extname(filePath).toLowerCase();
+  if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'].includes(ext)) return null;
+  const bytes = await fsp.readFile(filePath);
+  return {
+    path: filePath,
+    name: path.basename(filePath),
+    dataUrl: `data:${imageMime(filePath)};base64,${bytes.toString('base64')}`,
+  };
+}
+
+ipcMain.handle('desksprite:pick-chat-image', async () => pickChatImage());
 
 function registerProtocols() {
   protocol.handle('desksprite-app', async (request) => {

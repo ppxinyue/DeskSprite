@@ -2699,3 +2699,15 @@
 - 涉及文件：`src/i18n.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：图表和统计卡片里的文案经常是由数字和单位拼接出来的，国际化不能只依赖静态字典，也需要动态模式转换或更细粒度格式化函数。
 - 是否需更新技术文档：否。
+
+## ISSUE-227
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：聊天图片选择与语音输入反馈优化
+- 严重程度：一般
+- 问题现象：点击图片输入按钮弹出的文件选择框拖动异常；语音输入按钮录音期间缺少明确动效，录音结束后的转写等待也没有加载占位。
+- 原因分析：图片选择使用隐藏 DOM `input[type=file]`，在 Electron 浮窗和拖动区域内容易被窗口层级/拖拽逻辑干扰；语音输入只有 boolean listening 状态，无法区分正在录音和正在等待云端转写。
+- 解决方案：图片选择改为主进程独立 `showOpenDialog` 并返回 data URL；语音输入拆成 `recording / loading / idle`，录音阶段使用 AudioContext analyser 采集分贝驱动按钮波纹，loading 阶段显示 spinner。
+- 涉及文件：`electron/main.cjs`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/ChatPrimitives.tsx`, `src/features/voice/voiceService.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：浮窗里的系统文件选择更适合走主进程原生 dialog；语音交互要把采集和识别两个等待阶段拆开，否则用户会误以为点击没有响应。
+- 是否需更新技术文档：否。

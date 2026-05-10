@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Copy, ImagePlus, Mic, Speaker, X } from 'lucide-react';
+import { Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,8 @@ export function Composer({
   input,
   isStreaming,
   isListening = false,
+  isVoiceLoading = false,
+  voiceLevel = 0,
   onImagePick,
   onInputChange,
   onKeyDown,
@@ -38,6 +40,8 @@ export function Composer({
   input: string;
   isStreaming: boolean;
   isListening?: boolean;
+  isVoiceLoading?: boolean;
+  voiceLevel?: number;
   onImagePick?: () => void;
   onInputChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
@@ -78,8 +82,13 @@ export function Composer({
         <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'ml-0.5 h-7 w-7 rounded-[6px]'} p-0 text-[var(--text-secondary)] transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]`} title="上传图片" aria-label="上传图片" onClick={onImagePick}>
           <ImagePlus className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'}`} />
         </Button>
-        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'h-7 w-7 rounded-[6px]'} p-0 transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${isListening ? 'animate-pulse text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
-          <Mic className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'}`} />
+        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'h-7 w-7 rounded-[6px]'} relative overflow-hidden p-0 transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${(isListening || isVoiceLoading) ? 'text-[var(--color-chat-accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
+          {isListening && <VoiceRipple level={voiceLevel} compact={compact} />}
+          {isVoiceLoading ? (
+            <Loader2 className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'} animate-spin`} />
+          ) : (
+            <Mic className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'} relative z-10`} />
+          )}
         </Button>
         <Textarea
           ref={textareaRef}
@@ -106,6 +115,25 @@ export function Composer({
         </p>
       )}
     </div>
+  );
+}
+
+function VoiceRipple({ level, compact }: { level: number; compact: boolean }) {
+  const clamped = Math.max(0, Math.min(1, level));
+  const base = compact ? 18 : 22;
+  const sizeA = base + clamped * 12;
+  const sizeB = base * 0.72 + clamped * 9;
+  return (
+    <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      <span
+        className="absolute rounded-full bg-[var(--color-chat-accent)]/14 transition-[height,width,opacity] duration-75"
+        style={{ width: sizeA, height: sizeA, opacity: 0.16 + clamped * 0.34 }}
+      />
+      <span
+        className="absolute rounded-full border border-[var(--color-chat-accent)]/45 transition-[height,width,opacity] duration-75"
+        style={{ width: sizeB, height: sizeB, opacity: 0.28 + clamped * 0.42 }}
+      />
+    </span>
   );
 }
 
