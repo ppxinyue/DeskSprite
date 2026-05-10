@@ -10,7 +10,8 @@ import { ChatDialog, Composer, MessageBubble } from "@/features/chat/ChatDialog"
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
-import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry, type TimelineBackgroundMarker } from "@/lib/db";
+import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
+import { TimelineRecorder, type TimelineSnapshot } from "@/lib/timelineRecorder";
 import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
 import "./index.css";
@@ -53,22 +54,6 @@ type PetPrompt =
 
 function isCompactChatDismissed() {
   return localStorage.getItem(COMPACT_CHAT_DISMISSED_KEY) === "1";
-}
-
-function getTimelineSnapshotKey(appName: string, windowTitle: string, url: string | null) {
-  const normalizedApp = appName.trim().toLowerCase();
-  const normalizedUrl = url?.trim();
-  if (normalizedUrl) {
-    try {
-      const parsed = new URL(normalizedUrl);
-      return `${normalizedApp}\n${parsed.origin}${parsed.pathname}`;
-    } catch {
-      return `${normalizedApp}\n${normalizedUrl}`;
-    }
-  }
-  const browserLike = /(safari|chrome|chromium|brave|edge|arc|firefox|vivaldi)/i.test(appName);
-  if (browserLike && windowTitle.trim()) return `${normalizedApp}\n${windowTitle.trim().toLowerCase()}`;
-  return normalizedApp;
 }
 
 function timelineDebugLog(payload: Record<string, unknown>) {
@@ -1596,128 +1581,23 @@ function PetWindow() {
     let disposed = false;
     let useFallbackSnapshot = false;
     let accessibilityChecked = false;
-    const activeRef: {
-      key: string;
-      firstSeenAt: number;
-      lastSeenAt: number;
-      segmentId: number | null;
-      appName: string;
-      windowTitle: string;
-      url: string | null;
-      backgroundMarkers: TimelineBackgroundMarker[];
-    } = {
-      key: '',
-      firstSeenAt: 0,
-      lastSeenAt: 0,
-      segmentId: null,
-      appName: '',
-      windowTitle: '',
-      url: null,
-      backgroundMarkers: [],
-    };
-    const candidateRef: {
-      key: string;
-      firstSeenAt: number;
-      lastSeenAt: number;
-      appName: string;
-      windowTitle: string;
-      url: string | null;
-      backgroundMarkers: TimelineBackgroundMarker[];
-    } = {
-      key: '',
-      firstSeenAt: 0,
-      lastSeenAt: 0,
-      appName: '',
-      windowTitle: '',
-      url: null,
-      backgroundMarkers: [],
-    };
     const minSegmentMs = Math.max(1, Math.min(20, settings.timelineMinSegmentMinutes)) * 60_000;
     timelineDebugLog({ stage: 'start', message: 'Timeline sampler started', minSegmentMs });
 
-    const persistActive = async (endedAt = Date.now()) => {
-      if (!activeRef.key) {
-        timelineDebugLog({ stage: 'persist:skip', message: 'no active segment' });
-        return;
-      }
-      const durationMs = endedAt - activeRef.firstSeenAt;
-      if (durationMs < minSegmentMs) {
-        timelineDebugLog({
-          stage: 'persist:skip',
-          message: 'active segment below minimum',
-          appName: activeRef.appName,
-          windowTitle: activeRef.windowTitle,
-          url: activeRef.url,
-          key: activeRef.key,
-          durationMs,
-          minSegmentMs,
-        });
-        return;
-      }
-      const entry = await upsertTimelineEntry({
-        id: activeRef.segmentId,
-        startedAt: activeRef.firstSeenAt,
-        endedAt,
-        appName: activeRef.appName,
-        windowTitle: activeRef.windowTitle,
-        url: activeRef.url,
-        backgroundMarkers: activeRef.backgroundMarkers,
-      });
-      if (entry) {
-        activeRef.segmentId = entry.id;
-        timelineDebugLog({
-          stage: 'persist:ok',
-          message: `entry=${entry.id}`,
-          appName: activeRef.appName,
-          windowTitle: activeRef.windowTitle,
-          url: activeRef.url,
-          key: activeRef.key,
-          durationMs,
-          minSegmentMs,
-        });
-        emit('profile:data-updated', { kind: 'timeline', date: entry.date }).catch(() => {});
-      } else {
-        timelineDebugLog({
-          stage: 'persist:null',
-          message: 'upsert returned null',
-          appName: activeRef.appName,
-          key: activeRef.key,
-          durationMs,
-          minSegmentMs,
-        });
-      }
-    };
+    const recorder = new TimelineRecorder({
+      minSegmentMs,
+      log: timelineDebugLog,
+      persist: async (payload) => {
+        const entry = await upsertTimelineEntry(payload);
+        if (entry) emit('profile:data-updated', { kind: 'timeline', date: entry.date }).catch(() => {});
+        return entry;
+      },
+    });
 
-    const mergeBackgroundMarkers = (
-      existing: TimelineBackgroundMarker[],
-      next: TimelineBackgroundMarker[] | undefined,
-      checkedAt: number,
-    ) => {
-      if (!next || next.length === 0) return existing;
-      const checkedIso = new Date(checkedAt).toISOString();
-      const merged = existing.slice();
-      for (const marker of next) {
-        const previous = merged.at(-1);
-        if (previous && previous.type === marker.type && previous.name === marker.name && previous.detail === marker.detail) {
-          previous.endedAt = checkedIso;
-        } else {
-          merged.push({ ...marker, startedAt: checkedIso, endedAt: checkedIso });
-        }
-      }
-      return merged.slice(-24);
-    };
-
-    const readTimelineSnapshot = async () => {
+    const readTimelineSnapshot = async (): Promise<TimelineSnapshot> => {
       if (!useFallbackSnapshot) {
         try {
-          return await invoke<{
-            supported: boolean;
-            appName: string;
-            windowTitle: string;
-            url?: string | null;
-            background?: TimelineBackgroundMarker[];
-            error?: string | null;
-          }>('read_timeline_active_window');
+          return await invoke<TimelineSnapshot>('read_timeline_active_window');
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (!message.includes('Unknown command: read_timeline_active_window')) throw error;
@@ -1752,117 +1632,7 @@ function PetWindow() {
         }
         const result = await readTimelineSnapshot();
         if (disposed) return;
-        if (!result.supported || result.error) {
-          timelineDebugLog({ stage: 'sample:skip', message: 'unsupported or error', error: result.error ?? 'unsupported' });
-          return;
-        }
-        const appName = result.appName?.trim() || 'Unknown';
-        const windowTitle = result.windowTitle?.trim() || '';
-        const url = result.url?.trim() || null;
-        const key = getTimelineSnapshotKey(appName, windowTitle, url);
-        const checkedAt = Date.now();
-        timelineDebugLog({
-          stage: 'sample',
-          appName,
-          windowTitle,
-          url,
-          key,
-          message: `background=${result.background?.length ?? 0}`,
-        });
-        if (!activeRef.key) {
-          activeRef.key = key;
-          activeRef.firstSeenAt = checkedAt;
-          activeRef.lastSeenAt = checkedAt;
-          activeRef.segmentId = null;
-          activeRef.appName = appName;
-          activeRef.windowTitle = windowTitle;
-          activeRef.url = url;
-          activeRef.backgroundMarkers = mergeBackgroundMarkers([], result.background, checkedAt);
-          timelineDebugLog({
-            stage: 'active:start',
-            appName,
-            windowTitle,
-            url,
-            key,
-            minSegmentMs,
-          });
-          return;
-        }
-        if (activeRef.key !== key) {
-          if (candidateRef.key !== key) {
-            candidateRef.key = key;
-            candidateRef.firstSeenAt = checkedAt;
-            candidateRef.lastSeenAt = checkedAt;
-            candidateRef.appName = appName;
-            candidateRef.windowTitle = windowTitle;
-            candidateRef.url = url;
-            candidateRef.backgroundMarkers = mergeBackgroundMarkers([], result.background, checkedAt);
-            timelineDebugLog({
-              stage: 'candidate:start',
-              appName,
-              windowTitle,
-              url,
-              key,
-              message: 'different from active',
-              minSegmentMs,
-            });
-            return;
-          }
-          candidateRef.lastSeenAt = checkedAt;
-          candidateRef.windowTitle = windowTitle;
-          candidateRef.url = url;
-          candidateRef.backgroundMarkers = mergeBackgroundMarkers(candidateRef.backgroundMarkers, result.background, checkedAt);
-          if (checkedAt - candidateRef.firstSeenAt < minSegmentMs) {
-            timelineDebugLog({
-              stage: 'candidate:hold',
-              appName,
-              windowTitle,
-              url,
-              key,
-              durationMs: checkedAt - candidateRef.firstSeenAt,
-              minSegmentMs,
-            });
-            return;
-          }
-          timelineDebugLog({
-            stage: 'candidate:confirm',
-            appName,
-            windowTitle,
-            url,
-            key,
-            durationMs: checkedAt - candidateRef.firstSeenAt,
-            minSegmentMs,
-          });
-          await persistActive(candidateRef.firstSeenAt);
-          activeRef.key = candidateRef.key;
-          activeRef.firstSeenAt = candidateRef.firstSeenAt;
-          activeRef.lastSeenAt = checkedAt;
-          activeRef.segmentId = null;
-          activeRef.appName = candidateRef.appName;
-          activeRef.windowTitle = candidateRef.windowTitle;
-          activeRef.url = candidateRef.url;
-          activeRef.backgroundMarkers = candidateRef.backgroundMarkers;
-          candidateRef.key = '';
-          return;
-        }
-        if (candidateRef.key) {
-          timelineDebugLog({
-            stage: 'candidate:discard',
-            message: 'returned to active before minimum',
-            appName: candidateRef.appName,
-            windowTitle: candidateRef.windowTitle,
-            url: candidateRef.url,
-            key: candidateRef.key,
-            durationMs: candidateRef.lastSeenAt - candidateRef.firstSeenAt,
-            minSegmentMs,
-          });
-        }
-        candidateRef.key = '';
-        activeRef.lastSeenAt = checkedAt;
-        activeRef.windowTitle = windowTitle;
-        activeRef.url = url;
-        activeRef.backgroundMarkers = mergeBackgroundMarkers(activeRef.backgroundMarkers, result.background, checkedAt);
-        await persistActive(checkedAt);
+        await recorder.handleSnapshot(result, Date.now());
       } catch (error) {
         timelineDebugLog({ stage: 'error', error: error instanceof Error ? error.message : String(error) });
         if (!disposed) console.warn('Failed to record timeline:', error);
@@ -1874,10 +1644,9 @@ function PetWindow() {
     return () => {
       disposed = true;
       window.clearInterval(timer);
-      timelineDebugLog({ stage: 'stop', message: 'Timeline sampler stopped' });
-      persistActive(activeRef.lastSeenAt || Date.now()).catch(() => {});
+      recorder.stop(Date.now()).catch(() => {});
     };
-  }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes]);
+  }, [settings, settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes]);
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;

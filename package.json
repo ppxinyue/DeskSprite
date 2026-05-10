@@ -10,6 +10,7 @@
     "build": "tsc -b && vite build",
     "electron:build": "pnpm build && electron-builder",
     "lint": "eslint .",
+    "test:timeline": "node --test src/lib/timelineRecorder.test.ts",
     "preview": "vite preview"
   },
   "main": "electron/main.cjs",

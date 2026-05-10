@@ -2255,3 +2255,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：AppleScript 中 app-specific dictionary 语句不要混在一条通用脚本里；应把可选增强信息拆成独立、可失败的采集步骤。
 - 是否需更新技术文档：否。
+
+## ISSUE-190
+- 发现时间：2026-05-10
+- 发现者：用户要求
+- 相关任务：Timeline 状态机单元测试
+- 严重程度：重要
+- 问题现象：Timeline 记录逻辑包含 active、candidate、最小时长、短切屏过滤、后台 marker、落库和前端刷新事件，靠手动操作很难覆盖所有组合。
+- 原因分析：状态机逻辑之前内联在 React effect 中，无法直接单元测试；没有独立测试脚本验证“短切屏不打断”“候选确认”“后台详情”和“推送前端”等关键路径。
+- 解决方案：将状态机抽到 `TimelineRecorder` 纯逻辑模块；新增 Node 内置测试脚本，模拟各类用户活动和 persist/push 行为；App 改为调用同一 recorder，避免测试和线上逻辑分叉。
+- 涉及文件：`src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `package.json`, `tsconfig.app.json`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：时间序列状态机必须先抽成纯逻辑，再用确定性时间戳单测，UI 层只负责采样和持久化回调。
+- 是否需更新技术文档：否。

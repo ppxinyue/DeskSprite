@@ -1441,3 +1441,11 @@
 - 日志：保留 `browser-url:error`、`music:error`，但前台 app/window 采样可继续成功。
 - 验证：主采样脚本已通过 `/usr/bin/osacompile` 编译；`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R185. Timeline 状态机单元测试（2026-05-10）
+- 重构：将 timeline active/candidate/persist 状态机抽到 `src/lib/timelineRecorder.ts`，App 运行时和测试共用同一套逻辑。
+- 测试入口：新增 `pnpm test:timeline`，使用 Node 内置 `node:test`，不新增测试依赖。
+- 覆盖场景：Codex 长任务中短切 WeChat 不打断；新 app 达到最小时长后确认切换；浏览器 URL 路径作为稳定 key；后台音乐/终端 marker 随前台记录保存；错误/低于阈值不落库。
+- 前端推送：测试 harness 模拟 persist 成功后推送 `profile:data-updated`，确保落库路径可触发前端刷新。
+- 验证：`pnpm test:timeline`、`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, package.json, tsconfig.app.json, ISSUES.md, PROGRESS.md
