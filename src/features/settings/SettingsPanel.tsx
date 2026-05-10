@@ -1868,71 +1868,17 @@ function ThemeSelect({
   value: import('./settingsStore').Theme;
   onChange: (theme: import('./settingsStore').Theme) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const current = THEME_OPTIONS.find((option) => option.id === value) ?? THEME_OPTIONS[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
-    };
-    window.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [open]);
-
   return (
-    <div ref={menuRef} className="relative w-[220px]">
-      <button
-        type="button"
-        className="flex h-10 w-full items-center justify-between gap-2 rounded-[12px] border border-border/70 bg-transparent px-3 text-left text-[13px] text-foreground outline-none transition-all hover:border-border focus-visible:ring-2 focus-visible:ring-ring/20"
-        onClick={() => setOpen((value) => !value)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
+    <div className="min-w-0 text-right">
+      <select
+        className="px-2.5 py-1"
+        value={value}
+        onChange={(event) => onChange(event.target.value as import('./settingsStore').Theme)}
       >
-        <span className="truncate">{current.title}</span>
-        <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div
-          className="glass-panel-strong absolute left-0 top-11 z-50 w-[260px] overflow-hidden rounded-[10px] py-1.5"
-          role="listbox"
-        >
-          <div className="px-3 pb-1.5 pt-1 text-[11px] leading-[1.5] text-muted-foreground">选择主题</div>
-          {THEME_OPTIONS.map((option) => {
-            const selected = option.id === value;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                role="option"
-                aria-selected={selected}
-                className={`flex min-h-11 w-full items-center gap-3 px-3.5 py-2 text-left transition-colors hover:bg-muted/70 ${
-                  selected ? 'bg-muted/72' : ''
-                }`}
-                onClick={() => {
-                  onChange(option.id);
-                  setOpen(false);
-                }}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] leading-[1.35] text-foreground">{option.title}</span>
-                  <span className="block truncate text-[11px] leading-[1.35] text-muted-foreground">{option.description}</span>
-                </span>
-                {selected && <Check className="h-4 w-4 shrink-0 text-foreground" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
+        {THEME_OPTIONS.map((option) => (
+          <option key={option.id} value={option.id}>{option.title}</option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -2942,15 +2888,13 @@ function GeneralSection({
         </SettingRow>
       </SettingsGroup>
 
-      <SettingsGroup>
-        <div className="space-y-3 py-1">
-          <Button variant="destructive" size="sm" disabled>清除所有对话历史</Button>
-          <br />
-          <Button variant="destructive" size="sm" disabled>删除所有 API 配置</Button>
-          <br />
-          <Button variant="outline" size="sm" disabled>导出对话资料 (JSON)</Button>
-        </div>
-      </SettingsGroup>
+      <div className="space-y-3 pt-1">
+        <Button variant="destructive" size="sm" disabled>清除所有对话历史</Button>
+        <br />
+        <Button variant="destructive" size="sm" disabled>删除所有 API 配置</Button>
+        <br />
+        <Button variant="outline" size="sm" disabled>导出对话资料 (JSON)</Button>
+      </div>
     </>
   );
 }

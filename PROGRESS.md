@@ -1656,3 +1656,9 @@
 - 设置窗口：默认尺寸改为内容驱动的 980x760 居中窗口，并在小屏上自动不超过工作区，减少右侧空白。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
 - 文件：main.cjs, switch.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R214. 主题选择与隐私按钮背景调整（2026-05-10）
+- 外观：主题选择从自定义浮层菜单改为和 Chat 模型一致的紧凑原生下拉选择。
+- 通用：底部清除历史、删除 API 配置、导出资料三个隐私安全按钮移出 `SettingsGroup`，删除背后的白色背景框。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

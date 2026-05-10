@@ -2603,3 +2603,15 @@
 - 涉及文件：`electron/main.cjs`, `src/components/ui/switch.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：设置窗口宽度应该跟侧栏和内容最大宽度绑定，避免使用屏幕比例造成不同设备上的空白不一致。
 - 是否需更新技术文档：否。
+
+## ISSUE-219
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：主题选择与隐私按钮背景调整
+- 严重程度：轻微
+- 问题现象：外观-主题使用独立的自定义浮层菜单，和 Chat 模型选择交互不一致；通用底部三个隐私安全按钮外仍包着白色设置卡片背景。
+- 原因分析：主题选择沿用了早期自定义下拉组件；隐私按钮复用了 `SettingsGroup`，导致禁用按钮背后多了一层卡片容器。
+- 解决方案：主题选择改为和 Chat 模型一致的紧凑原生 `select`；隐私按钮移出 `SettingsGroup`，只保留按钮本身和纵向间距。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：同类设置控件要优先复用同一交互模式；危险操作按钮区域不一定需要和普通设置项共用卡片容器。
+- 是否需更新技术文档：否。
