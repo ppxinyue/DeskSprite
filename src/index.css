@@ -262,8 +262,24 @@
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
   }
 
+  .settings-window {
+    background:
+      radial-gradient(circle at 18% 0%, rgba(255,255,255,0.88), transparent 34%),
+      linear-gradient(135deg, #f6f7f9 0%, #e8edf3 46%, #f7f8fa 100%);
+  }
+
+  .settings-main {
+    background: transparent;
+  }
+
   .dark .settings-window {
-    background: #1f1f1f;
+    background: #1f1f1f !important;
+  }
+
+  .dark .settings-window .settings-main,
+  .dark .settings-window [data-radix-scroll-area-viewport],
+  .dark .settings-window [data-radix-scroll-area-content] {
+    background: #1f1f1f !important;
   }
 
   .dark .settings-window [class*="shadow-"] {

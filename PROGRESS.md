@@ -1847,3 +1847,9 @@
 - 背景：对 settings/chat hash 增加首帧背景类，只影响非透明窗口；灵宠/悬浮球窗口继续保持透明背景。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
 - 文件：index.html, electron/main.cjs, ISSUES.md, PROGRESS.md
+
+### R241. 设置深色右侧背景修正（2026-05-11）
+- 布局：移除 SettingsLayout root 上的浅色 radial/linear 背景 utility，避免深色模式下内容区被浅色背景抢回。
+- 背景：将设置窗口浅色/深色背景收敛到 `.settings-window` 作用域；深色下 root、main 和 Radix ScrollArea viewport/content 都强制使用 #1f1f1f。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
+- 文件：SettingsLayout.tsx, index.css, ISSUES.md, PROGRESS.md

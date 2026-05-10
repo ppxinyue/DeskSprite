@@ -2927,3 +2927,15 @@
 - 涉及文件：`index.html`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：主题类必须在首帧前落地，不能依赖 React effect；非透明 Electron 窗口也要避免在 renderer 尚未绘制完成时提前 show。
 - 是否需更新技术文档：否。
+
+## ISSUE-246
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：设置深色右侧背景修正
+- 严重程度：一般
+- 问题现象：深色主题下设置界面左侧和卡片已经变暗，但右侧大面积内容背景仍显示浅色渐变。
+- 原因分析：SettingsLayout root 仍直接挂载浅色 radial/linear background utility；部分 ScrollArea 视口背景未被设置页深色作用域明确覆盖，导致外层内容区仍露出浅色背景。
+- 解决方案：将设置窗口背景从 JSX utility 移到 CSS 作用域；深色下同时覆盖 `.settings-window`、`.settings-main` 和 Radix ScrollArea viewport/content。
+- 涉及文件：`src/components/layouts/SettingsLayout.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：复杂主题背景不要用浅色 utility 与 dark utility 混在同一个元素上，尤其是窗口级背景；应使用稳定作用域和明确的 dark 覆盖。
+- 是否需更新技术文档：否。
