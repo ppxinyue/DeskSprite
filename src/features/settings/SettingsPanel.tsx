@@ -244,6 +244,90 @@ function EditableTextarea({
   );
 }
 
+function RuleTokenEditor({
+  value,
+  onChange,
+  addLabel,
+}: {
+  value: string[];
+  onChange: (value: string[]) => void;
+  addLabel: string;
+}) {
+  const items = value.length > 0 ? value : [''];
+
+  const updateItem = (index: number, nextValue: string) => {
+    const pieces = nextValue.split(/[\n,，]/).map((item) => item.trim()).filter(Boolean);
+    if (pieces.length > 1) {
+      onChange([...items.slice(0, index), ...pieces, ...items.slice(index + 1)]);
+      return;
+    }
+    onChange(items.map((item, itemIndex) => itemIndex === index ? nextValue : item));
+  };
+
+  const deleteItem = (index: number) => {
+    const next = items.filter((_, itemIndex) => itemIndex !== index);
+    onChange(next.length > 0 ? next : ['']);
+  };
+
+  const addItem = () => {
+    if (items.some((item) => item.trim() === '')) return;
+    onChange([...items, '']);
+  };
+
+  return (
+    <div className="flex min-h-[86px] flex-wrap content-start gap-2 rounded-[14px] border border-input/75 bg-[var(--surface-raised)] p-2.5 shadow-[0_1px_0_rgba(255,255,255,0.68)_inset,0_8px_22px_rgba(52,64,84,0.045)]">
+      {items.map((item, index) => {
+        const empty = item.trim() === '';
+        return (
+          <div
+            key={`rule-token-${index}`}
+            className="group flex h-8 items-center rounded-[9px] border border-[var(--glass-border)] bg-white/44 shadow-[0_1px_0_rgba(255,255,255,0.66)_inset] transition-colors focus-within:border-ring/55 focus-within:bg-[var(--glass-bg-strong)] dark:bg-white/[0.055]"
+          >
+            <input
+              value={item}
+              autoFocus={empty}
+              placeholder={addLabel}
+              onChange={(event) => updateItem(index, event.target.value)}
+              onBlur={() => {
+                const cleaned = items.map((entry, itemIndex) => itemIndex === index ? entry.trim() : entry).filter(Boolean);
+                onChange(cleaned.length > 0 ? cleaned : ['']);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  addItem();
+                }
+                if (event.key === 'Backspace' && item === '' && items.length > 1) {
+                  event.preventDefault();
+                  deleteItem(index);
+                }
+              }}
+              className="h-full min-w-[72px] max-w-[180px] bg-transparent px-3 text-[13px] leading-5 text-foreground outline-none placeholder:text-muted-foreground/70"
+              style={{ width: `${Math.max(6, Math.min(18, item.length + 2))}ch` }}
+            />
+            <button
+              type="button"
+              className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] text-[14px] leading-none text-muted-foreground transition hover:bg-white/70 hover:text-foreground dark:hover:bg-white/10"
+              onClick={() => deleteItem(index)}
+              aria-label={`删除 ${item || addLabel}`}
+            >
+              ×
+            </button>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-dashed border-[#b8c0c6] bg-white/28 text-muted-foreground transition hover:border-[#2f8fff]/55 hover:bg-white/58 hover:text-[#2f8fff] dark:border-white/18 dark:bg-white/[0.035] dark:hover:bg-white/10"
+        onClick={addItem}
+        aria-label={addLabel}
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 function CollapsedUnavailableSection({ title, reason }: { title: string; reason: string }) {
   return (
     <div className="quiet-card mb-6 overflow-hidden rounded-[9px]">
@@ -1358,14 +1442,20 @@ function RemindersSection({
     draft.focusDurationMinutes !== settings.focusDurationMinutes ||
     draft.distractionDetectionEnabled !== settings.distractionDetectionEnabled ||
     draft.distractionGraceSeconds !== settings.distractionGraceSeconds ||
-    draft.distractionBlockedApps.join('\n') !== settings.distractionBlockedApps.join('\n') ||
-    draft.distractionBlockedKeywords.join('\n') !== settings.distractionBlockedKeywords.join('\n');
+    cleanRuleList(draft.distractionBlockedApps).join('\n') !== cleanRuleList(settings.distractionBlockedApps).join('\n') ||
+    cleanRuleList(draft.distractionBlockedKeywords).join('\n') !== cleanRuleList(settings.distractionBlockedKeywords).join('\n');
 
   const handleApply = async () => {
     setSaving(true);
     try {
-      await updateSettings(draft);
-      await emit('reminders:settings-applied', draft);
+      const cleanedDraft = {
+        ...draft,
+        distractionBlockedApps: cleanRuleList(draft.distractionBlockedApps),
+        distractionBlockedKeywords: cleanRuleList(draft.distractionBlockedKeywords),
+      };
+      await updateSettings(cleanedDraft);
+      setDraft(cleanedDraft);
+      await emit('reminders:settings-applied', cleanedDraft);
       setSavedPulse(true);
       window.setTimeout(() => setSavedPulse(false), 1200);
     } finally {
@@ -1437,23 +1527,21 @@ function RemindersSection({
             />
           </div>
         </AppearanceRow>
-        <div className="grid gap-3 px-0 py-3 sm:grid-cols-2">
+        <div className="grid gap-3 px-0 py-3">
           <div>
             <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽应用</div>
-            <EditableTextarea
-              value={draft.distractionBlockedApps.join('\n')}
-              onChange={(value) => update('distractionBlockedApps', parseRuleTextarea(value))}
-              rows={6}
-              className="min-h-[132px]"
+            <RuleTokenEditor
+              value={draft.distractionBlockedApps}
+              onChange={(value) => update('distractionBlockedApps', value)}
+              addLabel="添加应用"
             />
           </div>
           <div>
             <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽关键词</div>
-            <EditableTextarea
-              value={draft.distractionBlockedKeywords.join('\n')}
-              onChange={(value) => update('distractionBlockedKeywords', parseRuleTextarea(value))}
-              rows={6}
-              className="min-h-[132px]"
+            <RuleTokenEditor
+              value={draft.distractionBlockedKeywords}
+              onChange={(value) => update('distractionBlockedKeywords', value)}
+              addLabel="添加关键词"
             />
           </div>
         </div>
@@ -1601,11 +1689,8 @@ function formatMotionValue(value: number, unit: string): string {
   return `${Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)}${unit}`;
 }
 
-function parseRuleTextarea(value: string): string[] {
-  return value
-    .split(/\n|,/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+function cleanRuleList(value: string[]): string[] {
+  return value.map((item) => item.trim()).filter(Boolean);
 }
 
 function getLocalDateKey(date = new Date()): string {

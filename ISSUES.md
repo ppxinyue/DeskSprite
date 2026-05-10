@@ -2447,3 +2447,15 @@
 - 涉及文件：`src/components/layouts/SettingsLayout.tsx`, `src/components/ui/input.tsx`, `src/components/ui/textarea.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：设置页控件应先统一基础组件语义，再做局部字段调整；直接可编辑字段需要显式编辑入口来减少误触。
 - 是否需更新技术文档：否。
+
+## ISSUE-206
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：设置输入留白与分心规则 Token 编辑器
+- 严重程度：一般
+- 问题现象：设置页文本框左右边框和文字距离太近；专注模式里的屏蔽应用、屏蔽关键词仍是一个词一行的多行文本框，不便浏览和增删。
+- 原因分析：Input / Textarea 基础组件横向 padding 偏小；分心规则数据虽然是数组，但 UI 仍用 textarea 字符串编辑，没有体现规则项的独立性。
+- 解决方案：加宽 Input / Textarea 横向 padding；新增 `RuleTokenEditor`，用自然换行的小文本框展示每个规则，支持单项编辑、删除和末尾 `+` 添加。
+- 涉及文件：`src/components/ui/input.tsx`, `src/components/ui/textarea.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：数组型配置应使用 token/chip 编辑器，而不是让用户维护换行文本。
+- 是否需更新技术文档：否。

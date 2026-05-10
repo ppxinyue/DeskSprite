@@ -1565,3 +1565,11 @@
 - Slider：重做滑动条轨道和 thumb，使用 Vite 蓝进度、玻璃轨道、白色高光 thumb 和 hover/focus 微交互。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsLayout.tsx, input.tsx, textarea.tsx, SettingsPanel.tsx, index.css, ISSUES.md, PROGRESS.md
+
+### R201. 设置输入留白与分心规则 Token 编辑器（2026-05-10）
+- 输入框：Input / Textarea 左右 padding 加宽，避免边框贴近文字。
+- 分心规则：屏蔽应用、屏蔽关键词从多行文本框改为自然换行的 token 输入区域。
+- 交互：每个规则都是独立小文本框，右侧有删除按钮；末尾 `+` 按钮可继续添加应用或关键词。
+- 保存：应用设置前自动 trim 并清理空白规则，避免空 token 进入配置。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：input.tsx, textarea.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
