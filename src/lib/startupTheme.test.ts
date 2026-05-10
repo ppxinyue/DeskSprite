@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { getThemeClassAction, readStoredThemeFromRawStore, resolveInitialTheme } from './startupTheme.ts';
+import { getThemeClassAction, readStoredThemeFromRawStore, resolveInitialTheme, shouldDeferWindowContent } from './startupTheme.ts';
 
 test('keeps pre-painted dark class untouched until persisted settings are loaded', () => {
   assert.equal(getThemeClassAction({ loaded: false, theme: 'system', prefersDark: false }), 'defer');
@@ -31,4 +31,12 @@ test('reads both JSON encoded and legacy raw theme values from the local store',
   assert.equal(readStoredThemeFromRawStore(JSON.stringify({ settings: { theme: JSON.stringify('system') } })), 'system');
   assert.equal(readStoredThemeFromRawStore(JSON.stringify({ settings: { theme: JSON.stringify('invalid') } })), 'system');
   assert.equal(readStoredThemeFromRawStore('{broken'), 'system');
+});
+
+test('defers opaque shell window content until settings are loaded', () => {
+  assert.equal(shouldDeferWindowContent('settings', false), true);
+  assert.equal(shouldDeferWindowContent('chat', false), true);
+  assert.equal(shouldDeferWindowContent('settings', true), false);
+  assert.equal(shouldDeferWindowContent('pet', false), false);
+  assert.equal(shouldDeferWindowContent('compact-chat', false), false);
 });

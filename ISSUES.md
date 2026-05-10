@@ -2999,3 +2999,15 @@
 - 涉及文件：`src/lib/db.ts`, `src/lib/timelineView.ts`, `src/lib/timelineView.test.ts`, `src/lib/db.timeline.test.ts`, `src/features/settings/SettingsPanel.tsx`, `package.json`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Timeline 的前台色块、后台轨道、统计图例必须有清晰分层；后台-only 记录不能靠伪造前台色块显示，否则统计和视觉都会串口径。
 - 是否需更新技术文档：否。
+
+## ISSUE-252
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：启动闪烁与灵宠首帧跳动实链路修复
+- 严重程度：一般
+- 问题现象：此前新增单测通过，但深色主题仍会从浅色闪到深色，灵宠首次显示仍会跳动一下。
+- 原因分析：测试覆盖了抽象状态机，但漏掉实际渲染链路：设置/聊天窗口在 settings 加载前已经渲染完整 UI；main 进程窗口背景仍是浅色硬编码；pet 在 renderer 刚完成 layout 计算后立刻通知 main show，可能早于 React 下一帧绘制。
+- 解决方案：settings/chat 在 loaded 前只显示预绘制背景，并把 renderer ready 推迟到 loaded 后两帧；main 进程 opaque window 背景跟随系统深浅；pet 首个 layout 应用后等待两帧再发送 ready。
+- 涉及文件：`src/App.tsx`, `src/main.tsx`, `src/lib/startupTheme.ts`, `src/lib/startupTheme.test.ts`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：首帧问题不能只测业务状态机，还要覆盖“是否渲染完整 UI”“何时通知 main show”“原生窗口底色”这些真实显示链路。
+- 是否需更新技术文档：否。

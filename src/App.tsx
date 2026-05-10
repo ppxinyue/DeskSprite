@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -11,7 +11,7 @@ import { shouldSubmitMessage } from "@/features/chat/sendShortcut";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
 import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
-import { getThemeClassAction } from "@/lib/startupTheme";
+import { getThemeClassAction, shouldDeferWindowContent } from "@/lib/startupTheme";
 import { TimelineRecorder, type TimelineRecorderState, type TimelineSnapshot } from "@/lib/timelineRecorder";
 import { installDocumentTranslator } from "@/i18n";
 import type { ChatMessage } from "@/features/chat/chatStore";
@@ -56,7 +56,15 @@ const SYSTEM_ACTIVITY_POLL_INTERVAL_MS = 15_000;
 const SYSTEM_INACTIVE_THRESHOLD_MS = 60_000;
 
 function WindowLoadingFallback() {
-  return <div className="h-screen w-screen bg-background" />;
+  return <div className="h-screen w-screen bg-background" style={{ background: 'var(--initial-window-bg, var(--color-background))' }} />;
+}
+
+function waitForStablePaint() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve());
+    });
+  });
 }
 
 type PetPrompt =
@@ -172,7 +180,7 @@ function App() {
     }
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = (prefersDark: boolean) => {
@@ -195,7 +203,13 @@ function App() {
   useEffect(() => {
     if (!loaded) return;
     if (windowLabel !== "settings" && windowLabel !== "chat") return;
-    invoke("renderer_window_ready").catch(() => {});
+    let cancelled = false;
+    waitForStablePaint().then(() => {
+      if (!cancelled) invoke("renderer_window_ready").catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loaded, windowLabel]);
 
   useEffect(() => {
@@ -234,6 +248,7 @@ function App() {
   }, []);
 
   if (windowLabel === "settings") {
+    if (shouldDeferWindowContent(windowLabel, loaded)) return <WindowLoadingFallback />;
     return (
       <TooltipProvider>
         <Suspense fallback={<WindowLoadingFallback />}>
@@ -245,6 +260,7 @@ function App() {
 
   if (windowLabel === "chat") {
     const handoffConversationId = readChatHandoffConversationId();
+    if (shouldDeferWindowContent(windowLabel, loaded)) return <WindowLoadingFallback />;
     return (
       <TooltipProvider>
         <div className="h-screen w-screen bg-background text-foreground">
@@ -1229,6 +1245,7 @@ function PetWindow() {
         applyLayout: applyLayoutState,
       });
       if (!initialLayoutReadyRef.current) {
+        await waitForStablePaint();
         initialLayoutReadyRef.current = true;
         invoke("pet_window_layout_ready").catch(() => {});
       }

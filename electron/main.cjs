@@ -6,6 +6,7 @@ const {
   globalShortcut,
   ipcMain,
   Menu,
+  nativeTheme,
   nativeImage,
   protocol,
   powerMonitor,
@@ -257,6 +258,10 @@ function centerBoundsForSize(targetWidth, targetHeight) {
     x: Math.round(work.x + (work.width - width) / 2),
     y: Math.round(work.y + (work.height - height) / 2),
   };
+}
+
+function opaqueWindowBackgroundColor() {
+  return nativeTheme.shouldUseDarkColors ? '#1f1f1f' : '#f4f5f7';
 }
 
 function createWindow(label, options) {
@@ -851,7 +856,7 @@ function showSettingsWindow() {
     frame: true,
     transparent: false,
     alwaysOnTop: false,
-    backgroundColor: '#f7f3ed',
+    backgroundColor: opaqueWindowBackgroundColor(),
   });
   win.setBounds(bounds);
   showWindowAfterInitialPaint(win, { focus: true });
@@ -868,7 +873,7 @@ function showChatWindow() {
     frame: true,
     transparent: false,
     alwaysOnTop: false,
-    backgroundColor: '#f7f3ed',
+    backgroundColor: opaqueWindowBackgroundColor(),
   });
   win.setBounds(bounds);
   showWindowAfterInitialPaint(win, { focus: true });

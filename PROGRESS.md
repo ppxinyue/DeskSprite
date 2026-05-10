@@ -1888,3 +1888,10 @@
 - 详情：跨日裁剪和短暂切换提取移动到 `timelineView.ts` 并补充单测，确保未达阈值的软件使用会作为“短暂切换”出现在点击详情里。
 - 验证：`pnpm test`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.99 kB，未触发 chunk 体积 warning。
 - 文件：SettingsPanel.tsx, db.ts, timelineView.ts, timelineView.test.ts, db.timeline.test.ts, package.json, PROGRESS.md, ISSUES.md
+
+### R247. 启动闪烁与灵宠首帧跳动实链路修复（2026-05-11）
+- 深色：设置/大聊天窗口在 settings 未加载前不再渲染完整 UI，只显示预绘制背景；renderer ready 也延后到真实设置加载并完成两帧绘制后才通知 main 显示窗口。
+- 窗口：main 进程不再给设置/聊天窗口硬编码浅色 `backgroundColor`，改为跟随系统深浅色的 opaque window 底色，减少 Electron 原生底色闪烁。
+- 灵宠：首个 layout 应用后等待两帧稳定绘制，再发送 `pet_window_layout_ready`，避免 main 进程在 React layout state 尚未完成绘制时 showInactive。
+- 验证：`pnpm test`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；生产构建主包 489.47 kB，未触发 chunk 体积 warning。
+- 文件：App.tsx, main.tsx, startupTheme.ts, startupTheme.test.ts, electron/main.cjs, PROGRESS.md, ISSUES.md

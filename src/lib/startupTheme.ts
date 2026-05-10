@@ -36,3 +36,7 @@ export function readStoredThemeFromRawStore(raw: string | null): Theme {
     return 'system';
   }
 }
+
+export function shouldDeferWindowContent(label: string, loaded: boolean): boolean {
+  return (label === 'settings' || label === 'chat') && !loaded;
+}
