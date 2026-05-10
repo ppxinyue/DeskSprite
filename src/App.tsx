@@ -10,7 +10,7 @@ import { Composer, MessageBubble } from "@/features/chat/ChatPrimitives";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
 import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
-import { TimelineRecorder, type TimelineSnapshot } from "@/lib/timelineRecorder";
+import { TimelineRecorder, type TimelineRecorderState, type TimelineSnapshot } from "@/lib/timelineRecorder";
 import { installDocumentTranslator } from "@/i18n";
 import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
@@ -24,6 +24,7 @@ const COMPACT_CHAT_KEY = "desksprite:compact-chat";
 const COMPACT_CHAT_DISMISSED_KEY = "desksprite:compact-chat-dismissed";
 const CODING_CONVERSATION_KEY = "desksprite:coding-conversation-id";
 const CODING_SAVED_MESSAGES_KEY = "desksprite:coding-saved-message-ids";
+const TIMELINE_RECORDER_STATE_KEY = "desksprite:timeline-recorder-state";
 const SCREEN_MARGIN = 16;
 const PET_CONTENT_MARGIN = 20;
 const MIN_DIALOG_WIDTH = 200;
@@ -95,6 +96,42 @@ function timelineDebugLog(payload: Record<string, unknown>) {
   if (payload.stage === 'accessibility') timelineLogLastByKey.set('accessibility', Date.now());
   if (payload.stage === 'start') timelineLogLastByKey.set('start', Date.now());
   invoke('timeline_debug_log', payload).catch(() => {});
+}
+
+function loadTimelineRecorderState(minSegmentMs: number): TimelineRecorderState | null {
+  try {
+    const raw = localStorage.getItem(TIMELINE_RECORDER_STATE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as TimelineRecorderState & { savedAt?: number; minSegmentMs?: number };
+    if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > Math.max(minSegmentMs * 2, 30 * 60_000)) {
+      localStorage.removeItem(TIMELINE_RECORDER_STATE_KEY);
+      return null;
+    }
+    if (typeof parsed.minSegmentMs === 'number' && parsed.minSegmentMs !== minSegmentMs) {
+      localStorage.removeItem(TIMELINE_RECORDER_STATE_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    localStorage.removeItem(TIMELINE_RECORDER_STATE_KEY);
+    return null;
+  }
+}
+
+function saveTimelineRecorderState(state: TimelineRecorderState, minSegmentMs: number) {
+  try {
+    if (!state.active.key && !state.candidate.key && !state.paused.key) {
+      localStorage.removeItem(TIMELINE_RECORDER_STATE_KEY);
+      return;
+    }
+    localStorage.setItem(TIMELINE_RECORDER_STATE_KEY, JSON.stringify({
+      ...state,
+      savedAt: Date.now(),
+      minSegmentMs,
+    }));
+  } catch {
+    // Ignore storage failures; losing a pending timeline segment is non-fatal.
+  }
 }
 
 function App() {
@@ -1687,13 +1724,18 @@ function PetWindow() {
     let foregroundPaused = false;
     const minSegmentMs = Math.max(1, Math.min(20, settings.timelineMinSegmentMinutes)) * 60_000;
     timelineDebugLog({ stage: 'start', message: 'Timeline sampler started', minSegmentMs });
+    const initialTimelineState = loadTimelineRecorderState(minSegmentMs);
 
     const recorder = new TimelineRecorder({
       minSegmentMs,
       log: timelineDebugLog,
+      initialState: initialTimelineState,
       persist: async (payload) => {
         const entry = await upsertTimelineEntry(payload);
-        if (entry) emit('profile:data-updated', { kind: 'timeline', date: entry.date }).catch(() => {});
+        if (entry) {
+          emit('profile:data-updated', { kind: 'timeline', date: entry.date }).catch(() => {});
+          saveTimelineRecorderState(recorder.getState(), minSegmentMs);
+        }
         return entry;
       },
     });
@@ -1738,6 +1780,7 @@ function PetWindow() {
           if (!foregroundPaused) {
             foregroundPaused = true;
             await recorder.pauseForeground(gameStartedAtRef.current ?? Date.now());
+            saveTimelineRecorderState(recorder.getState(), minSegmentMs);
           }
           return;
         }
@@ -1745,18 +1788,24 @@ function PetWindow() {
           if (!foregroundPaused) {
             foregroundPaused = true;
             await recorder.pauseForeground(systemInactiveStartedAtRef.current ?? Date.now());
+            saveTimelineRecorderState(recorder.getState(), minSegmentMs);
           }
           const backgroundOnly = await invoke<{ supported: boolean; background: TimelineSnapshot['background']; error?: string | null }>('read_timeline_background_markers').catch(() => null);
-          if (backgroundOnly?.supported) await recorder.handleBackgroundMarkers(backgroundOnly.background, Date.now());
+          if (backgroundOnly?.supported) {
+            await recorder.handleBackgroundMarkers(backgroundOnly.background, Date.now());
+            saveTimelineRecorderState(recorder.getState(), minSegmentMs);
+          }
           return;
         }
         if (foregroundPaused) {
           foregroundPaused = false;
           recorder.resumeForeground();
+          saveTimelineRecorderState(recorder.getState(), minSegmentMs);
         }
         const result = await readTimelineSnapshot();
         if (disposed) return;
         await recorder.handleSnapshot(result, Date.now());
+        saveTimelineRecorderState(recorder.getState(), minSegmentMs);
       } catch (error) {
         timelineDebugLog({ stage: 'error', error: error instanceof Error ? error.message : String(error) });
         if (!disposed) console.warn('Failed to record timeline:', error);
@@ -1768,7 +1817,9 @@ function PetWindow() {
     return () => {
       disposed = true;
       window.clearInterval(timer);
-      recorder.stop(Date.now()).catch(() => {});
+      recorder.stop(Date.now())
+        .then(() => saveTimelineRecorderState(recorder.getState(), minSegmentMs))
+        .catch(() => saveTimelineRecorderState(recorder.getState(), minSegmentMs));
     };
   }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes]);
 

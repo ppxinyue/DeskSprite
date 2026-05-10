@@ -1691,3 +1691,11 @@
 - 保护：聊天消息正文标记为不翻译，避免用户/AI 内容被界面语言层误处理。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：App.tsx, i18n.ts, ChatPrimitives.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
+
+### R219. Timeline 采样器重启后续记当前片段（2026-05-10）
+- 排查：日志中 `min=360s`，但 HMR/窗口重建频繁触发 `start -> stop -> persist:skip`，导致未满 6 分钟的当前片段被丢弃，设置里的 Timeline 看不到更新。
+- 修复：`TimelineRecorder` 新增状态导出/恢复；前端把未完成 active/candidate/paused 片段暂存到 localStorage，采样器重建后继续累计同一段。
+- 边界：暂存状态和 Timeline 最小时长绑定，过期后自动丢弃；聊天/设置窗口重建不再让正在累计的前台窗口从 0 开始。
+- 测试：新增“采样器重启后恢复未完成片段”的单元测试，覆盖 4 分钟重启后继续到 6 分钟以上落库的场景。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, ISSUES.md, PROGRESS.md

@@ -34,6 +34,12 @@ export type TimelineDebugPayload = Record<string, unknown> & {
   stage: string;
 };
 
+export type TimelineRecorderState = {
+  active: TimelineSegmentState;
+  candidate: TimelineSegmentState;
+  paused: TimelineSegmentState;
+};
+
 const IGNORED_TIMELINE_APPS = new Set(['desksprite', 'pawpal', 'electron']);
 
 type TimelineSegmentState = {
@@ -109,8 +115,26 @@ export class TimelineRecorder {
     minSegmentMs: number;
     persist: (payload: TimelinePersistPayload) => Promise<TimelinePersistResult>;
     log?: (payload: TimelineDebugPayload) => void;
+    initialState?: Partial<TimelineRecorderState> | null;
   }) {
     this.options = options;
+    if (options.initialState) {
+      this.active = normalizeSegmentState(options.initialState.active);
+      this.candidate = normalizeSegmentState(options.initialState.candidate);
+      this.paused = normalizeSegmentState(options.initialState.paused);
+      if (this.active.key) {
+        this.log({
+          stage: 'restore',
+          message: 'Timeline active segment restored',
+          appName: this.active.appName,
+          windowTitle: this.active.windowTitle,
+          url: this.active.url,
+          key: this.active.key,
+          durationMs: this.active.lastSeenAt - this.active.firstSeenAt,
+          minSegmentMs: this.options.minSegmentMs,
+        });
+      }
+    }
   }
 
   async handleSnapshot(snapshot: TimelineSnapshot, checkedAt = Date.now()) {
@@ -229,6 +253,14 @@ export class TimelineRecorder {
     this.paused = emptySegment();
   }
 
+  getState(): TimelineRecorderState {
+    return {
+      active: cloneSegment(this.active),
+      candidate: cloneSegment(this.candidate),
+      paused: cloneSegment(this.paused),
+    };
+  }
+
   async handleBackgroundMarkers(markers: TimelineBackgroundMarker[] | undefined, checkedAt = Date.now()) {
     if (!markers || markers.length === 0 || !this.paused.key) return;
     this.paused.backgroundMarkers = mergeBackgroundMarkers(this.paused.backgroundMarkers, markers, checkedAt);
@@ -306,4 +338,35 @@ export class TimelineRecorder {
   private log(payload: TimelineDebugPayload) {
     this.options.log?.(payload);
   }
+}
+
+function cloneSegment(segment: TimelineSegmentState): TimelineSegmentState {
+  return {
+    ...segment,
+    backgroundMarkers: segment.backgroundMarkers.map((marker) => ({ ...marker })),
+  };
+}
+
+function normalizeSegmentState(value: unknown): TimelineSegmentState {
+  if (!value || typeof value !== 'object') return emptySegment();
+  const source = value as Partial<TimelineSegmentState>;
+  if (typeof source.key !== 'string' || !source.key) return emptySegment();
+  return {
+    key: source.key,
+    firstSeenAt: typeof source.firstSeenAt === 'number' && Number.isFinite(source.firstSeenAt) ? source.firstSeenAt : 0,
+    lastSeenAt: typeof source.lastSeenAt === 'number' && Number.isFinite(source.lastSeenAt) ? source.lastSeenAt : 0,
+    segmentId: typeof source.segmentId === 'number' ? source.segmentId : null,
+    appName: typeof source.appName === 'string' ? source.appName : 'Unknown',
+    windowTitle: typeof source.windowTitle === 'string' ? source.windowTitle : '',
+    url: typeof source.url === 'string' ? source.url : null,
+    backgroundMarkers: Array.isArray(source.backgroundMarkers)
+      ? source.backgroundMarkers.map((marker) => ({
+        type: String(marker?.type ?? ''),
+        name: String(marker?.name ?? ''),
+        detail: String(marker?.detail ?? ''),
+        startedAt: typeof marker?.startedAt === 'string' ? marker.startedAt : undefined,
+        endedAt: typeof marker?.endedAt === 'string' ? marker.endedAt : undefined,
+      })).filter((marker) => marker.type && marker.name)
+      : [],
+  };
 }

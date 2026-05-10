@@ -153,3 +153,33 @@ test('does not persist unsupported/error snapshots or below-threshold segments',
   assert.ok(logs.some((item) => item.stage === 'sample:skip'));
   assert.ok(logs.some((item) => item.stage === 'persist:skip'));
 });
+
+test('restores an unfinished active segment after sampler restart', async () => {
+  const first = createHarness(360_000);
+
+  await first.recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
+  await first.recorder.handleSnapshot(snapshot('Codex', 'Codex'), 240_000);
+  const state = first.recorder.getState();
+  await first.recorder.stop(240_000);
+
+  assert.equal(first.persisted.length, 0);
+
+  const persisted: TimelinePersistPayload[] = [];
+  const logs: TimelineDebugPayload[] = [];
+  const restored = new TimelineRecorder({
+    minSegmentMs: 360_000,
+    initialState: state,
+    log: (payload) => logs.push(payload),
+    persist: async (payload): Promise<TimelinePersistResult> => {
+      persisted.push({ ...payload, backgroundMarkers: payload.backgroundMarkers.map((marker) => ({ ...marker })) });
+      return { id: payload.id ?? 1, date: new Date(payload.endedAt).toISOString().slice(0, 10) };
+    },
+  });
+
+  await restored.handleSnapshot(snapshot('Codex', 'Codex'), 390_000);
+
+  assert.equal(persisted.length, 1);
+  assert.equal(persisted[0].startedAt, 0);
+  assert.equal(persisted[0].endedAt, 390_000);
+  assert.ok(logs.some((item) => item.stage === 'restore'));
+});

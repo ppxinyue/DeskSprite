@@ -2663,3 +2663,15 @@
 - 涉及文件：`src/App.tsx`, `src/i18n.ts`, `src/features/chat/ChatPrimitives.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：多窗口 Electron 应用的国际化入口应先落在设置和全局渲染层，保留中文源文案，后续再按模块补充更细粒度 key。
 - 是否需更新技术文档：否。
+
+## ISSUE-224
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Timeline 采样器重启后续记当前片段
+- 严重程度：一般
+- 问题现象：用户持续使用 Codex，但设置里的 Timeline 没有更新；日志中反复出现 `start Timeline sampler started min=360s`、`stop Timeline sampler stopped`、`persist:skip no active segment`。
+- 原因分析：Timeline 最小时长为 6 分钟时，开发态 HMR、设置窗口重建或采样器 effect 重启会销毁 `TimelineRecorder` 实例；未达阈值的 active 片段只存在内存里，重建后累计时间从 0 开始，导致一直无法跨过阈值落库。
+- 解决方案：给 `TimelineRecorder` 增加 `getState()` 和 `initialState` 恢复能力；前端把未完成片段暂存到 localStorage，并在采样器重建后恢复继续累计；新增单元测试覆盖重启续记。
+- 涉及文件：`src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：长时间采样器不能只依赖 React effect 内存态，至少要保存“未完成但有价值”的当前片段，避免窗口/HMR/设置变更造成统计断档。
+- 是否需更新技术文档：否。
