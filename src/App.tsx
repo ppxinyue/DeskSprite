@@ -2244,7 +2244,13 @@ function PetWindow() {
                 </button>
               </div>
             ) : focusEndAt ? (
-              <div className="pointer-events-none mt-1 text-center text-[11px] font-medium tabular-nums text-muted-foreground drop-shadow-sm">
+              <div
+                className="pointer-events-none mx-auto mt-1 w-fit rounded-[9px] border px-2.5 py-1 text-center text-[11px] font-medium tabular-nums text-muted-foreground shadow-[0_8px_24px_rgba(32,28,22,0.10),0_1px_0_rgba(255,255,255,0.55)_inset] backdrop-blur-md"
+                style={{
+                  background: `color-mix(in srgb, var(--surface-flat) ${Math.round(settings.petOpacity * 88)}%, transparent)`,
+                  borderColor: `color-mix(in srgb, var(--color-chat-border) ${Math.round(settings.petOpacity * 72)}%, transparent)`,
+                }}
+              >
                 {formatCountdown(Math.max(0, focusEndAt - now))}
               </div>
             ) : null}

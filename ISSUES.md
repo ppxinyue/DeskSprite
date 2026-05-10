@@ -2879,3 +2879,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `src/features/chat/sendShortcut.ts`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/i18n.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：输入快捷键这类交互偏好必须抽成共享判断，避免普通 chat 和 coding chat 行为分叉。
 - 是否需更新技术文档：否。
+
+## ISSUE-242
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：专注倒计时背景跟随灵宠透明度
+- 严重程度：轻微
+- 问题现象：专注模式下灵宠下方倒计时是裸文字，没有和灵宠透明度统一的背景承托。
+- 原因分析：休息倒计时此前有独立 UI，而专注倒计时只渲染文本，未接入 `petOpacity` 参数。
+- 解决方案：给专注倒计时增加轻量磨砂背景和边框，并用 `settings.petOpacity` 计算背景/边框混合比例，文字保持不透明。
+- 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：跟随灵宠显示的附属 UI 也应复用同一透明度语义，但不要把文字一起降透明，避免可读性下降。
+- 是否需更新技术文档：否。

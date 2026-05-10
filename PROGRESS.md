@@ -1820,3 +1820,9 @@
 - 英文：补充“发送消息”和发送快捷键说明的英文映射，并复查设置页短中文文案无残留缺口。
 - 验证：`pnpm exec tsc -b --pretty false`、设置页中文残留扫描脚本、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 488.37 kB，未触发 chunk 体积 warning。
 - 文件：App.tsx, ChatDialog.tsx, HoverInputBar.tsx, sendShortcut.ts, SettingsPanel.tsx, settingsStore.ts, i18n.ts, ISSUES.md, PROGRESS.md
+
+### R237. 专注倒计时背景跟随灵宠透明度（2026-05-11）
+- UI：专注模式下灵宠底部倒计时不再是裸文字，新增轻量圆角背景、细边和磨砂阴影。
+- 透明度：倒计时背景和边框使用 `settings.petOpacity` 计算透明度，和灵宠/悬浮球透明度设置保持一致；文字本身保持清晰。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 488.71 kB，未触发 chunk 体积 warning。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md
