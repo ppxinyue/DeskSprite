@@ -2800,14 +2800,6 @@ function AISection({
         <SettingRow label="语音输出">
           <Switch checked={settings.voiceOutput} onCheckedChange={(v) => updateSetting('voiceOutput', v)} />
         </SettingRow>
-        <SettingRow label="语音唤醒" hint="开启后，说出唤醒词即可唤醒灵宠对话">
-          <Switch checked={settings.wakeWordEnabled} onCheckedChange={(v) => updateSetting('wakeWordEnabled', v)} />
-        </SettingRow>
-        {settings.wakeWordEnabled && (
-          <SettingRow label="唤醒词">
-            <EditableInput value={settings.wakeWord} onChange={(value) => updateSetting('wakeWord', value.slice(0, 20))} className="w-48" maxLength={20} />
-          </SettingRow>
-        )}
         <SettingRow label="自动朗读 AI 回复">
           <Switch checked={settings.autoSpeak} onCheckedChange={(v) => updateSetting('autoSpeak', v)} />
         </SettingRow>

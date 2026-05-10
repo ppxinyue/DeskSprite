@@ -1763,3 +1763,10 @@
 - 结果：自定义形象卡片、图片网格、方案切换、恢复默认和动作控制区在英文模式下不再残留这些中文文案。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：i18n.ts, ISSUES.md, PROGRESS.md
+
+### R229. 暂停语音唤醒功能入口（2026-05-10）
+- 设置：从 AI 对话 / Voice Models 中移除 `Voice Wake` 和 `Wake Word` 两个设置项。
+- 逻辑：删除 pet 窗口里的 wake word 后台 SpeechRecognition 监听 effect，功能暂不启动，也不再占用麦克风/语音识别资源。
+- 模型：从 `AppSettings` 和默认设置中移除 `wakeWord`、`wakeWordEnabled` 字段；旧本地存储键会被忽略。
+- 验证：`rg "Voice Wake|Wake Word|语音唤醒|唤醒词|wakeWord|wakeWordEnabled|wake word" src electron` 无结果；`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过。
+- 文件：App.tsx, SettingsPanel.tsx, settingsStore.ts, i18n.ts, ISSUES.md, PROGRESS.md

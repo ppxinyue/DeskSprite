@@ -51,8 +51,6 @@ export interface AppSettings {
   customTtsBaseUrl: string;
   customTtsModel: string;
   customTtsApiKey: string;
-  wakeWord: string;
-  wakeWordEnabled: boolean;
   autoSpeak: boolean;
   speakRate: number;
   launchAtLogin: boolean;
@@ -108,8 +106,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   customTtsBaseUrl: 'https://api.openai-proxy.org/v1',
   customTtsModel: 'tts-1',
   customTtsApiKey: '',
-  wakeWord: '你好灵宠',
-  wakeWordEnabled: false,
   autoSpeak: false,
   speakRate: 1.0,
   launchAtLogin: true,

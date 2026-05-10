@@ -2783,3 +2783,15 @@
 - 涉及文件：`src/i18n.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：设置页国际化不能只看主标题；状态常量、数量单位、confirm/alert、title/aria-label 和组合字符串都需要纳入检查。
 - 是否需更新技术文档：否。
+
+## ISSUE-234
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：暂停语音唤醒功能入口
+- 严重程度：一般
+- 问题现象：AI 对话 / Voice Models 中仍展示 `Voice Wake` 和 `Wake Word`，但用户希望该功能暂时不做。
+- 原因分析：语音唤醒此前已经有 UI、设置字段和 App 后台监听 effect；仅隐藏 UI 会留下后台语音识别逻辑和本地设置字段。
+- 解决方案：删除 Voice Wake / Wake Word 设置行、移除 `wakeWord` / `wakeWordEnabled` 设置字段和默认值，并删除 App 中的 wake word SpeechRecognition effect。
+- 涉及文件：`src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/i18n.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：暂缓功能应同时移除入口和运行逻辑，尤其是会占用麦克风或系统权限的后台监听。
+- 是否需更新技术文档：否。
