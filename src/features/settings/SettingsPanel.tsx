@@ -22,7 +22,7 @@ import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, i
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
-import type { ReactNode } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 
 type SettingsSection = 'profile' | 'appearance' | 'reminders' | 'ai' | 'history' | 'general';
 const ALLOWED_STATIC_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp']);
@@ -222,14 +222,14 @@ function ProfileSection() {
   const statsScrollRef = useRef<HTMLDivElement>(null);
   const scrollStatsChart = (direction: -1 | 1) => {
     setChartEndDate((date) => {
-      const next = shiftDateKey(date, direction * 14);
+      const next = shiftDateKey(date, direction * 7);
       return next > getLocalDateKey() ? getLocalDateKey() : next;
     });
   };
 
   const loadProfileData = useCallback(() => {
     Promise.all([
-      getFocusStatsDays(14, chartEndDate),
+      getFocusStatsDays(7, chartEndDate),
       getTimelineEntries(selectedDate),
     ])
       .then(([nextStats, nextTimeline]) => {
@@ -360,7 +360,7 @@ function ProfileSection() {
           <div>
             <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
-              最近 14 天
+              7 天专注
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground">
               共 {formatFocusDuration(totalFocusMs)} · {totalSessions} 次专注 · {totalDistractions} 次分心
@@ -371,7 +371,7 @@ function ProfileSection() {
               type="button"
               className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
               onClick={() => scrollStatsChart(-1)}
-              aria-label="向左滑动最近 14 天图表"
+              aria-label="向左滑动 7 天专注图"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
             </button>
@@ -380,7 +380,7 @@ function ProfileSection() {
               className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
               onClick={() => scrollStatsChart(1)}
               disabled={chartEndDate >= todayKey}
-              aria-label="向右滑动最近 14 天图表"
+              aria-label="向右滑动 7 天专注图"
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
@@ -388,7 +388,7 @@ function ProfileSection() {
         </div>
 
         <div ref={statsScrollRef} className="overflow-x-auto border-b border-border/55 pb-3 [scrollbar-width:thin]">
-          <div className="flex h-48 min-w-[760px] snap-x snap-mandatory items-end gap-2">
+          <div className="flex h-48 min-w-[420px] snap-x snap-mandatory items-end gap-2">
             {stats.map((day) => {
               const height = Math.max(day.focusMs > 0 ? 10 : 2, (day.focusMs / maxFocusMs) * 140);
               const selected = day.date === selectedDate;
@@ -512,6 +512,7 @@ function TimelineSection({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [backgroundDetail, setBackgroundDetail] = useState<BackgroundMarkerWithTime[] | null>(null);
+  const [hoverCard, setHoverCard] = useState<TimelineHoverCard | null>(null);
   const isMockPreview = entries.some((entry) => entry.id < 0);
   const timelineBlocks = getTimelineBlocks(entries);
   const selectedBlock = timelineBlocks.find((block) => block.entries.some((entry) => entry.id === selectedId)) ?? timelineBlocks.at(-1) ?? null;
@@ -597,7 +598,7 @@ function TimelineSection({
         })}
       </div>
 
-      <div ref={scrollRef} className="overflow-x-auto pb-20 pt-24">
+      <div ref={scrollRef} className="overflow-x-auto pb-2">
         <div className="min-w-[960px]">
           <div className="rounded-[16px] border border-[#dfe3e6] bg-[#f7f8f9] p-4 shadow-[0_1px_0_rgba(255,255,255,0.76)_inset] dark:border-white/10 dark:bg-white/[0.035]">
             <div className="relative h-[74px]">
@@ -611,7 +612,7 @@ function TimelineSection({
                 </div>
               ))}
 
-              <div className="absolute inset-x-0 top-7 h-12 overflow-visible rounded-[15px] border border-[#dde1e4] bg-[#edf0f2] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_10px_24px_rgba(28,32,36,0.04)] dark:border-white/10 dark:bg-white/8">
+              <div className="absolute inset-x-0 top-7 h-12 overflow-hidden rounded-[15px] border border-[#dde1e4] bg-[#edf0f2] shadow-[0_1px_0_rgba(255,255,255,0.9)_inset,0_10px_24px_rgba(28,32,36,0.04)] dark:border-white/10 dark:bg-white/8">
                 {entries.length === 0 ? (
                   <div className="flex h-full items-center justify-center text-[12px] text-muted-foreground">
                     暂无足够长的焦点窗口记录
@@ -623,6 +624,8 @@ function TimelineSection({
                     entries={entries}
                     selected={selectedBlock?.id === block.id}
                     onSelect={() => onSelect(block.entries[0]?.id ?? null)}
+                    onHover={(event, card) => setHoverCard(positionTimelineHoverCard(event, card))}
+                    onLeave={() => setHoverCard(null)}
                   />
                 ))}
               </div>
@@ -636,6 +639,8 @@ function TimelineSection({
                     icon="music"
                     markers={musicMarkers}
                     onInspect={(marker) => setBackgroundDetail(getRelatedBackgroundMarkers(musicMarkers, marker))}
+                    onHover={(event, card) => setHoverCard(positionTimelineHoverCard(event, card))}
+                    onLeave={() => setHoverCard(null)}
                   />
                 )}
                 {terminalMarkers.length > 0 && (
@@ -644,6 +649,8 @@ function TimelineSection({
                     icon="terminal"
                     markers={terminalMarkers}
                     onInspect={(marker) => setBackgroundDetail(getRelatedBackgroundMarkers(terminalMarkers, marker))}
+                    onHover={(event, card) => setHoverCard(positionTimelineHoverCard(event, card))}
+                    onLeave={() => setHoverCard(null)}
                   />
                 )}
               </div>
@@ -750,9 +757,19 @@ function TimelineSection({
           </div>
         </div>
       </div>
+      {hoverCard && <TimelineHoverCardView card={hoverCard} />}
     </SettingsGroup>
   );
 }
+
+type TimelineHoverCard = {
+  x: number;
+  y: number;
+  eyebrow: string;
+  title: string;
+  body: string;
+  time?: string;
+};
 
 type TimelineBlock = {
   id: string;
@@ -763,7 +780,21 @@ type TimelineBlock = {
   entries: TimelineEntry[];
 };
 
-function TimelineSegment({ block, entries, selected, onSelect }: { block: TimelineBlock; entries: TimelineEntry[]; selected: boolean; onSelect: () => void }) {
+function TimelineSegment({
+  block,
+  entries,
+  selected,
+  onSelect,
+  onHover,
+  onLeave,
+}: {
+  block: TimelineBlock;
+  entries: TimelineEntry[];
+  selected: boolean;
+  onSelect: () => void;
+  onHover: (event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y'>) => void;
+  onLeave: () => void;
+}) {
   const meta = TIMELINE_CATEGORY_META[block.category];
   const left = `${getTimelineDayProgress(block.startedAt) * 100}%`;
   const width = `${Math.max(0.35, ((new Date(block.endedAt).getTime() - new Date(block.startedAt).getTime()) / 86_400_000) * 100)}%`;
@@ -783,11 +814,20 @@ function TimelineSegment({ block, entries, selected, onSelect }: { block: Timeli
           : 'inset 1px 0 0 rgba(255,255,255,0.55), inset -1px 0 0 rgba(255,255,255,0.45)',
       }}
       onClick={onSelect}
+      onMouseEnter={(event) => onHover(event, {
+        eyebrow: TIMELINE_CATEGORY_META[block.category].label,
+        title: block.appName,
+        body: topContent,
+        time: `${formatTimelineClock(block.startedAt)} - ${formatTimelineClock(block.endedAt)}`,
+      })}
+      onMouseMove={(event) => onHover(event, {
+        eyebrow: TIMELINE_CATEGORY_META[block.category].label,
+        title: block.appName,
+        body: topContent,
+        time: `${formatTimelineClock(block.startedAt)} - ${formatTimelineClock(block.endedAt)}`,
+      })}
+      onMouseLeave={onLeave}
     >
-      <span className="pointer-events-none absolute bottom-[56px] left-1 hidden w-60 rounded-[12px] border border-[#dfe3e6] bg-white p-2.5 text-left text-[11px] text-[#687076] shadow-[0_14px_40px_rgba(28,32,36,0.16)] group-hover:block dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70">
-        <span className="block font-semibold text-[#1c2024] dark:text-white">{block.appName}</span>
-        <span className="mt-1 block line-clamp-2">{topContent}</span>
-      </span>
     </button>
   );
 }
@@ -803,11 +843,15 @@ function BackgroundTimelineTrack({
   icon,
   markers,
   onInspect,
+  onHover,
+  onLeave,
 }: {
   label: string;
   icon: 'music' | 'terminal';
   markers: BackgroundMarkerWithTime[];
   onInspect: (marker: BackgroundMarkerWithTime) => void;
+  onHover: (event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y'>) => void;
+  onLeave: () => void;
 }) {
   const Icon = icon === 'music' ? Music2 : Terminal;
   return (
@@ -824,6 +868,8 @@ function BackgroundTimelineTrack({
           marker={marker}
           compactLabel={label}
           onInspect={onInspect}
+          onHover={onHover}
+          onLeave={onLeave}
         />
       ))}
     </div>
@@ -834,10 +880,14 @@ function BackgroundTimelineMarker({
   marker,
   compactLabel,
   onInspect,
+  onHover,
+  onLeave,
 }: {
   marker: BackgroundMarkerWithTime;
   compactLabel: string;
   onInspect: (marker: BackgroundMarkerWithTime) => void;
+  onHover: (event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y'>) => void;
+  onLeave: () => void;
 }) {
   const left = `${getTimelineDayProgress(marker.startedAt) * 100}%`;
   const width = `${Math.max(1.2, ((new Date(marker.endedAt).getTime() - new Date(marker.startedAt).getTime()) / 86_400_000) * 100)}%`;
@@ -848,17 +898,44 @@ function BackgroundTimelineMarker({
       className="group/marker absolute top-1/2 h-3.5 -translate-y-1/2"
       style={{ left, width }}
       onClick={() => onInspect(marker)}
+      onMouseEnter={(event) => onHover(event, {
+        eyebrow: compactLabel,
+        title: detail,
+        body: '',
+        time: `${formatTimelineClock(marker.startedAt)} - ${formatTimelineClock(marker.endedAt)}`,
+      })}
+      onMouseMove={(event) => onHover(event, {
+        eyebrow: compactLabel,
+        title: detail,
+        body: '',
+        time: `${formatTimelineClock(marker.startedAt)} - ${formatTimelineClock(marker.endedAt)}`,
+      })}
+      onMouseLeave={onLeave}
     >
       <div className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-[#8b8d98]/36" />
       <div className="relative h-full min-w-[18px] rounded-full bg-[#8b8d98]/18 ring-1 ring-[#8b8d98]/16 transition-colors group-hover/marker:bg-[#8b8d98]/28 dark:ring-white/10" />
-      <div className="pointer-events-none absolute bottom-5 left-0 z-30 hidden w-64 rounded-[9px] border border-[#dfe3e6] bg-white p-2 text-left text-[11px] leading-4 text-[#687076] shadow-[0_14px_38px_rgba(28,32,36,0.16)] group-hover/marker:block dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70">
-        <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#8b8d98]">{compactLabel}</div>
-        <div className="font-medium text-[#3a3d40] dark:text-white/80">{detail}</div>
-        <div className="mt-1 text-[10px] text-[#8b8d98]">
-          {formatTimelineClock(marker.startedAt)} - {formatTimelineClock(marker.endedAt)}
-        </div>
-      </div>
     </button>
+  );
+}
+
+function positionTimelineHoverCard(event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y'>): TimelineHoverCard {
+  const width = 300;
+  const x = Math.min(window.innerWidth - width - 12, Math.max(12, event.clientX + 14));
+  const y = Math.min(window.innerHeight - 132, Math.max(12, event.clientY - 86));
+  return { ...card, x, y };
+}
+
+function TimelineHoverCardView({ card }: { card: TimelineHoverCard }) {
+  return (
+    <div
+      className="pointer-events-none fixed z-[9999] w-[300px] rounded-[14px] border border-[#dfe3e6] bg-white p-3 text-left text-[11px] leading-4 text-[#687076] shadow-[0_18px_54px_rgba(28,32,36,0.20)] dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70"
+      style={{ left: card.x, top: card.y }}
+    >
+      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b8d98]">{card.eyebrow}</div>
+      <div className="text-[13px] font-semibold text-[#1c2024] dark:text-white">{card.title}</div>
+      {card.body && <div className="mt-1 line-clamp-3">{card.body}</div>}
+      {card.time && <div className="mt-2 text-[11px] text-[#8b8d98]">{card.time}</div>}
+    </div>
   );
 }
 

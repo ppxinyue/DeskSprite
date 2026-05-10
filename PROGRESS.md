@@ -1497,3 +1497,11 @@
 - 测试：新增 timeline 暂停前台但延展后台 marker 的单元测试。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R192. 7 天专注图与 Timeline Hover 浮层（2026-05-10）
+- 专注图：个人档案的“最近 14 天”改为“7 天专注”，默认显示最近 7 天。
+- 日期窗口：左右按钮每次翻动 7 天；日历选择日期后，图表直接跳到以该日期为结束日的 7 天窗口。
+- Timeline：移除为 hover 卡片预留的大块上下空白，主条带恢复紧凑排版。
+- Hover：主 task 和后台进程的 hover 详情改为 fixed 浮层覆盖显示，不再依赖轨道内部空间，避免被滚动容器或圆角条带裁切。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

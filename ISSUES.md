@@ -2339,3 +2339,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：统计类计时不能只看 wall-clock，必须把系统休眠/锁屏视为暂停；时间轴的标签和 tooltip 应该独立于滚动内容的裁切层。
 - 是否需更新技术文档：否。
+
+## ISSUE-197
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：7 天专注图与 Timeline Hover 浮层
+- 严重程度：一般
+- 问题现象：个人档案专注图仍以 14 天为单位展示，用户希望按任意 7 天窗口查看；timeline 条带上下为了 hover 详情预留过多空白，视觉不够紧凑。
+- 原因分析：专注图的数据窗口和翻页步长都固定为 14 天；timeline hover 卡片之前放在滚动条带内部，为避免裁切只能增加 `pt/pb` 留白。
+- 解决方案：专注图改为 7 天窗口，翻页步长为 7 天，日历选择日期时同步设置该日期为窗口结束日；timeline hover 详情改为 fixed 浮层覆盖显示，条带容器恢复紧凑 padding。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：hover 详情不应通过增加布局留白解决遮挡，应该脱离裁切层作为浮层展示。
+- 是否需更新技术文档：否。
