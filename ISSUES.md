@@ -2231,3 +2231,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/lib/db.ts`, `src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：时间轴采样需要区分“观测到短暂切换”和“确认切换”；hover 提示只能保留一套系统，避免浏览器原生 tooltip 干扰设计。
 - 是否需更新技术文档：否。
+
+## ISSUE-188
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Timeline 采集链路实时 Debug 日志
+- 严重程度：重要
+- 问题现象：用户试用后今天 timeline 仍然没有记录，需要知道采样器实时采到了什么、为什么没有落库。
+- 原因分析：当前采样链路跨 renderer、本地存储和 Electron 主进程，失败可能发生在 Accessibility 权限、osascript 返回、最小时长判断、candidate 确认、upsert 落库或设置页读取任一环节；缺少 terminal 级别的实时采样日志。
+- 解决方案：新增主进程 timeline debug log 命令；osascript 采样成功/失败直接打印；renderer 采样器在 active/candidate/persist 的每个关键状态向 terminal 打印结构化日志。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：跨进程采集功能必须有可观测性，尤其是依赖系统权限和时间阈值的记录逻辑。
+- 是否需更新技术文档：否。

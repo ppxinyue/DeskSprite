@@ -1425,3 +1425,12 @@
 - 分心统计：专注模式记录分心 app、次数和估算时长，并在个人档案中列出。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：main.cjs, App.tsx, db.ts, settingsStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R183. Timeline 采集链路实时 Debug 日志（2026-05-10）
+- Debug：主进程新增 `timeline_debug_log` 命令，统一将 timeline 采集状态打印到启动应用的 terminal。
+- 采样日志：`read_timeline_active_window` 每次 osascript 成功/失败都会打印前台 app、窗口标题、URL 或错误。
+- 状态日志：renderer 采样器会打印 accessibility 权限、sample key、active start、candidate start/hold/confirm/discard、persist skip/ok/null 和 stop。
+- 排查目标：用于确认今天 timeline 为空到底是权限失败、采样为空、未达到最小时长、candidate 未确认，还是 upsert 未落库。
+- 当前真实方案：每 3 秒采样；同 app/URL 维持 active；不同 app/URL 先进入 candidate；candidate 连续达到设置的最小时长才确认切换；短切屏被丢弃且不打断 active。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md

@@ -414,6 +414,7 @@ function readActiveWindow() {
   return new Promise((resolve) => {
     execFile('/usr/bin/osascript', ['-e', activeWindowScript()], { timeout: 2500 }, (error, stdout) => {
       if (error) {
+        timelineDebugLog({ stage: 'osascript:error', error: error.message || String(error) });
         resolve({
           supported: true,
           appName: '',
@@ -463,6 +464,12 @@ function readTimelineActiveWindow() {
         return;
       }
       const [appName = '', windowTitle = '', url = '', ...backgroundParts] = String(stdout || '').trimEnd().split('\n');
+      timelineDebugLog({
+        stage: 'osascript:sample',
+        appName: appName.trim(),
+        windowTitle: windowTitle.trim(),
+        url: url.trim(),
+      });
       resolve({
         supported: true,
         appName: appName.trim(),
@@ -480,6 +487,21 @@ function ensureAccessibilityPermission() {
   if (process.platform !== 'darwin') return { supported: false, trusted: false };
   const trusted = systemPreferences.isTrustedAccessibilityClient(true);
   return { supported: true, trusted };
+}
+
+function timelineDebugLog(payload = {}) {
+  const nowLabel = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+  const stage = payload.stage || 'log';
+  const message = payload.message || '';
+  const appName = payload.appName ? ` app=${JSON.stringify(payload.appName)}` : '';
+  const title = payload.windowTitle ? ` title=${JSON.stringify(payload.windowTitle)}` : '';
+  const url = payload.url ? ` url=${JSON.stringify(payload.url)}` : '';
+  const key = payload.key ? ` key=${JSON.stringify(payload.key)}` : '';
+  const duration = typeof payload.durationMs === 'number' ? ` duration=${Math.round(payload.durationMs / 1000)}s` : '';
+  const min = typeof payload.minSegmentMs === 'number' ? ` min=${Math.round(payload.minSegmentMs / 1000)}s` : '';
+  const error = payload.error ? ` error=${JSON.stringify(payload.error)}` : '';
+  console.log(`[timeline ${nowLabel}] ${stage}${message ? ` ${message}` : ''}${appName}${title}${url}${key}${duration}${min}${error}`);
+  return true;
 }
 
 function listContainsAny(text, keywords) {
@@ -2264,6 +2286,7 @@ const handlers = {
   can_start_speech_recognition: () => true,
   check_distraction: checkDistraction,
   ensure_accessibility_permission: ensureAccessibilityPermission,
+  timeline_debug_log: timelineDebugLog,
   read_timeline_active_window: readTimelineActiveWindow,
   get_launch_at_login: () => app.getLoginItemSettings().openAtLogin,
   set_launch_at_login: ({ enabled }) => {

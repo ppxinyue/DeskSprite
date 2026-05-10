@@ -71,6 +71,10 @@ function getTimelineSnapshotKey(appName: string, windowTitle: string, url: strin
   return normalizedApp;
 }
 
+function timelineDebugLog(payload: Record<string, unknown>) {
+  invoke('timeline_debug_log', payload).catch(() => {});
+}
+
 function App() {
   const [windowLabel, setWindowLabel] = useState<string>(() => getCurrentWindow().label);
   const { settings, loaded, loadSettings } = useSettingsStore();
@@ -1581,8 +1585,14 @@ function PetWindow() {
   }, [dialogOpen, positionCompactChatWindow]);
 
   useEffect(() => {
-    if (!settings.timelineRecordingEnabled) return;
-    if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
+    if (!settings.timelineRecordingEnabled) {
+      timelineDebugLog({ stage: 'disabled', message: 'Timeline recording is off' });
+      return;
+    }
+    if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) {
+      timelineDebugLog({ stage: 'unsupported', message: `platform=${navigator.platform}` });
+      return;
+    }
     let disposed = false;
     let useFallbackSnapshot = false;
     let accessibilityChecked = false;
@@ -1623,9 +1633,27 @@ function PetWindow() {
       backgroundMarkers: [],
     };
     const minSegmentMs = Math.max(1, Math.min(20, settings.timelineMinSegmentMinutes)) * 60_000;
+    timelineDebugLog({ stage: 'start', message: 'Timeline sampler started', minSegmentMs });
 
     const persistActive = async (endedAt = Date.now()) => {
-      if (!activeRef.key || endedAt - activeRef.firstSeenAt < minSegmentMs) return;
+      if (!activeRef.key) {
+        timelineDebugLog({ stage: 'persist:skip', message: 'no active segment' });
+        return;
+      }
+      const durationMs = endedAt - activeRef.firstSeenAt;
+      if (durationMs < minSegmentMs) {
+        timelineDebugLog({
+          stage: 'persist:skip',
+          message: 'active segment below minimum',
+          appName: activeRef.appName,
+          windowTitle: activeRef.windowTitle,
+          url: activeRef.url,
+          key: activeRef.key,
+          durationMs,
+          minSegmentMs,
+        });
+        return;
+      }
       const entry = await upsertTimelineEntry({
         id: activeRef.segmentId,
         startedAt: activeRef.firstSeenAt,
@@ -1637,7 +1665,26 @@ function PetWindow() {
       });
       if (entry) {
         activeRef.segmentId = entry.id;
+        timelineDebugLog({
+          stage: 'persist:ok',
+          message: `entry=${entry.id}`,
+          appName: activeRef.appName,
+          windowTitle: activeRef.windowTitle,
+          url: activeRef.url,
+          key: activeRef.key,
+          durationMs,
+          minSegmentMs,
+        });
         emit('profile:data-updated', { kind: 'timeline', date: entry.date }).catch(() => {});
+      } else {
+        timelineDebugLog({
+          stage: 'persist:null',
+          message: 'upsert returned null',
+          appName: activeRef.appName,
+          key: activeRef.key,
+          durationMs,
+          minSegmentMs,
+        });
       }
     };
 
@@ -1697,15 +1744,31 @@ function PetWindow() {
       try {
         if (!accessibilityChecked) {
           accessibilityChecked = true;
-          await invoke('ensure_accessibility_permission').catch(() => {});
+          const permission = await invoke<{ supported: boolean; trusted: boolean }>('ensure_accessibility_permission').catch((error) => {
+            timelineDebugLog({ stage: 'accessibility:error', error: error instanceof Error ? error.message : String(error) });
+            return null;
+          });
+          if (permission) timelineDebugLog({ stage: 'accessibility', message: `trusted=${permission.trusted}` });
         }
         const result = await readTimelineSnapshot();
-        if (disposed || !result.supported || result.error) return;
+        if (disposed) return;
+        if (!result.supported || result.error) {
+          timelineDebugLog({ stage: 'sample:skip', message: 'unsupported or error', error: result.error ?? 'unsupported' });
+          return;
+        }
         const appName = result.appName?.trim() || 'Unknown';
         const windowTitle = result.windowTitle?.trim() || '';
         const url = result.url?.trim() || null;
         const key = getTimelineSnapshotKey(appName, windowTitle, url);
         const checkedAt = Date.now();
+        timelineDebugLog({
+          stage: 'sample',
+          appName,
+          windowTitle,
+          url,
+          key,
+          message: `background=${result.background?.length ?? 0}`,
+        });
         if (!activeRef.key) {
           activeRef.key = key;
           activeRef.firstSeenAt = checkedAt;
@@ -1715,6 +1778,14 @@ function PetWindow() {
           activeRef.windowTitle = windowTitle;
           activeRef.url = url;
           activeRef.backgroundMarkers = mergeBackgroundMarkers([], result.background, checkedAt);
+          timelineDebugLog({
+            stage: 'active:start',
+            appName,
+            windowTitle,
+            url,
+            key,
+            minSegmentMs,
+          });
           return;
         }
         if (activeRef.key !== key) {
@@ -1726,13 +1797,42 @@ function PetWindow() {
             candidateRef.windowTitle = windowTitle;
             candidateRef.url = url;
             candidateRef.backgroundMarkers = mergeBackgroundMarkers([], result.background, checkedAt);
+            timelineDebugLog({
+              stage: 'candidate:start',
+              appName,
+              windowTitle,
+              url,
+              key,
+              message: 'different from active',
+              minSegmentMs,
+            });
             return;
           }
           candidateRef.lastSeenAt = checkedAt;
           candidateRef.windowTitle = windowTitle;
           candidateRef.url = url;
           candidateRef.backgroundMarkers = mergeBackgroundMarkers(candidateRef.backgroundMarkers, result.background, checkedAt);
-          if (checkedAt - candidateRef.firstSeenAt < minSegmentMs) return;
+          if (checkedAt - candidateRef.firstSeenAt < minSegmentMs) {
+            timelineDebugLog({
+              stage: 'candidate:hold',
+              appName,
+              windowTitle,
+              url,
+              key,
+              durationMs: checkedAt - candidateRef.firstSeenAt,
+              minSegmentMs,
+            });
+            return;
+          }
+          timelineDebugLog({
+            stage: 'candidate:confirm',
+            appName,
+            windowTitle,
+            url,
+            key,
+            durationMs: checkedAt - candidateRef.firstSeenAt,
+            minSegmentMs,
+          });
           await persistActive(candidateRef.firstSeenAt);
           activeRef.key = candidateRef.key;
           activeRef.firstSeenAt = candidateRef.firstSeenAt;
@@ -1745,6 +1845,18 @@ function PetWindow() {
           candidateRef.key = '';
           return;
         }
+        if (candidateRef.key) {
+          timelineDebugLog({
+            stage: 'candidate:discard',
+            message: 'returned to active before minimum',
+            appName: candidateRef.appName,
+            windowTitle: candidateRef.windowTitle,
+            url: candidateRef.url,
+            key: candidateRef.key,
+            durationMs: candidateRef.lastSeenAt - candidateRef.firstSeenAt,
+            minSegmentMs,
+          });
+        }
         candidateRef.key = '';
         activeRef.lastSeenAt = checkedAt;
         activeRef.windowTitle = windowTitle;
@@ -1752,6 +1864,7 @@ function PetWindow() {
         activeRef.backgroundMarkers = mergeBackgroundMarkers(activeRef.backgroundMarkers, result.background, checkedAt);
         await persistActive(checkedAt);
       } catch (error) {
+        timelineDebugLog({ stage: 'error', error: error instanceof Error ? error.message : String(error) });
         if (!disposed) console.warn('Failed to record timeline:', error);
       }
     };
@@ -1761,6 +1874,7 @@ function PetWindow() {
     return () => {
       disposed = true;
       window.clearInterval(timer);
+      timelineDebugLog({ stage: 'stop', message: 'Timeline sampler stopped' });
       persistActive(activeRef.lastSeenAt || Date.now()).catch(() => {});
     };
   }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes]);
