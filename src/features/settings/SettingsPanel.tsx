@@ -475,24 +475,44 @@ function DistractionAppsPanel({ apps }: { apps: Record<string, { count: number; 
     .map(([appName, value]) => ({ appName, ...value }))
     .sort((a, b) => b.count - a.count || b.durationMs - a.durationMs)
     .slice(0, 6);
-  if (items.length === 0) return null;
+  const maxCount = Math.max(1, ...items.map((item) => item.count));
   return (
     <SettingsGroup className="px-4 py-4">
-      <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-foreground">
-        <Monitor className="h-4 w-4 text-muted-foreground" />
-        分心软件
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+          <Monitor className="h-4 w-4 text-muted-foreground" />
+          分心软件排行
+        </div>
+        {items.length > 0 && (
+          <div className="text-[11px] text-[#687076] dark:text-white/56">
+            {items.reduce((sum, item) => sum + item.count, 0)} 次 · {formatTimelineDuration(items.reduce((sum, item) => sum + item.durationMs, 0))}
+          </div>
+        )}
       </div>
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div key={item.appName} className="grid grid-cols-[96px_1fr_72px] items-center gap-2 text-[11px]">
-            <div className="truncate font-medium text-[#3a3d40] dark:text-white/74">{item.appName}</div>
+
+      <div className="overflow-hidden rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] dark:border-white/10 dark:bg-white/[0.035]">
+        {items.length === 0 ? (
+          <div className="px-3 py-5 text-center text-[12px] text-[#687076] dark:text-white/56">
+            这一天还没有记录到分心软件
+          </div>
+        ) : items.map((item, index) => (
+          <div key={item.appName} className="grid grid-cols-[28px_minmax(82px,1fr)_minmax(120px,1.4fr)_86px] items-center gap-3 border-b border-[#e6e8eb] px-3 py-2.5 text-[11px] last:border-b-0 dark:border-white/10">
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#eef0f2] text-[10px] font-semibold text-[#687076] dark:bg-white/8 dark:text-white/58">
+              {index + 1}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-[12px] font-semibold text-[#1c2024] dark:text-white/84">{item.appName}</div>
+              <div className="mt-0.5 text-[10px] text-[#8b8d98] dark:text-white/42">累计 {formatTimelineDuration(item.durationMs)}</div>
+            </div>
             <div className="h-2 overflow-hidden rounded-full bg-[#eceef0] dark:bg-white/8">
               <div
-                className="h-full rounded-full bg-[#ff5f57]/70"
-                style={{ width: `${Math.max(8, Math.min(100, item.count * 18))}%` }}
+                className="h-full rounded-full bg-[#ff5f57]/72"
+                style={{ width: `${Math.max(6, (item.count / maxCount) * 100)}%` }}
               />
             </div>
-            <div className="text-right text-[#687076]">{item.count} 次 · {formatTimelineDuration(item.durationMs)}</div>
+            <div className="text-right text-[12px] font-semibold text-[#3a3d40] dark:text-white/76">
+              {item.count} 次
+            </div>
           </div>
         ))}
       </div>

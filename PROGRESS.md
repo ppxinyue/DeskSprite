@@ -1518,3 +1518,10 @@
 - 摘要：平均每日专注、最高单日专注、平均分心次数合并为一个整体分组，取消漂浮小卡片感。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R195. 分心软件排行卡片（2026-05-10）
+- 分心统计：个人档案新增明确的“分心软件排行”卡片，按次数排序展示软件名、次数和累计分心时长。
+- 视觉：排行卡片使用和 timeline 一致的 Apple/Radix 低对比容器、分隔线、灰色比例条和红色强调条。
+- 空态：没有分心数据时仍显示卡片空态，避免页面布局跳变。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
