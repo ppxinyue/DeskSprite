@@ -384,61 +384,49 @@ function ProfileSection() {
           </div>
         </div>
 
-        <div ref={statsScrollRef} className="overflow-x-auto border-b border-[#e6e8eb] pb-3 [scrollbar-width:thin] dark:border-white/10">
-          <div className="min-w-[520px] rounded-[14px] border border-[#dfe3e6] bg-[#f7f8f9] p-3 dark:border-white/10 dark:bg-white/[0.035]">
-            <div className="flex h-36 items-end gap-2 rounded-[10px] bg-[#eef0f2]/55 px-2 pb-2 pt-3 dark:bg-white/[0.035]">
-              {stats.map((day) => {
-                const height = Math.max(day.focusMs > 0 ? 12 : 2, (day.focusMs / maxFocusMs) * 104);
-                const selected = day.date === selectedDate;
-                return (
-                  <button
-                    key={day.date}
-                    data-focus-date={day.date}
-                    type="button"
-                    className="group flex min-w-[28px] flex-1 items-end justify-center"
-                    onClick={() => {
-                      setSelectedDate(day.date);
-                      setChartEndDate(day.date > todayKey ? todayKey : day.date);
-                    }}
-                    title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
-                  >
+        <div ref={statsScrollRef} className="overflow-x-auto border-b border-[#e6e8eb] pb-2 [scrollbar-width:thin] dark:border-white/10">
+          <div className="flex min-w-max items-end gap-1.5 rounded-[12px] border border-[#dfe3e6] bg-[#f7f8f9] px-2 py-2 dark:border-white/10 dark:bg-white/[0.035]">
+            {stats.map((day) => {
+              const height = Math.max(day.focusMs > 0 ? 8 : 2, (day.focusMs / maxFocusMs) * 72);
+              const selected = day.date === selectedDate;
+              return (
+                <button
+                  key={day.date}
+                  data-focus-date={day.date}
+                  type="button"
+                  className={`group flex min-w-[46px] flex-col items-center justify-end rounded-[8px] px-1.5 pb-1 pt-2 transition-colors ${
+                    selected ? 'bg-white shadow-sm dark:bg-white/9' : 'hover:bg-white/55 dark:hover:bg-white/7'
+                  }`}
+                  onClick={() => {
+                    setSelectedDate(day.date);
+                    setChartEndDate(day.date > todayKey ? todayKey : day.date);
+                  }}
+                  title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
+                >
+                  <span className="flex h-[76px] w-full items-end justify-center">
                     <span
-                      className={`w-full max-w-9 rounded-t-[6px] transition-all duration-200 ${
-                        selected ? 'bg-[#697177] dark:bg-white/58' : 'bg-[#c1c8cd] group-hover:bg-[#8b8d98] dark:bg-white/18 dark:group-hover:bg-white/34'
+                      className={`w-5 rounded-t-[5px] transition-all duration-200 ${
+                        selected ? 'bg-[#697177] dark:bg-white/58' : 'bg-[#b8c0c6] group-hover:bg-[#8b8d98] dark:bg-white/18 dark:group-hover:bg-white/34'
                       }`}
                       style={{ height }}
                     />
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-2 flex gap-2 px-2">
-              {stats.map((day) => {
-                const selected = day.date === selectedDate;
-                return (
-                  <button
-                    key={`label-${day.date}`}
-                    type="button"
-                    className={`min-w-0 flex-1 rounded-[6px] py-1 text-center text-[10px] leading-none transition-colors ${
-                      selected ? 'bg-white text-[#1c2024] shadow-sm dark:bg-white/10 dark:text-white' : 'text-[#8b8d98] hover:bg-white/55 hover:text-[#3a3d40] dark:hover:bg-white/7'
-                    }`}
-                    onClick={() => {
-                      setSelectedDate(day.date);
-                      setChartEndDate(day.date > todayKey ? todayKey : day.date);
-                    }}
-                  >
+                  </span>
+                  <span className={`mt-1 text-[9px] leading-none ${selected ? 'text-[#3a3d40] dark:text-white/82' : 'text-[#8b8d98] dark:text-white/42'}`}>
+                    {formatChartDateLabel(day.date)}
+                  </span>
+                  <span className={`mt-0.5 text-[8px] leading-none ${selected ? 'text-[#697177] dark:text-white/58' : 'text-[#a0a6ad] dark:text-white/30'}`}>
                     {formatWeekdayShort(day.date)}
-                  </button>
-                );
-              })}
-            </div>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div className="mt-3 grid gap-0 overflow-hidden rounded-[12px] border border-[#dfe3e6] bg-[#fbfcfd] dark:border-white/10 dark:bg-white/[0.035] sm:grid-cols-3">
-          <MiniMetric label="平均每日专注" value={formatFocusDuration(totalFocusMs / Math.max(1, stats.length))} />
-          <MiniMetric label="最高单日专注" value={formatFocusDuration(Math.max(0, ...stats.map((day) => day.focusMs)))} />
-          <MiniMetric label="平均分心次数" value={`${(totalDistractions / Math.max(1, stats.length)).toFixed(1)} 次`} />
+          <MiniMetric label="平均每日专注" value={formatFocusDuration(totalFocusMs / Math.max(1, focusWindowStats.length))} />
+          <MiniMetric label="最高单日专注" value={formatFocusDuration(Math.max(0, ...focusWindowStats.map((day) => day.focusMs)))} />
+          <MiniMetric label="平均分心次数" value={`${(totalDistractions / Math.max(1, focusWindowStats.length)).toFixed(1)} 次`} />
         </div>
       </SettingsGroup>
 
@@ -1604,6 +1592,11 @@ function formatMonthHeading(monthKey: string): string {
 
 function formatWeekdayShort(dateKey: string): string {
   return new Date(`${dateKey}T00:00:00`).toLocaleDateString('zh-CN', { weekday: 'short' }).replace('周', '');
+}
+
+function formatChartDateLabel(dateKey: string): string {
+  const [, month, day] = dateKey.split('-');
+  return `${Number(month)}/${Number(day)}`;
 }
 
 function formatFocusDuration(ms: number): string {

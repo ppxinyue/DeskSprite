@@ -1533,3 +1533,11 @@
 - 视觉：7 天专注柱子的选中态从硬黑改为柔和 Radix 灰，降低视觉突兀感。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R197. 7 天专注图轻量化与日期坐标（2026-05-10）
+- 修复：7 天专注图去掉独立的第二排 label button，避免视觉上像 14 个 bar。
+- 坐标：每个日期单元下方直接显示 `月/日` 和星期，横坐标有明确日期信息。
+- 视觉：压缩图表高度、padding 和柱宽，改为单层轻量面板，减少臃肿感。
+- 统计：平均每日专注、最高单日专注、平均分心次数统一按选中日及前 6 天窗口计算。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
