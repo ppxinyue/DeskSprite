@@ -181,7 +181,12 @@ const EN: Record<string, string> = {
   '其他': 'Other',
   '通知': 'Notifications',
   '记录': 'Record',
+  '记录达到最小时长的前台窗口，浏览器会尽量保留当前网站': 'Records foreground windows that reach the minimum duration. Browser entries try to keep the current site.',
   '软件': 'App',
+  '段': 'segments',
+  '个 task': 'tasks',
+  '共': 'Total',
+  '累计': 'Total',
   '分钟': 'min',
   '小时': 'h',
   '天专注': 'days focused',
@@ -256,6 +261,13 @@ const EN: Record<string, string> = {
   '单窗口': 'Single Window',
   '横向并排': 'Side by Side',
   '纵向并排': 'Stacked',
+  '日': 'Sun',
+  '一': 'Mon',
+  '二': 'Tue',
+  '三': 'Wed',
+  '四': 'Thu',
+  '五': 'Fri',
+  '六': 'Sat',
 };
 
 const ZH_BY_EN = new Map(Object.entries(EN).map(([zh, en]) => [en, zh]));
@@ -264,7 +276,7 @@ export function translateText(language: AppLanguage | undefined, text: string): 
   if (!text) return text;
   const trimmed = text.trim();
   if (!trimmed) return text;
-  if (language === 'en') return preserveOuterWhitespace(text, EN[trimmed] ?? text);
+  if (language === 'en') return preserveOuterWhitespace(text, EN[trimmed] ?? translateDynamicEnglish(text));
   return preserveOuterWhitespace(text, ZH_BY_EN.get(trimmed) ?? text);
 }
 
@@ -330,4 +342,31 @@ function preserveOuterWhitespace(source: string, translated: string): string {
   const leading = source.match(/^\s*/)?.[0] ?? '';
   const trailing = source.match(/\s*$/)?.[0] ?? '';
   return `${leading}${translated}${trailing}`;
+}
+
+function translateDynamicEnglish(text: string): string {
+  if (!/[\u4e00-\u9fff]/.test(text)) return text;
+  let next = text;
+  next = next.replace(/(\d{4})年(\d{1,2})月/g, (_, year, month) => `${monthName(Number(month))} ${year}`);
+  next = next.replace(/(\d{1,2})月(\d{1,2})日/g, (_, month, day) => `${monthName(Number(month))} ${Number(day)}`);
+  next = next.replace(/(\d+)\s*小时\s*(\d+)\s*分钟/g, '$1h $2m');
+  next = next.replace(/(\d+)\s*小时/g, '$1h');
+  next = next.replace(/(\d+)\s*分钟/g, '$1m');
+  next = next.replace(/共\s*/g, 'Total ');
+  next = next.replace(/累计\s*/g, 'Total ');
+  next = next.replace(/分心\s*(\d+)\s*次/g, '$1 distractions');
+  next = next.replace(/(\d+)\s*次专注/g, '$1 focus sessions');
+  next = next.replace(/(\d+)\s*次分心/g, '$1 distractions');
+  next = next.replace(/(\d+)\s*次/g, '$1 times');
+  next = next.replace(/(\d+)\s*段/g, '$1 segments');
+  next = next.replace(/(\d+)\s*个\s*task/gi, '$1 tasks');
+  next = next.replace(/周([日一二三四五六])/g, (_, day) => EN[day] ?? day);
+  return next;
+}
+
+function monthName(month: number): string {
+  return [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ][Math.min(11, Math.max(0, month - 1))] ?? String(month);
 }

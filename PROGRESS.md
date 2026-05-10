@@ -1707,3 +1707,10 @@
 - 测试：新增短暂停顿续记、长暂停断段两个 timeline 单测。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
 - 文件：App.tsx, timelineRecorder.ts, timelineRecorder.test.ts, ISSUES.md, PROGRESS.md
+
+### R221. 个人档案英文动态文案补全（2026-05-10）
+- 修复：英文模式下，个人档案卡片和图表中的动态组合文案仍显示中文的问题。
+- 覆盖：补充 Timeline 说明、星期、段数、task 数、累计/共、次数、分心次数、小时/分钟、中文日期等动态转换规则。
+- 结果：`共 2 小时 · 3 次专注 · 1 次分心`、`累计 15 分钟`、`5月10日`、`3 个 task` 等文本会在英文模式下转换为自然英文表达。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：i18n.ts, ISSUES.md, PROGRESS.md
