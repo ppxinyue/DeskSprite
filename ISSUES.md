@@ -2363,3 +2363,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：图表轴标签不能参与数据图形的尺寸流，应该放在独立轴层。
 - 是否需更新技术文档：否。
+
+## ISSUE-199
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：个人档案统计区 Apple/Radix 化
+- 严重程度：一般
+- 问题现象：7 天专注图和上方统计卡片仍不像下方 timeline 的 Apple/Radix 风格，视觉上有漂浮卡片感，整体不够统一。
+- 原因分析：顶部统计项仍是四个独立 `quiet-card`；7 天专注图沿用普通柱图容器，缺少和 timeline 一致的浅灰底、低对比边框、整体分组和分隔逻辑。
+- 解决方案：统计项改成一个整体分组容器，用分隔线建立层级；7 天专注图改为浅灰面板和独立标签行；下方 mini metrics 合并为一个整体分组。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：同一页面的信息模块要统一“容器语法”，尤其是 Apple/Radix 风格里应减少孤立卡片，更多使用整体面板和弱分隔。
+- 是否需更新技术文档：否。

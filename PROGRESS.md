@@ -1511,3 +1511,10 @@
 - 坐标：x 轴标签从 0/6/12/18 改为每 2 小时一个标签，并下移到柱图下方独立显示。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R194. 个人档案统计区 Apple/Radix 化（2026-05-10）
+- 统计：顶部四个统计卡片改为一个整体分组容器，使用低对比边框、浅灰底和分隔线，和 timeline 面板风格统一。
+- 7 天图：专注图改为浅灰底、低对比边框、统一柱形与独立日期标签行，不再像单独网页图表。
+- 摘要：平均每日专注、最高单日专注、平均分心次数合并为一个整体分组，取消漂浮小卡片感。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

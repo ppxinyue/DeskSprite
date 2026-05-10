@@ -348,11 +348,13 @@ function ProfileSection() {
         </div>
       </div>
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-4">
-        <StatsCard label="专注时长" value={formatFocusDuration(selectedStats.focusMs)} accent />
-        <StatsCard label="专注次数" value={`${selectedStats.focusSessions} 次`} />
-        <StatsCard label="分心次数" value={`${selectedStats.distractions} 次`} />
-        <StatsCard label="Coding 模式时长" value={formatFocusDuration(selectedStats.codingMs ?? 0)} />
+      <div className="mb-4 rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035]">
+        <div className="grid divide-y divide-[#e6e8eb] dark:divide-white/10 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+          <ProfileMetric label="专注时长" value={formatFocusDuration(selectedStats.focusMs)} />
+          <ProfileMetric label="专注次数" value={`${selectedStats.focusSessions} 次`} />
+          <ProfileMetric label="分心次数" value={`${selectedStats.distractions} 次`} />
+          <ProfileMetric label="Coding 模式时长" value={formatFocusDuration(selectedStats.codingMs ?? 0)} />
+        </div>
       </div>
 
       <SettingsGroup className="px-4 py-4">
@@ -387,37 +389,51 @@ function ProfileSection() {
           </div>
         </div>
 
-        <div ref={statsScrollRef} className="overflow-x-auto border-b border-border/55 pb-3 [scrollbar-width:thin]">
-          <div className="flex h-48 min-w-[420px] snap-x snap-mandatory items-end gap-2">
-            {stats.map((day) => {
-              const height = Math.max(day.focusMs > 0 ? 10 : 2, (day.focusMs / maxFocusMs) * 140);
-              const selected = day.date === selectedDate;
-              return (
-                <button
-                  key={day.date}
-                  type="button"
-                  className="group flex min-w-[46px] flex-1 snap-center flex-col items-center justify-end gap-2"
-                  onClick={() => setSelectedDate(day.date)}
-                  title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
-                >
-                  <div className="flex h-[144px] w-full items-end justify-center">
-                    <div
-                      className={`w-full max-w-8 rounded-t-[7px] transition-all duration-200 ${
-                        selected ? 'bg-foreground' : 'bg-foreground/24 group-hover:bg-foreground/42'
+        <div ref={statsScrollRef} className="overflow-x-auto border-b border-[#e6e8eb] pb-3 [scrollbar-width:thin] dark:border-white/10">
+          <div className="min-w-[520px] rounded-[14px] border border-[#dfe3e6] bg-[#f7f8f9] p-3 dark:border-white/10 dark:bg-white/[0.035]">
+            <div className="flex h-36 items-end gap-2 rounded-[10px] bg-[#eef0f2]/55 px-2 pb-2 pt-3 dark:bg-white/[0.035]">
+              {stats.map((day) => {
+                const height = Math.max(day.focusMs > 0 ? 12 : 2, (day.focusMs / maxFocusMs) * 104);
+                const selected = day.date === selectedDate;
+                return (
+                  <button
+                    key={day.date}
+                    type="button"
+                    className="group flex min-w-0 flex-1 items-end justify-center"
+                    onClick={() => setSelectedDate(day.date)}
+                    title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
+                  >
+                    <span
+                      className={`w-full max-w-9 rounded-t-[6px] transition-all duration-200 ${
+                        selected ? 'bg-[#1c2024] dark:bg-white/82' : 'bg-[#c1c8cd] group-hover:bg-[#8b8d98] dark:bg-white/18 dark:group-hover:bg-white/34'
                       }`}
                       style={{ height }}
                     />
-                  </div>
-                  <div className={`text-[10px] leading-none ${selected ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex gap-2 px-2">
+              {stats.map((day) => {
+                const selected = day.date === selectedDate;
+                return (
+                  <button
+                    key={`label-${day.date}`}
+                    type="button"
+                    className={`min-w-0 flex-1 rounded-[6px] py-1 text-center text-[10px] leading-none transition-colors ${
+                      selected ? 'bg-white text-[#1c2024] shadow-sm dark:bg-white/10 dark:text-white' : 'text-[#8b8d98] hover:bg-white/55 hover:text-[#3a3d40] dark:hover:bg-white/7'
+                    }`}
+                    onClick={() => setSelectedDate(day.date)}
+                  >
                     {formatWeekdayShort(day.date)}
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <div className="mt-3 grid gap-0 overflow-hidden rounded-[12px] border border-[#dfe3e6] bg-[#fbfcfd] dark:border-white/10 dark:bg-white/[0.035] sm:grid-cols-3">
           <MiniMetric label="平均每日专注" value={formatFocusDuration(totalFocusMs / Math.max(1, stats.length))} />
           <MiniMetric label="最高单日专注" value={formatFocusDuration(Math.max(0, ...stats.map((day) => day.focusMs)))} />
           <MiniMetric label="平均分心次数" value={`${(totalDistractions / Math.max(1, stats.length)).toFixed(1)} 次`} />
@@ -436,20 +452,20 @@ function ProfileSection() {
   );
 }
 
-function StatsCard({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+function ProfileMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className={`quiet-card rounded-[9px] px-4 py-3 ${accent ? 'shadow-[0_12px_32px_rgba(42,38,31,0.08)]' : ''}`}>
-      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
-      <div className="mt-1 text-[20px] font-semibold tracking-[-0.02em] text-foreground">{value}</div>
+    <div className="px-3 py-2.5">
+      <div className="text-[11px] font-medium text-[#687076] dark:text-white/56">{label}</div>
+      <div className="mt-1 text-[17px] font-semibold tracking-[-0.015em] text-[#1c2024] dark:text-white/88">{value}</div>
     </div>
   );
 }
 
 function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[8px] border border-border/50 px-3 py-2">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-[13px] font-semibold text-foreground">{value}</div>
+    <div className="border-b border-[#e6e8eb] px-3 py-2 last:border-b-0 dark:border-white/10 sm:border-b-0 sm:border-r sm:last:border-r-0">
+      <div className="text-[11px] text-[#687076] dark:text-white/56">{label}</div>
+      <div className="mt-0.5 text-[13px] font-semibold text-[#1c2024] dark:text-white/82">{value}</div>
     </div>
   );
 }
