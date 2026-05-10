@@ -22,7 +22,7 @@ import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, i
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
-import type { MouseEvent, ReactNode } from 'react';
+import type { ComponentProps, MouseEvent, ReactNode } from 'react';
 
 type SettingsSection = 'profile' | 'appearance' | 'reminders' | 'ai' | 'history' | 'general';
 const ALLOWED_STATIC_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp']);
@@ -168,8 +168,78 @@ function AppearanceRow({ label, hint, children }: { label: string; hint?: string
 
 function SettingsGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`quiet-card mb-6 overflow-hidden rounded-[9px] ${className}`}>
+    <div className={`mb-6 overflow-hidden rounded-[16px] border border-[var(--glass-border)] bg-white/38 shadow-[0_1px_0_rgba(255,255,255,0.74)_inset,0_14px_38px_rgba(52,64,84,0.07)] backdrop-blur-[26px] dark:bg-white/[0.045] ${className}`}>
       {children}
+    </div>
+  );
+}
+
+function EditableInput({
+  value,
+  onChange,
+  className,
+  type = 'text',
+  ...props
+}: Omit<ComponentProps<typeof Input>, 'value' | 'onChange'> & {
+  value: string | number;
+  onChange: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <Input
+        {...props}
+        type={type}
+        value={value}
+        readOnly={!editing}
+        onChange={(event) => onChange(event.target.value)}
+        className={className}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 shrink-0 px-2.5 text-[12px]"
+        onClick={() => setEditing((next) => !next)}
+      >
+        {editing ? '完成' : '修改'}
+      </Button>
+    </div>
+  );
+}
+
+function EditableTextarea({
+  value,
+  onChange,
+  className,
+  ...props
+}: Omit<ComponentProps<typeof Textarea>, 'value' | 'onChange'> & {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+
+  return (
+    <div className="grid gap-2">
+      <Textarea
+        {...props}
+        value={value}
+        readOnly={!editing}
+        onChange={(event) => onChange(event.target.value)}
+        className={className}
+      />
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8 px-2.5 text-[12px]"
+          onClick={() => setEditing((next) => !next)}
+        >
+          {editing ? '完成' : '修改'}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1370,20 +1440,20 @@ function RemindersSection({
         <div className="grid gap-3 px-0 py-3 sm:grid-cols-2">
           <div>
             <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽应用</div>
-            <Textarea
+            <EditableTextarea
               value={draft.distractionBlockedApps.join('\n')}
-              onChange={(e) => update('distractionBlockedApps', parseRuleTextarea(e.target.value))}
+              onChange={(value) => update('distractionBlockedApps', parseRuleTextarea(value))}
               rows={6}
-              className="min-h-[132px] text-[12px]"
+              className="min-h-[132px]"
             />
           </div>
           <div>
             <div className="mb-1.5 text-[13px] font-medium text-foreground">屏蔽关键词</div>
-            <Textarea
+            <EditableTextarea
               value={draft.distractionBlockedKeywords.join('\n')}
-              onChange={(e) => update('distractionBlockedKeywords', parseRuleTextarea(e.target.value))}
+              onChange={(value) => update('distractionBlockedKeywords', parseRuleTextarea(value))}
               rows={6}
-              className="min-h-[132px] text-[12px]"
+              className="min-h-[132px]"
             />
           </div>
         </div>
@@ -2355,9 +2425,9 @@ function AISection({
         ) : (
           <div className="px-4">
             <SettingRow label="宠物名字">
-              <Input
+              <EditableInput
                 value={settings.petName}
-                onChange={(e) => updateSetting('petName', e.target.value)}
+                onChange={(value) => updateSetting('petName', value)}
                 className="w-48"
               />
             </SettingRow>
@@ -2370,11 +2440,11 @@ function AISection({
               Orb 模式使用独立的 AI 助手 Prompt，不会覆盖灵宠模式的设定。
             </div>
           )}
-          <Textarea
+          <EditableTextarea
             value={displayedSystemPrompt}
-            onChange={(e) => setDisplayedSystemPrompt(e.target.value)}
+            onChange={setDisplayedSystemPrompt}
             rows={6}
-            className="font-mono text-[13px]"
+            className="font-mono"
           />
           <div className="flex gap-2 mt-3">
             <Button onClick={() => saveDisplayedSystemPrompt()}>保存</Button>
@@ -2421,7 +2491,7 @@ function AISection({
       <SectionTitle>Chat 模型</SectionTitle>
       <SettingRow label="Chat 使用">
         <select
-          className="bg-input border border-border rounded px-2 py-1 text-[13px]"
+          className="px-2.5 py-1"
           value={settings.chatModelMode}
           onChange={(e) => updateSetting('chatModelMode', e.target.value as ModelMode)}
         >
@@ -2504,7 +2574,7 @@ function AISection({
         <Slider value={[settings.temperature]} onValueChange={([v]) => updateSetting('temperature', v)} min={0} max={2} step={0.1} className="w-32" />
       </SettingRow>
       <SettingRow label="最大 Token">
-        <Input type="number" value={settings.maxTokens} onChange={(e) => updateSetting('maxTokens', Number(e.target.value))} className="w-24" />
+        <EditableInput type="number" value={settings.maxTokens} onChange={(value) => updateSetting('maxTokens', Number(value))} className="w-24" />
       </SettingRow>
       <SettingRow label="流式输出">
         <Switch checked={settings.streamOutput} onCheckedChange={(v) => updateSetting('streamOutput', v)} />
@@ -2514,7 +2584,7 @@ function AISection({
       <SectionTitle>STT 模型</SectionTitle>
       <SettingRow label="STT 使用" hint="默认和自定义都会在失败时回退到系统输入">
         <select
-          className="bg-input border border-border rounded px-2 py-1 text-[13px]"
+          className="px-2.5 py-1"
           value={settings.voiceInputProvider}
           onChange={(e) => updateSetting('voiceInputProvider', e.target.value as VoiceProviderMode)}
         >
@@ -2526,26 +2596,26 @@ function AISection({
       {settings.voiceInputProvider === 'user-cloud' && (
         <div className="mb-4 grid gap-3 rounded-md border border-border bg-muted/30 p-3">
           <SettingRow label="STT Base URL">
-            <Input
+            <EditableInput
               value={settings.customSttBaseUrl}
-              onChange={(e) => updateSetting('customSttBaseUrl', e.target.value.trim())}
+              onChange={(value) => updateSetting('customSttBaseUrl', value.trim())}
               className="w-full max-w-md"
               placeholder="https://api.example.com/v1"
             />
           </SettingRow>
           <SettingRow label="STT 模型">
-            <Input
+            <EditableInput
               value={settings.customSttModel}
-              onChange={(e) => updateSetting('customSttModel', e.target.value.trim())}
+              onChange={(value) => updateSetting('customSttModel', value.trim())}
               className="w-full max-w-md"
               placeholder="gpt-4o-mini-transcribe"
             />
           </SettingRow>
           <SettingRow label="STT API Key">
-            <Input
+            <EditableInput
               type="password"
               value={settings.customSttApiKey}
-              onChange={(e) => updateSetting('customSttApiKey', e.target.value)}
+              onChange={(value) => updateSetting('customSttApiKey', value)}
               className="w-full max-w-md"
               placeholder="sk-..."
             />
@@ -2553,7 +2623,7 @@ function AISection({
         </div>
       )}
       <SettingRow label="语音输入语言">
-        <select className="bg-input border border-border rounded px-2 py-1 text-[13px]"
+        <select className="px-2.5 py-1"
           value={settings.voiceInputLang} onChange={(e) => updateSetting('voiceInputLang', e.target.value)}>
           <option value="system">跟随系统</option>
           <option value="zh-CN">简体中文</option>
@@ -2568,7 +2638,7 @@ function AISection({
       </SettingRow>
       <SettingRow label="TTS 使用" hint="默认和自定义都会在失败时回退到系统朗读">
         <select
-          className="bg-input border border-border rounded px-2 py-1 text-[13px]"
+          className="px-2.5 py-1"
           value={settings.voiceOutputProvider}
           onChange={(e) => updateSetting('voiceOutputProvider', e.target.value as VoiceProviderMode)}
         >
@@ -2580,26 +2650,26 @@ function AISection({
       {settings.voiceOutputProvider === 'user-cloud' && (
         <div className="mb-4 grid gap-3 rounded-md border border-border bg-muted/30 p-3">
           <SettingRow label="TTS Base URL">
-            <Input
+            <EditableInput
               value={settings.customTtsBaseUrl}
-              onChange={(e) => updateSetting('customTtsBaseUrl', e.target.value.trim())}
+              onChange={(value) => updateSetting('customTtsBaseUrl', value.trim())}
               className="w-full max-w-md"
               placeholder="https://api.example.com/v1"
             />
           </SettingRow>
           <SettingRow label="TTS 模型">
-            <Input
+            <EditableInput
               value={settings.customTtsModel}
-              onChange={(e) => updateSetting('customTtsModel', e.target.value.trim())}
+              onChange={(value) => updateSetting('customTtsModel', value.trim())}
               className="w-full max-w-md"
               placeholder="tts-1"
             />
           </SettingRow>
           <SettingRow label="TTS API Key">
-            <Input
+            <EditableInput
               type="password"
               value={settings.customTtsApiKey}
-              onChange={(e) => updateSetting('customTtsApiKey', e.target.value)}
+              onChange={(value) => updateSetting('customTtsApiKey', value)}
               className="w-full max-w-md"
               placeholder="sk-..."
             />
@@ -2614,9 +2684,9 @@ function AISection({
       </SettingRow>
       {settings.wakeWordEnabled && (
         <SettingRow label="唤醒词">
-          <Input
+          <EditableInput
             value={settings.wakeWord}
-            onChange={(e) => updateSetting('wakeWord', e.target.value.slice(0, 20))}
+            onChange={(value) => updateSetting('wakeWord', value.slice(0, 20))}
             className="w-48"
             maxLength={20}
           />
@@ -2721,10 +2791,10 @@ function GeneralSection({
 
       <SettingsGroup>
         <SettingRow label="全局唤起">
-          <Input value={settings.globalShortcut} onChange={(e) => updateSetting('globalShortcut', e.target.value)} className="w-48" readOnly />
+          <EditableInput value={settings.globalShortcut} onChange={(value) => updateSetting('globalShortcut', value)} className="w-48" />
         </SettingRow>
         <SettingRow label="截图快捷键">
-          <Input value={settings.screenshotShortcut} onChange={(e) => updateSetting('screenshotShortcut', e.target.value)} className="w-48" readOnly />
+          <EditableInput value={settings.screenshotShortcut} onChange={(value) => updateSetting('screenshotShortcut', value)} className="w-48" />
         </SettingRow>
       </SettingsGroup>
 
@@ -2994,7 +3064,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
           <div className="space-y-2">
             <label className="text-[13px] font-medium">服务提供商</label>
             <select
-              className="w-full bg-input border border-border rounded-md px-3 py-2 text-[13px]"
+              className="w-full px-3 py-2"
               value={form.providerId}
               onChange={(e) => handleProviderChange(e.target.value)}
             >

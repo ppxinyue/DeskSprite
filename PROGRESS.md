@@ -1557,3 +1557,11 @@
 - 说明：仅调整默认值，不覆盖用户已经保存过的本地设置。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：settingsStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R200. 设置页玻璃质感与字段编辑态（2026-05-10）
+- 视觉：设置窗口背景改为 Apple 风浅灰蓝底色，侧栏、分组卡片和 quiet-card 增加磨砂玻璃、内高光和柔和阴影。
+- 字段：统一 Input、Textarea、Select 为 Radix 风格 13px 字号、圆角、低对比边框和只读态样式。
+- 编辑态：宠物名、System Prompt、分心规则、STT/TTS 自定义字段、最大 Token、唤醒词和通用快捷键默认只读，点击“修改”后进入可编辑状态。
+- Slider：重做滑动条轨道和 thumb，使用 Vite 蓝进度、玻璃轨道、白色高光 thumb 和 hover/focus 微交互。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsLayout.tsx, input.tsx, textarea.tsx, SettingsPanel.tsx, index.css, ISSUES.md, PROGRESS.md

@@ -2435,3 +2435,15 @@
 - 涉及文件：`src/features/settings/settingsStore.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：默认值调整应只影响新用户或未保存该项的用户，避免静默覆盖已有偏好。
 - 是否需更新技术文档：否。
+
+## ISSUE-205
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：设置页玻璃质感与字段编辑态
+- 严重程度：一般
+- 问题现象：设置页整体不够清透；通用、外观、提醒事项和 AI 对话中的输入控件字号和质感不统一；文本字段默认可编辑，容易误触；滑动条视觉偏粗糙。
+- 原因分析：设置页仍混用早期透明/白底容器和零散 Tailwind 输入样式；Input、Textarea、Select、Slider 缺少统一的 Radix/Apple 视觉语言；文本字段直接绑定设置值，没有只读编辑态。
+- 解决方案：重做设置背景、分组卡片、Input/Textarea/Select 和 Slider 基础样式；新增 `EditableInput` / `EditableTextarea`，让主要文本字段默认只读，通过“修改/完成”切换编辑态。
+- 涉及文件：`src/components/layouts/SettingsLayout.tsx`, `src/components/ui/input.tsx`, `src/components/ui/textarea.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/index.css`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：设置页控件应先统一基础组件语义，再做局部字段调整；直接可编辑字段需要显式编辑入口来减少误触。
+- 是否需更新技术文档：否。
