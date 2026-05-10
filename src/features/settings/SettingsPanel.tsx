@@ -974,6 +974,7 @@ function TimelineSection({
 type TimelineHoverCard = {
   x: number;
   y: number;
+  width: number;
   eyebrow: string;
   title: string;
   body: string;
@@ -1012,7 +1013,7 @@ function TimelineSegment({
   entries: TimelineEntry[];
   selected: boolean;
   onSelect: () => void;
-  onHover: (event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y'>) => void;
+  onHover: (event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y' | 'width'>) => void;
   onLeave: () => void;
 }) {
   const meta = TIMELINE_CATEGORY_META[block.category];
@@ -1070,7 +1071,7 @@ function BackgroundTimelineTrack({
   icon: 'music' | 'terminal';
   markers: BackgroundMarkerWithTime[];
   onInspect: (marker: BackgroundMarkerWithTime) => void;
-  onHover: (event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y'>) => void;
+  onHover: (event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y' | 'width'>) => void;
   onLeave: () => void;
 }) {
   const Icon = icon === 'music' ? Music2 : Terminal;
@@ -1106,7 +1107,7 @@ function BackgroundTimelineMarker({
   marker: BackgroundMarkerWithTime;
   compactLabel: string;
   onInspect: (marker: BackgroundMarkerWithTime) => void;
-  onHover: (event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y'>) => void;
+  onHover: (event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y' | 'width'>) => void;
   onLeave: () => void;
 }) {
   const left = `${getTimelineDayProgress(marker.startedAt) * 100}%`;
@@ -1138,9 +1139,9 @@ function BackgroundTimelineMarker({
   );
 }
 
-function positionTimelineHoverCard(event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y'>): TimelineHoverCard {
-  const width = 300;
-  const height = 148;
+function positionTimelineHoverCard(event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y' | 'width'>): TimelineHoverCard {
+  const width = getTimelineHoverCardWidth(card);
+  const height = 128;
   const margin = 12;
   const gap = 16;
   const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
@@ -1150,18 +1151,28 @@ function positionTimelineHoverCard(event: MouseEvent<HTMLElement>, card: Omit<Ti
     ? event.clientX + gap
     : Math.max(margin, event.clientX - width - gap);
   const y = Math.min(viewportHeight - height - margin, Math.max(margin, event.clientY - height / 2));
-  return { ...card, x, y };
+  return { ...card, x, y, width };
+}
+
+function getTimelineHoverCardWidth(card: Omit<TimelineHoverCard, 'x' | 'y' | 'width'>): number {
+  const lines = [card.eyebrow, card.title, card.body, card.time ?? ''].filter(Boolean);
+  const textWidth = Math.max(...lines.map((line) => getApproxTextWidth(line)), 120);
+  return Math.max(156, Math.min(248, textWidth + 28));
+}
+
+function getApproxTextWidth(text: string): number {
+  return Array.from(text).reduce((sum, char) => sum + (/[\u3400-\u9fff]/.test(char) ? 13 : 7), 0);
 }
 
 function TimelineHoverCardView({ card }: { card: TimelineHoverCard }) {
   return (
     <div
-      className="pointer-events-none fixed z-[9999] w-[300px] rounded-[14px] border border-[#dfe3e6] bg-white p-3 text-left text-[11px] leading-4 text-[#687076] shadow-[0_18px_54px_rgba(28,32,36,0.20)] dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70"
-      style={{ left: card.x, top: card.y }}
+      className="pointer-events-none fixed z-[9999] rounded-[14px] border border-[#dfe3e6] bg-white p-3 text-left text-[11px] leading-4 text-[#687076] shadow-[0_18px_54px_rgba(28,32,36,0.20)] dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70"
+      style={{ left: card.x, top: card.y, width: card.width }}
     >
       <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b8d98]">{card.eyebrow}</div>
       <div className="text-[13px] font-semibold text-[#1c2024] dark:text-white">{card.title}</div>
-      {card.body && <div className="mt-1 line-clamp-3">{card.body}</div>}
+      {card.body && <div className="mt-1 line-clamp-2 break-words">{card.body}</div>}
       {card.time && <div className="mt-2 text-[11px] text-[#8b8d98]">{card.time}</div>}
     </div>
   );

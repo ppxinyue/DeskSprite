@@ -2831,3 +2831,15 @@
 - 涉及文件：`src/App.tsx`, `electron/main.cjs`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Timeline 的主记录和短暂活动应分层保存；“进程存在”不能等同于“后台活动正在发生”，尤其是音乐播放状态。
 - 是否需更新技术文档：否。
+
+## ISSUE-238
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Timeline Hover 卡片自适应宽度
+- 严重程度：轻微
+- 问题现象：Timeline hover 详情卡片固定宽度过长，靠右片段仍可能显示不完整。
+- 原因分析：上一版虽然会靠右翻到左侧，但卡片宽度仍按固定 300px 渲染和定位，短文本也占用过大横向空间。
+- 解决方案：按内容估算 hover 卡片宽度，限制在 156px-248px；定位算法使用该宽度，并将正文限制为 2 行。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：浮层定位不能只靠视口夹紧，卡片自身尺寸也要随内容收缩。
+- 是否需更新技术文档：否。

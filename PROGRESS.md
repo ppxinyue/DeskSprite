@@ -1791,3 +1791,9 @@
 - Terminal：补充从系统进程中识别长跑开发命令的后台 terminal 标记，覆盖没有被 Terminal/iTerm AppleScript 正确读到的场景。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；新增短暂切屏附属明细单测，生产构建主包 486.44 kB，未触发 chunk 体积 warning。
 - 文件：App.tsx, main.cjs, SettingsPanel.tsx, settingsStore.ts, timelineRecorder.ts, timelineRecorder.test.ts, ISSUES.md, PROGRESS.md
+
+### R233. Timeline Hover 卡片自适应宽度（2026-05-10）
+- 修复：Timeline hover 详情卡片不再固定 300px，改为根据 eyebrow、标题、正文和时间估算宽度，最小 156px、最大 248px。
+- 定位：hover 定位使用估算后的实际宽度，靠右片段更容易完整显示；正文从 3 行收敛到 2 行并允许断词换行。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；生产构建主包 486.44 kB，未触发 chunk 体积 warning。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
