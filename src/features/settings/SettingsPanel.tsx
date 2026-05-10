@@ -220,16 +220,10 @@ function ProfileSection() {
   const [selectedTimelineId, setSelectedTimelineId] = useState<number | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const statsScrollRef = useRef<HTMLDivElement>(null);
-  const scrollStatsChart = (direction: -1 | 1) => {
-    setChartEndDate((date) => {
-      const next = shiftDateKey(date, direction * 7);
-      return next > getLocalDateKey() ? getLocalDateKey() : next;
-    });
-  };
 
   const loadProfileData = useCallback(() => {
     Promise.all([
-      getFocusStatsDays(7, chartEndDate),
+      getFocusStatsDays(90, chartEndDate),
       getTimelineEntries(selectedDate),
     ])
       .then(([nextStats, nextTimeline]) => {
@@ -259,6 +253,14 @@ function ProfileSection() {
   }, [selectedDate]);
 
   useEffect(() => {
+    const node = statsScrollRef.current;
+    if (!node) return;
+    const selectedNode = node.querySelector<HTMLElement>(`[data-focus-date="${selectedDate}"]`);
+    if (!selectedNode) return;
+    selectedNode.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [selectedDate, stats]);
+
+  useEffect(() => {
     if (!calendarOpen) return;
     const handlePointerDown = (event: PointerEvent) => {
       if (!calendarRef.current?.contains(event.target as Node)) setCalendarOpen(false);
@@ -282,10 +284,12 @@ function ProfileSection() {
   }, [loadProfileData, selectedDate]);
 
   const selectedStats = stats.find((day) => day.date === selectedDate) ?? stats[stats.length - 1] ?? { date: selectedDate, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0, distractionApps: {} };
+  const focusWindowStart = shiftDateKey(selectedDate, -6);
+  const focusWindowStats = stats.filter((day) => day.date >= focusWindowStart && day.date <= selectedDate);
   const maxFocusMs = Math.max(1, ...stats.map((day) => day.focusMs));
-  const totalFocusMs = stats.reduce((sum, day) => sum + day.focusMs, 0);
-  const totalSessions = stats.reduce((sum, day) => sum + day.focusSessions, 0);
-  const totalDistractions = stats.reduce((sum, day) => sum + day.distractions, 0);
+  const totalFocusMs = focusWindowStats.reduce((sum, day) => sum + day.focusMs, 0);
+  const totalSessions = focusWindowStats.reduce((sum, day) => sum + day.focusSessions, 0);
+  const totalDistractions = focusWindowStats.reduce((sum, day) => sum + day.distractions, 0);
   const todayKey = getLocalDateKey();
 
   return (
@@ -348,6 +352,13 @@ function ProfileSection() {
         </div>
       </div>
 
+      <TimelineSection
+        date={selectedDate}
+        entries={timelineEntries}
+        selectedId={selectedTimelineId}
+        onSelect={setSelectedTimelineId}
+      />
+
       <div className="mb-4 rounded-[14px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035]">
         <div className="grid divide-y divide-[#e6e8eb] dark:divide-white/10 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
           <ProfileMetric label="专注时长" value={formatFocusDuration(selectedStats.focusMs)} />
@@ -365,27 +376,11 @@ function ProfileSection() {
               7 天专注
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground">
-              共 {formatFocusDuration(totalFocusMs)} · {totalSessions} 次专注 · {totalDistractions} 次分心
+              {formatDateHeading(focusWindowStart)} - {formatDateHeading(selectedDate)} · 共 {formatFocusDuration(totalFocusMs)} · {totalSessions} 次专注 · {totalDistractions} 次分心
             </div>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
-              onClick={() => scrollStatsChart(-1)}
-              aria-label="向左滑动 7 天专注图"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
-              onClick={() => scrollStatsChart(1)}
-              disabled={chartEndDate >= todayKey}
-              aria-label="向右滑动 7 天专注图"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
+          <div className="hidden text-[11px] text-[#8b8d98] dark:text-white/42 sm:block">
+            横向滑动查看历史
           </div>
         </div>
 
@@ -398,14 +393,18 @@ function ProfileSection() {
                 return (
                   <button
                     key={day.date}
+                    data-focus-date={day.date}
                     type="button"
-                    className="group flex min-w-0 flex-1 items-end justify-center"
-                    onClick={() => setSelectedDate(day.date)}
+                    className="group flex min-w-[28px] flex-1 items-end justify-center"
+                    onClick={() => {
+                      setSelectedDate(day.date);
+                      setChartEndDate(day.date > todayKey ? todayKey : day.date);
+                    }}
                     title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
                   >
                     <span
                       className={`w-full max-w-9 rounded-t-[6px] transition-all duration-200 ${
-                        selected ? 'bg-[#1c2024] dark:bg-white/82' : 'bg-[#c1c8cd] group-hover:bg-[#8b8d98] dark:bg-white/18 dark:group-hover:bg-white/34'
+                        selected ? 'bg-[#697177] dark:bg-white/58' : 'bg-[#c1c8cd] group-hover:bg-[#8b8d98] dark:bg-white/18 dark:group-hover:bg-white/34'
                       }`}
                       style={{ height }}
                     />
@@ -423,7 +422,10 @@ function ProfileSection() {
                     className={`min-w-0 flex-1 rounded-[6px] py-1 text-center text-[10px] leading-none transition-colors ${
                       selected ? 'bg-white text-[#1c2024] shadow-sm dark:bg-white/10 dark:text-white' : 'text-[#8b8d98] hover:bg-white/55 hover:text-[#3a3d40] dark:hover:bg-white/7'
                     }`}
-                    onClick={() => setSelectedDate(day.date)}
+                    onClick={() => {
+                      setSelectedDate(day.date);
+                      setChartEndDate(day.date > todayKey ? todayKey : day.date);
+                    }}
                   >
                     {formatWeekdayShort(day.date)}
                   </button>
@@ -441,13 +443,6 @@ function ProfileSection() {
       </SettingsGroup>
 
       <DistractionAppsPanel apps={selectedStats.distractionApps ?? {}} />
-
-      <TimelineSection
-        date={selectedDate}
-        entries={timelineEntries}
-        selectedId={selectedTimelineId}
-        onSelect={setSelectedTimelineId}
-      />
     </>
   );
 }

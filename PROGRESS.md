@@ -1525,3 +1525,11 @@
 - 空态：没有分心数据时仍显示卡片空态，避免页面布局跳变。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R196. 个人档案顺序与 7 天专注横滑（2026-05-10）
+- 顺序：个人档案中 Timeline 移到最上方，专注统计和分心统计整体放到下方。
+- 7 天专注：移除左右翻页按钮，改为横向 overflow 时间带；默认滚到当前选中日期，用户可直接滑动查看历史日期。
+- 统计窗口：选中某一天后，7 天专注摘要按“该日及前 6 天”计算。
+- 视觉：7 天专注柱子的选中态从硬黑改为柔和 Radix 灰，降低视觉突兀感。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
