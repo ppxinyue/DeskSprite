@@ -23,6 +23,7 @@ const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
 const windows = new Map();
 let topmostGuard = null;
+let topmostSuppressed = false;
 let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'png', 'idle.png');
 let tray = null;
 let currentAppIcon = null;
@@ -114,6 +115,10 @@ function broadcast(channel, payload) {
 function applyFloatingFullscreenBehavior(win, options = {}) {
   if (!win || win.isDestroyed()) return;
   const force = Boolean(options.force);
+  if (topmostSuppressed) {
+    win.setAlwaysOnTop(false);
+    return;
+  }
   if (process.platform === 'darwin') {
     if (!force && floatingConfiguredWindows.has(win) && win.isAlwaysOnTop()) return;
     if (app.dock) app.dock.show();
@@ -378,6 +383,29 @@ return frontApp & linefeed & frontWindow & linefeed & pageUrl & linefeed & backg
 `;
 }
 
+function petPresenceContextScript() {
+  return `
+set frontApp to ""
+set frontWindow to ""
+set isFullscreen to false
+set runningApps to ""
+
+tell application "System Events"
+  set frontAppProcess to first application process whose frontmost is true
+  set frontApp to name of frontAppProcess
+  try
+    set frontWindow to name of front window of frontAppProcess
+  end try
+  try
+    set isFullscreen to value of attribute "AXFullScreen" of front window of frontAppProcess
+  end try
+  set runningApps to name of every application process whose background only is false
+end tell
+
+return frontApp & linefeed & frontWindow & linefeed & isFullscreen & linefeed & (runningApps as text)
+`;
+}
+
 function readActiveWindow() {
   if (process.platform !== 'darwin') {
     return Promise.resolve({ supported: false, appName: '', windowTitle: '', error: 'unsupported' });
@@ -442,6 +470,66 @@ function readTimelineActiveWindow() {
         background: parseTimelineBackground(backgroundParts.join('\n')),
         error: null,
         checkedAt: Date.now(),
+      });
+    });
+  });
+}
+
+function listContainsAny(text, keywords) {
+  const lower = String(text || '').toLowerCase();
+  return keywords.some((keyword) => lower.includes(keyword));
+}
+
+function classifyPetPresenceContext({ appName, windowTitle, runningApps, fullscreen }) {
+  const gameKeywords = [
+    'steam', 'epic games', 'battle.net', 'riot client', 'league of legends',
+    'dota', 'minecraft', 'roblox', 'unity', 'unreal', 'godot', 'blizzard',
+    'world of warcraft', 'genshin', 'honkai', 'valorant', 'counter-strike',
+    'final fantasy', 'baldur', 'civilization', 'factorio',
+  ];
+  const screenShareApps = [
+    'zoom', 'zoom.us', 'microsoft teams', 'teams', '腾讯会议', 'tencent meeting',
+    '飞书', 'feishu', 'lark', '钉钉', 'dingtalk', 'google chrome', 'chrome',
+    'slack', 'discord', 'obs', 'obs studio', 'quicktime player',
+  ];
+  const screenShareKeywords = [
+    'screen sharing', 'sharing screen', 'screen share', 'share screen',
+    '正在共享', '共享屏幕', '屏幕共享', 'presenting', '正在演示', '演示中',
+  ];
+  const activeText = `${appName} ${windowTitle}`;
+  const isFullscreenGame = Boolean(fullscreen && listContainsAny(activeText, gameKeywords));
+  const screenShareAppRunning = listContainsAny(runningApps, screenShareApps);
+  const screenShareByTitle = listContainsAny(activeText, screenShareKeywords);
+  return {
+    isFullscreenGame,
+    isScreenSharing: screenShareByTitle || screenShareAppRunning && listContainsAny(activeText, screenShareKeywords),
+  };
+}
+
+function readPetPresenceContext() {
+  if (process.platform !== 'darwin') {
+    return Promise.resolve({ supported: false, isFullscreenGame: false, isScreenSharing: false });
+  }
+  return new Promise((resolve) => {
+    execFile('/usr/bin/osascript', ['-e', petPresenceContextScript()], { timeout: 2500 }, (error, stdout) => {
+      if (error) {
+        resolve({ supported: true, isFullscreenGame: false, isScreenSharing: false, error: error.message || String(error) });
+        return;
+      }
+      const [appName = '', windowTitle = '', fullscreenRaw = '', runningAppsRaw = ''] = String(stdout || '').trimEnd().split('\n');
+      const fullscreen = fullscreenRaw.trim().toLowerCase() === 'true';
+      const context = classifyPetPresenceContext({
+        appName: appName.trim(),
+        windowTitle: windowTitle.trim(),
+        runningApps: runningAppsRaw.trim(),
+        fullscreen,
+      });
+      resolve({
+        supported: true,
+        appName: appName.trim(),
+        windowTitle: windowTitle.trim(),
+        fullscreen,
+        ...context,
       });
     });
   });
@@ -517,6 +605,7 @@ function updateTrayMenu() {
 function ensureTopmostGuard() {
   if (topmostGuard) return;
   topmostGuard = setInterval(() => {
+    if (topmostSuppressed) return;
     for (const label of ['pet', 'compact-chat']) {
       const win = windows.get(label);
       if (win?.isVisible()) applyFloatingFullscreenBehavior(win);
@@ -2122,9 +2211,20 @@ const handlers = {
   focus_compact_chat_input: () => broadcast('compact-chat:focus-input', {}),
   show_pet_window: () => showPetWindow(),
   hide_pet_window: () => hidePetWindow(),
+  read_pet_presence_context: readPetPresenceContext,
   quit_app: () => app.quit(),
   pin_pet_above_fullscreen_cmd: () => applyFloatingFullscreenBehavior(windows.get('pet'), { force: true }),
   unpin_pet_from_fullscreen_cmd: () => windows.get('pet')?.setAlwaysOnTop(false),
+  set_topmost_suppressed: ({ suppressed }) => {
+    topmostSuppressed = Boolean(suppressed);
+    if (topmostSuppressed) {
+      for (const label of ['pet', 'compact-chat']) {
+        const win = windows.get(label);
+        if (win && !win.isDestroyed()) win.setAlwaysOnTop(false);
+      }
+    }
+    return topmostSuppressed;
+  },
   start_topmost_guard: () => {
     ensureTopmostGuard();
   },

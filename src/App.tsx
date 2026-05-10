@@ -44,7 +44,8 @@ const DISTRACTION_CHECK_INTERVAL_MS = 3000;
 const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
 const TIMELINE_POLL_INTERVAL_MS = 3000;
 const TIMELINE_MIN_SEGMENT_MS = 8000;
-const CODING_MODE_STATS_INTERVAL_MS = 15_000;
+const LIVE_STATS_INTERVAL_MS = 60_000;
+const PET_PRESENCE_CHECK_INTERVAL_MS = 3000;
 
 type PetPrompt =
   | { id: 'rest-reminder'; message: string; variant: 'rest' }
@@ -960,8 +961,11 @@ function PetWindow() {
   const focusEndAtRef = useRef<number | null>(null);
   const restEndAtRef = useRef<number | null>(null);
   const focusStartedAtRef = useRef<number | null>(null);
+  const focusStatsStartedAtRef = useRef<number | null>(null);
   const focusWarningAtRef = useRef(0);
   const codingModeStatsStartedAtRef = useRef<number | null>(null);
+  const autoHiddenForScreenShareRef = useRef(false);
+  const topmostSuppressedForGameRef = useRef(false);
   const autoFocusAfterRestRef = useRef(false);
   const restPresentationFrameRef = useRef<number | null>(null);
   const restPresentationSnapshotRef = useRef<RestPresentationSnapshot | null>(null);
@@ -1380,6 +1384,7 @@ function PetWindow() {
     setPetPrompt(null);
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
+    focusStatsStartedAtRef.current = null;
     autoFocusAfterRestRef.current = shouldStartNextFocus;
     restEndAtRef.current = endAt;
     setRestEndAt(endAt);
@@ -1395,8 +1400,9 @@ function PetWindow() {
   }, []);
 
   const recordCurrentFocusSession = useCallback((endedAt = Date.now()) => {
-    const startedAt = focusStartedAtRef.current;
+    const startedAt = focusStatsStartedAtRef.current;
     if (!startedAt) return;
+    focusStatsStartedAtRef.current = endedAt;
     recordFocusSession(startedAt, endedAt)
       .then((day) => {
         if (day) emit('profile:data-updated', { kind: 'focus', date: day.date }).catch(() => {});
@@ -1408,6 +1414,7 @@ function PetWindow() {
     recordCurrentFocusSession();
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
+    focusStatsStartedAtRef.current = null;
     focusWarningAtRef.current = 0;
     autoFocusAfterRestRef.current = false;
     setPetPrompt(null);
@@ -1417,7 +1424,9 @@ function PetWindow() {
   const startFocus = useCallback(() => {
     const duration = Math.max(1, settings.focusDurationMinutes) * 60_000;
     const endAt = Date.now() + duration;
-    focusStartedAtRef.current = Date.now();
+    const startedAt = Date.now();
+    focusStartedAtRef.current = startedAt;
+    focusStatsStartedAtRef.current = startedAt;
     focusWarningAtRef.current = 0;
     setRestEndAt(null);
     setPetPrompt(null);
@@ -1482,6 +1491,7 @@ function PetWindow() {
     recordCurrentFocusSession(focusEndAt);
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
+    focusStatsStartedAtRef.current = null;
     autoFocusAfterRestRef.current = true;
     setPetState('rest');
     setPetPrompt({ id: 'focus-complete', message: '该休息啦', variant: 'rest' });
@@ -1536,6 +1546,14 @@ function PetWindow() {
       window.clearInterval(timer);
     };
   }, [focusEndAt, settings, setPetState]);
+
+  useEffect(() => {
+    if (!focusEndAt) return;
+    const timer = window.setInterval(() => {
+      if (focusEndAtRef.current) recordCurrentFocusSession();
+    }, LIVE_STATS_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [focusEndAt, recordCurrentFocusSession]);
 
   useEffect(() => {
     const unlisten = listen<{ conversationId: number | null }>("compact-chat:conversation", ({ payload }) => {
@@ -1672,6 +1690,56 @@ function PetWindow() {
   }, [settings.timelineRecordingEnabled]);
 
   useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
+    let disposed = false;
+
+    const runPresenceCheck = async () => {
+      try {
+        const context = await invoke<{
+          supported: boolean;
+          isFullscreenGame: boolean;
+          isScreenSharing: boolean;
+        }>('read_pet_presence_context');
+        if (disposed || !context.supported) return;
+
+        const shouldSuppressTopmost = Boolean(settings.alwaysOnTop && context.isFullscreenGame);
+        if (topmostSuppressedForGameRef.current !== shouldSuppressTopmost) {
+          topmostSuppressedForGameRef.current = shouldSuppressTopmost;
+          await invoke('set_topmost_suppressed', { suppressed: shouldSuppressTopmost });
+          if (!shouldSuppressTopmost && settings.alwaysOnTop) {
+            await invoke('pin_pet_above_fullscreen_cmd');
+          }
+        }
+
+        const shouldAutoHide = Boolean(settings.hidePetDuringScreenShare && context.isScreenSharing);
+        if (shouldAutoHide && !autoHiddenForScreenShareRef.current) {
+          autoHiddenForScreenShareRef.current = true;
+          await invoke('hide_pet_window');
+        } else if (!shouldAutoHide && autoHiddenForScreenShareRef.current) {
+          autoHiddenForScreenShareRef.current = false;
+          await invoke('show_pet_window');
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!message.includes('Unknown command: read_pet_presence_context')) {
+          console.warn('Failed to update pet presence context:', error);
+        }
+      }
+    };
+
+    runPresenceCheck();
+    const timer = window.setInterval(runPresenceCheck, PET_PRESENCE_CHECK_INTERVAL_MS);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      if (topmostSuppressedForGameRef.current) {
+        topmostSuppressedForGameRef.current = false;
+        invoke('set_topmost_suppressed', { suppressed: false }).catch(() => {});
+      }
+    };
+  }, [settings.alwaysOnTop, settings.hidePetDuringScreenShare]);
+
+  useEffect(() => {
     const unlisten = listen("compact-chat:collapsed", () => {
       compactDismissedRef.current = true;
       setCompactVisible(false);
@@ -1704,7 +1772,7 @@ function PetWindow() {
     codingModeStatsStartedAtRef.current = Date.now();
     const timer = window.setInterval(() => {
       flushCodingModeStats().catch(() => {});
-    }, CODING_MODE_STATS_INTERVAL_MS);
+    }, LIVE_STATS_INTERVAL_MS);
     return () => {
       window.clearInterval(timer);
       flushCodingModeStats().catch(() => {});

@@ -1382,3 +1382,18 @@
 - 并行后台：后台轨道视觉减轻，Music 只标注 `music`，Terminal 保留进程内容和时间范围。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：SettingsLayout.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R178. 专注与 Coding 时长按分钟落库（2026-05-10）
+- 专注时长：专注模式开启期间每 1 分钟增量写入一次个人档案，结束时补齐最后不足 1 分钟的尾段。
+- 进度隔离：新增独立的专注统计起点 ref，周期落库不会影响专注倒计时和动画进度。
+- Coding 时长：Coding 模式开启期间从每 15 秒落库调整为每 1 分钟落库，关闭时同样补齐尾段。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check` 通过；完整构建见 R179。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R179. 全屏游戏与屏幕共享可见性策略（2026-05-10）
+- 全屏游戏：主进程新增前台上下文检测，识别游戏类全屏 app 时临时抑制 screen-saver 级置顶，避免灵宠穿透全屏游戏。
+- 置顶守卫：新增 `topmostSuppressed` 状态，抑制期间 topmost guard 不再把 pet / compact chat 拉回最上层。
+- 屏幕共享：通用设置新增“共享屏幕时隐藏灵宠”，默认开启；检测到共享屏幕时自动隐藏灵宠，结束后只恢复由系统自动隐藏的那一次。
+- 设置：新增 `hidePetDuringScreenShare` 配置项，用户可手动关闭自动隐藏。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, settingsStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

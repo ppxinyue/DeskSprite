@@ -53,6 +53,7 @@ export interface AppSettings {
   speakRate: number;
   launchAtLogin: boolean;
   timelineRecordingEnabled: boolean;
+  hidePetDuringScreenShare: boolean;
   globalShortcut: string;
   screenshotShortcut: string;
   restReminderEnabled: boolean;
@@ -104,6 +105,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   speakRate: 1.0,
   launchAtLogin: true,
   timelineRecordingEnabled: true,
+  hidePetDuringScreenShare: true,
   globalShortcut: 'CommandOrControl+Shift+P',
   screenshotShortcut: 'CommandOrControl+Shift+S',
   restReminderEnabled: true,

@@ -2429,6 +2429,9 @@ function GeneralSection({
         <SettingRow label="Timeline 记录" hint="不开专注模式也会全程记录超过 8 秒的前台窗口">
           <Switch checked={settings.timelineRecordingEnabled} onCheckedChange={(v) => updateSetting('timelineRecordingEnabled', v)} />
         </SettingRow>
+        <SettingRow label="共享屏幕时隐藏灵宠" hint="默认开启，防止共享屏幕时灵宠进入画面">
+          <Switch checked={settings.hidePetDuringScreenShare} onCheckedChange={(v) => updateSetting('hidePetDuringScreenShare', v)} />
+        </SettingRow>
       </SettingsGroup>
 
       <SettingsGroup>
