@@ -2576,7 +2576,12 @@ function AISection({
 
       <SectionTitle>Chat 模型</SectionTitle>
       <SettingsGroup>
-        <SettingRow label="模型">
+        <SettingRow
+          label="模型"
+          hint={settings.chatModelMode === 'custom' && defaultConfig
+            ? `自定义：${getProviderName(defaultConfig.providerId || defaultConfig.provider)} · ${defaultConfig.model}`
+            : `默认：CloseAI · ${BUILTIN_CLOSEAI_CONFIG.model}`}
+        >
           <div className="min-w-0 text-right">
             <select
               className="px-2.5 py-1"
@@ -2586,73 +2591,72 @@ function AISection({
               <option value="default">默认</option>
               <option value="custom">自定义</option>
             </select>
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              {settings.chatModelMode === 'custom' && defaultConfig
-                ? `${getProviderName(defaultConfig.providerId || defaultConfig.provider)} · ${defaultConfig.model}`
-                : BUILTIN_CLOSEAI_CONFIG.model}
-            </div>
           </div>
         </SettingRow>
-        <div className="flex items-center justify-between gap-3 border-b border-[#e6e8eb] px-4 py-3 dark:border-white/10">
-          <div>
-            <div className="text-[13px] font-medium leading-5 text-foreground">API 配置</div>
-            <div className="mt-1 text-[11px] leading-5 text-muted-foreground">自定义模式会使用标记为默认的模型</div>
-          </div>
-          <Button size="sm" onClick={onAdd}>
-            <Plus className="mr-1 h-4 w-4" />
-            添加 API
-          </Button>
-        </div>
-        <div className="space-y-3 px-4 py-4">
-          {configs.map((c) => {
-            const testResult = testResults[c.id];
-            const isTesting = testingConfigId === c.id;
-            return (
-              <div key={c.id} className="rounded-lg border border-border p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-center gap-2">
-                      <span className="font-medium text-[13px]">{getProviderName(c.providerId || c.provider)}</span>
-                      {c.isDefault && (
-                        <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
-                      )}
-                    </div>
-                    <div className="mb-1 text-[11px] text-muted-foreground">{c.providerId || c.provider} · {c.model}</div>
-                    <div className="truncate text-[11px] text-muted-foreground">{c.baseUrl}</div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">{describeApiKey(c.apiKey)}</div>
-                    {testResult && (
-                      <div className={`mt-1 text-[11px] ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
-                        {testResult.message}
-                        {testResult.latency !== undefined && ` (${testResult.latency}ms)`}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 gap-1">
-                    {!c.isDefault && (
-                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onSetDefault(c.id)}>
-                        设为默认
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onTest(c)} disabled={isTesting}>
-                      {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : '测试'}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEdit(c)}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" onClick={() => onDelete(c.id, c.keyringRef)}>
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                </div>
+        {settings.chatModelMode === 'custom' && (
+          <>
+            <div className="flex items-center justify-between gap-3 border-b border-[#e6e8eb] px-4 py-3 dark:border-white/10">
+              <div>
+                <div className="text-[13px] font-medium leading-5 text-foreground">自定义配置</div>
+                <div className="mt-1 text-[11px] leading-5 text-muted-foreground">Base URL、Model、API Key；标记为默认的配置会用于 Chat</div>
               </div>
-            );
-          })}
-          {configs.length === 0 && (
-            <div className="rounded-lg border border-border p-4 text-[13px] text-muted-foreground">
-              暂无 API 配置，点击“添加 API”添加
+              <Button size="sm" onClick={onAdd}>
+                <Plus className="mr-1 h-4 w-4" />
+                添加 API
+              </Button>
             </div>
-          )}
-        </div>
+            <div className="space-y-3 px-4 py-4">
+              {configs.map((c) => {
+                const testResult = testResults[c.id];
+                const isTesting = testingConfigId === c.id;
+                return (
+                  <div key={c.id} className="rounded-lg border border-border p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center gap-2">
+                          <span className="font-medium text-[13px]">{getProviderName(c.providerId || c.provider)}</span>
+                          {c.isDefault && (
+                            <span className="shrink-0 rounded border border-[#2f8fff]/20 bg-[#eaf5ff] px-2 py-0.5 text-[11px] text-[#0b6bcb] shadow-none dark:bg-[#2f8fff]/18 dark:text-[#9ed0ff]">默认</span>
+                          )}
+                        </div>
+                        <div className="mb-1 text-[11px] text-muted-foreground">Model: {c.model}</div>
+                        <div className="truncate text-[11px] text-muted-foreground">Base URL: {c.baseUrl}</div>
+                        <div className="mt-1 text-[11px] text-muted-foreground">API Key: {describeApiKey(c.apiKey)}</div>
+                        {testResult && (
+                          <div className={`mt-1 text-[11px] ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
+                            {testResult.message}
+                            {testResult.latency !== undefined && ` (${testResult.latency}ms)`}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        {!c.isDefault && (
+                          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onSetDefault(c.id)}>
+                            设为默认
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onTest(c)} disabled={isTesting}>
+                          {isTesting ? <Loader2 className="h-3 w-3 animate-spin" /> : '测试'}
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEdit(c)}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" onClick={() => onDelete(c.id, c.keyringRef)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {configs.length === 0 && (
+                <div className="rounded-lg border border-border p-4 text-[13px] text-muted-foreground">
+                  暂无 API 配置，点击“添加 API”添加
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {orbMode ? (
           <div className="px-4">
@@ -2684,7 +2688,14 @@ function AISection({
 
       <SectionTitle>语音模型</SectionTitle>
       <SettingsGroup>
-        <SettingRow label="STT 模型" hint="默认和自定义都会在失败时回退到系统输入">
+        <SettingRow
+          label="STT 模型"
+          hint={settings.voiceInputProvider === 'user-cloud'
+            ? `自定义：${settings.customSttModel || '未设置模型'}`
+            : settings.voiceInputProvider === 'system'
+              ? '系统输入'
+              : `默认：CloseAI · ${BUILTIN_STT_MODEL}`}
+        >
           <select
             className="px-2.5 py-1"
             value={settings.voiceInputProvider}
@@ -2715,7 +2726,14 @@ function AISection({
             <option value="en-US">英文</option>
           </select>
         </SettingRow>
-        <SettingRow label="TTS 模型" hint="默认和自定义都会在失败时回退到系统朗读">
+        <SettingRow
+          label="TTS 模型"
+          hint={settings.voiceOutputProvider === 'user-cloud'
+            ? `自定义：${settings.customTtsModel || '未设置模型'}`
+            : settings.voiceOutputProvider === 'system'
+              ? '系统朗读'
+              : `默认：CloseAI · ${BUILTIN_TTS_MODEL}`}
+        >
           <select
             className="px-2.5 py-1"
             value={settings.voiceOutputProvider}

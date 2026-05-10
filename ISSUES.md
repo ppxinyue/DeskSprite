@@ -2543,3 +2543,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/pet/PetAvatar.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：新增 provider 时应区分“当前选中 provider”和“provider 是否可用”，否则设置、菜单和历史入口会互相耦合。
 - 是否需更新技术文档：否。
+
+## ISSUE-214
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：模型设置展开逻辑与开关可见度
+- 严重程度：一般
+- 问题现象：设置中的开关关闭态颜色太浅，几乎融入背景；AI 对话里的 Chat 模型和语音模型交互不一致，Chat 默认状态仍显示 API 配置列表。
+- 原因分析：Switch unchecked 使用 `bg-input/90`，在当前玻璃底色上对比不足；Chat 自定义 API 配置没有受 `chatModelMode` 控制。
+- 解决方案：提高 Switch unchecked 灰度；Chat 模型默认只显示当前模型说明，选择自定义后再展开 Base URL / Model / API Key 配置；STT/TTS 默认模型说明也统一放到左侧标题下方。
+- 涉及文件：`src/components/ui/switch.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：设置项应让“默认/自定义”的信息层级一致，默认态展示摘要，自定义态再展示可编辑配置。
+- 是否需更新技术文档：否。

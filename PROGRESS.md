@@ -1621,3 +1621,10 @@
 - Chat/语音：Chat 模型卡片中先显示当前默认模型，API 添加按钮右对齐；System Prompt 和宠物名字合并在同一卡片；语音模型卡片按 STT、TTS、语音设置分组。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积与 dynamic import 提示。
 - 文件：main.cjs, App.tsx, PetAvatar.tsx, SettingsPanel.tsx, settingsStore.ts, ISSUES.md, PROGRESS.md
+
+### R209. 模型设置展开逻辑与开关可见度（2026-05-10）
+- 开关：Switch 关闭态从接近背景的浅色改为更清晰的灰色，暗色模式也提高对比度。
+- Chat 模型：默认状态只在模型标题下方展示 `CloseAI · gpt-4o-mini`；选择自定义后才展开 Base URL / Model / API Key 配置列表。
+- 语音模型：STT / TTS 的默认模型信息移到左侧标题下方，和 Chat 模型保持一致。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积与 dynamic import 提示。
+- 文件：switch.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
