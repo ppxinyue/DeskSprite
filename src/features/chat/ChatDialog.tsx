@@ -1,18 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Check, ChevronDown, Columns3, Copy, Grid2X2, ImagePlus, Mic, PanelRight, Plus, Rows3, Speaker, X } from 'lucide-react';
+import { Check, ChevronDown, Columns3, Grid2X2, PanelRight, Plus, Rows3, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { PulseDot } from '@/components/loading-ui/pulse-dot';
 import { useChatStore, createMessage } from './chatStore';
+import { Composer, MessageBubble, type SelectedImage } from './ChatPrimitives';
 import { useApiConfigStore } from '@/features/settings/apiConfigStore';
 import { useSettingsStore, type AppSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
 import { streamChat } from '@/features/ai/aiService';
 import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
 import { getProviderName } from '@/features/ai/providers';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
-import { speakWithCloudVoice, stopCloudVoice, transcribeWithCloudVoice } from '@/features/voice/voiceService';
+import { speakWithCloudVoice, transcribeWithCloudVoice } from '@/features/voice/voiceService';
 import type { ApiConfig } from '@/features/ai/types';
 import {
   getMessages,
@@ -21,14 +20,6 @@ import {
   getConversations,
 } from '@/lib/db';
 import type { ChatMessage } from './chatStore';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-
-interface SelectedImage {
-  path: string;
-  name: string;
-  dataUrl: string;
-}
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']);
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
@@ -844,23 +835,6 @@ function fileToDataUrl(file: File) {
   });
 }
 
-async function clipboardImageToSelectedImage(event: React.ClipboardEvent): Promise<SelectedImage | null> {
-  const files = Array.from(event.clipboardData.files ?? []);
-  const directFile = files.find((file) => file.type.startsWith('image/'));
-  if (directFile) return fileToSelectedImage(directFile, '剪贴板图片');
-
-  const items = Array.from(event.clipboardData.items ?? []);
-  const imageItem = items.find((item) => item.kind === 'file' && item.type.startsWith('image/'));
-  const file = imageItem?.getAsFile();
-  if (!file) return null;
-  return fileToSelectedImage(file, `clipboard-${Date.now()}`);
-}
-
-function clipboardHasImage(event: React.ClipboardEvent) {
-  return Array.from(event.clipboardData.files ?? []).some((file) => file.type.startsWith('image/')) ||
-    Array.from(event.clipboardData.items ?? []).some((item) => item.kind === 'file' && item.type.startsWith('image/'));
-}
-
 function supportsImageOrFileInput(config: ApiConfig) {
   const provider = String(config.provider).toLowerCase();
   const model = config.model.toLowerCase();
@@ -1233,192 +1207,6 @@ function ModelControl({
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-export function Composer({
-  input,
-  isStreaming,
-  isListening = false,
-  onImagePick,
-  onInputChange,
-  onKeyDown,
-  onPasteImage,
-  onSubmit,
-  onVoiceInput,
-  selectedImage,
-  textareaRef,
-  compact = false,
-  compactFontSize = 13,
-  error = null,
-  shakeKey = 0,
-}: {
-  input: string;
-  isStreaming: boolean;
-  isListening?: boolean;
-  onImagePick?: () => void;
-  onInputChange: (value: string) => void;
-  onKeyDown: (e: React.KeyboardEvent) => void;
-  onPasteImage?: (image: SelectedImage) => void;
-  onSubmit: () => void;
-  onVoiceInput?: () => void;
-  selectedImage?: SelectedImage | null;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  compact?: boolean;
-  compactFontSize?: number;
-  error?: string | null;
-  shakeKey?: number;
-}) {
-  async function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
-    if (!clipboardHasImage(event)) return;
-    event.preventDefault();
-    const image = await clipboardImageToSelectedImage(event);
-    if (!image) return;
-    onPasteImage?.(image);
-  }
-
-  return (
-    <div className={`${compact ? "p-1.5 pt-1" : "p-2.5"} min-w-0 max-w-full overflow-x-hidden`}>
-      {selectedImage && (
-        <div className={`mb-1.5 flex items-center gap-1.5 rounded-[7px] border px-2 py-1 text-[12px] leading-[1.5] text-[var(--color-chat-muted)] ${error ? 'animate-input-shake border-destructive/45 bg-destructive/5' : 'border-[var(--color-chat-border)] bg-background'}`}>
-          <img src={selectedImage.dataUrl} alt="" className="h-9 w-9 rounded-[9px] object-cover shadow-sm" />
-          <span className="min-w-0 flex-1 truncate">{selectedImage.name}</span>
-        </div>
-      )}
-      <form
-        key={shakeKey}
-        className={`${compact ? 'rounded-[7px]' : 'rounded-[9px]'} ${error ? 'animate-input-shake border-destructive/55' : 'border-[var(--color-chat-border)]'} flex w-full min-w-0 max-w-full items-end gap-0.5 overflow-hidden border bg-[var(--surface-flat)] p-0.5 shadow-[0_1px_0_rgba(255,255,255,0.55)_inset,0_6px_18px_rgba(42,38,31,0.06)] transition-[border-color,box-shadow,background] hover:border-[var(--color-chat-accent)] focus-within:border-[var(--color-chat-accent)] focus-within:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-chat-accent)_13%,transparent)] dark:bg-[var(--surface-flat)]`}
-        onSubmit={(e) => {
-          e.preventDefault();
-          onSubmit();
-        }}
-      >
-        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'ml-0.5 h-7 w-7 rounded-[6px]'} p-0 text-[var(--text-secondary)] transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]`} title="上传图片" aria-label="上传图片" onClick={onImagePick}>
-          <ImagePlus className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'}`} />
-        </Button>
-        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'h-7 w-7 rounded-[6px]'} p-0 transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${isListening ? 'animate-pulse text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput}>
-          <Mic className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'}`} />
-        </Button>
-        <Textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => onInputChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          onPaste={handlePaste}
-          onMouseDown={() => {
-            if (compact) invoke('focus_compact_chat_window').catch(() => {});
-          }}
-          placeholder="输入消息..."
-          className={`${compact ? 'min-h-[28px] px-1.5 py-1.5 leading-[1.35] overflow-hidden' : 'min-h-[34px] px-2 py-1.5 text-[14px] leading-[1.45] overflow-y-auto'} max-h-[112px] min-w-0 flex-1 resize-none border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
-          style={{ fontSize: compact ? compactFontSize : undefined }}
-          rows={1}
-          disabled={isStreaming}
-        />
-        <Button size="sm" type="submit" disabled={isStreaming} className={`${compact ? 'h-6 rounded-[5px] px-2 text-[10px]' : 'h-7 rounded-[6px] px-2.5 text-[11px]'} shrink-0 ${(!input.trim() && !selectedImage) ? 'opacity-55' : ''}`}>
-          发送
-        </Button>
-      </form>
-      {error && (
-        <p className="mt-2 px-1 text-[11px] leading-5 text-destructive">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-}
-
-export function MessageBubble({
-  message,
-  isStreaming = false,
-  fullWidth = false,
-  compact = false,
-  bubble = false,
-  compactFontSize = 13,
-  speakRate = 1.0,
-  onSpeak,
-}: {
-  message: ChatMessage;
-  isStreaming?: boolean;
-  fullWidth?: boolean;
-  compact?: boolean;
-  bubble?: boolean;
-  compactFontSize?: number;
-  speakRate?: number;
-  onSpeak?: (text: string, rate: number) => void;
-}) {
-  const isUser = message.role === 'user';
-  const isPending = message.role === 'assistant' && message.content === '...';
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const canSpeak = !isPending && Boolean(message.content) && !isUser;
-  const canCopy = !isPending && Boolean(message.content);
-
-  const handleSpeak = () => {
-    if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      stopCloudVoice();
-      setIsSpeaking(false);
-    } else {
-      window.speechSynthesis.cancel();
-      stopCloudVoice();
-      onSpeak?.(message.content, speakRate);
-      setIsSpeaking(true);
-      setTimeout(() => setIsSpeaking(false), message.content.length * 100);
-    }
-  };
-
-  const actionButtonClass = "flex h-7 w-7 items-center justify-center rounded-[9px] border border-[var(--color-chat-border)] bg-background/72 text-[var(--color-chat-muted)] shadow-sm backdrop-blur hover:text-[var(--color-chat-text)]";
-
-  return (
-    <div className={`group flex w-full min-w-0 max-w-full flex-col overflow-x-hidden animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'items-end' : 'items-start'}`}>
-      <div
-        className={`relative min-w-0 max-w-full overflow-hidden border leading-[1.55] text-[var(--color-chat-text)] transition-all duration-200 [overflow-wrap:anywhere] ${
-          compact ? 'rounded-[7px] px-2.5 py-1.5' : 'rounded-[9px] px-3 py-2 text-[14px] leading-[1.55]'
-        } ${
-          fullWidth ? 'max-w-full' : 'max-w-[84%]'
-        } ${
-          isUser
-            ? 'border-[var(--color-chat-bubble-border)] bg-[var(--surface-flat)] text-right shadow-[0_1px_0_rgba(255,255,255,0.55)_inset]'
-            : (compact || bubble) ? 'border-[var(--color-chat-bubble-border)] bg-[var(--surface-flat)] text-left shadow-[0_1px_0_rgba(255,255,255,0.45)_inset]' : 'border-transparent bg-transparent text-left shadow-none'
-        }`}
-        style={{ fontSize: compact ? compactFontSize : undefined }}
-      >
-        {(message.imageDataUrl || message.imageUrl) && (
-          <img src={message.imageDataUrl || message.imageUrl} alt="" className="mb-2 max-h-48 rounded-[8px] object-contain" />
-        )}
-        {isPending ? (
-          <PulseDot className="text-[var(--color-chat-muted)]" />
-        ) : isUser ? (
-          <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{cleanChatText(message.content)}</p>
-        ) : (
-          <div className="chat-markdown max-w-full overflow-hidden [overflow-wrap:anywhere]">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {cleanChatText(message.content)}
-            </ReactMarkdown>
-          </div>
-        )}
-        {isStreaming && (
-          <span className="inline-block w-1.5 h-4 bg-current animate-pulse ml-0.5" />
-        )}
-        {!compact && canSpeak && (
-          <button
-            className={`absolute top-1 hidden group-hover:flex -right-8 ${actionButtonClass}`}
-            title={isSpeaking ? '停止朗读' : '朗读'}
-            onClick={handleSpeak}
-          >
-            {isSpeaking ? <X className="h-3.5 w-3.5" /> : <Speaker className="h-3.5 w-3.5" />}
-          </button>
-        )}
-        {!compact && canCopy && (
-          <button
-            className={`absolute top-1 hidden group-hover:flex ${isUser ? '-left-8' : '-right-14'} ${actionButtonClass}`}
-            title="复制"
-            onClick={() => navigator.clipboard?.writeText(cleanChatText(message.content)).catch(() => {})}
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
     </div>
   );
 }

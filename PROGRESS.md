@@ -1662,3 +1662,12 @@
 - 通用：底部清除历史、删除 API 配置、导出资料三个隐私安全按钮移出 `SettingsGroup`，删除背后的白色背景框。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R215. 构建拆包与无效动态导入清理（2026-05-10）
+- Push：已先推送 `codex-electron-rewrite` 到远端。
+- 拆包：`SettingsPanel` 和完整 `ChatDialog` 改为 `React.lazy` 按窗口加载，pet/compact 首屏不再静态吃完整设置页和大聊天页。
+- 轻量组件：抽出 `ChatPrimitives`，App 只静态导入 compact/coding 需要的 `Composer` 和 `MessageBubble`。
+- Shim：移除 `@tauri-apps/api/core` 的无效动态导入，统一走静态 import，消除 Vite 的 `INEFFECTIVE_DYNAMIC_IMPORT` 提示。
+- 结果：主 JS 从约 684 kB 降到 467.90 kB，低于 500 kB warning 阈值；构建不再输出 chunk 体积或 dynamic import warning。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建输出主包 `index-ClaEDNe2.js` 467.90 kB / gzip 144.13 kB，未出现 chunk 体积或 dynamic import warning。
+- 文件：App.tsx, ChatDialog.tsx, ChatPrimitives.tsx, HoverInputBar.tsx, petStore.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

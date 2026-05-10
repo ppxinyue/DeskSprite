@@ -2615,3 +2615,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：同类设置控件要优先复用同一交互模式；危险操作按钮区域不一定需要和普通设置项共用卡片容器。
 - 是否需更新技术文档：否。
+
+## ISSUE-220
+- 发现时间：2026-05-10
+- 发现者：构建审查
+- 相关任务：构建拆包与无效动态导入清理
+- 严重程度：一般
+- 问题现象：`pnpm build` 报主 chunk 超过 500 kB，并提示 `src/electron-shims/core.ts` 同时被动态和静态导入，导致动态导入无法拆包。
+- 原因分析：App 顶层静态导入 `SettingsPanel` 和完整 `ChatDialog`，即使当前窗口只是 pet 也会进入主包；`petStore`、`SettingsPanel`、`HoverInputBar` 里对 `@tauri-apps/api/core` 做了动态 import，但同模块又被 App/Chat/Pet 静态 import。
+- 解决方案：将设置页和完整聊天页改为 `React.lazy`；把 compact/coding 需要的聊天基础组件抽到轻量 `ChatPrimitives`；移除无效 core 动态 import。
+- 涉及文件：`src/App.tsx`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/ChatPrimitives.tsx`, `src/features/chat/HoverInputBar.tsx`, `src/features/pet/petStore.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：多窗口 Electron 应用的入口应按窗口懒加载页面级模块；共享 shim 不适合在同一图里混用静态和动态 import。
+- 是否需更新技术文档：否。

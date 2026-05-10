@@ -2050,7 +2050,6 @@ function ImageSection() {
       alert(scheme === 'gif' ? 'GIF 方案只能上传 .gif 动图。' : '图片方案只能上传 PNG、JPG、JPEG、WEBP 或 BMP。');
     }
     if (acceptedFiles.length === 0) return;
-    const { invoke } = await import('@tauri-apps/api/core');
     for (const file of acceptedFiles) {
       try {
         const importedPath = await invoke<string>('import_pet_image', {
@@ -2102,7 +2101,6 @@ function ImageSection() {
     const confirmed = confirm(scheme === 'gif' ? '确定要删除这个 GIF 吗？' : '确定要删除这张图片吗？');
     if (confirmed) {
       try {
-        const { invoke } = await import('@tauri-apps/api/core');
         await invoke('delete_pet_image', { filePath: path });
         if (scheme === 'gif') removeUserGif(selectedState, path);
         else removeUserFrame(selectedState, path);
@@ -2124,7 +2122,6 @@ function ImageSection() {
   const handleResetAll = async () => {
     const confirmed = confirm('确定要恢复全部默认吗？这将删除所有自定义图片。');
     if (confirmed) {
-      const { invoke } = await import('@tauri-apps/api/core');
       for (const state of ALL_PET_STATES) {
         for (const path of [...userFrames[state], ...userGifs[state]]) {
           try {

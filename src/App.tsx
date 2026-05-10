@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -6,8 +6,7 @@ import { Check, MessageCircle, Minus, Maximize2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
-import { ChatDialog, Composer, MessageBubble } from "@/features/chat/ChatDialog";
-import { SettingsPanel } from "@/features/settings/SettingsPanel";
+import { Composer, MessageBubble } from "@/features/chat/ChatPrimitives";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
 import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
@@ -15,6 +14,9 @@ import { TimelineRecorder, type TimelineSnapshot } from "@/lib/timelineRecorder"
 import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
 import "./index.css";
+
+const SettingsPanel = lazy(() => import("@/features/settings/SettingsPanel").then((mod) => ({ default: mod.SettingsPanel })));
+const ChatDialog = lazy(() => import("@/features/chat/ChatDialog").then((mod) => ({ default: mod.ChatDialog })));
 
 const CHAT_HANDOFF_KEY = "desksprite:chat-handoff-conversation-id";
 const COMPACT_CHAT_KEY = "desksprite:compact-chat";
@@ -48,6 +50,10 @@ const LIVE_STATS_INTERVAL_MS = 60_000;
 const PET_PRESENCE_CHECK_INTERVAL_MS = 3000;
 const SYSTEM_ACTIVITY_POLL_INTERVAL_MS = 15_000;
 const SYSTEM_INACTIVE_THRESHOLD_MS = 60_000;
+
+function WindowLoadingFallback() {
+  return <div className="h-screen w-screen bg-background" />;
+}
 
 type PetPrompt =
   | { id: 'rest-reminder'; message: string; variant: 'rest' }
@@ -175,7 +181,13 @@ function App() {
   }, []);
 
   if (windowLabel === "settings") {
-    return <TooltipProvider><SettingsPanel /></TooltipProvider>;
+    return (
+      <TooltipProvider>
+        <Suspense fallback={<WindowLoadingFallback />}>
+          <SettingsPanel />
+        </Suspense>
+      </TooltipProvider>
+    );
   }
 
   if (windowLabel === "chat") {
@@ -186,12 +198,14 @@ function App() {
           {settings.codingModeEnabled ? (
             <CodingStandaloneDialog />
           ) : (
-            <ChatDialog
-              initialConversationId={handoffConversationId}
-              initialMode={handoffConversationId ? "history" : "new"}
-              maxHeight={760}
-              standalone
-            />
+            <Suspense fallback={<WindowLoadingFallback />}>
+              <ChatDialog
+                initialConversationId={handoffConversationId}
+                initialMode={handoffConversationId ? "history" : "new"}
+                maxHeight={760}
+                standalone
+              />
+            </Suspense>
           )}
         </div>
       </TooltipProvider>
@@ -417,16 +431,18 @@ function CompactChatWindow() {
             onContentHeightChange={handleContentHeightChange}
           />
         ) : (
-          <ChatDialog
-            key={`${session.mode}-${session.conversationId ?? 'new'}-${session.version}`}
-            initialConversationId={session.conversationId}
-            initialMode={session.mode}
-            dialogOpacity={settings.petOpacity}
-            compactFontSize={settings.compactChatFontSize}
-            maxHeight={COMPACT_CHAT_PREFERRED_HEIGHT}
-            onContentHeightChange={handleContentHeightChange}
-            onConversationChange={handleConversationChange}
-          />
+          <Suspense fallback={null}>
+            <ChatDialog
+              key={`${session.mode}-${session.conversationId ?? 'new'}-${session.version}`}
+              initialConversationId={session.conversationId}
+              initialMode={session.mode}
+              dialogOpacity={settings.petOpacity}
+              compactFontSize={settings.compactChatFontSize}
+              maxHeight={COMPACT_CHAT_PREFERRED_HEIGHT}
+              onContentHeightChange={handleContentHeightChange}
+              onConversationChange={handleConversationChange}
+            />
+          </Suspense>
         )}
       </div>
     </div>

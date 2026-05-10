@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { invoke } from '@tauri-apps/api/core';
 import type { PetState, PetMediaConfig, PetStateMediaConfig } from './animations';
 import { DEFAULT_MEDIA_CONFIG, isGifAsset } from './animations';
 
@@ -51,7 +52,6 @@ export const usePetStore = create<PetStore>((set) => ({
     set((s) => ({ mediaConfig: { ...s.mediaConfig, [state]: config } })),
   resetMediaConfig: () => set({ mediaConfig: DEFAULT_MEDIA_CONFIG }),
   loadUserFrames: async () => {
-    const { invoke } = await import('@tauri-apps/api/core');
     const states = Object.keys(DEFAULT_MEDIA_CONFIG) as PetState[];
     const results = await Promise.allSettled(
       states.map(async (state) => {

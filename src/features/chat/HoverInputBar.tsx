@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useApiConfigStore } from '@/features/settings/apiConfigStore';
 import { useSettingsStore } from '@/features/settings/settingsStore';
 import { useChatStore, createMessage } from './chatStore';
@@ -112,7 +113,6 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
             <button
               className="underline text-white/90 hover:text-white"
               onClick={async () => {
-                const { invoke } = await import('@tauri-apps/api/core');
                 invoke('show_settings_cmd').catch(() => {});
               }}
             >
