@@ -1606,3 +1606,9 @@
 - 开关与局部状态：Switch、日历选中态、API 默认标签和用量条去掉立体阴影，保持统一的 Apple 平面控件质感。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
 - 文件：index.css, button.tsx, switch.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R207. Top 软件列表扩展与时间左对齐（2026-05-10）
+- 调整：个人档案 Top 软件从 3 个扩展为 4 个，让左侧卡片高度更接近右侧全天活跃度图。
+- 布局：Top 软件右侧时间 label 改为左对齐，并继续保持不换行。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

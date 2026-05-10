@@ -905,7 +905,7 @@ function TimelineSection({
                     style={{ width: `${topApps[0]?.durationMs ? Math.max(4, (item.durationMs / topApps[0].durationMs) * 100) : 0}%` }}
                   />
                 </div>
-                <div className="whitespace-nowrap text-right text-[#687076]">{item.durationMs ? formatTimelineDuration(item.durationMs) : '-'}</div>
+                <div className="whitespace-nowrap text-left text-[#687076]">{item.durationMs ? formatTimelineDuration(item.durationMs) : '-'}</div>
               </div>
             ))}
           </div>
@@ -1821,7 +1821,7 @@ function getTopTimelineApps(entries: TimelineEntry[]): Array<{ appName: string; 
   return Array.from(durations.entries())
     .map(([appName, durationMs]) => ({ appName, durationMs }))
     .sort((a, b) => b.durationMs - a.durationMs)
-    .slice(0, 3);
+    .slice(0, 4);
 }
 
 function getTopTimelineContent(entries: TimelineEntry[], appName: string): string {

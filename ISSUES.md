@@ -2519,3 +2519,15 @@
 - 涉及文件：`src/index.css`, `src/components/ui/button.tsx`, `src/components/ui/switch.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：玻璃质感适合容器背景，但可操作控件需要更克制，主色按钮和滑动条应优先保持清晰平面语义。
 - 是否需更新技术文档：否。
+
+## ISSUE-212
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：Top 软件列表扩展与时间左对齐
+- 严重程度：一般
+- 问题现象：个人档案 Top 软件右侧时间 label 靠右对齐，视觉上和 bar 关系不够稳定；Top 软件只有 3 条时，高度比右侧全天活跃度图偏矮。
+- 原因分析：Top 软件聚合函数只截取前 3 个应用；时间列使用 `text-right`，在固定列宽下显得和 bar 分离。
+- 解决方案：Top 软件聚合改为前 4 个；时间 label 改为左对齐并保持不换行。
+- 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：并排统计卡片应尽量匹配内容密度，数值列与图形列的对齐方式要服务可读性而不是单纯贴边。
+- 是否需更新技术文档：否。
