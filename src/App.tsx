@@ -11,6 +11,7 @@ import { shouldSubmitMessage } from "@/features/chat/sendShortcut";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
 import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
+import { getThemeClassAction } from "@/lib/startupTheme";
 import { TimelineRecorder, type TimelineRecorderState, type TimelineSnapshot } from "@/lib/timelineRecorder";
 import { installDocumentTranslator } from "@/i18n";
 import type { ChatMessage } from "@/features/chat/chatStore";
@@ -173,16 +174,17 @@ function App() {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (!loaded) return;
-    if (settings.theme === "dark") root.classList.add("dark");
-    else if (settings.theme === "light") root.classList.remove("dark");
-    else {
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      const handler = (e: MediaQueryListEvent) => root.classList.toggle("dark", e.matches);
-      root.classList.toggle("dark", mq.matches);
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
-    }
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = (prefersDark: boolean) => {
+      const action = getThemeClassAction({ loaded, theme: settings.theme, prefersDark });
+      if (action === "add-dark") root.classList.add("dark");
+      if (action === "remove-dark") root.classList.remove("dark");
+    };
+    apply(mq.matches);
+    if (!loaded || settings.theme !== "system") return;
+    const handler = (e: MediaQueryListEvent) => apply(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, [loaded, settings.theme]);
 
   useEffect(() => {

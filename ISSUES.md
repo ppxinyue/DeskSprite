@@ -2975,3 +2975,15 @@
 - 涉及文件：`src/lib/db.ts`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：时间轴渲染不能假设记录完全落在单日内；查询负责找交集，渲染负责按当前视图窗口裁剪。
 - 是否需更新技术文档：否。
+
+## ISSUE-250
+- 发现时间：2026-05-11
+- 发现者：用户反馈
+- 相关任务：启动闪烁与灵宠跳动单测覆盖
+- 严重程度：一般
+- 问题现象：深色闪烁和灵宠初始跳动此前多次修复仍未稳定消失，缺少可回归验证的测试。
+- 原因分析：相关逻辑分散在 React effect 和 Electron main 进程中，依赖窗口 ready、设置 loaded、layout ready 等异步时序；没有单元测试约束时，很容易把“DOM load”误当成“真实设置/布局稳定”。
+- 解决方案：抽出可测试的主题决策和窗口显示状态机，新增 startup 测试套件，明确断言 loaded 前不得移除 `.dark`、renderer ready 前不得 show settings/chat、pet layout ready 前不得 show。
+- 涉及文件：`src/App.tsx`, `electron/main.cjs`, `src/lib/startupTheme.ts`, `src/lib/startupTheme.test.ts`, `electron/windowLifecycle.cjs`, `electron/windowLifecycle.test.cjs`, `package.json`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：启动首帧和窗口显示问题必须用状态机测试保护；否则视觉 bug 只靠手测很容易反复回归。
+- 是否需更新技术文档：否。

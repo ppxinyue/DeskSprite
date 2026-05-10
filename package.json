@@ -11,6 +11,8 @@
     "electron:build": "pnpm build && electron-builder",
     "lint": "eslint .",
     "test:timeline": "node --test src/lib/timelineRecorder.test.ts",
+    "test:startup": "node --test src/lib/startupTheme.test.ts electron/windowLifecycle.test.cjs",
+    "test": "pnpm test:timeline && pnpm test:startup",
     "preview": "vite preview"
   },
   "main": "electron/main.cjs",

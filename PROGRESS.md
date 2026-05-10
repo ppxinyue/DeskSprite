@@ -1874,3 +1874,10 @@
 - 修复：例如 23:51-00:45 的 Codex 记录，昨天显示 23:51-24:00，今天显示 00:00-00:45，不再错误画到今天 23:51-24:00。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.82 kB，未触发 chunk 体积 warning。
 - 文件：db.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R245. 启动闪烁与灵宠跳动单测覆盖（2026-05-11）
+- 抽象：将首帧主题决策抽为 `startupTheme.ts`，将 Electron 窗口延迟显示和 pet layout-ready 显示抽为 `windowLifecycle.cjs`。
+- 测试：新增 `test:startup`，覆盖深色首帧不被未加载设置覆盖、系统浅色下持久化 dark 仍生效、settings/chat 等 renderer ready 才显示、pet layout ready 前绝不 show、隐藏时取消 pending show、ready 后手动显示立即稳定。
+- 集成：`App` 使用 `getThemeClassAction`，main 进程使用可测 window lifecycle controller，`pnpm test` 同时运行 timeline 和 startup 测试。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test`、`git diff --check`、`pnpm build` 通过；生产构建主包 488.99 kB，未触发 chunk 体积 warning。
+- 文件：App.tsx, main.cjs, startupTheme.ts, startupTheme.test.ts, windowLifecycle.cjs, windowLifecycle.test.cjs, package.json, ISSUES.md, PROGRESS.md
