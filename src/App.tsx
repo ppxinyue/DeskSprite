@@ -10,7 +10,7 @@ import { ChatDialog, Composer, MessageBubble } from "@/features/chat/ChatDialog"
 import { SettingsPanel } from "@/features/settings/SettingsPanel";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
-import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordDistraction, recordFocusSession } from "@/lib/db";
+import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordDistraction, recordFocusSession, upsertTimelineEntry, type TimelineBackgroundMarker } from "@/lib/db";
 import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
 import "./index.css";
@@ -42,6 +42,8 @@ const PET_REST_ORBIT_MARGIN = 34;
 const PET_REST_ORBIT_LOOP_MS = 8_000;
 const DISTRACTION_CHECK_INTERVAL_MS = 3000;
 const DISTRACTION_WARNING_COOLDOWN_MS = 60_000;
+const TIMELINE_POLL_INTERVAL_MS = 3000;
+const TIMELINE_MIN_SEGMENT_MS = 8000;
 
 type PetPrompt =
   | { id: 'rest-reminder'; message: string; variant: 'rest' }
@@ -1534,6 +1536,99 @@ function PetWindow() {
     });
     return () => { unlisten.then((fn) => fn()); };
   }, [dialogOpen, positionCompactChatWindow]);
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
+    let disposed = false;
+    const activeRef: {
+      key: string;
+      firstSeenAt: number;
+      lastSeenAt: number;
+      segmentId: number | null;
+      appName: string;
+      windowTitle: string;
+      url: string | null;
+      backgroundMarkers: TimelineBackgroundMarker[];
+    } = {
+      key: '',
+      firstSeenAt: 0,
+      lastSeenAt: 0,
+      segmentId: null,
+      appName: '',
+      windowTitle: '',
+      url: null,
+      backgroundMarkers: [],
+    };
+
+    const persistActive = async (endedAt = Date.now()) => {
+      if (!activeRef.key || endedAt - activeRef.firstSeenAt < TIMELINE_MIN_SEGMENT_MS) return;
+      const entry = await upsertTimelineEntry({
+        id: activeRef.segmentId,
+        startedAt: activeRef.firstSeenAt,
+        endedAt,
+        appName: activeRef.appName,
+        windowTitle: activeRef.windowTitle,
+        url: activeRef.url,
+        backgroundMarkers: activeRef.backgroundMarkers,
+      });
+      if (entry) activeRef.segmentId = entry.id;
+    };
+
+    const runTimelineCheck = async () => {
+      try {
+        const result = await invoke<{
+          supported: boolean;
+          appName: string;
+          windowTitle: string;
+          url?: string | null;
+          background?: TimelineBackgroundMarker[];
+          error?: string | null;
+        }>('read_timeline_active_window');
+        if (disposed || !result.supported || result.error) return;
+        const appName = result.appName?.trim() || 'Unknown';
+        const windowTitle = result.windowTitle?.trim() || '';
+        const url = result.url?.trim() || null;
+        const key = `${appName}\n${windowTitle}\n${url ?? ''}`;
+        const checkedAt = Date.now();
+        if (!activeRef.key) {
+          activeRef.key = key;
+          activeRef.firstSeenAt = checkedAt;
+          activeRef.lastSeenAt = checkedAt;
+          activeRef.segmentId = null;
+          activeRef.appName = appName;
+          activeRef.windowTitle = windowTitle;
+          activeRef.url = url;
+          activeRef.backgroundMarkers = result.background ?? [];
+          return;
+        }
+        if (activeRef.key !== key) {
+          await persistActive(activeRef.lastSeenAt);
+          activeRef.key = key;
+          activeRef.firstSeenAt = checkedAt;
+          activeRef.lastSeenAt = checkedAt;
+          activeRef.segmentId = null;
+          activeRef.appName = appName;
+          activeRef.windowTitle = windowTitle;
+          activeRef.url = url;
+          activeRef.backgroundMarkers = result.background ?? [];
+          return;
+        }
+        activeRef.lastSeenAt = checkedAt;
+        activeRef.backgroundMarkers = result.background ?? activeRef.backgroundMarkers;
+        await persistActive(checkedAt);
+      } catch (error) {
+        if (!disposed) console.warn('Failed to record timeline:', error);
+      }
+    };
+
+    runTimelineCheck();
+    const timer = window.setInterval(runTimelineCheck, TIMELINE_POLL_INTERVAL_MS);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      persistActive(activeRef.lastSeenAt || Date.now()).catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     const unlisten = listen("compact-chat:collapsed", () => {

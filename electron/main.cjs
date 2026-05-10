@@ -309,6 +309,75 @@ return frontApp & linefeed & frontWindow
 `;
 }
 
+function timelineActiveWindowScript() {
+  return `
+set frontApp to ""
+set frontWindow to ""
+set pageUrl to ""
+set backgroundInfo to ""
+set musicRunning to false
+set spotifyRunning to false
+
+tell application "System Events"
+  set frontAppProcess to first application process whose frontmost is true
+  set frontApp to name of frontAppProcess
+  try
+    set frontWindow to name of front window of frontAppProcess
+  end try
+  try
+    if exists application process "Terminal" then
+      set backgroundInfo to backgroundInfo & "terminal|Terminal|running" & linefeed
+    end if
+  end try
+  try
+    if exists application process "iTerm2" then
+      set backgroundInfo to backgroundInfo & "terminal|iTerm2|running" & linefeed
+    end if
+  end try
+  try
+    set musicRunning to exists application process "Music"
+  end try
+  try
+    set spotifyRunning to exists application process "Spotify"
+  end try
+end tell
+
+try
+  if frontApp is "Safari" then
+    tell application "Safari"
+      set pageUrl to URL of front document
+    end tell
+  else if frontApp is "Google Chrome" or frontApp is "Chromium" or frontApp is "Brave Browser" or frontApp is "Microsoft Edge" or frontApp is "Vivaldi" or frontApp is "Arc" then
+    tell application frontApp
+      set pageUrl to URL of active tab of front window
+    end tell
+  end if
+end try
+
+try
+  if musicRunning then
+    tell application "Music"
+      if player state is playing then
+        set backgroundInfo to backgroundInfo & "music|Music|" & name of current track & " - " & artist of current track & linefeed
+      end if
+    end tell
+  end if
+end try
+
+try
+  if spotifyRunning then
+    tell application "Spotify"
+      if player state is playing then
+        set backgroundInfo to backgroundInfo & "music|Spotify|" & name of current track & " - " & artist of current track & linefeed
+      end if
+    end tell
+  end if
+end try
+
+return frontApp & linefeed & frontWindow & linefeed & pageUrl & linefeed & backgroundInfo
+`;
+}
+
 function readActiveWindow() {
   if (process.platform !== 'darwin') {
     return Promise.resolve({ supported: false, appName: '', windowTitle: '', error: 'unsupported' });
@@ -330,6 +399,49 @@ function readActiveWindow() {
         appName: appName.trim(),
         windowTitle: titleParts.join('\n').trim(),
         error: null,
+      });
+    });
+  });
+}
+
+function parseTimelineBackground(raw) {
+  return String(raw || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [type = 'other', name = '', detail = ''] = line.split('|');
+      return { type, name, detail };
+    })
+    .filter((item) => item.name);
+}
+
+function readTimelineActiveWindow() {
+  if (process.platform !== 'darwin') {
+    return Promise.resolve({ supported: false, appName: '', windowTitle: '', url: '', background: [], error: 'unsupported' });
+  }
+  return new Promise((resolve) => {
+    execFile('/usr/bin/osascript', ['-e', timelineActiveWindowScript()], { timeout: 2500 }, (error, stdout) => {
+      if (error) {
+        resolve({
+          supported: true,
+          appName: '',
+          windowTitle: '',
+          url: '',
+          background: [],
+          error: error.message || String(error),
+        });
+        return;
+      }
+      const [appName = '', windowTitle = '', url = '', ...backgroundParts] = String(stdout || '').trimEnd().split('\n');
+      resolve({
+        supported: true,
+        appName: appName.trim(),
+        windowTitle: windowTitle.trim(),
+        url: url.trim(),
+        background: parseTimelineBackground(backgroundParts.join('\n')),
+        error: null,
+        checkedAt: Date.now(),
       });
     });
   });
@@ -2044,6 +2156,7 @@ const handlers = {
   synthesize_speech: synthesizeSpeech,
   can_start_speech_recognition: () => true,
   check_distraction: checkDistraction,
+  read_timeline_active_window: readTimelineActiveWindow,
   coding_get_state: () => publishCodingState(),
   coding_get_claude_state: () => publishClaudeCodingState(),
   coding_get_inherited_state: getInheritedCodingState,
@@ -2147,6 +2260,7 @@ function registerProtocols() {
 
 app.whenReady().then(() => {
   registerProtocols();
+  app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
   setAppIcon('assets/idle/png/idle.png');
   createPetWindow();
   ensureTopmostGuard();

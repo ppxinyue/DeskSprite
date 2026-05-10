@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { BarChart3, Bell, Bot, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Keyboard, Loader2, Palette, PawPrint, Pencil, Plus, Shield, Trash2, UserRound } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { BarChart3, Bell, Bot, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Gamepad2, Globe2, Keyboard, Loader2, MessageSquareText, Monitor, Music2, Palette, PawPrint, Pencil, Plus, Shield, Terminal, Trash2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +16,7 @@ import { DEFAULT_SYSTEM_PROMPT, ORB_SYSTEM_PROMPT, normalizeOrbSystemPrompt, nor
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
 import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
-import { getConversations, getFocusStatsDays, getMessages, getSetting, getSystemPrompt, setSetting, updateSystemPrompt, type FocusStatsDay } from '@/lib/db';
+import { getConversations, getFocusStatsDays, getMessages, getSetting, getSystemPrompt, getTimelineEntries, setSetting, updateSystemPrompt, type FocusStatsDay, type TimelineCategory, type TimelineEntry } from '@/lib/db';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, isBuiltinAsset, normalizePetMediaConfig, type PetStateMediaConfig } from '@/features/pet/animations';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
@@ -217,13 +217,31 @@ function ProfileSection() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey(getLocalDateKey()));
   const [stats, setStats] = useState<FocusStatsDay[]>([]);
+  const [timelineEntries, setTimelineEntries] = useState<TimelineEntry[]>([]);
+  const [selectedTimelineId, setSelectedTimelineId] = useState<number | null>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    getFocusStatsDays(14, selectedDate)
-      .then(setStats)
-      .catch(() => setStats([]));
+  const loadProfileData = useCallback(() => {
+    Promise.all([
+      getFocusStatsDays(14, selectedDate),
+      getTimelineEntries(selectedDate),
+    ])
+      .then(([nextStats, nextTimeline]) => {
+        setStats(nextStats);
+        setTimelineEntries(nextTimeline);
+        setSelectedTimelineId((id) => nextTimeline.some((entry) => entry.id === id) ? id : nextTimeline.at(-1)?.id ?? null);
+      })
+      .catch(() => {
+        setStats([]);
+        setTimelineEntries([]);
+      });
   }, [selectedDate]);
+
+  useEffect(() => {
+    loadProfileData();
+    const timer = window.setInterval(loadProfileData, 30_000);
+    return () => window.clearInterval(timer);
+  }, [loadProfileData]);
 
   useEffect(() => {
     setCalendarMonth(getMonthKey(selectedDate));
@@ -352,6 +370,12 @@ function ProfileSection() {
           <MiniMetric label="平均分心次数" value={`${(totalDistractions / Math.max(1, stats.length)).toFixed(1)} 次`} />
         </div>
       </SettingsGroup>
+
+      <TimelineSection
+        entries={timelineEntries}
+        selectedId={selectedTimelineId}
+        onSelect={setSelectedTimelineId}
+      />
     </>
   );
 }
@@ -371,6 +395,169 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
       <div className="text-[11px] text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-[13px] font-semibold text-foreground">{value}</div>
     </div>
+  );
+}
+
+const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
+  label: string;
+  color: string;
+  soft: string;
+  Icon: typeof Monitor;
+}> = {
+  coding: { label: 'Coding', color: '#3b9eff', soft: 'rgba(59,158,255,0.16)', Icon: Terminal },
+  chat: { label: 'Chat', color: '#30a46c', soft: 'rgba(48,164,108,0.14)', Icon: MessageSquareText },
+  browser: { label: '浏览器', color: '#8b8d98', soft: 'rgba(139,141,152,0.16)', Icon: Globe2 },
+  office: { label: '办公', color: '#ad7f58', soft: 'rgba(173,127,88,0.15)', Icon: BriefcaseBusiness },
+  entertainment: { label: '娱乐', color: '#e93d82', soft: 'rgba(233,61,130,0.13)', Icon: Gamepad2 },
+  other: { label: '其他', color: '#6f6f74', soft: 'rgba(111,111,116,0.12)', Icon: Monitor },
+};
+
+function TimelineSection({
+  entries,
+  selectedId,
+  onSelect,
+}: {
+  entries: TimelineEntry[];
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
+}) {
+  const selected = entries.find((entry) => entry.id === selectedId) ?? entries.at(-1) ?? null;
+  const topApps = getTopTimelineApps(entries);
+  const totalMs = entries.reduce((sum, entry) => sum + getTimelineDurationMs(entry), 0);
+  const backgroundMarkers = entries.flatMap((entry) => entry.backgroundMarkers.map((marker) => ({
+    ...marker,
+    entryId: entry.id,
+    startedAt: entry.startedAt,
+    endedAt: entry.endedAt,
+  })));
+
+  return (
+    <SettingsGroup className="mt-4 px-4 py-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+            <Clock3 className="h-4 w-4 text-muted-foreground" />
+            Timeline
+          </div>
+          <div className="mt-1 text-[11px] text-muted-foreground">
+            记录超过 8 秒的前台窗口，浏览器会尽量保留当前网站
+          </div>
+        </div>
+        <div className="text-right text-[11px] text-muted-foreground">
+          {entries.length} 段 · {formatTimelineDuration(totalMs)}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto pb-2">
+        <div className="min-w-[960px]">
+          <div className="relative h-[108px] rounded-[10px] border border-[#dfe3e6] bg-[#f8f9fa] px-3 py-3 dark:border-white/10 dark:bg-white/[0.035]">
+            <div className="absolute inset-x-3 top-1/2 h-px bg-[#d7dbdf] dark:bg-white/10" />
+            {[0, 6, 12, 18, 24].map((hour) => (
+              <div
+                key={hour}
+                className="absolute top-3 h-[78px] border-l border-[#eceef0] text-[10px] text-[#8b8d98] dark:border-white/7"
+                style={{ left: `calc(12px + ${(hour / 24) * 100}% - ${(hour === 24 ? 24 : 0)}px)` }}
+              >
+                <span className="ml-1">{String(hour).padStart(2, '0')}:00</span>
+              </div>
+            ))}
+
+            {entries.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center text-[12px] text-muted-foreground">
+                今天还没有足够长的焦点窗口记录
+              </div>
+            ) : entries.map((entry) => (
+              <TimelineSegment
+                key={entry.id}
+                entry={entry}
+                selected={entry.id === selected?.id}
+                onSelect={() => onSelect(entry.id)}
+              />
+            ))}
+          </div>
+
+          {backgroundMarkers.length > 0 && (
+            <div className="mt-2 flex min-h-7 items-center gap-2 rounded-[9px] border border-[#e6e8eb] bg-[#fbfcfd] px-3 py-1.5 dark:border-white/10 dark:bg-white/[0.03]">
+              <Music2 className="h-3.5 w-3.5 text-[#8b8d98]" />
+              <div className="flex min-w-0 flex-wrap gap-1.5">
+                {backgroundMarkers.slice(-8).map((marker, index) => (
+                  <span
+                    key={`${marker.entryId}-${marker.type}-${marker.name}-${index}`}
+                    className="max-w-[220px] truncate rounded-full border border-[#dfe3e6] bg-white px-2 py-0.5 text-[10px] text-[#687076] shadow-[0_1px_0_rgba(255,255,255,0.8)_inset] dark:border-white/10 dark:bg-white/5 dark:text-white/60"
+                    title={`${marker.name} · ${marker.detail}`}
+                  >
+                    {marker.name}{marker.detail ? ` · ${marker.detail}` : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {selected && (
+        <div className="mt-3 rounded-[10px] border border-[#dfe3e6] bg-[#fbfcfd] p-3 dark:border-white/10 dark:bg-white/[0.035]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
+                {(() => {
+                  const Icon = TIMELINE_CATEGORY_META[selected.category].Icon;
+                  return <Icon className="h-4 w-4" style={{ color: TIMELINE_CATEGORY_META[selected.category].color }} />;
+                })()}
+                <span className="truncate">{selected.appName}</span>
+                {selected.domain && <span className="rounded-full bg-[#eef0f2] px-2 py-0.5 text-[10px] text-[#687076] dark:bg-white/10 dark:text-white/60">{selected.domain}</span>}
+              </div>
+              <div className="mt-1 line-clamp-2 text-[12px] leading-5 text-muted-foreground">{selected.windowTitle || '无窗口标题'}</div>
+              {selected.url && <div className="mt-1 truncate text-[11px] text-[#687076]">{selected.url}</div>}
+            </div>
+            <div className="shrink-0 text-right text-[11px] text-muted-foreground">
+              <div>{formatTimelineClock(selected.startedAt)} - {formatTimelineClock(selected.endedAt)}</div>
+              <div className="mt-0.5 font-medium text-foreground">{formatTimelineDuration(getTimelineDurationMs(selected))}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {topApps.length > 0 ? topApps.map((item, index) => (
+          <MiniMetric key={item.appName} label={`Top ${index + 1} · ${item.appName}`} value={formatTimelineDuration(item.durationMs)} />
+        )) : (
+          <>
+            <MiniMetric label="Top 1 软件" value="暂无" />
+            <MiniMetric label="Top 2 软件" value="暂无" />
+            <MiniMetric label="Top 3 软件" value="暂无" />
+          </>
+        )}
+      </div>
+    </SettingsGroup>
+  );
+}
+
+function TimelineSegment({ entry, selected, onSelect }: { entry: TimelineEntry; selected: boolean; onSelect: () => void }) {
+  const meta = TIMELINE_CATEGORY_META[entry.category];
+  const left = `${getTimelineDayProgress(entry.startedAt) * 100}%`;
+  const width = `${Math.max(0.7, (getTimelineDurationMs(entry) / 86_400_000) * 100)}%`;
+  const Icon = meta.Icon;
+  return (
+    <button
+      type="button"
+      className={`group absolute top-[38px] h-9 min-w-[10px] overflow-visible rounded-[7px] border transition-all duration-150 ${
+        selected ? 'border-[#1c2024] shadow-[0_8px_22px_rgba(28,32,36,0.14)]' : 'border-white/70 hover:border-[#c1c8cd] hover:shadow-[0_7px_18px_rgba(28,32,36,0.10)]'
+      }`}
+      style={{ left, width, backgroundColor: meta.soft }}
+      onClick={onSelect}
+      title={`${entry.appName} · ${formatTimelineClock(entry.startedAt)} - ${formatTimelineClock(entry.endedAt)}`}
+    >
+      <span className="flex h-full min-w-0 items-center gap-1.5 px-2 text-left">
+        <Icon className="h-3.5 w-3.5 shrink-0" style={{ color: meta.color }} />
+        <span className="truncate text-[11px] font-medium text-[#3a3d40] dark:text-white/74">{entry.domain || entry.appName}</span>
+      </span>
+      <span className="pointer-events-none absolute bottom-[42px] left-1 hidden w-60 rounded-[9px] border border-[#dfe3e6] bg-white p-2 text-left text-[11px] text-[#687076] shadow-[0_14px_40px_rgba(28,32,36,0.16)] group-hover:block dark:border-white/10 dark:bg-[#1c1c1f] dark:text-white/70">
+        <span className="block font-semibold text-[#1c2024] dark:text-white">{entry.appName}</span>
+        <span className="mt-1 block line-clamp-2">{entry.windowTitle || '无窗口标题'}</span>
+        <span className="mt-1 block">{formatTimelineClock(entry.startedAt)} - {formatTimelineClock(entry.endedAt)} · {formatTimelineDuration(getTimelineDurationMs(entry))}</span>
+      </span>
+    </button>
   );
 }
 
@@ -948,6 +1135,38 @@ function formatFocusDuration(ms: number): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
+}
+
+function getTimelineDurationMs(entry: TimelineEntry): number {
+  return Math.max(0, new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime());
+}
+
+function getTimelineDayProgress(iso: string): number {
+  const date = new Date(iso);
+  return ((date.getHours() * 60 + date.getMinutes()) * 60 + date.getSeconds()) / 86_400;
+}
+
+function formatTimelineClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function formatTimelineDuration(ms: number): string {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 60) return `${minutes} 分钟`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
+}
+
+function getTopTimelineApps(entries: TimelineEntry[]): Array<{ appName: string; durationMs: number }> {
+  const durations = new Map<string, number>();
+  for (const entry of entries) {
+    durations.set(entry.appName, (durations.get(entry.appName) ?? 0) + getTimelineDurationMs(entry));
+  }
+  return Array.from(durations.entries())
+    .map(([appName, durationMs]) => ({ appName, durationMs }))
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .slice(0, 3);
 }
 
 const THEME_OPTIONS: { id: import('./settingsStore').Theme; title: string; description: string }[] = [

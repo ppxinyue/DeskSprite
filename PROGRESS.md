@@ -1315,3 +1315,13 @@
 - 高度策略：候选位置会按安全工作区、最小高度和期望高度打分，优先选择完整显示且高度损失最少的位置。
 - 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R170. 自动记录焦点 Timeline（2026-05-10）
+- 启动：Electron ready 阶段默认开启 macOS 登录项，让 DeskSprite 随系统启动。
+- 采集：主进程新增 timeline active window 快照，读取前台 app、窗口标题、浏览器当前 URL，并附带 Music / Spotify / Terminal / iTerm2 等轻量后台标记。
+- 记录：pet 主窗口每 3 秒采样一次，前台窗口稳定超过 8 秒后写入本地 timeline，并持续更新当前段的结束时间。
+- 存储：本地 storage 增加 `timelineEntries`，按天保存 app、标题、URL、域名、分类和后台标记；老数据自动补齐新字段。
+- 展示：个人档案新增横向 Timeline，可左右滑动，hover / 点击时间段查看详情，并展示后台标记和 Top3 软件统计卡片。
+- 风格：Timeline 采用 Apple / Radix 风格的低对比浅灰、细边框、柔和色块和基础分类图标。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。
+- 文件：main.cjs, App.tsx, db.ts, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

@@ -38,6 +38,27 @@ export type FocusStatsDay = {
   distractions: number;
 };
 
+export type TimelineCategory = 'coding' | 'chat' | 'browser' | 'office' | 'entertainment' | 'other';
+
+export type TimelineBackgroundMarker = {
+  type: string;
+  name: string;
+  detail: string;
+};
+
+export type TimelineEntry = {
+  id: number;
+  date: string;
+  startedAt: string;
+  endedAt: string;
+  appName: string;
+  windowTitle: string;
+  url: string | null;
+  domain: string | null;
+  category: TimelineCategory;
+  backgroundMarkers: TimelineBackgroundMarker[];
+};
+
 type Store = {
   apiConfigs: ApiConfigRow[];
   systemPrompt: string;
@@ -46,11 +67,13 @@ type Store = {
   settings: Record<string, string>;
   usageLogs: Array<Record<string, unknown>>;
   focusStats: Record<string, FocusStatsDay>;
+  timelineEntries: TimelineEntry[];
   nextIds: {
     apiConfig: number;
     conversation: number;
     message: number;
     usageLog: number;
+    timelineEntry: number;
   };
 };
 
@@ -69,11 +92,13 @@ function createStore(): Store {
     settings: {},
     usageLogs: [],
     focusStats: {},
+    timelineEntries: [],
     nextIds: {
       apiConfig: 1,
       conversation: 1,
       message: 1,
       usageLog: 1,
+      timelineEntry: 1,
     },
   };
 }
@@ -82,7 +107,17 @@ function loadStore(): Store {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (!raw) return createStore();
-    return { ...createStore(), ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    const base = createStore();
+    return {
+      ...base,
+      ...parsed,
+      timelineEntries: Array.isArray(parsed.timelineEntries) ? parsed.timelineEntries : [],
+      nextIds: {
+        ...base.nextIds,
+        ...(parsed.nextIds ?? {}),
+      },
+    };
   } catch {
     return createStore();
   }
@@ -103,6 +138,32 @@ function addDays(dateKey: string, offset: number) {
   const date = new Date(`${dateKey}T00:00:00`);
   date.setDate(date.getDate() + offset);
   return localDateKey(date);
+}
+
+function domainFromUrl(url: string | null | undefined) {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+function classifyTimelineCategory(appName: string, windowTitle: string, url: string | null | undefined): TimelineCategory {
+  const app = appName.toLowerCase();
+  const title = windowTitle.toLowerCase();
+  const domain = domainFromUrl(url)?.toLowerCase() ?? '';
+  if (/(terminal|iterm|warp|cursor|visual studio code|xcode|github|codex|claude)/.test(app)) return 'coding';
+  if (/(wechat|微信|qq|feishu|飞书|slack|discord|telegram|messages|mail|outlook|teams)/.test(app)) return 'chat';
+  if (/(safari|chrome|chromium|brave|edge|arc|firefox|vivaldi)/.test(app)) {
+    if (/(youtube|bilibili|netflix|twitch|douyin|tiktok|weibo|xiaohongshu|reddit|instagram|twitter|x\.com)/.test(`${domain} ${title}`)) {
+      return 'entertainment';
+    }
+    return 'browser';
+  }
+  if (/(music|spotify|steam|网易云|vlc|quicktime|tv|podcasts)/.test(app)) return 'entertainment';
+  if (/(pages|numbers|keynote|word|excel|powerpoint|preview|finder|notion|obsidian|figma|photoshop|illustrator)/.test(app)) return 'office';
+  return 'other';
 }
 
 function ensureFocusStatsDay(store: Store, dateKey: string): FocusStatsDay {
@@ -331,4 +392,65 @@ export async function getFocusStatsDays(days = 14, endDate = localDateKey()): Pr
     const day = store.focusStats[date];
     return day ? { ...day } : { date, focusMs: 0, focusSessions: 0, distractions: 0 };
   });
+}
+
+export async function upsertTimelineEntry({
+  id,
+  startedAt,
+  endedAt,
+  appName,
+  windowTitle,
+  url,
+  backgroundMarkers,
+}: {
+  id?: number | null;
+  startedAt: number;
+  endedAt: number;
+  appName: string;
+  windowTitle: string;
+  url?: string | null;
+  backgroundMarkers?: TimelineBackgroundMarker[];
+}): Promise<TimelineEntry | null> {
+  const start = Math.min(startedAt, endedAt);
+  const end = Math.max(startedAt, endedAt);
+  if (end - start < 1000) return null;
+  return mutate((store) => {
+    const normalizedUrl = url?.trim() || null;
+    const domain = domainFromUrl(normalizedUrl);
+    const category = classifyTimelineCategory(appName, windowTitle, normalizedUrl);
+    const next: TimelineEntry = {
+      id: id ?? store.nextIds.timelineEntry,
+      date: localDateKey(new Date(end)),
+      startedAt: new Date(start).toISOString(),
+      endedAt: new Date(end).toISOString(),
+      appName,
+      windowTitle,
+      url: normalizedUrl,
+      domain,
+      category,
+      backgroundMarkers: backgroundMarkers ?? [],
+    };
+    const existingIndex = id ? store.timelineEntries.findIndex((entry) => entry.id === id) : -1;
+    if (existingIndex >= 0) {
+      store.timelineEntries[existingIndex] = next;
+    } else {
+      store.timelineEntries.push(next);
+      store.nextIds.timelineEntry = Math.max(store.nextIds.timelineEntry + 1, next.id + 1);
+    }
+    const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+    store.timelineEntries = store.timelineEntries.filter((entry) => new Date(entry.endedAt).getTime() >= cutoff);
+    return { ...next, backgroundMarkers: next.backgroundMarkers.map((marker) => ({ ...marker })) };
+  });
+}
+
+export async function getTimelineEntries(date = localDateKey()): Promise<TimelineEntry[]> {
+  return loadStore().timelineEntries
+    .filter((entry) => entry.date === date)
+    .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
+    .map((entry) => ({
+      ...entry,
+      backgroundMarkers: Array.isArray(entry.backgroundMarkers)
+        ? entry.backgroundMarkers.map((marker) => ({ ...marker }))
+        : [],
+    }));
 }
