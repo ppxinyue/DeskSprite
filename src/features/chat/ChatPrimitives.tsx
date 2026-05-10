@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Check, Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -140,10 +140,11 @@ export function Composer({
 
 function AudioWaveform({ level, compact }: { level: number; compact: boolean }) {
   const clamped = Math.max(0, Math.min(1, level));
-  const voiceAmount = clamped < 0.035 ? 0 : clamped;
+  const voiceAmount = clamped < 0.01 ? 0 : Math.min(1, (clamped - 0.01) * 3.2);
   const barCount = compact ? 42 : 54;
   const centerIndex = Math.floor(barCount * 0.52);
   const [samples, setSamples] = useState<number[]>(() => Array.from({ length: centerIndex + 1 }, () => 0));
+  const latestVoiceAmountRef = useRef(0);
   const shapedSamples = useMemo(
     () => Array.from({ length: barCount }, (_, index) => {
       if (index > centerIndex) return 0;
@@ -155,15 +156,19 @@ function AudioWaveform({ level, compact }: { level: number; compact: boolean }) 
   const voiceRange = compact ? 15 : 18;
 
   useEffect(() => {
+    latestVoiceAmountRef.current = voiceAmount;
+  }, [voiceAmount]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => {
       setSamples((current) => {
-        const nextSample = voiceAmount;
+        const nextSample = latestVoiceAmountRef.current;
         const next = [nextSample, ...current];
         return next.slice(0, centerIndex + 1);
       });
-    }, 320);
+    }, 180);
     return () => window.clearInterval(timer);
-  }, [centerIndex, voiceAmount]);
+  }, [centerIndex]);
 
   return (
     <div className={`${compact ? 'h-7' : 'h-8'} relative min-w-0 flex-1 overflow-hidden rounded-[6px] bg-transparent`}>
@@ -171,7 +176,7 @@ function AudioWaveform({ level, compact }: { level: number; compact: boolean }) 
         {shapedSamples.map((sample, index) => (
           <span
             key={index}
-            className="block w-[2px] rounded-full bg-[var(--color-chat-text)] opacity-80 transition-[height,opacity] duration-300 ease-out"
+            className="block w-[2px] rounded-full bg-[var(--color-chat-text)] opacity-80 transition-[height,opacity] duration-200 ease-out"
             style={{
               height: `${silentHeight + sample * voiceRange}px`,
               opacity: 0.38 + sample * 0.46,

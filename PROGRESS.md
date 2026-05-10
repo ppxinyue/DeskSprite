@@ -1770,3 +1770,10 @@
 - 模型：从 `AppSettings` 和默认设置中移除 `wakeWord`、`wakeWordEnabled` 字段；旧本地存储键会被忽略。
 - 验证：`rg "Voice Wake|Wake Word|语音唤醒|唤醒词|wakeWord|wakeWordEnabled|wake word" src electron` 无结果；`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过。
 - 文件：App.tsx, SettingsPanel.tsx, settingsStore.ts, i18n.ts, ISSUES.md, PROGRESS.md
+
+### R230. 修复录音波形采样器被高频音量重置（2026-05-10）
+- 修复：`AudioWaveform` 的采样 interval 不再依赖高频变化的 `voiceAmount`，改为稳定 interval + ref 读取最新音量，避免定时器不断重建导致波形看起来静止。
+- 音量：降低静音阈值并加入视觉增益，小声输入也能推动中间采样柱高度变化。
+- 速度：采样节奏调整为 180ms，配合 200ms 过渡，保持录音历史向左推进的可见动态。
+- 验证：`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm test:timeline`、`pnpm build` 通过；构建未出现 chunk 体积或 dynamic import warning。
+- 文件：ChatPrimitives.tsx, ISSUES.md, PROGRESS.md

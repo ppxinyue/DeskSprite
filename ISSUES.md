@@ -2795,3 +2795,15 @@
 - 涉及文件：`src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/features/settings/settingsStore.ts`, `src/i18n.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：暂缓功能应同时移除入口和运行逻辑，尤其是会占用麦克风或系统权限的后台监听。
 - 是否需更新技术文档：否。
+
+## ISSUE-235
+- 发现时间：2026-05-10
+- 发现者：用户反馈
+- 相关任务：修复录音波形采样器被高频音量重置
+- 严重程度：一般
+- 问题现象：录音波形看起来完全静止，也没有明显随音量变化。
+- 原因分析：`AudioWaveform` 的采样 `setInterval` 依赖 `voiceAmount`，而 `voiceAmount` 由 AudioContext 高频更新；React effect 不断清理并重建 interval，导致采样推进经常还没触发就被重置。音量阈值也偏高，小声输入容易被当成静音。
+- 解决方案：用 `useRef` 保存最新音量，让 interval 只按 `centerIndex` 建立一次并稳定推进；降低静音阈值，对小音量做视觉增益。
+- 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：动画采样器不能依赖高频传感器值创建/销毁；高频值应进 ref，采样时按固定时钟读取。
+- 是否需更新技术文档：否。
