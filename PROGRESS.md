@@ -1642,3 +1642,10 @@
 - 生效：语音自定义配置列表增加“使用此配置”，点击后把该配置同步到对应 STT/TTS 实际运行字段，并显示“使用中”。
 - 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R212. 外观自定义形象与动作说明调整（2026-05-10）
+- 外观：将“形象自定义”改名为“自定义形象”，并移动到“灵宠动作”之前。
+- 自定义形象：GIF 动图 / 图片方案按钮改为单行显示数量，避免 `GIF 动图（4 个）` 与 `图片（4 张）` 断成两行。
+- 灵宠动作：增加说明“灵宠形象使用 GIF 动图时，不叠加动作效果”。
+- 验证：`node --check electron/main.cjs`、`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 dynamic import 与 chunk 体积提示。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md

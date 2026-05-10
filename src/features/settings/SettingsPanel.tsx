@@ -1371,27 +1371,30 @@ function AppearanceSection({
       </SettingsGroup>
 
       {orbMode ? (
+        <CollapsedUnavailableSection title="自定义形象" reason="Orb 模式由程序绘制，图片与 GIF 设置已收起" />
+      ) : (
+        <>
+          <SectionTitle>自定义形象</SectionTitle>
+          <ImageSection />
+        </>
+      )}
+
+      {orbMode ? (
         <CollapsedUnavailableSection title="灵宠动作" reason="Orb 模式使用代码动效，不需要图片动作参数" />
       ) : (
         <>
           <SectionTitle>灵宠动作</SectionTitle>
           <SettingsGroup>
             <div className="px-4 py-4">
+              <p className="mb-3 text-[12px] leading-relaxed text-muted-foreground">
+                灵宠形象使用 GIF 动图时，不叠加动作效果
+              </p>
               <PetMotionControls
                 value={draft.petMotions}
                 onChange={(petMotions) => update('petMotions', petMotions)}
               />
             </div>
           </SettingsGroup>
-        </>
-      )}
-
-      {orbMode ? (
-        <CollapsedUnavailableSection title="形象自定义" reason="Orb 模式由程序绘制，图片与 GIF 设置已收起" />
-      ) : (
-        <>
-          <SectionTitle>形象自定义</SectionTitle>
-          <ImageSection />
         </>
       )}
 
@@ -2296,15 +2299,17 @@ function ImageSection() {
             <button
               key={option.id}
               type="button"
-              className={`rounded-[9px] px-3 py-2 text-left transition-all duration-200 ${
+              className={`rounded-[9px] px-3 py-2 text-center transition-all duration-200 ${
                 active
                   ? 'bg-background/78 text-foreground shadow-[0_1px_0_rgba(255,255,255,0.70)_inset,0_6px_16px_rgba(42,38,31,0.06)]'
                   : 'text-muted-foreground hover:bg-background/42 hover:text-foreground'
               }`}
               onClick={() => handleSchemeChange(option.id)}
             >
-              <span className="block text-[13px] font-medium">{option.label}</span>
-              <span className="block text-[11px] text-muted-foreground">{option.detail}</span>
+              <span className="block whitespace-nowrap text-[13px] font-medium">
+                {option.label}
+                <span className="text-[12px] font-normal text-muted-foreground">（{option.detail}）</span>
+              </span>
             </button>
           );
         })}
