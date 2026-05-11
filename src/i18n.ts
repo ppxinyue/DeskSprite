@@ -181,6 +181,7 @@ const EN: Record<string, string> = {
   '今天': 'Today',
   '昨天': 'Yesterday',
   '昨日示例': 'Yesterday Example',
+  '当前显示的是效果样例，不是真实使用数据。': 'This is a sample preview, not real usage data.',
   '上个月': 'Previous Month',
   '下个月': 'Next Month',
   '前一天': 'Previous Day',

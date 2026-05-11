@@ -24,7 +24,10 @@
 </p>
 
 <p align="center">
-  <img src="docs/orb-modes.gif" alt="cat15 orb modes" width="760" />
+  <img src="docs/orb-modes.gif" alt="cat15 orb modes" width="620" />
+</p>
+<p align="center">
+  <sub>Orb mode preview: idle, work, and rest states with dark glass styling.</sub>
 </p>
 
 ## English
@@ -88,6 +91,9 @@ cat15 is an Electron desktop app. It lives on your screen as either a pet or an 
 
 <p align="center">
   <img src="docs/avatar-resources.png" alt="cat15 built-in avatar resources" width="760" />
+</p>
+<p align="center">
+  <sub>Built-in cat15 avatar resources, plus a custom slot for user-added avatars.</sub>
 </p>
 
 ### Focus & Reminders
@@ -193,7 +199,10 @@ cat15 is an Electron desktop app. It lives on your screen as either a pet or an 
 </table>
 
 <p align="center">
-  <img src="docs/timeline-mock.png" alt="cat15 Timeline mock preview" width="760" />
+  <img src="docs/timeline-mock-en.png" alt="cat15 English Profile Timeline mock preview" width="760" />
+</p>
+<p align="center">
+  <sub>Profile preview with sample Timeline, activity, and app statistics.</sub>
 </p>
 
 ## Install from source
@@ -295,6 +304,9 @@ cat15 猫十五是一个 Electron 桌面应用。它可以以灵宠或悬浮球�
 
 <p align="center">
   <img src="docs/avatar-resources.png" alt="cat15 built-in avatar resources" width="760" />
+</p>
+<p align="center">
+  <sub>内置猫十五形象资源，以及用于添加自定义形象的入口。</sub>
 </p>
 
 ### 专注与提醒
@@ -401,6 +413,9 @@ cat15 猫十五是一个 Electron 桌面应用。它可以以灵宠或悬浮球�
 
 <p align="center">
   <img src="docs/timeline-mock.png" alt="cat15 Timeline mock preview" width="760" />
+</p>
+<p align="center">
+  <sub>个人档案预览：示例 Timeline、全天活跃度和软件统计。</sub>
 </p>
 
 ## 安装与运行

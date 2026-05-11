@@ -177,6 +177,16 @@ const DEFAULT_SETTINGS: AppSettings = {
   ],
 };
 
+function getPreviewLanguageOverride(): AppLanguage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = new URLSearchParams(window.location.search).get('previewLanguage');
+    return isAppLanguage(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface SettingsState {
   settings: AppSettings;
   loaded: boolean;
@@ -237,6 +247,8 @@ export const useSettingsStore = create<SettingsState>((set) => ({
           }
         }
       }
+      const previewLanguage = getPreviewLanguageOverride();
+      if (previewLanguage) loaded.appLanguage = previewLanguage;
       set({ settings: loaded, loaded: true });
     } catch (e) {
       console.warn('Failed to load settings from DB, using defaults:', e);
