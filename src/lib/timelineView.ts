@@ -29,7 +29,7 @@ export function clipTimelineEntriesToDate(dateKey: string, entries: TimelineEntr
     const backgroundMarkers: TimelineEntry['backgroundMarkers'] = [];
     for (const marker of entry.backgroundMarkers) {
       const markerStart = new Date(marker.startedAt ?? entry.startedAt).getTime();
-      const markerEnd = new Date(marker.endedAt ?? entry.endedAt).getTime();
+      const markerEnd = new Date(marker.endedAt ?? marker.startedAt ?? entry.startedAt).getTime();
       const clippedMarkerStart = Math.max(markerStart, dayStart);
       const clippedMarkerEnd = Math.min(markerEnd, dayEnd);
       if (clippedMarkerEnd <= clippedMarkerStart) continue;
@@ -40,7 +40,7 @@ export function clipTimelineEntriesToDate(dateKey: string, entries: TimelineEntr
       });
     }
 
-    const hasForeground = clippedEnd > clippedStart;
+    const hasForeground = entry.foregroundVisible !== false && clippedEnd > clippedStart;
     if (!hasForeground && backgroundMarkers.length === 0) continue;
     const backgroundStart = hasForeground ? clippedStart : Math.min(...backgroundMarkers.map((marker) => new Date(marker.startedAt ?? entry.startedAt).getTime()));
     const backgroundEnd = hasForeground ? clippedEnd : Math.max(...backgroundMarkers.map((marker) => new Date(marker.endedAt ?? entry.endedAt).getTime()));

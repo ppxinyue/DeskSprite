@@ -531,17 +531,17 @@
   position: relative;
   width: var(--orb-size);
   height: var(--orb-size);
-  --orb-state-core: color-mix(in srgb, var(--color-pet-dialog-bg) 64%, rgba(28,28,28,0.12));
-  --orb-state-mid: color-mix(in srgb, var(--color-pet-dialog-bg) 38%, transparent);
-  --orb-state-edge: color-mix(in srgb, var(--color-pet-dialog-bg) 16%, transparent);
-  --orb-base-core: rgba(28,28,28,0.20);
-  --orb-base-mid: rgba(74,74,74,0.14);
-  --orb-base-soft: rgba(128,128,128,0.075);
-  --orb-base-edge: rgba(170,170,170,0.018);
-  --orb-base-clear: rgba(190,190,190,0);
-  --orb-hover-fill: color-mix(in srgb, var(--color-pet-dialog-bg) 86%, rgba(255,255,255,0.92));
-  --orb-wave-strong: color-mix(in srgb, var(--color-pet-dialog-bg) 46%, rgba(18,18,18,0.040));
-  --orb-wave-soft: color-mix(in srgb, var(--color-pet-dialog-bg) 25%, rgba(140,140,140,0.018));
+  --orb-state-core: color-mix(in srgb, var(--color-pet-dialog-bg) 72%, rgba(116, 124, 134, 0.56));
+  --orb-state-mid: color-mix(in srgb, var(--color-pet-dialog-bg) 44%, rgba(142, 148, 156, 0.30));
+  --orb-state-edge: color-mix(in srgb, var(--color-pet-dialog-bg) 18%, rgba(220, 224, 230, 0.12));
+  --orb-base-core: rgba(247, 249, 252, 0.96);
+  --orb-base-mid: rgba(235, 239, 244, 0.78);
+  --orb-base-soft: rgba(216, 222, 230, 0.46);
+  --orb-base-edge: rgba(190, 198, 208, 0.16);
+  --orb-base-clear: rgba(245, 247, 250, 0);
+  --orb-hover-fill: color-mix(in srgb, var(--color-pet-dialog-bg) 82%, rgba(255,255,255,0.96));
+  --orb-wave-strong: color-mix(in srgb, var(--color-pet-dialog-bg) 35%, rgba(116, 124, 134, 0.075));
+  --orb-wave-soft: color-mix(in srgb, var(--color-pet-dialog-bg) 20%, rgba(176, 181, 188, 0.040));
   opacity: var(--orb-opacity);
   display: grid;
   place-items: center;
@@ -561,31 +561,73 @@
 }
 
 .orb-avatar--work {
-  --orb-state-core: rgba(47, 143, 255, 0.36);
-  --orb-state-mid: rgba(47, 143, 255, 0.20);
-  --orb-state-edge: rgba(47, 143, 255, 0.064);
-  --orb-base-core: rgba(255, 252, 244, 0.92);
-  --orb-base-mid: rgba(255, 250, 240, 0.64);
-  --orb-base-soft: rgba(255, 246, 232, 0.34);
-  --orb-base-edge: rgba(255, 244, 226, 0.11);
-  --orb-base-clear: rgba(255, 244, 226, 0);
-  --orb-hover-fill: rgba(225, 241, 255, 0.98);
-  --orb-wave-strong: rgba(47, 143, 255, 0.170);
-  --orb-wave-soft: rgba(132, 190, 255, 0.088);
+  --orb-state-core: rgba(64, 160, 255, 0.52);
+  --orb-state-mid: rgba(101, 184, 255, 0.30);
+  --orb-state-edge: rgba(137, 207, 255, 0.12);
+  --orb-base-core: rgba(250, 253, 255, 0.98);
+  --orb-base-mid: rgba(235, 246, 255, 0.80);
+  --orb-base-soft: rgba(216, 236, 250, 0.48);
+  --orb-base-edge: rgba(191, 221, 244, 0.18);
+  --orb-base-clear: rgba(191, 221, 244, 0);
+  --orb-hover-fill: rgba(231, 245, 255, 0.98);
+  --orb-wave-strong: rgba(64, 160, 255, 0.150);
+  --orb-wave-soft: rgba(145, 207, 255, 0.074);
 }
 
 .orb-avatar--rest {
-  --orb-state-core: rgba(255, 169, 211, 0.32);
-  --orb-state-mid: rgba(255, 169, 211, 0.17);
-  --orb-state-edge: rgba(255, 169, 211, 0.058);
-  --orb-base-core: rgba(255, 252, 244, 0.92);
-  --orb-base-mid: rgba(255, 250, 240, 0.64);
-  --orb-base-soft: rgba(255, 246, 232, 0.34);
-  --orb-base-edge: rgba(255, 244, 226, 0.11);
-  --orb-base-clear: rgba(255, 244, 226, 0);
-  --orb-hover-fill: rgba(255, 236, 246, 0.98);
-  --orb-wave-strong: rgba(255, 123, 188, 0.132);
-  --orb-wave-soft: rgba(255, 190, 223, 0.070);
+  --orb-state-core: rgba(255, 152, 207, 0.48);
+  --orb-state-mid: rgba(255, 182, 220, 0.28);
+  --orb-state-edge: rgba(255, 205, 233, 0.11);
+  --orb-base-core: rgba(255, 253, 251, 0.98);
+  --orb-base-mid: rgba(255, 243, 249, 0.78);
+  --orb-base-soft: rgba(250, 224, 237, 0.46);
+  --orb-base-edge: rgba(244, 198, 222, 0.17);
+  --orb-base-clear: rgba(244, 198, 222, 0);
+  --orb-hover-fill: rgba(255, 239, 248, 0.98);
+  --orb-wave-strong: rgba(255, 142, 201, 0.125);
+  --orb-wave-soft: rgba(255, 196, 226, 0.066);
+}
+
+.dark .orb-avatar {
+  --orb-state-core: rgba(182, 187, 194, 0.40);
+  --orb-state-mid: rgba(154, 160, 168, 0.24);
+  --orb-state-edge: rgba(126, 132, 140, 0.10);
+  --orb-base-core: rgba(54, 56, 60, 0.94);
+  --orb-base-mid: rgba(43, 45, 49, 0.78);
+  --orb-base-soft: rgba(34, 36, 40, 0.50);
+  --orb-base-edge: rgba(226, 230, 235, 0.10);
+  --orb-base-clear: rgba(226, 230, 235, 0);
+  --orb-hover-fill: rgba(48, 51, 56, 0.96);
+  --orb-wave-strong: rgba(196, 202, 210, 0.105);
+  --orb-wave-soft: rgba(150, 156, 164, 0.050);
+}
+
+.dark .orb-avatar--work {
+  --orb-state-core: rgba(91, 181, 255, 0.52);
+  --orb-state-mid: rgba(91, 181, 255, 0.32);
+  --orb-state-edge: rgba(91, 181, 255, 0.13);
+  --orb-base-core: rgba(39, 54, 68, 0.94);
+  --orb-base-mid: rgba(31, 45, 58, 0.78);
+  --orb-base-soft: rgba(24, 34, 44, 0.50);
+  --orb-base-edge: rgba(183, 220, 248, 0.12);
+  --orb-base-clear: rgba(183, 220, 248, 0);
+  --orb-hover-fill: rgba(31, 45, 58, 0.98);
+  --orb-wave-strong: rgba(91, 181, 255, 0.18);
+  --orb-wave-soft: rgba(143, 207, 255, 0.090);
+}
+
+.dark .orb-avatar--rest {
+  --orb-state-core: rgba(255, 166, 214, 0.50);
+  --orb-state-mid: rgba(255, 166, 214, 0.30);
+  --orb-state-edge: rgba(255, 166, 214, 0.12);
+  --orb-base-core: rgba(65, 44, 56, 0.94);
+  --orb-base-mid: rgba(55, 36, 48, 0.78);
+  --orb-base-soft: rgba(42, 28, 38, 0.50);
+  --orb-base-edge: rgba(255, 204, 232, 0.11);
+  --orb-base-clear: rgba(255, 204, 232, 0);
+  --orb-hover-fill: rgba(55, 36, 48, 0.98);
+  --orb-wave-strong: rgba(255, 166, 214, 0.155);
+  --orb-wave-soft: rgba(255, 197, 228, 0.075);
 }
 
 .orb-avatar__shell {
@@ -693,6 +735,10 @@
   transform: translate(-50%, -50%) translateY(-1px);
 }
 
+.dark .orb-avatar__hover-text {
+  color: rgba(245, 245, 245, 0.88);
+}
+
 .orb-avatar__idle-ring,
 .orb-avatar__rest-ring {
   position: absolute;
@@ -743,6 +789,16 @@
     rotate(calc(360deg / var(--letter-count) * var(--letter-index)))
     translateY(calc(var(--orb-size) * -0.55))
     rotate(calc(-360deg / var(--letter-count) * var(--letter-index)));
+}
+
+.dark .orb-avatar__idle-letter,
+.dark .orb-avatar__rest-letter,
+.dark .orb-avatar__work-letter {
+  color: rgba(245, 245, 245, 0.66);
+}
+
+.dark .orb-avatar--idle.is-hovering .orb-avatar__idle-letter {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .orb-avatar__work-field {

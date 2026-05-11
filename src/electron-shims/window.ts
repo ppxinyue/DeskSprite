@@ -32,6 +32,17 @@ export class LogicalSize {
 }
 
 export function getCurrentWindow() {
+  if (!window.deskSprite) {
+    const label = (window.location.hash.replace(/^#/, '') || 'pet').split(':')[0] || 'pet';
+    return {
+      label,
+      outerPosition: async () => ({ x: 0, y: 0 }),
+      outerSize: async () => ({ width: window.innerWidth, height: window.innerHeight }),
+      setPosition: async () => {},
+      setSize: async () => {},
+      onMoved: async () => () => {},
+    };
+  }
   return {
     label: window.deskSprite.label,
     outerPosition: () => window.deskSprite.window.outerPosition(),
@@ -44,5 +55,14 @@ export function getCurrentWindow() {
 }
 
 export function currentMonitor() {
+  if (!window.deskSprite) {
+    return Promise.resolve({
+      scaleFactor: window.devicePixelRatio || 1,
+      workArea: {
+        position: { x: 0, y: 0 },
+        size: { width: window.innerWidth, height: window.innerHeight },
+      },
+    });
+  }
   return window.deskSprite.currentMonitor();
 }

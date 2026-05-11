@@ -23,6 +23,7 @@ export type TimelinePersistPayload = {
   windowTitle: string;
   url: string | null;
   backgroundMarkers: TimelineBackgroundMarker[];
+  foregroundVisible?: boolean;
 };
 
 export type TimelinePersistResult = {
@@ -91,11 +92,34 @@ function mergeBackgroundMarkers(
   const checkedIso = new Date(checkedAt).toISOString();
   const merged = existing.slice();
   for (const marker of next) {
-    const previous = merged.at(-1);
+    const previous = findLastMatchingBackgroundMarker(merged, marker);
     if (previous && previous.type === marker.type && previous.name === marker.name && previous.detail === marker.detail) {
       previous.endedAt = checkedIso;
     } else {
       merged.push({ ...marker, startedAt: checkedIso, endedAt: checkedIso });
+    }
+  }
+  return merged.slice(-24);
+}
+
+function findLastMatchingBackgroundMarker(markers: TimelineBackgroundMarker[], marker: TimelineBackgroundMarker) {
+  for (let index = markers.length - 1; index >= 0; index -= 1) {
+    const candidate = markers[index];
+    if (candidate.type === marker.type && candidate.name === marker.name && candidate.detail === marker.detail) return candidate;
+  }
+  return null;
+}
+
+function mergeRecordedBackgroundMarkers(existing: TimelineBackgroundMarker[], next: TimelineBackgroundMarker[]) {
+  if (next.length === 0) return existing;
+  const merged = existing.slice();
+  for (const marker of next) {
+    const previous = findLastMatchingBackgroundMarker(merged, marker);
+    if (previous) {
+      if (marker.startedAt && (!previous.startedAt || marker.startedAt < previous.startedAt)) previous.startedAt = marker.startedAt;
+      if (marker.endedAt && (!previous.endedAt || marker.endedAt > previous.endedAt)) previous.endedAt = marker.endedAt;
+    } else {
+      merged.push({ ...marker });
     }
   }
   return merged.slice(-24);
@@ -118,11 +142,6 @@ function appendShortForegroundMarker(
     startedAt: new Date(start).toISOString(),
     endedAt: new Date(end).toISOString(),
   };
-  const previous = existing.at(-1);
-  if (previous && previous.type === marker.type && previous.name === marker.name && previous.detail === marker.detail) {
-    previous.endedAt = marker.endedAt;
-    return existing.slice(-24);
-  }
   return [...existing, marker].slice(-24);
 }
 
@@ -130,6 +149,7 @@ export class TimelineRecorder {
   private active = emptySegment();
   private candidate = emptySegment();
   private paused = emptySegment();
+  private backgroundOnly = emptySegment();
   private readonly options: {
     minSegmentMs: number;
     persist: (payload: TimelinePersistPayload) => Promise<TimelinePersistResult>;
@@ -173,6 +193,8 @@ export class TimelineRecorder {
     const url = snapshot.url?.trim() || null;
     if (IGNORED_TIMELINE_APPS.has(appName.toLowerCase())) {
       this.log({ stage: 'sample:ignore', message: 'own app foreground ignored', appName, windowTitle });
+      await this.foldCandidateIntoActive(checkedAt);
+      await this.mergeBackgroundDuringIgnoredForeground(snapshot.background, checkedAt);
       return;
     }
     const key = getTimelineSnapshotKey(appName, windowTitle, url);
@@ -203,9 +225,7 @@ export class TimelineRecorder {
 
     if (this.active.key !== key) {
       if (this.candidate.key !== key) {
-        if (this.candidate.key) {
-          this.active.backgroundMarkers = appendShortForegroundMarker(this.active.backgroundMarkers, this.candidate, checkedAt);
-        }
+        await this.foldCandidateIntoActive(checkedAt);
         this.candidate = {
           key,
           firstSeenAt: checkedAt,
@@ -249,7 +269,7 @@ export class TimelineRecorder {
         durationMs: this.candidate.lastSeenAt - this.candidate.firstSeenAt,
         minSegmentMs: this.options.minSegmentMs,
       });
-      this.active.backgroundMarkers = appendShortForegroundMarker(this.active.backgroundMarkers, this.candidate, checkedAt);
+      await this.foldCandidateIntoActive(checkedAt, false);
     }
 
     this.candidate = emptySegment();
@@ -262,11 +282,13 @@ export class TimelineRecorder {
 
   async stop(endedAt = Date.now()) {
     this.log({ stage: 'stop', message: 'Timeline sampler stopped' });
+    await this.foldCandidateIntoActive(endedAt);
     await this.persistActive(this.active.lastSeenAt || endedAt);
     if (this.paused.key) await this.persistPaused();
   }
 
   async pauseForeground(endedAt = Date.now()) {
+    await this.foldCandidateIntoActive(endedAt);
     if (this.active.key) {
       this.active.lastSeenAt = endedAt;
       await this.persistActive(endedAt);
@@ -320,9 +342,46 @@ export class TimelineRecorder {
   }
 
   async handleBackgroundMarkers(markers: TimelineBackgroundMarker[] | undefined, checkedAt = Date.now()) {
-    if (!markers || markers.length === 0 || !this.paused.key) return;
-    this.paused.backgroundMarkers = mergeBackgroundMarkers(this.paused.backgroundMarkers, markers, checkedAt);
-    await this.persistPaused();
+    if (!markers || markers.length === 0) return;
+    if (this.paused.key) {
+      this.paused.backgroundMarkers = mergeBackgroundMarkers(this.paused.backgroundMarkers, markers, checkedAt);
+      await this.persistPaused();
+      return;
+    }
+    await this.persistBackgroundOnly(markers, checkedAt);
+  }
+
+  private async foldCandidateIntoActive(endedAt: number, persist = true) {
+    if (!this.active.key || !this.candidate.key) return;
+    this.active.backgroundMarkers = appendShortForegroundMarker(this.active.backgroundMarkers, this.candidate, endedAt);
+    this.active.backgroundMarkers = mergeRecordedBackgroundMarkers(this.active.backgroundMarkers, this.candidate.backgroundMarkers);
+    this.log({
+      stage: 'candidate:fold',
+      message: 'short foreground folded into active segment',
+      appName: this.candidate.appName,
+      windowTitle: this.candidate.windowTitle,
+      url: this.candidate.url,
+      key: this.candidate.key,
+      durationMs: Math.max(0, (this.candidate.lastSeenAt || endedAt) - this.candidate.firstSeenAt),
+      minSegmentMs: this.options.minSegmentMs,
+    });
+    this.candidate = emptySegment();
+    if (persist) await this.persistActive(this.active.lastSeenAt || endedAt);
+  }
+
+  private async mergeBackgroundDuringIgnoredForeground(markers: TimelineBackgroundMarker[] | undefined, checkedAt: number) {
+    if (!markers || markers.length === 0) return;
+    if (this.active.key) {
+      this.active.backgroundMarkers = mergeBackgroundMarkers(this.active.backgroundMarkers, markers, checkedAt);
+      await this.persistActive(this.active.lastSeenAt || checkedAt);
+      return;
+    }
+    if (this.paused.key) {
+      this.paused.backgroundMarkers = mergeBackgroundMarkers(this.paused.backgroundMarkers, markers, checkedAt);
+      await this.persistPaused();
+      return;
+    }
+    await this.persistBackgroundOnly(markers, checkedAt);
   }
 
   private async persistActive(endedAt: number) {
@@ -391,6 +450,36 @@ export class TimelineRecorder {
       url: this.paused.url,
       backgroundMarkers: this.paused.backgroundMarkers,
     });
+  }
+
+  private async persistBackgroundOnly(markers: TimelineBackgroundMarker[], checkedAt: number) {
+    if (!this.backgroundOnly.key) {
+      this.backgroundOnly = {
+        key: '__background__',
+        firstSeenAt: checkedAt,
+        lastSeenAt: checkedAt,
+        segmentId: null,
+        appName: 'Background',
+        windowTitle: 'Background processes',
+        url: null,
+        backgroundMarkers: mergeBackgroundMarkers([], markers, checkedAt),
+      };
+      return;
+    }
+    this.backgroundOnly.lastSeenAt = checkedAt;
+    this.backgroundOnly.backgroundMarkers = mergeBackgroundMarkers(this.backgroundOnly.backgroundMarkers, markers, checkedAt);
+    if (this.backgroundOnly.lastSeenAt - this.backgroundOnly.firstSeenAt < this.options.minSegmentMs) return;
+    const entry = await this.options.persist({
+      id: this.backgroundOnly.segmentId,
+      startedAt: this.backgroundOnly.firstSeenAt,
+      endedAt: this.backgroundOnly.lastSeenAt,
+      appName: this.backgroundOnly.appName,
+      windowTitle: this.backgroundOnly.windowTitle,
+      url: null,
+      backgroundMarkers: this.backgroundOnly.backgroundMarkers,
+      foregroundVisible: false,
+    });
+    if (entry) this.backgroundOnly.segmentId = entry.id;
   }
 
   private log(payload: TimelineDebugPayload) {

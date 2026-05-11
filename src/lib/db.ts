@@ -431,6 +431,7 @@ export async function upsertTimelineEntry({
   windowTitle,
   url,
   backgroundMarkers,
+  foregroundVisible,
 }: {
   id?: number | null;
   startedAt: number;
@@ -439,6 +440,7 @@ export async function upsertTimelineEntry({
   windowTitle: string;
   url?: string | null;
   backgroundMarkers?: TimelineBackgroundMarker[];
+  foregroundVisible?: boolean;
 }): Promise<TimelineEntry | null> {
   const start = Math.min(startedAt, endedAt);
   const end = Math.max(startedAt, endedAt);
@@ -458,6 +460,7 @@ export async function upsertTimelineEntry({
       domain,
       category,
       backgroundMarkers: backgroundMarkers ?? [],
+      ...(foregroundVisible === false ? { foregroundVisible: false } : {}),
     };
     const existingIndex = id ? store.timelineEntries.findIndex((entry) => entry.id === id) : -1;
     if (existingIndex >= 0) {
@@ -483,7 +486,7 @@ export async function getTimelineEntries(date = localDateKey()): Promise<Timelin
       if (foregroundOverlaps) return true;
       return (entry.backgroundMarkers ?? []).some((marker) => {
         const markerStartedAt = new Date(marker.startedAt ?? entry.startedAt).getTime();
-        const markerEndedAt = new Date(marker.endedAt ?? entry.endedAt).getTime();
+        const markerEndedAt = new Date(marker.endedAt ?? marker.startedAt ?? entry.startedAt).getTime();
         return markerStartedAt < dayEnd && markerEndedAt > dayStart;
       });
     })

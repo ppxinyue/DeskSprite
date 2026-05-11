@@ -393,30 +393,6 @@ return processText
 `;
 }
 
-function terminalDetailScript(appName) {
-  if (appName === 'Terminal') {
-    return `
-tell application "Terminal"
-  if (count of windows) > 0 then
-    return name of front window
-  end if
-end tell
-return "running"
-`;
-  }
-  if (appName === 'iTerm2') {
-    return `
-tell application "iTerm2"
-  if (count of windows) > 0 then
-    return name of current window
-  end if
-end tell
-return "running"
-`;
-  }
-  return '';
-}
-
 function petPresenceContextScript() {
   return `
 set frontApp to ""
@@ -488,17 +464,188 @@ function readBrowserUrl(appName) {
 
 function readNowPlaying(appName) {
   const script = musicStatusScript(appName);
-  if (!script) return Promise.resolve(null);
+  if (!script) return Promise.resolve({ marker: null, status: 'unsupported' });
   return new Promise((resolve) => {
     execFile('/usr/bin/osascript', ['-e', script], { timeout: 1800 }, (error, stdout) => {
       if (error) {
         timelineDebugLog({ stage: 'music:error', appName, error: error.message || String(error) });
+        resolve({ marker: null, status: 'error' });
+        return;
+      }
+      const marker = parseTimelineMarkerLine(String(stdout || '').trim());
+      resolve({ marker, status: marker ? 'playing' : 'paused' });
+    });
+  });
+}
+
+function isNeteaseMusicApp(appName) {
+  const lower = String(appName || '').toLowerCase();
+  return lower.includes('netease') || lower.includes('网易云');
+}
+
+function neteaseStoragePath(...parts) {
+  const home = app?.getPath?.('home') || process.env.HOME || '';
+  return path.join(home, 'Library', 'Containers', 'com.netease.163music', 'Data', ...parts);
+}
+
+function parseNeteaseCacheResourceId(name) {
+  const match = String(name || '').match(/^(\d+)-_-_/);
+  return match?.[1] || '';
+}
+
+async function readNeteaseRecentCacheTracks(dir, maxCount = 16) {
+  try {
+    const names = await fsp.readdir(dir);
+    const items = [];
+    await Promise.all(names.map(async (name) => {
+      const resourceId = parseNeteaseCacheResourceId(name);
+      if (!resourceId || !/\.(info|idx!|uc!)$/.test(name)) return;
+      try {
+        const stat = await fsp.stat(path.join(dir, name));
+        if (stat.isFile()) items.push({ resourceId, mtimeMs: stat.mtimeMs });
+      } catch {
+        // Ignore individual cache files that disappear while being sampled.
+      }
+    }));
+    const byId = new Map();
+    for (const item of items) {
+      const existing = byId.get(item.resourceId);
+      if (!existing || item.mtimeMs > existing.mtimeMs) byId.set(item.resourceId, item);
+    }
+    return Array.from(byId.values())
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+      .slice(0, maxCount);
+  } catch {
+    return [];
+  }
+}
+
+function parseNeteaseTrack(jsonText, fallbackId) {
+  try {
+    const track = JSON.parse(jsonText || '{}');
+    const title = String(track.name || '').trim();
+    const artists = Array.isArray(track.artists)
+      ? track.artists.map((artist) => artist?.name).filter(Boolean).join(', ')
+      : '';
+    const detail = title && artists ? `${title} - ${artists}` : title;
+    const durationMs = Number(track.duration) || Number(track.dt) || 0;
+    return {
+      detail: detail || (fallbackId ? `track ${fallbackId}` : 'playing'),
+      durationMs,
+    };
+  } catch {
+    return {
+      detail: fallbackId ? `track ${fallbackId}` : 'playing',
+      durationMs: 0,
+    };
+  }
+}
+
+function readNeteaseLatestTrack() {
+  const dbPath = neteaseStoragePath('Documents', 'storage', 'sqlite_storage.sqlite3');
+  const query = `
+select pc.resourceId, pc.updateTime, pc.playDuration, coalesce(dt.jsonStr, ht.jsonStr, '')
+from playingCount pc
+left join dbTrack dt on dt.id = pc.resourceId
+left join historyTracks ht on ht.id = pc.resourceId
+order by pc.updateTime desc
+limit 1;
+`;
+  return new Promise((resolve) => {
+    execFile('/usr/bin/sqlite3', ['-separator', '\x1f', dbPath, query], { timeout: 1800 }, (error, stdout) => {
+      if (error) {
         resolve(null);
         return;
       }
-      resolve(parseTimelineMarkerLine(String(stdout || '').trim()));
+      const [resourceId = '', updateTimeRaw = '0', playDurationRaw = '0', jsonText = ''] = String(stdout || '').trim().split('\x1f');
+      const updateTime = Number(updateTimeRaw) || 0;
+      const parsedTrack = parseNeteaseTrack(jsonText, resourceId);
+      const playDurationMs = Math.max(0, Number(playDurationRaw) || 0) * 1000;
+      resolve({
+        resourceId,
+        updateTime,
+        detail: parsedTrack.detail,
+        durationMs: parsedTrack.durationMs || playDurationMs,
+      });
     });
   });
+}
+
+function readNeteaseTracksByIds(ids) {
+  const cleanIds = Array.from(new Set((ids || []).map((id) => String(id || '').trim()).filter((id) => /^\d+$/.test(id))));
+  if (cleanIds.length === 0) return Promise.resolve([]);
+  const dbPath = neteaseStoragePath('Documents', 'storage', 'sqlite_storage.sqlite3');
+  const idList = cleanIds.map((id) => `'${id}'`).join(',');
+  const query = `
+select ids.id, coalesce(pc.updateTime, 0), coalesce(pc.playDuration, 0), coalesce(dt.jsonStr, ht.jsonStr, '')
+from (
+  ${cleanIds.map((id) => `select '${id}' as id`).join(' union all ')}
+) ids
+left join playingCount pc on pc.resourceId = ids.id
+left join dbTrack dt on dt.id = ids.id
+left join historyTracks ht on ht.id = ids.id
+where ids.id in (${idList});
+`;
+  return new Promise((resolve) => {
+    execFile('/usr/bin/sqlite3', ['-separator', '\x1f', dbPath, query], { timeout: 1800 }, (error, stdout) => {
+      if (error) {
+        resolve([]);
+        return;
+      }
+      const rows = String(stdout || '').trim().split('\n').filter(Boolean).map((line) => {
+        const [resourceId = '', updateTimeRaw = '0', playDurationRaw = '0', jsonText = ''] = line.split('\x1f');
+        const parsedTrack = parseNeteaseTrack(jsonText, resourceId);
+        const playDurationMs = Math.max(0, Number(playDurationRaw) || 0) * 1000;
+        return {
+          resourceId,
+          updateTime: Number(updateTimeRaw) || 0,
+          detail: parsedTrack.detail,
+          durationMs: parsedTrack.durationMs || playDurationMs,
+        };
+      });
+      resolve(rows);
+    });
+  });
+}
+
+async function readNeteaseNowPlaying(appName, minSegmentMs = 60_000) {
+  const freshnessMs = Math.max(60_000, Number(minSegmentMs) || 60_000);
+  const cacheDir = neteaseStoragePath('Caches', 'online_play_cache');
+  const [latestTrack, cacheCandidates] = await Promise.all([
+    readNeteaseLatestTrack(),
+    readNeteaseRecentCacheTracks(cacheDir),
+  ]);
+  const cacheTrackRows = await readNeteaseTracksByIds(cacheCandidates.map((item) => item.resourceId));
+  const trackById = new Map(cacheTrackRows.map((track) => [track.resourceId, track]));
+  const newestCacheMtimeMs = cacheCandidates[0]?.mtimeMs || 0;
+  const recentCacheIds = cacheCandidates
+    .filter((item) => newestCacheMtimeMs - item.mtimeMs <= 8_000)
+    .map((item) => item.resourceId);
+  const cacheTrack = recentCacheIds
+    .map((id) => trackById.get(id))
+    .filter(Boolean)
+    .sort((a, b) => (b.updateTime || 0) - (a.updateTime || 0))[0]
+    || trackById.get(cacheCandidates[0]?.resourceId || '');
+  const cacheTrackMtimeMs = cacheCandidates.find((item) => item.resourceId === cacheTrack?.resourceId)?.mtimeMs || 0;
+  const track = cacheTrack && (!latestTrack || cacheTrackMtimeMs >= (latestTrack.updateTime || 0) || (cacheTrack.updateTime || 0) >= (latestTrack.updateTime || 0))
+    ? cacheTrack
+    : latestTrack;
+  const activityFromSameTrackMs = Math.max(track?.updateTime || 0, track?.resourceId === cacheTrack?.resourceId ? cacheTrackMtimeMs : 0);
+  const latestActivityMs = Math.max(activityFromSameTrackMs, track?.updateTime || 0);
+  const ageMs = latestActivityMs > 0 ? Date.now() - latestActivityMs : Number.POSITIVE_INFINITY;
+  const trackWindowMs = track?.durationMs
+    ? Math.min(Math.max(track.durationMs + 30_000, freshnessMs), 20 * 60_000)
+    : freshnessMs;
+  if (latestActivityMs > 0 && ageMs <= trackWindowMs) {
+    return {
+      marker: { type: 'music', name: appName || 'NeteaseMusic', detail: track?.detail || 'playing' },
+      status: `playing:${Math.round(ageMs / 1000)}s`,
+    };
+  }
+  return {
+    marker: null,
+    status: latestActivityMs > 0 ? `paused:${Math.round(ageMs / 1000)}s` : 'paused:unknown',
+  };
 }
 
 function readRunningProcessNames() {
@@ -514,21 +661,6 @@ function readRunningProcessNames() {
         return;
       }
       resolve(String(stdout || '').split('\n').map((line) => line.trim()).filter(Boolean));
-    });
-  });
-}
-
-function readTerminalDetail(appName) {
-  const script = terminalDetailScript(appName);
-  if (!script) return Promise.resolve('running');
-  return new Promise((resolve) => {
-    execFile('/usr/bin/osascript', ['-e', script], { timeout: 1500 }, (error, stdout, stderr) => {
-      if (error) {
-        timelineDebugLog({ stage: 'terminal:error', appName, error: stderr || error.message || String(error) });
-        resolve('running');
-        return;
-      }
-      resolve(String(stdout || '').trim() || 'running');
     });
   });
 }
@@ -550,37 +682,67 @@ function readShellProcessMarkers() {
         if (!match || match[1] === ownPid) continue;
         const command = match[2];
         const lower = command.toLowerCase();
-        if (
-          !/(pnpm|npm|yarn|bun|vite|next|tsx|ts-node|electron:dev|cargo|uvicorn|python|node .*server)/.test(lower) ||
-          /(osascript|\/bin\/ps|electron\/main\.cjs)/.test(lower)
-        ) {
-          continue;
-        }
-        const normalized = command.replace(/^.*?(pnpm|npm|yarn|bun|cargo|python|node)\s+/, '$1 ').slice(0, 140);
+        if (!isTrackableTerminalCommand(lower)) continue;
+        const normalized = normalizeTerminalCommand(command);
+        if (!normalized) continue;
         if (!commands.includes(normalized)) commands.push(normalized);
-        if (commands.length >= 3) break;
       }
-      resolve(commands.map((detail) => ({ type: 'terminal', name: 'Terminal', detail })));
+      const compacted = compactTerminalCommands(commands).slice(0, 8);
+      resolve(compacted.map((detail) => ({ type: 'terminal', name: 'Terminal', detail })));
     });
   });
 }
 
-function hasProcess(processNames, candidates) {
-  const names = new Set(processNames.map((name) => name.toLowerCase()));
-  return candidates.find((candidate) => names.has(candidate.toLowerCase())) || '';
+function isTrackableTerminalCommand(lower) {
+  if (/(osascript|\/bin\/ps|electron\/main\.cjs|powerd\.bundle|containermanagerd|launchd|xpcproxy|cfprefsd|runningboardd|distnoted|nsurlsessiond|trustd|accountsd|bird|cloudd)/.test(lower)) {
+    return false;
+  }
+  if (/\/applications\/codex\.app\/contents\//.test(lower)) return false;
+  if (/\bcodex\s+app-server\b/.test(lower)) return false;
+  if (/(codex helper|--type=gpu-process|--type=utility|--type=renderer|networkservice)/.test(lower)) return false;
+  return /\b(?:pnpm|npm|yarn|bun|cargo|uvicorn|pytest|python|node|tsx|ts-node|next|claude|claude-code|codex)\b/.test(lower)
+    || /electron:dev|@anthropic-ai\/claude-code|codex\s+exec/.test(lower);
 }
 
-async function readTimelineBackgroundMarkers({ musicAppKeywords } = {}) {
+function normalizeTerminalCommand(command) {
+  const clean = String(command || '').replace(/\s+/g, ' ').trim();
+  const lower = clean.toLowerCase();
+  if (!clean) return '';
+  if (/\bpnpm\s+electron:dev\b/.test(lower)) return 'pnpm electron:dev';
+  if (/electron\/cli\.js\s+\./.test(lower)) return '';
+  if (/@anthropic-ai\/claude-code|\/claude(?:\s|$)|\bclaude-code\b|\bclaude\b/.test(lower)) {
+    const promptMatch = clean.match(/(?:claude-code|claude)(?:\s+(.+))?$/i);
+    return promptMatch?.[1] ? `claude ${promptMatch[1]}`.slice(0, 160) : 'claude';
+  }
+  if (/\bcodex\s+exec\b/.test(lower)) {
+    const match = clean.match(/\bcodex\s+exec\b.*$/i);
+    return (match?.[0] || 'codex exec').slice(0, 160);
+  }
+  if (/\bpnpm\s+dev\b/.test(lower)) return 'pnpm dev';
+  if (/\bnpm\s+run\s+dev\b/.test(lower)) return 'npm run dev';
+  if (/\byarn\s+dev\b/.test(lower)) return 'yarn dev';
+  if (/\bbun\s+dev\b/.test(lower)) return 'bun dev';
+  if (/(concurrently|wait-on|vite\/bin\/vite\.js|\bvite\b)/.test(lower)) return '';
+  const normalized = clean.replace(/^.*?((?:pnpm|npm|yarn|bun|cargo|uvicorn|pytest|python|node|tsx|ts-node|next|codex)(?:\s+|$))/, '$1').trim();
+  return (normalized || clean).slice(0, 160);
+}
+
+function compactTerminalCommands(commands) {
+  const unique = Array.from(new Set(commands.filter(Boolean)));
+  const hasElectronDev = unique.some((command) => command === 'pnpm electron:dev');
+  return unique.filter((command) => {
+    const lower = command.toLowerCase();
+    if (hasElectronDev && /^(pnpm dev|npm run dev|yarn dev|bun dev)$/.test(lower)) return false;
+    if (hasElectronDev && /electron\/cli\.js\s+\./.test(lower)) return false;
+    if (/(concurrently|wait-on|vite\/bin\/vite\.js|\bvite\b)/.test(lower)) return false;
+    return true;
+  });
+}
+
+async function readTimelineBackgroundMarkers({ musicAppKeywords, minSegmentMs } = {}) {
   const processes = await readRunningProcessNames();
 
   const markers = [];
-  const terminalApps = ['Terminal', 'iTerm2'].filter((name) => hasProcess(processes, [name]));
-  const terminalMarkers = await Promise.all(terminalApps.map(async (name) => ({
-    type: 'terminal',
-    name,
-    detail: await readTerminalDetail(name),
-  })));
-  markers.push(...terminalMarkers);
   const shellMarkers = await readShellProcessMarkers();
   for (const marker of shellMarkers) {
     if (!markers.some((existing) => existing.type === marker.type && existing.detail === marker.detail)) {
@@ -589,19 +751,46 @@ async function readTimelineBackgroundMarkers({ musicAppKeywords } = {}) {
   }
 
   const configuredMusicApps = normalizeRuleList(musicAppKeywords);
-  const musicCandidates = ['Music', 'Spotify'].filter((name) => (
+  const scriptableMusicApps = ['Music', 'Spotify'];
+  const processNames = new Set(processes.map((name) => name.toLowerCase()));
+  const configuredRunningMusicApps = configuredMusicApps.length > 0
+    ? processes.filter((name) => configuredMusicApps.some((keyword) => name.toLowerCase().includes(keyword)))
+    : [];
+  const musicCandidates = Array.from(new Set([
+    ...scriptableMusicApps.filter((name) => (
     configuredMusicApps.length === 0 || configuredMusicApps.some((keyword) => name.toLowerCase().includes(keyword))
-  ));
-  const musicApps = musicCandidates.filter((name) => hasProcess(processes, [name]));
-  const musicMarkers = await Promise.all(musicApps.map((name) => readNowPlaying(name)));
-  markers.push(...musicMarkers.filter(Boolean));
+    )),
+    ...configuredRunningMusicApps,
+  ]));
+  const musicApps = musicCandidates.filter((name) => processNames.has(name.toLowerCase()));
+  const musicResults = await Promise.all(musicApps.map(async (name) => {
+    const result = isNeteaseMusicApp(name)
+      ? await readNeteaseNowPlaying(name, minSegmentMs)
+      : await readNowPlaying(name);
+    return { name, ...result };
+  }));
+  markers.push(...musicResults.map((result) => result.marker).filter(Boolean));
+
+  timelineDebugLog({
+    stage: 'background:music',
+    message: musicApps.length > 0
+      ? musicResults.map((result) => `${result.name}:${result.status}${result.marker?.detail ? `:${result.marker.detail}` : ''}`).join(' | ')
+      : 'none',
+  });
+
+  timelineDebugLog({
+    stage: 'background:markers',
+    message: markers.length > 0
+      ? markers.map((marker) => `${marker.type}:${marker.name}:${marker.detail}`).join(' | ')
+      : 'none',
+  });
 
   return markers;
 }
 
-async function readTimelineBackgroundOnly({ musicAppKeywords } = {}) {
+async function readTimelineBackgroundOnly({ musicAppKeywords, minSegmentMs } = {}) {
   if (process.platform !== 'darwin') return { supported: false, background: [], error: 'unsupported', checkedAt: Date.now() };
-  const background = await readTimelineBackgroundMarkers({ musicAppKeywords });
+  const background = await readTimelineBackgroundMarkers({ musicAppKeywords, minSegmentMs });
   return { supported: true, background, error: null, checkedAt: Date.now() };
 }
 
@@ -617,7 +806,7 @@ function readSystemActivityState() {
   };
 }
 
-async function readTimelineActiveWindow({ musicAppKeywords } = {}) {
+async function readTimelineActiveWindow({ musicAppKeywords, minSegmentMs } = {}) {
   if (process.platform !== 'darwin') {
     return { supported: false, appName: '', windowTitle: '', url: '', background: [], error: 'unsupported' };
   }
@@ -628,7 +817,7 @@ async function readTimelineActiveWindow({ musicAppKeywords } = {}) {
 
   const [url, background] = await Promise.all([
     readBrowserUrl(active.appName),
-    readTimelineBackgroundMarkers({ musicAppKeywords }),
+    readTimelineBackgroundMarkers({ musicAppKeywords, minSegmentMs }),
   ]);
   return {
     supported: true,
@@ -735,27 +924,52 @@ function normalizeRuleList(value) {
   return Array.isArray(value) ? value.map((item) => String(item).trim().toLowerCase()).filter(Boolean) : [];
 }
 
+function normalizeMatchText(value) {
+  const raw = String(value || '').toLowerCase();
+  const aliases = [];
+  if (/(^|[./])zhihu\.com|zhihu/.test(raw)) aliases.push('知乎');
+  if (/(^|[./])bilibili\.com|b23\.tv|bilibili/.test(raw)) aliases.push('哔哩哔哩', 'b站');
+  if (/(^|[./])xiaohongshu\.com|xiaohongshu/.test(raw)) aliases.push('小红书');
+  if (/(^|[./])weibo\.com|weibo/.test(raw)) aliases.push('微博');
+  if (/(^|[./])douyin\.com|douyin/.test(raw)) aliases.push('抖音');
+  if (/(^|[./])youtube\.com|youtu\.be|youtube/.test(raw)) aliases.push('油管');
+  try {
+    return `${raw} ${decodeURIComponent(raw)} ${aliases.join(' ')}`;
+  } catch {
+    return `${raw} ${aliases.join(' ')}`;
+  }
+}
+
 function classifyDistraction(active, settings) {
-  const appNameLower = String(active.appName || '').toLowerCase();
-  const titleLower = String(active.windowTitle || '').toLowerCase();
-  if (!appNameLower && !titleLower) return null;
+  const appNameLower = normalizeMatchText(active.appName);
+  const titleLower = normalizeMatchText(active.windowTitle);
+  const urlLower = normalizeMatchText(active.url);
+  if (!appNameLower && !titleLower && !urlLower) return null;
   if (IGNORED_DISTRACTION_APPS.some((ignored) => ignored.toLowerCase() === appNameLower)) return null;
   const blockedApp = normalizeRuleList(settings?.distractionBlockedApps)
     .find((rule) => appNameLower.includes(rule));
   if (blockedApp) return `app:${blockedApp}`;
   const blockedKeyword = normalizeRuleList(settings?.distractionBlockedKeywords)
-    .find((rule) => titleLower.includes(rule) || appNameLower.includes(rule));
+    .find((rule) => titleLower.includes(rule) || appNameLower.includes(rule) || urlLower.includes(rule));
   return blockedKeyword ? `keyword:${blockedKeyword}` : null;
 }
 
 async function checkDistraction({ settings }) {
-  const active = await readActiveWindow();
+  const active = await readTimelineActiveWindow({ musicAppKeywords: settings?.musicAppKeywords });
   if (!active.supported || active.error) {
-    return { ...active, matchedRule: null };
+    return { ...active, matchedRule: null, checkedAt: Date.now() };
   }
+  const matchedRule = classifyDistraction(active, settings || {});
+  timelineDebugLog({
+    stage: 'distraction:check',
+    message: matchedRule || 'none',
+    appName: active.appName,
+    windowTitle: active.windowTitle,
+    url: active.url,
+  });
   return {
     ...active,
-    matchedRule: classifyDistraction(active, settings || {}),
+    matchedRule,
     checkedAt: Date.now(),
   };
 }
@@ -844,7 +1058,7 @@ function createPetWindow() {
   return win;
 }
 
-function showSettingsWindow() {
+function showSettingsWindow(section) {
   windows.get('compact-chat')?.hide();
   broadcast('compact-chat:collapsed', {});
   const bounds = centerBoundsForSize(980, 760);
@@ -860,6 +1074,9 @@ function showSettingsWindow() {
   });
   win.setBounds(bounds);
   showWindowAfterInitialPaint(win, { focus: true });
+  if (section) {
+    setTimeout(() => broadcast('settings:navigate', { section }), 80);
+  }
 }
 
 function showChatWindow() {
@@ -2416,7 +2633,7 @@ async function ackInheritedClaudeCodingSessions({ ackKeys } = {}) {
 const keyStore = new Map();
 
 const handlers = {
-  show_settings_cmd: () => showSettingsWindow(),
+  show_settings_cmd: ({ section }) => showSettingsWindow(section),
   show_chat_window: () => showChatWindow(),
   show_compact_chat_window: (args) => showCompactChatWindow(args, true),
   position_compact_chat_window: (args) => showCompactChatWindow(args, false),

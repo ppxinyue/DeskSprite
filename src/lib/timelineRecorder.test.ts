@@ -71,6 +71,27 @@ test('keeps multiple short foreground switches as details on the active segment'
   assert.deepEqual(shortMarkers.map((marker) => marker.name), ['WeChat', 'Arc']);
 });
 
+test('keeps repeated short switches to the same app as separate visits', async () => {
+  const { recorder, persisted } = createHarness(10 * 60_000);
+
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 10 * 60_000);
+  await recorder.handleSnapshot(snapshot('WeChat', '微信'), 11 * 60_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 12 * 60_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 20 * 60_000);
+  await recorder.handleSnapshot(snapshot('WeChat', '微信'), 33 * 60_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 34 * 60_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 35 * 60_000);
+
+  const shortMarkers = persisted.at(-1)?.backgroundMarkers.filter((marker) => marker.type === 'foreground-short') ?? [];
+  assert.equal(shortMarkers.length, 2);
+  assert.deepEqual(shortMarkers.map((marker) => marker.name), ['WeChat', 'WeChat']);
+  assert.equal(shortMarkers[0].startedAt, new Date(11 * 60_000).toISOString());
+  assert.equal(shortMarkers[0].endedAt, new Date(12 * 60_000).toISOString());
+  assert.equal(shortMarkers[1].startedAt, new Date(33 * 60_000).toISOString());
+  assert.equal(shortMarkers[1].endedAt, new Date(34 * 60_000).toISOString());
+});
+
 test('ignores DeskSprite/Electron foreground so startup chrome does not steal active segment', async () => {
   const { recorder, persisted, logs } = createHarness();
 
@@ -82,6 +103,38 @@ test('ignores DeskSprite/Electron foreground so startup chrome does not steal ac
   assert.equal(persisted[0].appName, 'Codex');
   assert.equal(persisted[0].startedAt, 3_000);
   assert.ok(logs.some((item) => item.stage === 'sample:ignore'));
+});
+
+test('keeps background markers sampled while DeskSprite/Electron is foreground', async () => {
+  const { recorder, persisted } = createHarness();
+
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 65_000);
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings', {
+    background: [
+      { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
+      { type: 'music', name: 'NeteaseMusic', detail: 'running' },
+    ],
+  }), 120_000);
+
+  const latest = persisted.at(-1);
+  assert.equal(latest?.appName, 'Codex');
+  assert.equal(latest?.endedAt, 65_000);
+  assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'terminal' && marker.detail === 'pnpm electron:dev'), true);
+  assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'music' && marker.name === 'NeteaseMusic'), true);
+});
+
+test('does not extend foreground duration when only ignored app background markers are sampled', async () => {
+  const { recorder, persisted } = createHarness();
+
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 65_000);
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings', {
+    background: [{ type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' }],
+  }), 180_000);
+
+  assert.equal(persisted.at(-1)?.startedAt, 0);
+  assert.equal(persisted.at(-1)?.endedAt, 65_000);
 });
 
 test('confirms a new app only after it passes the minimum duration', async () => {
@@ -140,6 +193,77 @@ test('records background music and terminal markers without blocking foreground 
   assert.equal(markers.some((marker) => marker.type === 'terminal' && marker.detail === 'pnpm electron:dev'), true);
   assert.equal(markers.some((marker) => marker.type === 'music' && marker.detail === 'Track A - Artist'), true);
   assert.equal(markers.some((marker) => marker.type === 'music' && marker.detail === 'Track B - Artist'), true);
+});
+
+test('extends interleaved terminal and music markers instead of repeatedly pushing duplicates', async () => {
+  const { recorder, persisted } = createHarness();
+
+  for (const checkedAt of [0, 60_000, 120_000, 180_000]) {
+    await recorder.handleSnapshot(snapshot('Codex', 'task1', {
+      background: [
+        { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
+        { type: 'music', name: 'Music', detail: 'Track A - Artist' },
+      ],
+    }), checkedAt);
+  }
+
+  const markers = persisted.at(-1)?.backgroundMarkers ?? [];
+  const terminalMarkers = markers.filter((marker) => marker.type === 'terminal' && marker.detail === 'pnpm electron:dev');
+  const musicMarkers = markers.filter((marker) => marker.type === 'music' && marker.detail === 'Track A - Artist');
+  assert.equal(terminalMarkers.length, 1);
+  assert.equal(musicMarkers.length, 1);
+  assert.equal(terminalMarkers[0].startedAt, new Date(0).toISOString());
+  assert.equal(terminalMarkers[0].endedAt, new Date(180_000).toISOString());
+  assert.equal(musicMarkers[0].endedAt, new Date(180_000).toISOString());
+});
+
+test('persists short foreground candidate when sampling stops before returning to active app', async () => {
+  const { recorder, persisted } = createHarness();
+
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 70_000);
+  await recorder.handleSnapshot(snapshot('WeChat', '微信'), 90_000);
+  await recorder.stop(120_000);
+
+  const latest = persisted.at(-1);
+  const shortMarkers = latest?.backgroundMarkers.filter((marker) => marker.type === 'foreground-short') ?? [];
+  assert.equal(latest?.appName, 'Codex');
+  assert.equal(shortMarkers.length, 1);
+  assert.equal(shortMarkers[0].name, 'WeChat');
+  assert.equal(shortMarkers[0].startedAt, new Date(90_000).toISOString());
+});
+
+test('persists short foreground candidate when DeskSprite becomes foreground before returning to active app', async () => {
+  const { recorder, persisted } = createHarness();
+
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 70_000);
+  await recorder.handleSnapshot(snapshot('WeChat', '微信'), 90_000);
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings'), 120_000);
+
+  const shortMarkers = persisted.at(-1)?.backgroundMarkers.filter((marker) => marker.type === 'foreground-short') ?? [];
+  assert.equal(shortMarkers.length, 1);
+  assert.equal(shortMarkers[0].name, 'WeChat');
+});
+
+test('persists background-only markers when no foreground segment can carry them', async () => {
+  const { recorder, persisted } = createHarness();
+
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings', {
+    background: [{ type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' }],
+  }), 0);
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings', {
+    background: [
+      { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
+      { type: 'music', name: 'NeteaseMusic', detail: 'running' },
+    ],
+  }), 60_000);
+
+  const latest = persisted.at(-1);
+  assert.equal(latest?.foregroundVisible, false);
+  assert.equal(latest?.appName, 'Background');
+  assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'terminal'), true);
+  assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'music'), true);
 });
 
 test('pauses foreground while still extending background markers', async () => {

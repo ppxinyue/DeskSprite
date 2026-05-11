@@ -248,11 +248,14 @@ function App() {
   }, []);
 
   if (windowLabel === "settings") {
+    const previewSection = window.location.hash.startsWith('#settings:')
+      ? window.location.hash.replace(/^#settings:/, '')
+      : undefined;
     if (shouldDeferWindowContent(windowLabel, loaded)) return <WindowLoadingFallback />;
     return (
       <TooltipProvider>
         <Suspense fallback={<WindowLoadingFallback />}>
-          <SettingsPanel />
+          <SettingsPanel initialSection={previewSection as any} />
         </Suspense>
       </TooltipProvider>
     );
@@ -542,6 +545,7 @@ function CodingDialog({
   const stickToBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const autoOpenedHistoryProviderRef = useRef<CodingProvider | null>(null);
   const enabledProviders = useMemo(() => getEnabledCodingProviders(settings), [settings.codingCodexEnabled, settings.codingClaudeEnabled]);
   const activeProvider = standalone ? standaloneProvider : settings.codingProvider;
   const effectiveSettings = useMemo(() => ({ ...settings, codingProvider: activeProvider }), [activeProvider, settings]);
@@ -659,6 +663,8 @@ function CodingDialog({
     setActiveArchivedConversationId(null);
     setActiveInheritedSessionId(null);
     setInheritedState(DEFAULT_CODING_STATE);
+    setHistoryItems([]);
+    autoOpenedHistoryProviderRef.current = null;
     stickToBottomRef.current = true;
   }, [activeProvider]);
 
@@ -717,6 +723,23 @@ function CodingDialog({
   const inheritedSessions = standalone
     ? (inheritedState.allSessions || inheritedState.sessions || [])
     : state.sessions || [];
+
+  useEffect(() => {
+    if (!standalone) return;
+    if (autoOpenedHistoryProviderRef.current === activeProvider) return;
+    if (historyItems.length > 0) {
+      autoOpenedHistoryProviderRef.current = activeProvider;
+      loadArchivedConversation(historyItems[0].id);
+      return;
+    }
+    if (inheritedSessions.length > 0) {
+      autoOpenedHistoryProviderRef.current = activeProvider;
+      setArchivedMessages(null);
+      setActiveArchivedConversationId(null);
+      setActiveInheritedSessionId(inheritedSessions[0].id);
+    }
+  }, [activeProvider, historyItems, inheritedSessions, standalone]);
+
   const activeInheritedSession = (standalone || inherited)
     ? (standalone
       ? inheritedSessions.find((session) => session.id === activeInheritedSessionId) ?? null
@@ -1076,6 +1099,40 @@ function codingConnectionErrorMessage(error: unknown, label = 'Codex') {
   return detail ? `无法连接 ${label}：${detail}` : `无法连接 ${label}。`;
 }
 
+function normalizeDistractionText(value: unknown) {
+  const raw = String(value || '').toLowerCase();
+  const aliases: string[] = [];
+  if (/(^|[./])zhihu\.com|zhihu/.test(raw)) aliases.push('知乎');
+  if (/(^|[./])bilibili\.com|b23\.tv|bilibili/.test(raw)) aliases.push('哔哩哔哩', 'b站');
+  if (/(^|[./])xiaohongshu\.com|xiaohongshu/.test(raw)) aliases.push('小红书');
+  if (/(^|[./])weibo\.com|weibo/.test(raw)) aliases.push('微博');
+  if (/(^|[./])douyin\.com|douyin/.test(raw)) aliases.push('抖音');
+  if (/(^|[./])youtube\.com|youtu\.be|youtube/.test(raw)) aliases.push('油管');
+  try {
+    return `${raw} ${decodeURIComponent(raw)} ${aliases.join(' ')}`;
+  } catch {
+    return `${raw} ${aliases.join(' ')}`;
+  }
+}
+
+function getTimelineSnapshotDistractionMatch(snapshot: TimelineSnapshot, settings: AppSettings): string | null {
+  const appName = normalizeDistractionText(snapshot.appName);
+  const title = normalizeDistractionText(snapshot.windowTitle);
+  const url = normalizeDistractionText(snapshot.url);
+  if (!appName && !title && !url) return null;
+  if (['desksprite', 'pawpal', 'electron'].some((ignored) => appName.trim() === ignored)) return null;
+  const blockedApp = settings.distractionBlockedApps
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .find((rule) => appName.includes(rule));
+  if (blockedApp) return `app:${blockedApp}`;
+  const blockedKeyword = settings.distractionBlockedKeywords
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+    .find((rule) => title.includes(rule) || appName.includes(rule) || url.includes(rule));
+  return blockedKeyword ? `keyword:${blockedKeyword}` : null;
+}
+
 function PetWindow() {
   const { settings, updateSettings } = useSettingsStore();
   const { dialogOpen, chatMode, chatConversationId, openChat, closeChat, setPetState, petState, mediaConfig, userFrames, userGifs } = usePetStore();
@@ -1096,6 +1153,7 @@ function PetWindow() {
   const focusStartedAtRef = useRef<number | null>(null);
   const focusStatsStartedAtRef = useRef<number | null>(null);
   const focusWarningAtRef = useRef(0);
+  const activeDistractionRuleRef = useRef<string | null>(null);
   const codingModeStatsStartedAtRef = useRef<number | null>(null);
   const systemInactiveRef = useRef(false);
   const systemInactiveStartedAtRef = useRef<number | null>(null);
@@ -1586,12 +1644,34 @@ function PetWindow() {
     }
   }, []);
 
+  const triggerDistractionWarning = useCallback((matchedRule: string, appName: string, bypassCooldown = false) => {
+    if (!focusEndAtRef.current) return;
+    const startedAt = focusStartedAtRef.current ?? Date.now();
+    if (Date.now() - startedAt < Math.max(0, settingsRef.current.distractionGraceSeconds) * 1000) return;
+    if (!bypassCooldown && Date.now() - focusWarningAtRef.current < DISTRACTION_WARNING_COOLDOWN_MS) return;
+    focusWarningAtRef.current = Date.now();
+    const rule = matchedRule.replace(/^(app|keyword):/, '');
+    recordDistraction(Date.now(), rule || appName, DISTRACTION_CHECK_INTERVAL_MS)
+      .then((day) => {
+        if (day) emit('profile:data-updated', { kind: 'distraction', date: day.date }).catch(() => {});
+      })
+      .catch((e) => console.warn("Failed to record distraction stats:", e));
+    setPetState('work');
+    setPetPrompt({
+      id: 'focus-warning',
+      message: `检测到分心：${rule}`,
+      variant: 'warning',
+      rule,
+    });
+  }, [setPetState]);
+
   const endFocus = useCallback(() => {
     recordCurrentFocusSession();
     setFocusEndAt(null);
     focusStartedAtRef.current = null;
     focusStatsStartedAtRef.current = null;
     focusWarningAtRef.current = 0;
+    activeDistractionRuleRef.current = null;
     autoFocusAfterRestRef.current = false;
     setPetPrompt(null);
     if (!restEndAt) setPetState('idle');
@@ -1604,6 +1684,7 @@ function PetWindow() {
     focusStartedAtRef.current = startedAt;
     focusStatsStartedAtRef.current = startedAt;
     focusWarningAtRef.current = 0;
+    activeDistractionRuleRef.current = null;
     setRestEndAt(null);
     setPetPrompt(null);
     setFocusEndAt(endAt);
@@ -1692,24 +1773,17 @@ function PetWindow() {
           supported: boolean;
           appName: string;
           windowTitle: string;
+          url?: string;
           matchedRule: string | null;
         }>('check_distraction', { settings });
-        if (!result.supported || !result.matchedRule || !focusEndAtRef.current) return;
-        if (Date.now() - focusWarningAtRef.current < DISTRACTION_WARNING_COOLDOWN_MS) return;
-        focusWarningAtRef.current = Date.now();
-        const rule = result.matchedRule.replace(/^(app|keyword):/, '');
-        recordDistraction(Date.now(), result.appName || rule, DISTRACTION_CHECK_INTERVAL_MS)
-          .then((day) => {
-            if (day) emit('profile:data-updated', { kind: 'distraction', date: day.date }).catch(() => {});
-          })
-          .catch((e) => console.warn("Failed to record distraction stats:", e));
-        setPetState('work');
-        setPetPrompt({
-          id: 'focus-warning',
-          message: `检测到分心：${rule}`,
-          variant: 'warning',
-          rule,
-        });
+        if (!result.supported || !focusEndAtRef.current) return;
+        if (!result.matchedRule) {
+          activeDistractionRuleRef.current = null;
+          return;
+        }
+        const isNewEpisode = activeDistractionRuleRef.current !== result.matchedRule;
+        activeDistractionRuleRef.current = result.matchedRule;
+        triggerDistractionWarning(result.matchedRule, result.appName, isNewEpisode);
       } catch (e) {
         console.warn('Failed to check distraction:', e);
       }
@@ -1721,7 +1795,7 @@ function PetWindow() {
       window.clearTimeout(firstTimer);
       window.clearInterval(timer);
     };
-  }, [focusEndAt, settings, setPetState]);
+  }, [focusEndAt, settings, triggerDistractionWarning]);
 
   useEffect(() => {
     if (!focusEndAt) return;
@@ -1775,7 +1849,7 @@ function PetWindow() {
     const readTimelineSnapshot = async (): Promise<TimelineSnapshot> => {
       if (!useFallbackSnapshot) {
         try {
-          return await invoke<TimelineSnapshot>('read_timeline_active_window', { musicAppKeywords: settingsRef.current.musicAppKeywords });
+          return await invoke<TimelineSnapshot>('read_timeline_active_window', { musicAppKeywords: settingsRef.current.musicAppKeywords, minSegmentMs });
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (!message.includes('Unknown command: read_timeline_active_window')) throw error;
@@ -1822,7 +1896,7 @@ function PetWindow() {
             await recorder.pauseForeground(systemInactiveStartedAtRef.current ?? Date.now());
             saveTimelineRecorderState(recorder.getState(), minSegmentMs);
           }
-          const backgroundOnly = await invoke<{ supported: boolean; background: TimelineSnapshot['background']; error?: string | null }>('read_timeline_background_markers', { musicAppKeywords: settingsRef.current.musicAppKeywords }).catch(() => null);
+          const backgroundOnly = await invoke<{ supported: boolean; background: TimelineSnapshot['background']; error?: string | null }>('read_timeline_background_markers', { musicAppKeywords: settingsRef.current.musicAppKeywords, minSegmentMs }).catch(() => null);
           if (backgroundOnly?.supported) {
             await recorder.handleBackgroundMarkers(backgroundOnly.background, Date.now());
             saveTimelineRecorderState(recorder.getState(), minSegmentMs);
@@ -1836,6 +1910,23 @@ function PetWindow() {
         }
         const result = await readTimelineSnapshot();
         if (disposed) return;
+        if (focusEndAtRef.current && settingsRef.current.distractionDetectionEnabled && result.supported && !result.error) {
+          const matchedRule = getTimelineSnapshotDistractionMatch(result, settingsRef.current);
+          timelineDebugLog({
+            stage: 'distraction:timeline-check',
+            message: matchedRule || 'none',
+            appName: result.appName,
+            windowTitle: result.windowTitle,
+            url: result.url,
+          });
+          if (!matchedRule) {
+            activeDistractionRuleRef.current = null;
+          } else {
+            const isNewEpisode = activeDistractionRuleRef.current !== matchedRule;
+            activeDistractionRuleRef.current = matchedRule;
+            triggerDistractionWarning(matchedRule, result.appName, isNewEpisode);
+          }
+        }
         await recorder.handleSnapshot(result, Date.now());
         saveTimelineRecorderState(recorder.getState(), minSegmentMs);
       } catch (error) {
@@ -1853,7 +1944,7 @@ function PetWindow() {
         .then(() => saveTimelineRecorderState(recorder.getState(), minSegmentMs))
         .catch(() => saveTimelineRecorderState(recorder.getState(), minSegmentMs));
     };
-  }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes, settings.musicAppKeywords]);
+  }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes, settings.musicAppKeywords, triggerDistractionWarning]);
 
   useEffect(() => {
     if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;

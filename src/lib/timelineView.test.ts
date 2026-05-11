@@ -43,6 +43,30 @@ test('clips cross-day background markers into the selected day even when foregro
   assert.equal(clipped[0].backgroundMarkers[0].endedAt, '2026-05-10T17:00:00.000Z');
 });
 
+test('keeps background-only entries hidden from foreground stats after clipping', () => {
+  const clipped = clipTimelineEntriesToDate('2026-05-11', [
+    entry({
+      foregroundVisible: false,
+      startedAt: '2026-05-11T00:00:00.000Z',
+      endedAt: '2026-05-11T01:00:00.000Z',
+      backgroundMarkers: [
+        {
+          type: 'terminal',
+          name: 'Terminal',
+          detail: 'pnpm electron:dev',
+          startedAt: '2026-05-11T00:00:00.000Z',
+          endedAt: '2026-05-11T01:00:00.000Z',
+        },
+      ],
+    }),
+  ]);
+
+  assert.equal(clipped.length, 1);
+  assert.equal(clipped[0].foregroundVisible, false);
+  assert.deepEqual(getVisibleTimelineCategories(clipped), []);
+  assert.equal(getTimelineCategoryStats(clipped).coding, 0);
+});
+
 test('keeps short foreground switches as detail rows after day clipping', () => {
   const clipped = clipTimelineEntriesToDate('2026-05-11', [
     entry({
@@ -65,6 +89,26 @@ test('keeps short foreground switches as detail rows after day clipping', () => 
   assert.equal(shortRows[0].name, 'WeChat');
   assert.equal(shortRows[0].startedAt, '2026-05-11T00:04:00.000Z');
   assert.equal(shortRows[0].endedAt, '2026-05-11T00:05:30.000Z');
+});
+
+test('does not stretch legacy background markers without endedAt to the foreground end', () => {
+  const clipped = clipTimelineEntriesToDate('2026-05-11', [
+    entry({
+      startedAt: '2026-05-11T00:00:00.000Z',
+      endedAt: '2026-05-11T02:00:00.000Z',
+      backgroundMarkers: [
+        {
+          type: 'music',
+          name: 'NeteaseMusic',
+          detail: 'running',
+          startedAt: '2026-05-11T00:10:00.000Z',
+        },
+      ],
+    }),
+  ]);
+
+  assert.equal(clipped.length, 1);
+  assert.equal(clipped[0].backgroundMarkers.length, 0);
 });
 
 test('category legend stats are calculated from visible timeline blocks only', () => {

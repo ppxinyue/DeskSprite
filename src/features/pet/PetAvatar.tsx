@@ -32,7 +32,7 @@ const MOTION_BASE_DURATION: Record<PetMotionName, number> = {
 const PET_DRAW_PADDING = 2;
 const SOURCE_EDGE_INSET_RATIO = 0.004;
 const MENU_WIDTH = 136;
-const MENU_HEIGHT = 312;
+const MENU_HEIGHT = 334;
 const SUBMENU_WIDTH = 190;
 const MENU_MARGIN = 8;
 const MENU_LEFT_SIDE_THRESHOLD = 0.62;
@@ -211,6 +211,9 @@ export function PetAvatar({
     setMenuOpen(false);
     onMenuOpenChange?.(false);
     switch (action) {
+      case 'profile':
+        try { await invoke('show_settings_cmd', { section: 'profile' }); } catch (e) { console.error(e); }
+        break;
       case 'new-chat':
         openChat('new');
         emit('pet:force-open-chat', { mode: 'new', conversationId: null }).catch(() => {});
@@ -434,34 +437,45 @@ export function PetAvatar({
         onContextMenu={(e) => e.stopPropagation()}
         onWheel={(e) => e.stopPropagation()}
       >
-        <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">对话</div>
-        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('new-chat')}>新对话</button>
-        <div className="group/history relative">
-          <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">历史对话</button>
-          <div className={submenuBridgeClass} style={submenuBridgeStyle} />
-          <div
-              className={`absolute top-0 hidden w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/history:block dark:bg-[#1c1b18] ${
-              submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
-            }`}
+        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('profile')}>个人档案</button>
+        <div className="my-1 h-px bg-border/60" />
+        <button
+          className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent disabled:cursor-not-allowed disabled:text-muted-foreground/45 disabled:hover:bg-transparent"
+          disabled={codingModeEnabled}
+          onClick={() => handleContextMenu('new-chat')}
         >
-          {recentConversations.length === 0 ? (
-            <div className="px-2 py-1 text-xs text-muted-foreground">暂无历史</div>
-          ) : recentConversations.map((item) => (
-            <button
-              key={item.id}
-              className="block w-full max-w-44 truncate rounded px-2 py-1 text-left text-xs hover:bg-accent"
-              onClick={() => {
-                setMenuOpen(false);
-                onMenuOpenChange?.(false);
-                openChat('history', item.id);
-                emit('pet:force-open-chat', { mode: 'history', conversationId: item.id }).catch(() => {});
-              }}
-            >
-              {item.title || `对话 ${item.id}`}
-            </button>
-          ))}
+          新对话
+        </button>
+        {codingModeEnabled ? (
+          <button className="block w-full cursor-not-allowed rounded px-2 py-1 text-left text-xs text-muted-foreground/45" disabled>历史对话</button>
+        ) : (
+          <div className="group/history relative">
+            <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">历史对话</button>
+            <div className={submenuBridgeClass} style={submenuBridgeStyle} />
+            <div
+                className={`absolute top-0 hidden w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/history:block dark:bg-[#1c1b18] ${
+                submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
+              }`}
+          >
+            {recentConversations.length === 0 ? (
+              <div className="px-2 py-1 text-xs text-muted-foreground">暂无历史</div>
+            ) : recentConversations.map((item) => (
+              <button
+                key={item.id}
+                className="block w-full max-w-44 truncate rounded px-2 py-1 text-left text-xs hover:bg-accent"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onMenuOpenChange?.(false);
+                  openChat('history', item.id);
+                  emit('pet:force-open-chat', { mode: 'history', conversationId: item.id }).catch(() => {});
+                }}
+              >
+                {item.title || `对话 ${item.id}`}
+              </button>
+            ))}
+            </div>
           </div>
-        </div>
+        )}
         <div className="my-1 h-px bg-border/60" />
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('focus')}>
           {focusActive ? '退出专注' : '专注模式'}

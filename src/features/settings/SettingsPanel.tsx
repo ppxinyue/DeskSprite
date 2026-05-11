@@ -7,7 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { SettingsLayout } from '@/components/layouts/SettingsLayout';
-import { useSettingsStore, type AppLanguage, type AvatarRenderMode, type CodingProvider, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
+import { useSettingsStore, type AppLanguage, type AppSettings, type AvatarRenderMode, type CodingProvider, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
 import { BUILTIN_CLOSEAI_CONFIG, getBuiltinUsageStats } from '@/features/ai/defaultModel';
@@ -16,7 +16,7 @@ import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
 import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getFocusStatsDays, getMessages, getSetting, getSystemPrompt, getTimelineEntries, setSetting, updateSystemPrompt, type FocusStatsDay, type TimelineCategory, type TimelineEntry } from '@/lib/db';
-import { clipTimelineEntriesToDate, getShortForegroundRows, getTimelineCategoryStats, getTimelineDurationMs, getVisibleTimelineCategories, type BackgroundMarkerWithTime } from '@/lib/timelineView';
+import { clipTimelineEntriesToDate, getShortForegroundRows, type BackgroundMarkerWithTime } from '@/lib/timelineView';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, isBuiltinAsset, normalizePetMediaConfig, type PetStateMediaConfig } from '@/features/pet/animations';
 import { LANGUAGE_OPTIONS } from '@/i18n';
@@ -24,8 +24,9 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { ComponentProps, MouseEvent, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
-type SettingsSection =
+export type SettingsSection =
   | 'profile'
   | 'history'
   | 'general'
@@ -95,8 +96,14 @@ const SECTION_GROUPS: Array<{
   },
 ];
 
-export function SettingsPanel() {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
+export function SettingsPanel({
+  initialSection = 'profile',
+  presentation = false,
+}: {
+  initialSection?: SettingsSection;
+  presentation?: boolean;
+} = {}) {
+  const [activeSection, setActiveSection] = useState<SettingsSection>(initialSection);
   const { settings, loaded, loadSettings, updateSetting, updateSettings } = useSettingsStore();
   const { configs, loadConfigs, removeConfig, setDefault } = useApiConfigStore();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
@@ -107,13 +114,26 @@ export function SettingsPanel() {
   const [testResults, setTestResults] = useState<Record<number, { success: boolean; message: string; latency?: number }>>({});
 
   useEffect(() => {
+    if (presentation) return;
     loadSettings();
     loadConfigs();
     getSystemPrompt().then((prompt) => setSystemPrompt(normalizeSystemPrompt(prompt)));
     getSetting('orbSystemPrompt').then((prompt) => setOrbSystemPrompt(normalizeOrbSystemPrompt(prompt)));
-  }, []);
+  }, [presentation]);
 
-  if (!loaded) return <div className="p-6">加载中...</div>;
+  useEffect(() => {
+    setActiveSection(initialSection);
+  }, [initialSection]);
+
+  useEffect(() => {
+    if (presentation) return;
+    const unlisten = listen<{ section?: SettingsSection }>('settings:navigate', ({ payload }) => {
+      if (payload?.section) setActiveSection(payload.section);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, [presentation]);
+
+  if (!loaded && !presentation) return <div className="p-6">加载中...</div>;
 
   const sidebar = (
     <>
@@ -441,12 +461,14 @@ function CollapsedUnavailableRow({ title, reason }: { title: string; reason: str
 }
 
 function ProfileSection() {
+  const { settings } = useSettingsStore();
   const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey(getLocalDateKey()));
   const [stats, setStats] = useState<FocusStatsDay[]>([]);
   const [timelineEntries, setTimelineEntries] = useState<TimelineEntry[]>([]);
   const [selectedTimelineId, setSelectedTimelineId] = useState<number | null>(null);
+  const [profileMockPreview, setProfileMockPreview] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null);
   const statsScrollRef = useRef<HTMLDivElement>(null);
 
@@ -457,18 +479,26 @@ function ProfileSection() {
     ])
       .then(([nextStats, nextTimeline]) => {
         const clippedTimeline = clipTimelineEntriesToDate(selectedDate, nextTimeline);
+        const selectedFocusStats = nextStats.find((day) => day.date === selectedDate);
+        const hasSelectedFocusData = Boolean(
+          selectedFocusStats
+          && (selectedFocusStats.focusMs > 0 || selectedFocusStats.focusSessions > 0 || selectedFocusStats.distractions > 0 || (selectedFocusStats.codingMs ?? 0) > 0),
+        );
+        const shouldUseMockPreview = selectedDate === shiftDateKey(getLocalDateKey(), -1) && clippedTimeline.length === 0 && !hasSelectedFocusData;
         const displayTimeline = clippedTimeline.length > 0
           ? clippedTimeline
-          : selectedDate === shiftDateKey(getLocalDateKey(), -1)
+          : shouldUseMockPreview
             ? createMockTimelineEntries(selectedDate)
             : [];
-        setStats(nextStats);
+        setStats(shouldUseMockPreview ? mergeMockFocusStats(nextStats, selectedDate) : nextStats);
         setTimelineEntries(displayTimeline);
+        setProfileMockPreview(shouldUseMockPreview);
         setSelectedTimelineId((id) => displayTimeline.some((entry) => entry.id === id) ? id : displayTimeline.at(-1)?.id ?? null);
       })
       .catch(() => {
         setStats([]);
         setTimelineEntries([]);
+        setProfileMockPreview(false);
       });
   }, [selectedDate]);
 
@@ -521,60 +551,68 @@ function ProfileSection() {
   const totalFocusMs = focusWindowStats.reduce((sum, day) => sum + day.focusMs, 0);
   const totalSessions = focusWindowStats.reduce((sum, day) => sum + day.focusSessions, 0);
   const totalDistractions = focusWindowStats.reduce((sum, day) => sum + day.distractions, 0);
+  const distractionContentStats = getDistractionContentStats(selectedStats.distractionApps ?? {}, timelineEntries, settings);
   const todayKey = getLocalDateKey();
   return (
     <>
       <div className="mb-5 flex items-center justify-between gap-3">
         <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.018em] text-foreground">个人档案</h1>
-        <div ref={calendarRef} className="relative flex items-center gap-1.5 rounded-[9px] bg-white/44 p-1 shadow-[0_8px_22px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.7)_inset] dark:bg-white/[0.045]">
-          <button
-            type="button"
-            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
-            onClick={() => {
-              setSelectedDate((date) => {
-                const next = shiftDateKey(date, -1);
-                return next;
-              });
-            }}
-            aria-label="前一天"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            className="flex min-w-[128px] items-center justify-center gap-1.5 rounded-[7px] px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-background/70"
-            onClick={() => setCalendarOpen((open) => !open)}
-            aria-haspopup="dialog"
-            aria-expanded={calendarOpen}
-          >
-            <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-            {formatDateHeading(selectedDate)}
-          </button>
-          <button
-            type="button"
-            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
-            onClick={() => {
-              setSelectedDate((date) => {
-                const next = shiftDateKey(date, 1);
-                return next;
-              });
-            }}
-            disabled={selectedDate >= todayKey}
-            aria-label="后一天"
-          >
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-          {calendarOpen && (
-            <ProfileCalendar
-              month={calendarMonth}
-              selectedDate={selectedDate}
-              todayKey={todayKey}
-              onMonthChange={setCalendarMonth}
-              onSelect={(date) => {
-                setSelectedDate(date);
-                setCalendarOpen(false);
+        <div className="flex flex-col items-end gap-1">
+          <div ref={calendarRef} className="relative flex items-center gap-1.5 rounded-[9px] bg-white/44 p-1 shadow-[0_8px_22px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.7)_inset] dark:bg-white/[0.045]">
+            <button
+              type="button"
+              className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+              onClick={() => {
+                setSelectedDate((date) => {
+                  const next = shiftDateKey(date, -1);
+                  return next;
+                });
               }}
-            />
+              aria-label="前一天"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              className="flex min-w-[128px] items-center justify-center gap-1.5 rounded-[7px] px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-background/70"
+              onClick={() => setCalendarOpen((open) => !open)}
+              aria-haspopup="dialog"
+              aria-expanded={calendarOpen}
+            >
+              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+              {formatDateHeading(selectedDate)}
+            </button>
+            <button
+              type="button"
+              className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
+              onClick={() => {
+                setSelectedDate((date) => {
+                  const next = shiftDateKey(date, 1);
+                  return next;
+                });
+              }}
+              disabled={selectedDate >= todayKey}
+              aria-label="后一天"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+            {calendarOpen && (
+              <ProfileCalendar
+                month={calendarMonth}
+                selectedDate={selectedDate}
+                todayKey={todayKey}
+                onMonthChange={setCalendarMonth}
+                onSelect={(date) => {
+                  setSelectedDate(date);
+                  setCalendarOpen(false);
+                }}
+              />
+            )}
+          </div>
+          {profileMockPreview && (
+            <div className="text-right text-[10px] font-medium text-[#d13438] dark:text-[#ff8f8f]">
+              当前显示的是效果样例，不是真实使用数据。
+            </div>
           )}
         </div>
       </div>
@@ -586,18 +624,9 @@ function ProfileSection() {
         onSelect={setSelectedTimelineId}
       />
 
-      <div className="mb-4 rounded-[14px] bg-white/50 p-3 shadow-[0_14px_34px_rgba(52,64,84,0.06),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.045]">
-        <div className="grid divide-y divide-[#e6e8eb] dark:divide-white/10 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
-          <ProfileMetric label="专注时长" value={formatFocusDuration(selectedStats.focusMs)} />
-          <ProfileMetric label="专注次数" value={`${selectedStats.focusSessions} 次`} />
-          <ProfileMetric label="分心次数" value={`${selectedStats.distractions} 次`} />
-          <ProfileMetric label="Coding 模式时长" value={formatFocusDuration(selectedStats.codingMs ?? 0)} />
-        </div>
-      </div>
-
       <SettingsGroup className="px-4 py-4">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
+        <div className="mb-4">
+          <div className="mb-4">
             <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
               14 天专注
@@ -606,57 +635,65 @@ function ProfileSection() {
               {formatDateHeading(focusWindowStart)} - {formatDateHeading(selectedDate)} · 共 {formatFocusDuration(totalFocusMs)} · {totalSessions} 次专注 · {totalDistractions} 次分心
             </div>
           </div>
-          <div className="hidden text-[11px] text-[#8b8d98] dark:text-white/42 sm:block">
-            横向滑动查看历史
-          </div>
-        </div>
 
-        <div ref={statsScrollRef} className="overflow-x-auto pb-2 [scrollbar-width:thin]">
-          <div className="flex min-w-max items-end gap-1.5 rounded-[12px] bg-white/38 px-2 py-2 shadow-[0_8px_22px_rgba(52,64,84,0.045),0_1px_0_rgba(255,255,255,0.68)_inset] dark:bg-white/[0.035]">
-            {stats.map((day) => {
-              const height = Math.max(day.focusMs > 0 ? 8 : 2, (day.focusMs / maxFocusMs) * 72);
-              const selected = day.date === selectedDate;
-              return (
-                <button
-                  key={day.date}
-                  data-focus-date={day.date}
-                  type="button"
-                  className={`group flex min-w-[46px] flex-col items-center justify-end rounded-[8px] px-1.5 pb-1 pt-2 transition-colors ${
-                    selected ? 'bg-white shadow-sm dark:bg-white/9' : 'hover:bg-white/55 dark:hover:bg-white/7'
-                  }`}
-                  onClick={() => {
-                    setSelectedDate(day.date);
-                  }}
-                  title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
+          <div className="overflow-hidden rounded-[16px] bg-white/38 px-4 pb-2 pt-3 shadow-[0_14px_34px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.035]">
+            <div ref={statsScrollRef} className="overflow-x-auto [scrollbar-width:thin]">
+              <div
+                className="min-w-full"
+                style={{ width: `${(Math.max(stats.length, 14) / 14) * 100}%` }}
+              >
+                <div
+                  className="grid min-w-full items-end gap-1"
+                  style={{ gridTemplateColumns: `repeat(${Math.max(stats.length, 14)}, minmax(0, 1fr))` }}
                 >
-                  <span className="flex h-[76px] w-full items-end justify-center">
-                    <span
-                      className={`w-5 rounded-t-[5px] transition-all duration-200 ${
-                        selected ? 'bg-[#697177] dark:bg-white/58' : 'bg-[#b8c0c6] group-hover:bg-[#8b8d98] dark:bg-white/18 dark:group-hover:bg-white/34'
-                      }`}
-                      style={{ height }}
-                    />
-                  </span>
-                  <span className={`mt-1 text-[9px] leading-none ${selected ? 'text-[#3a3d40] dark:text-white/82' : 'text-[#8b8d98] dark:text-white/42'}`}>
-                    {formatChartDateLabel(day.date)}
-                  </span>
-                  <span className={`mt-0.5 text-[8px] leading-none ${selected ? 'text-[#697177] dark:text-white/58' : 'text-[#a0a6ad] dark:text-white/30'}`}>
-                    {formatWeekdayShort(day.date)}
-                  </span>
-                </button>
-              );
-            })}
+                  {stats.map((day) => {
+                    const height = Math.max(day.focusMs > 0 ? 8 : 2, (day.focusMs / maxFocusMs) * 72);
+                    const selected = day.date === selectedDate;
+                    return (
+                      <button
+                        key={day.date}
+                        data-focus-date={day.date}
+                        type="button"
+                        className={`group flex min-w-0 flex-col items-center justify-end rounded-[8px] px-1 pb-1 pt-2 transition-colors ${
+                          selected ? 'bg-white shadow-sm dark:bg-white/9' : 'hover:bg-white/55 dark:hover:bg-white/7'
+                        }`}
+                        onClick={() => {
+                          setSelectedDate(day.date);
+                        }}
+                        title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
+                      >
+                        <span className="flex h-[76px] w-full items-end justify-center">
+                          <span
+                            className={`w-5 rounded-t-[5px] transition-all duration-200 ${
+                              selected ? 'bg-[#0090ff] dark:bg-[#5eb1ff]' : 'bg-[#9ed0ff] group-hover:bg-[#5eb1ff] dark:bg-[#2b6ea8] dark:group-hover:bg-[#5eb1ff]'
+                            }`}
+                            style={{ height }}
+                          />
+                        </span>
+                        <span className={`mt-1 text-[9px] leading-none ${selected ? 'text-[#3a3d40] dark:text-white/82' : 'text-[#8b8d98] dark:text-white/42'}`}>
+                          {formatChartDateLabel(day.date)}
+                        </span>
+                        <span className={`mt-0.5 text-[8px] leading-none ${selected ? 'text-[#697177] dark:text-white/58' : 'text-[#a0a6ad] dark:text-white/30'}`}>
+                          {formatWeekdayShort(day.date)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="mt-3 grid gap-0 overflow-hidden rounded-[12px] bg-white/42 shadow-[0_10px_26px_rgba(52,64,84,0.052),0_1px_0_rgba(255,255,255,0.66)_inset] dark:bg-white/[0.04] sm:grid-cols-3">
-          <MiniMetric label="平均每日专注" value={formatFocusDuration(totalFocusMs / Math.max(1, focusWindowStats.length))} />
-          <MiniMetric label="最高单日专注" value={formatFocusDuration(Math.max(0, ...focusWindowStats.map((day) => day.focusMs)))} />
-          <MiniMetric label="平均分心次数" value={`${(totalDistractions / Math.max(1, focusWindowStats.length)).toFixed(1)} 次`} />
+        <div className="mt-3 grid divide-y divide-[#e6e8eb] overflow-hidden rounded-[14px] bg-white/42 shadow-[0_12px_30px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.68)_inset] dark:divide-white/10 dark:bg-white/[0.04] sm:grid-cols-4 sm:divide-x sm:divide-y-0">
+          <ProfileMetric label="专注模式时长" value={formatFocusDuration(selectedStats.focusMs)} />
+          <ProfileMetric label="专注模式次数" value={`${selectedStats.focusSessions} 次`} />
+          <ProfileMetric label="专注中分心次数" value={`${selectedStats.distractions} 次`} />
+          <ProfileMetric label="Coding 模式时长" value={formatFocusDuration(selectedStats.codingMs ?? 0)} />
         </div>
-      </SettingsGroup>
 
-      <DistractionAppsPanel apps={selectedStats.distractionApps ?? {}} />
+        <DistractionAppsContent apps={distractionContentStats} />
+      </SettingsGroup>
     </>
   );
 }
@@ -665,32 +702,23 @@ function ProfileMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="px-3 py-2.5">
       <div className="text-[11px] font-medium text-[#687076] dark:text-white/56">{label}</div>
-      <div className="mt-1 text-[17px] font-semibold tracking-[-0.015em] text-[#1c2024] dark:text-white/88">{value}</div>
+      <div className="mt-1 text-[14px] font-semibold tracking-[-0.01em] text-[#1c2024] dark:text-white/88">{value}</div>
     </div>
   );
 }
 
-function MiniMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="relative px-3 py-2 after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-foreground/[0.055] last:after:hidden dark:after:bg-white/[0.065] sm:after:bottom-3 sm:after:left-auto sm:after:right-0 sm:after:top-3 sm:after:h-auto sm:after:w-px sm:last:after:hidden">
-      <div className="text-[11px] text-[#687076] dark:text-white/56">{label}</div>
-      <div className="mt-0.5 text-[13px] font-semibold text-[#1c2024] dark:text-white/82">{value}</div>
-    </div>
-  );
-}
-
-function DistractionAppsPanel({ apps }: { apps: Record<string, { count: number; durationMs: number }> }) {
+function DistractionAppsContent({ apps }: { apps: Record<string, { count: number; durationMs: number }> }) {
   const items = Object.entries(apps)
-    .map(([appName, value]) => ({ appName, ...value }))
+    .map(([contentName, value]) => ({ contentName, ...value }))
     .sort((a, b) => b.count - a.count || b.durationMs - a.durationMs)
     .slice(0, 6);
   const maxCount = Math.max(1, ...items.map((item) => item.count));
   return (
-    <SettingsGroup className="px-4 py-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="mt-4 overflow-hidden rounded-[14px] bg-white/46 shadow-[0_12px_30px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.68)_inset] dark:bg-white/[0.04]">
+      <div className="flex items-center justify-between gap-3 px-3 py-3">
         <div className="flex items-center gap-2 text-[13px] font-semibold text-foreground">
           <Monitor className="h-4 w-4 text-muted-foreground" />
-          分心软件排行
+          分心内容排行
         </div>
         {items.length > 0 && (
           <div className="text-[11px] text-[#687076] dark:text-white/56">
@@ -699,23 +727,23 @@ function DistractionAppsPanel({ apps }: { apps: Record<string, { count: number; 
         )}
       </div>
 
-      <div className="overflow-hidden rounded-[14px] bg-white/46 shadow-[0_12px_30px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.68)_inset] dark:bg-white/[0.04]">
+      <div>
         {items.length === 0 ? (
-          <div className="px-3 py-5 text-center text-[12px] text-[#687076] dark:text-white/56">
-            这一天还没有记录到分心软件
+          <div className="border-t border-foreground/[0.055] px-3 py-5 text-center text-[12px] text-[#687076] dark:border-white/[0.065] dark:text-white/56">
+            这一天还没有记录到分心内容
           </div>
         ) : items.map((item, index) => (
-          <div key={item.appName} className="relative grid grid-cols-[28px_minmax(82px,1fr)_minmax(120px,1.4fr)_86px] items-center gap-3 px-3 py-2.5 text-[11px] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-foreground/[0.055] last:after:hidden dark:after:bg-white/[0.065]">
+          <div key={item.contentName} className="relative grid grid-cols-[28px_minmax(82px,1fr)_minmax(120px,1.4fr)_86px] items-center gap-3 px-3 py-2.5 text-[11px] before:absolute before:left-3 before:right-3 before:top-0 before:h-px before:bg-foreground/[0.055] after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-foreground/[0.055] last:after:hidden dark:before:bg-white/[0.065] dark:after:bg-white/[0.065]">
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#eef0f2] text-[10px] font-semibold text-[#687076] dark:bg-white/8 dark:text-white/58">
               {index + 1}
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[12px] font-semibold text-[#1c2024] dark:text-white/84">{item.appName}</div>
+              <div className="truncate text-[12px] font-semibold text-[#1c2024] dark:text-white/84">{item.contentName}</div>
               <div className="mt-0.5 text-[10px] text-[#8b8d98] dark:text-white/42">累计 {formatTimelineDuration(item.durationMs)}</div>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-[#eceef0] dark:bg-white/8">
               <div
-                className="h-full rounded-full bg-[#ff5f57]/72"
+                className="h-full rounded-full bg-[#8b8d98]/78 dark:bg-white/34"
                 style={{ width: `${Math.max(6, (item.count / maxCount) * 100)}%` }}
               />
             </div>
@@ -725,8 +753,86 @@ function DistractionAppsPanel({ apps }: { apps: Record<string, { count: number; 
           </div>
         ))}
       </div>
-    </SettingsGroup>
+    </div>
   );
+}
+
+function normalizeDistractionContentText(value: unknown) {
+  const raw = String(value || '').toLowerCase();
+  const aliases: string[] = [];
+  if (/(^|[./])zhihu\.com|zhihu/.test(raw)) aliases.push('知乎');
+  if (/(^|[./])bilibili\.com|b23\.tv|bilibili/.test(raw)) aliases.push('哔哩哔哩', 'b站');
+  if (/(^|[./])xiaohongshu\.com|xiaohongshu/.test(raw)) aliases.push('小红书');
+  if (/(^|[./])weibo\.com|weibo/.test(raw)) aliases.push('微博');
+  if (/(^|[./])douyin\.com|douyin/.test(raw)) aliases.push('抖音');
+  if (/(^|[./])youtube\.com|youtu\.be|youtube/.test(raw)) aliases.push('油管');
+  try {
+    return `${raw} ${decodeURIComponent(raw)} ${aliases.join(' ')}`;
+  } catch {
+    return `${raw} ${aliases.join(' ')}`;
+  }
+}
+
+function findDistractionContentRule(text: string, rules: string[]) {
+  const normalized = normalizeDistractionContentText(text);
+  return rules.find((rule) => normalized.includes(rule.toLowerCase())) ?? null;
+}
+
+function addDistractionContentStat(
+  target: Record<string, { count: number; durationMs: number }>,
+  name: string,
+  count: number,
+  durationMs: number,
+) {
+  const key = name.trim();
+  if (!key) return;
+  const current = target[key] ?? { count: 0, durationMs: 0 };
+  target[key] = {
+    count: current.count + Math.max(0, count),
+    durationMs: current.durationMs + Math.max(0, durationMs),
+  };
+}
+
+function getDistractionContentStats(
+  rawStats: Record<string, { count: number; durationMs: number }>,
+  timelineEntries: TimelineEntry[],
+  settings: AppSettings,
+) {
+  const keywordRules = settings.distractionBlockedKeywords.map((item) => item.trim()).filter(Boolean);
+  const appRules = settings.distractionBlockedApps.map((item) => item.trim()).filter(Boolean);
+  const timelineStats: Record<string, { count: number; durationMs: number }> = {};
+  for (const marker of getShortForegroundRows(timelineEntries)) {
+    const durationMs = Math.max(0, new Date(marker.endedAt).getTime() - new Date(marker.startedAt).getTime());
+    const keywordRule = findDistractionContentRule(`${marker.name} ${marker.detail}`, keywordRules);
+    const appRule = findDistractionContentRule(marker.name, appRules);
+    const rule = keywordRule ?? appRule;
+    if (rule) addDistractionContentStat(timelineStats, rule, 1, durationMs);
+  }
+
+  const hasTimelineContent = Object.keys(timelineStats).length > 0;
+  const next: Record<string, { count: number; durationMs: number }> = {};
+  let skippedLegacyBrowserShell = false;
+  for (const [name, value] of Object.entries(rawStats)) {
+    const keywordRule = findDistractionContentRule(name, keywordRules);
+    const appRule = findDistractionContentRule(name, appRules);
+    const rule = keywordRule ?? appRule;
+    if (rule) {
+      addDistractionContentStat(next, rule, value.count, value.durationMs);
+      continue;
+    }
+    const legacyBrowserShell = /^(microsoft edge|edge|google chrome|chrome|safari|arc|brave browser|chromium|vivaldi)$/i.test(name.trim());
+    if (legacyBrowserShell && hasTimelineContent) {
+      skippedLegacyBrowserShell = true;
+      continue;
+    }
+    addDistractionContentStat(next, name, value.count, value.durationMs);
+  }
+  if (skippedLegacyBrowserShell) {
+    for (const [name, value] of Object.entries(timelineStats)) {
+      addDistractionContentStat(next, name, value.count, value.durationMs);
+    }
+  }
+  return next;
 }
 
 const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
@@ -738,7 +844,7 @@ const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
 }> = {
   coding: { label: 'Coding', color: '#0090ff', fill: '#9ed0ff', soft: 'rgba(0,144,255,0.12)', Icon: Terminal },
   chat: { label: 'Chat', color: '#218358', fill: '#a8ddb8', soft: 'rgba(33,131,88,0.11)', Icon: MessageSquareText },
-  browser: { label: '浏览器', color: '#697177', fill: '#d0d4d9', soft: 'rgba(105,113,119,0.12)', Icon: Globe2 },
+  browser: { label: '浏览器', color: '#c2410c', fill: '#fdba74', soft: 'rgba(194,65,12,0.11)', Icon: Globe2 },
   office: { label: '办公', color: '#ad5700', fill: '#f2c36b', soft: 'rgba(173,87,0,0.11)', Icon: BriefcaseBusiness },
   entertainment: { label: '娱乐', color: '#cd1d8d', fill: '#f5b4df', soft: 'rgba(205,29,141,0.11)', Icon: Gamepad2 },
   other: { label: '其他', color: '#60646c', fill: '#c5c7d0', soft: 'rgba(96,100,108,0.11)', Icon: Monitor },
@@ -764,22 +870,24 @@ function TimelineSection({
   const selected = selectedBlock?.entries[0] ?? null;
   const selectedGroup = selectedBlock?.entries ?? [];
   const selectedActivityRows = getTimelineDetailRows(selectedGroup);
-  const selectedShortRows = getShortForegroundRows(selectedGroup);
+  const selectedShortRows = getShortForegroundSummaryRows(getShortForegroundRows(selectedGroup));
   const animationPlayedRef = useRef(false);
-  const visibleCategories = getVisibleTimelineCategories(entries);
-  const categoryStats = getTimelineCategoryStats(entries);
-  const topApps = getTopTimelineApps(entries);
-  const hourlyCounts = getHourlyTaskCounts(entries);
+  const visibleCategories = getVisibleTimelineCategoriesFromBlocks(timelineBlocks);
+  const categoryStats = getTimelineCategoryStatsFromBlocks(timelineBlocks);
+  const topApps = getTopTimelineApps(timelineBlocks);
+  const hourlyCounts = getHourlyTaskCounts(timelineBlocks);
   const maxHourlyCount = Math.max(1, ...hourlyCounts.map((item) => item.count));
-  const totalMs = entries.reduce((sum, entry) => sum + getTimelineDurationMs(entry), 0);
+  const selectedBlockDurationMs = selectedBlock ? getTimelineBlockDurationMs(selectedBlock) : 0;
+  const totalMs = timelineBlocks.reduce((sum, block) => sum + getTimelineBlockDurationMs(block), 0);
   const backgroundMarkers = entries.flatMap((entry) => entry.backgroundMarkers.map((marker) => ({
     ...marker,
     entryId: entry.id,
     startedAt: marker.startedAt ?? entry.startedAt,
     endedAt: marker.endedAt ?? entry.endedAt,
   })));
-  const musicMarkers = backgroundMarkers.filter((marker) => marker.type === 'music');
-  const terminalMarkers = backgroundMarkers.filter((marker) => marker.type === 'terminal');
+  const backgroundProcessMarkers = backgroundMarkers.filter(isTimelineBackgroundProcessMarker);
+  const musicMarkers = backgroundProcessMarkers.filter((marker) => marker.type === 'music');
+  const terminalMarkers = backgroundProcessMarkers.filter((marker) => marker.type === 'terminal');
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -826,7 +934,7 @@ function TimelineSection({
           </div>
         </div>
         <div className="text-right text-[11px] text-muted-foreground">
-          {entries.length} 段 · {formatTimelineDuration(totalMs)}
+          {timelineBlocks.length} 段 · {formatTimelineDuration(totalMs)}
         </div>
       </div>
 
@@ -890,7 +998,7 @@ function TimelineSection({
                     label="music"
                     icon="music"
                     markers={musicMarkers}
-                    onInspect={(marker) => setBackgroundDetail(getRelatedBackgroundMarkers(musicMarkers, marker))}
+                    onInspect={(marker) => setBackgroundDetail(getRelatedBackgroundMarkers(backgroundProcessMarkers, marker))}
                     onHover={(event, card) => setHoverCard(positionTimelineHoverCard(event, card))}
                     onLeave={() => setHoverCard(null)}
                   />
@@ -900,7 +1008,7 @@ function TimelineSection({
                     label="terminal"
                     icon="terminal"
                     markers={terminalMarkers}
-                    onInspect={(marker) => setBackgroundDetail(getRelatedBackgroundMarkers(terminalMarkers, marker))}
+                    onInspect={(marker) => setBackgroundDetail(getRelatedBackgroundMarkers(backgroundProcessMarkers, marker))}
                     onHover={(event, card) => setHoverCard(positionTimelineHoverCard(event, card))}
                     onLeave={() => setHoverCard(null)}
                   />
@@ -928,7 +1036,7 @@ function TimelineSection({
             </div>
             <div className="shrink-0 text-right text-[11px] text-muted-foreground">
               <div>{formatTimelineClock(selectedGroup[0]?.startedAt ?? selected.startedAt)} - {formatTimelineClock(selectedGroup.at(-1)?.endedAt ?? selected.endedAt)}</div>
-              <div className="mt-0.5 font-medium text-foreground">{formatTimelineDuration(selectedGroup.reduce((sum, entry) => sum + getTimelineDurationMs(entry), 0))}</div>
+              <div className="mt-0.5 font-medium text-foreground">{formatTimelineDuration(selectedBlockDurationMs)}</div>
             </div>
           </div>
           <div className="space-y-1.5 border-t border-foreground/[0.055] pt-2 dark:border-white/10">
@@ -936,9 +1044,7 @@ function TimelineSection({
               <button
                 key={`detail-${entry.id}-${entry.startedAt}`}
                 type="button"
-                className={`flex w-full items-start justify-between gap-3 rounded-[9px] px-2 py-1.5 text-left transition-colors ${
-                  entry.entryIds.includes(selected.id) ? 'bg-[#eef0f2] dark:bg-white/8' : 'hover:bg-[#f1f3f5] dark:hover:bg-white/5'
-                }`}
+                className="flex w-full items-start justify-between gap-3 rounded-[9px] px-2 py-1.5 text-left transition-colors hover:bg-[#f1f3f5] dark:hover:bg-white/5"
                 onClick={() => onSelect(entry.entryIds[0] ?? null)}
               >
                 <div className="min-w-0">
@@ -955,15 +1061,15 @@ function TimelineSection({
               <div className="mt-2 border-t border-foreground/[0.055] pt-2 dark:border-white/10">
                 <div className="mb-1 px-2 text-[10px] font-medium text-[#8b8d98]">短暂切换</div>
                 <div className="space-y-1.5">
-                  {selectedShortRows.map((entry, index) => (
-                    <div key={`short-${entry.startedAt}-${index}`} className="flex w-full items-start justify-between gap-3 rounded-[9px] bg-[#f5f6f7] px-2 py-1.5 text-left dark:bg-white/[0.045]">
+                  {selectedShortRows.map((entry) => (
+                    <div key={`short-${entry.name}`} className="flex w-full items-start justify-between gap-3 rounded-[9px] bg-[#f5f6f7] px-2 py-1.5 text-left dark:bg-white/[0.045]">
                       <div className="min-w-0">
                         <div className="truncate text-[12px] font-medium text-[#3a3d40] dark:text-white/76">{entry.name}</div>
                         <div className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-[#687076] dark:text-white/54">{entry.detail || '短暂活动'}</div>
                       </div>
                       <div className="shrink-0 text-right text-[10px] leading-4 text-[#8b8d98]">
-                        <div>{formatTimelineClock(entry.startedAt)} - {formatTimelineClock(entry.endedAt)}</div>
-                        <div>{formatTimelineDuration(new Date(entry.endedAt).getTime() - new Date(entry.startedAt).getTime())}</div>
+                        <div>{entry.count} 次</div>
+                        <div>{formatTimelineDuration(entry.durationMs)}</div>
                       </div>
                     </div>
                   ))}
@@ -984,7 +1090,23 @@ function TimelineSection({
             {backgroundDetail.map((marker, index) => {
               const detail = marker.detail ? `${marker.name} · ${marker.detail}` : marker.name;
               return (
-                <div key={`${marker.type}-${marker.startedAt}-${index}`} className="flex items-start justify-between gap-3 rounded-[9px] bg-[#eef0f2]/70 px-2 py-1.5 text-[11px] dark:bg-white/7">
+                <div
+                  key={`${marker.type}-${marker.startedAt}-${index}`}
+                  className="flex items-start justify-between gap-3 rounded-[9px] bg-[#eef0f2]/70 px-2 py-1.5 text-[11px] dark:bg-white/7"
+                  onMouseEnter={(event) => setHoverCard(positionTimelineHoverCard(event, {
+                    eyebrow: marker.type,
+                    title: detail,
+                    body: '',
+                    time: `${formatTimelineClock(marker.startedAt)} - ${formatTimelineClock(marker.endedAt)}`,
+                  }))}
+                  onMouseMove={(event) => setHoverCard(positionTimelineHoverCard(event, {
+                    eyebrow: marker.type,
+                    title: detail,
+                    body: '',
+                    time: `${formatTimelineClock(marker.startedAt)} - ${formatTimelineClock(marker.endedAt)}`,
+                  }))}
+                  onMouseLeave={() => setHoverCard(null)}
+                >
                   <div className="min-w-0 truncate font-medium text-[#3a3d40] dark:text-white/76">{detail}</div>
                   <div className="shrink-0 text-[#8b8d98]">{formatTimelineClock(marker.startedAt)} - {formatTimelineClock(marker.endedAt)}</div>
                 </div>
@@ -1069,6 +1191,13 @@ type TimelineDetailRow = {
   domain: string | null;
   startedAt: string;
   endedAt: string;
+};
+
+type TimelineShortSummaryRow = {
+  name: string;
+  detail: string;
+  count: number;
+  durationMs: number;
 };
 
 function TimelineSegment({
@@ -1205,23 +1334,37 @@ function BackgroundTimelineMarker({
 
 function positionTimelineHoverCard(event: MouseEvent<HTMLElement>, card: Omit<TimelineHoverCard, 'x' | 'y' | 'width'>): TimelineHoverCard {
   const width = getTimelineHoverCardWidth(card);
-  const height = 128;
-  const margin = 12;
-  const gap = 16;
+  const height = getTimelineHoverCardHeight(card);
+  const margin = 8;
+  const gap = 18;
   const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
   const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
-  const hasRoomRight = event.clientX + gap + width <= viewportWidth - margin;
-  const x = hasRoomRight
-    ? event.clientX + gap
-    : Math.max(margin, event.clientX - width - gap);
-  const y = Math.min(viewportHeight - height - margin, Math.max(margin, event.clientY - height / 2));
+  const preferredX = event.clientX - 10;
+  const preferredY = event.clientY + gap + height <= viewportHeight - margin
+    ? event.clientY + gap
+    : event.clientY - height - gap;
+  const x = Math.min(viewportWidth - width - margin, Math.max(margin, preferredX));
+  const y = Math.min(viewportHeight - height - margin, Math.max(margin, preferredY));
   return { ...card, x, y, width };
 }
 
 function getTimelineHoverCardWidth(card: Omit<TimelineHoverCard, 'x' | 'y' | 'width'>): number {
-  const lines = [card.eyebrow, card.title, card.body, card.time ?? ''].filter(Boolean);
-  const textWidth = Math.max(...lines.map((line) => getApproxTextWidth(line)), 120);
-  return Math.max(156, Math.min(248, textWidth + 28));
+  const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+  const available = Math.max(160, viewportWidth - 16);
+  const text = getTimelineHoverText(card);
+  const natural = getApproxTextWidth(text) + 16;
+  return Math.min(220, available, Math.max(124, natural));
+}
+
+function getTimelineHoverCardHeight(card: Omit<TimelineHoverCard, 'x' | 'y' | 'width'>): number {
+  const width = getTimelineHoverCardWidth(card);
+  const text = getTimelineHoverText(card);
+  const lines = Math.max(1, Math.ceil(getApproxTextWidth(text) / Math.max(80, width - 18)));
+  return Math.min(92, 12 + lines * 16);
+}
+
+function getTimelineHoverText(card: Omit<TimelineHoverCard, 'x' | 'y' | 'width'>) {
+  return [card.title, card.body, card.time].filter(Boolean).join(' · ');
 }
 
 function getApproxTextWidth(text: string): number {
@@ -1229,16 +1372,16 @@ function getApproxTextWidth(text: string): number {
 }
 
 function TimelineHoverCardView({ card }: { card: TimelineHoverCard }) {
-  return (
+  const text = getTimelineHoverText(card);
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <div
-      className="pointer-events-none fixed z-[9999] rounded-[14px] bg-white p-3 text-left text-[11px] leading-4 text-[#687076] shadow-[0_18px_54px_rgba(28,32,36,0.20),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-[#1c1c1f] dark:text-white/70"
+      className="pointer-events-none fixed z-[9999] rounded-[6px] bg-[#3a3d40]/78 px-2 py-1 text-left text-[11px] leading-4 text-white/92 shadow-[0_6px_18px_rgba(28,32,36,0.14)] backdrop-blur-md dark:bg-[#6f7378]/72"
       style={{ left: card.x, top: card.y, width: card.width }}
     >
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8b8d98]">{card.eyebrow}</div>
-      <div className="text-[13px] font-semibold text-[#1c2024] dark:text-white">{card.title}</div>
-      {card.body && <div className="mt-1 line-clamp-2 break-words">{card.body}</div>}
-      {card.time && <div className="mt-2 text-[11px] text-[#8b8d98]">{card.time}</div>}
-    </div>
+      <div className="whitespace-normal break-words">{text}</div>
+    </div>,
+    document.body,
   );
 }
 
@@ -1300,6 +1443,40 @@ function createMockTimelineEntries(dateKey: string): TimelineEntry[] {
     item(-10, '16:12', '16:54', 'Arc', 'YouTube - tiny desk concert', 'entertainment', 'https://www.youtube.com/watch?v=mock-preview'),
     item(-11, '17:10', '18:08', 'Visual Studio Code', 'timeline-renderer.tsx - DeskSprite', 'coding'),
   ];
+}
+
+function mergeMockFocusStats(stats: FocusStatsDay[], selectedDate: string): FocusStatsDay[] {
+  const mockByDate = new Map(createMockFocusStatsDays(selectedDate).map((day) => [day.date, day]));
+  return stats.map((day) => {
+    const mock = mockByDate.get(day.date);
+    if (!mock) return day;
+    const hasRealData = day.focusMs > 0 || day.focusSessions > 0 || day.distractions > 0 || (day.codingMs ?? 0) > 0;
+    return hasRealData ? day : mock;
+  });
+}
+
+function createMockFocusStatsDays(selectedDate: string): FocusStatsDay[] {
+  const focusMinutes = [35, 52, 18, 64, 41, 0, 76, 29, 58, 44, 67, 21, 73, 86];
+  const sessionCounts = [1, 2, 1, 2, 1, 0, 3, 1, 2, 2, 3, 1, 3, 4];
+  const distractionCounts = [1, 0, 2, 1, 1, 0, 2, 1, 0, 2, 1, 1, 2, 2];
+  return Array.from({ length: 14 }, (_, index) => {
+    const date = shiftDateKey(selectedDate, index - 13);
+    const focusMs = focusMinutes[index] * 60_000;
+    const distractionApps: FocusStatsDay['distractionApps'] = distractionCounts[index] > 0
+      ? {
+          bilibili: { count: Math.max(1, distractionCounts[index] - 1), durationMs: 4 * 60_000 },
+          zhihu: { count: 1, durationMs: 7 * 60_000 },
+        }
+      : {};
+    return {
+      date,
+      focusMs,
+      focusSessions: sessionCounts[index],
+      distractions: distractionCounts[index],
+      codingMs: Math.round(focusMs * (index % 3 === 0 ? 0.42 : 0.28)),
+      distractionApps,
+    };
+  });
 }
 
 function ProfileCalendar({
@@ -1890,6 +2067,26 @@ function getTimelineBlocks(entries: TimelineEntry[]): TimelineBlock[] {
   return blocks;
 }
 
+function getTimelineBlockDurationMs(block: TimelineBlock): number {
+  return Math.max(0, new Date(block.endedAt).getTime() - new Date(block.startedAt).getTime());
+}
+
+function getVisibleTimelineCategoriesFromBlocks(blocks: TimelineBlock[]): TimelineCategory[] {
+  return (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[]).filter((category) => (
+    blocks.some((block) => block.category === category)
+  ));
+}
+
+function getTimelineCategoryStatsFromBlocks(blocks: TimelineBlock[]): Record<TimelineCategory, number> {
+  const stats = Object.fromEntries(
+    (Object.keys(TIMELINE_CATEGORY_META) as TimelineCategory[]).map((category) => [category, 0]),
+  ) as Record<TimelineCategory, number>;
+  for (const block of blocks) {
+    stats[block.category] += getTimelineBlockDurationMs(block);
+  }
+  return stats;
+}
+
 function getTimelineActivityKey(entry: TimelineEntry): string {
   return [
     entry.appName.trim().toLowerCase(),
@@ -1924,6 +2121,65 @@ function getTimelineDetailRows(entries: TimelineEntry[]): TimelineDetailRow[] {
   return rows;
 }
 
+function getShortForegroundSummaryRows(markers: BackgroundMarkerWithTime[]): TimelineShortSummaryRow[] {
+  const byApp = new Map<string, TimelineShortSummaryRow & { longestMs: number; details: Set<string> }>();
+  for (const marker of markers) {
+    const durationMs = Math.max(0, new Date(marker.endedAt).getTime() - new Date(marker.startedAt).getTime());
+    const key = marker.name.trim() || 'Unknown';
+    const detail = formatShortForegroundDetail(marker.detail);
+    const current = byApp.get(key);
+    if (!current) {
+      byApp.set(key, {
+        name: key,
+        detail,
+        count: 1,
+        durationMs,
+        longestMs: durationMs,
+        details: new Set(detail ? [detail] : []),
+      });
+      continue;
+    }
+    current.count += 1;
+    current.durationMs += durationMs;
+    if (detail) current.details.add(detail);
+    if (durationMs > current.longestMs) {
+      current.longestMs = durationMs;
+      current.detail = detail;
+    }
+  }
+  return Array.from(byApp.values())
+    .sort((a, b) => b.durationMs - a.durationMs)
+    .map(({ longestMs: _longestMs, details, ...row }) => ({
+      ...row,
+      detail: details.size > 1 && row.detail ? `${row.detail} 等` : row.detail,
+    }));
+}
+
+function formatShortForegroundDetail(detail: string): string {
+  const text = detail.trim();
+  if (!text) return '短暂活动';
+  try {
+    const url = new URL(text);
+    return `${url.origin}${url.pathname === '/' ? '/' : url.pathname}`;
+  } catch {
+    return text;
+  }
+}
+
+function isTimelineBackgroundProcessMarker(marker: BackgroundMarkerWithTime): boolean {
+  if (marker.type === 'music') {
+    return Boolean(marker.detail.trim()) && marker.detail.trim().toLowerCase() !== 'running';
+  }
+  if (marker.type === 'terminal') {
+    const detail = marker.detail.trim().toLowerCase();
+    if (!detail || detail === 'running') return false;
+    if (/^(\/system|\/usr\/libexec|\/usr\/sbin|\/sbin)\//.test(detail)) return false;
+    if (/(powerd\.bundle|containermanagerd|launchd|xpcproxy|cfprefsd|runningboardd|distnoted|nsurlsessiond|trustd|accountsd|bird|cloudd)/.test(detail)) return false;
+    return true;
+  }
+  return false;
+}
+
 function getRelatedBackgroundMarkers(markers: BackgroundMarkerWithTime[], selected: BackgroundMarkerWithTime): BackgroundMarkerWithTime[] {
   const selectedStart = new Date(selected.startedAt).getTime();
   const selectedEnd = new Date(selected.endedAt).getTime();
@@ -1946,17 +2202,17 @@ function formatTimelineClock(iso: string): string {
 }
 
 function formatTimelineDuration(ms: number): string {
-  const minutes = Math.max(1, Math.round(ms / 60_000));
+  const minutes = Math.max(1, Math.floor(ms / 60_000));
   if (minutes < 60) return `${minutes} 分钟`;
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
 }
 
-function getTopTimelineApps(entries: TimelineEntry[]): Array<{ appName: string; durationMs: number }> {
+function getTopTimelineApps(blocks: TimelineBlock[]): Array<{ appName: string; durationMs: number }> {
   const durations = new Map<string, number>();
-  for (const entry of entries) {
-    durations.set(entry.appName, (durations.get(entry.appName) ?? 0) + getTimelineDurationMs(entry));
+  for (const block of blocks) {
+    durations.set(block.appName, (durations.get(block.appName) ?? 0) + getTimelineBlockDurationMs(block));
   }
   return Array.from(durations.entries())
     .map(([appName, durationMs]) => ({ appName, durationMs }))
@@ -1967,16 +2223,19 @@ function getTopTimelineApps(entries: TimelineEntry[]): Array<{ appName: string; 
 function getTopTimelineContent(entries: TimelineEntry[], appName: string): string {
   const top = entries
     .filter((entry) => entry.appName === appName)
-    .sort((a, b) => getTimelineDurationMs(b) - getTimelineDurationMs(a))[0];
+    .sort((a, b) => (
+      new Date(b.endedAt).getTime() - new Date(b.startedAt).getTime()
+      - (new Date(a.endedAt).getTime() - new Date(a.startedAt).getTime())
+    ))[0];
   return top?.domain || top?.windowTitle || top?.url || '无标题活动';
 }
 
-function getHourlyTaskCounts(entries: TimelineEntry[]): Array<{ hour: number; count: number }> {
+function getHourlyTaskCounts(blocks: TimelineBlock[]): Array<{ hour: number; count: number }> {
   return Array.from({ length: 24 }, (_, hour) => ({
     hour,
-    count: entries.filter((entry) => {
-      const start = new Date(entry.startedAt);
-      const end = new Date(entry.endedAt);
+    count: blocks.filter((block) => {
+      const start = new Date(block.startedAt);
+      const end = new Date(block.endedAt);
       const hourStart = new Date(start);
       hourStart.setHours(hour, 0, 0, 0);
       const hourEnd = new Date(hourStart);
