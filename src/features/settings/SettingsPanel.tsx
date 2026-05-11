@@ -460,11 +460,21 @@ function CollapsedUnavailableRow({ title, reason }: { title: string; reason: str
   );
 }
 
+function getInitialProfileDate() {
+  try {
+    const date = new URLSearchParams(window.location.search).get('profileDate');
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  } catch {
+    // Ignore malformed preview URLs.
+  }
+  return getLocalDateKey();
+}
+
 function ProfileSection() {
   const { settings } = useSettingsStore();
-  const [selectedDate, setSelectedDate] = useState(() => getLocalDateKey());
+  const [selectedDate, setSelectedDate] = useState(getInitialProfileDate);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey(getLocalDateKey()));
+  const [calendarMonth, setCalendarMonth] = useState(() => getMonthKey(getInitialProfileDate()));
   const [stats, setStats] = useState<FocusStatsDay[]>([]);
   const [timelineEntries, setTimelineEntries] = useState<TimelineEntry[]>([]);
   const [selectedTimelineId, setSelectedTimelineId] = useState<number | null>(null);
