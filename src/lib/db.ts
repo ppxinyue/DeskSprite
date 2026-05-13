@@ -64,6 +64,79 @@ export type TimelineEntry = {
   foregroundVisible?: boolean;
 };
 
+export type TelemetryFeature =
+  | 'app'
+  | 'chat'
+  | 'coding'
+  | 'voice'
+  | 'screenshot'
+  | 'timeline'
+  | 'settings'
+  | 'focus'
+  | 'rest'
+  | 'avatar';
+
+export type TelemetryEvent = {
+  id: number;
+  eventName: string;
+  feature: TelemetryFeature;
+  count: number;
+  durationMs: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  syncedAt: string | null;
+};
+
+export type FeatureUsageSummary = {
+  feature: TelemetryFeature;
+  eventCount: number;
+  totalCount: number;
+  totalDurationMs: number;
+  lastUsedAt: string | null;
+};
+
+export type AnalyticsDashboard = {
+  deviceId: string;
+  totalUsers: number;
+  dau: number;
+  activeDays: number;
+  totalUsageMs: number;
+  featureUsage: FeatureUsageSummary[];
+  recentEvents: TelemetryEvent[];
+};
+
+export type CloudSyncStatus = {
+  deviceId: string;
+  enabled: boolean;
+  endpoint: string | null;
+  pendingBackup: boolean;
+  pendingTelemetryEvents: number;
+  lastBackupAt: string | null;
+  lastSyncAttemptAt: string | null;
+  lastSyncError: string | null;
+};
+
+export type CloudSyncResult = CloudSyncStatus & {
+  ok: boolean;
+  uploadedTelemetryEvents: number;
+};
+
+export type CloudBackupPayload = {
+  id: string;
+  reason: string;
+  createdAt: string;
+  deviceId: string;
+  snapshot: Omit<Store, 'cloudSync'>;
+};
+
+type CloudSyncState = {
+  deviceId: string;
+  pendingBackup: CloudBackupPayload | null;
+  lastBackupAt: string | null;
+  lastSyncAttemptAt: string | null;
+  lastSyncError: string | null;
+};
+
 type Store = {
   apiConfigs: ApiConfigRow[];
   systemPrompt: string;
@@ -71,14 +144,17 @@ type Store = {
   messages: MessageRow[];
   settings: Record<string, string>;
   usageLogs: Array<Record<string, unknown>>;
+  telemetryEvents: TelemetryEvent[];
   focusStats: Record<string, FocusStatsDay>;
   timelineEntries: TimelineEntry[];
+  cloudSync: CloudSyncState;
   nextIds: {
     apiConfig: number;
     conversation: number;
     message: number;
     usageLog: number;
     timelineEntry: number;
+    telemetryEvent: number;
   };
 };
 
@@ -88,22 +164,47 @@ function now() {
   return new Date().toISOString();
 }
 
+function createDeviceId() {
+  const cryptoObj = globalThis.crypto;
+  if (cryptoObj && 'randomUUID' in cryptoObj) return cryptoObj.randomUUID();
+  return `device-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function getDefaultCloudSettings(): Record<string, string> {
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  const endpoint = env?.VITE_CLOUD_SYNC_ENDPOINT?.trim();
+  const ingestToken = env?.VITE_CLOUD_SYNC_INGEST_TOKEN?.trim();
+  return {
+    ...(endpoint ? { cloudSyncEndpoint: endpoint } : {}),
+    ...(ingestToken ? { cloudSyncIngestToken: ingestToken } : {}),
+  };
+}
+
 function createStore(): Store {
   return {
     apiConfigs: [],
     systemPrompt: '',
     conversations: [],
     messages: [],
-    settings: {},
+    settings: getDefaultCloudSettings(),
     usageLogs: [],
+    telemetryEvents: [],
     focusStats: {},
     timelineEntries: [],
+    cloudSync: {
+      deviceId: createDeviceId(),
+      pendingBackup: null,
+      lastBackupAt: null,
+      lastSyncAttemptAt: null,
+      lastSyncError: null,
+    },
     nextIds: {
       apiConfig: 1,
       conversation: 1,
       message: 1,
       usageLog: 1,
       timelineEntry: 1,
+      telemetryEvent: 1,
     },
   };
 }
@@ -117,7 +218,17 @@ function loadStore(): Store {
     return {
       ...base,
       ...parsed,
+      settings: {
+        ...base.settings,
+        ...(parsed.settings ?? {}),
+      },
+      telemetryEvents: Array.isArray(parsed.telemetryEvents) ? parsed.telemetryEvents : [],
       timelineEntries: Array.isArray(parsed.timelineEntries) ? parsed.timelineEntries : [],
+      cloudSync: {
+        ...base.cloudSync,
+        ...(parsed.cloudSync ?? {}),
+        deviceId: parsed.cloudSync?.deviceId || parsed.settings?.cloudDeviceId || base.cloudSync.deviceId,
+      },
       nextIds: {
         ...base.nextIds,
         ...(parsed.nextIds ?? {}),
@@ -130,6 +241,82 @@ function loadStore(): Store {
 
 function saveStore(store: Store) {
   localStorage.setItem(STORE_KEY, JSON.stringify(store));
+}
+
+function cloudBackupEnabled(store: Store) {
+  return store.settings.cloudBackupEnabled !== 'false';
+}
+
+function analyticsEnabled(store: Store) {
+  return store.settings.analyticsEnabled !== 'false';
+}
+
+function scrubApiConfigForCloud(config: ApiConfigRow): ApiConfigRow {
+  return {
+    ...config,
+    api_key: config.api_key ? '[redacted]' : null,
+    keyring_ref: config.keyring_ref ? '[keychain]' : null,
+  };
+}
+
+function scrubSettingsForCloud(settings: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(settings).map(([key, value]) => [
+    key,
+    /(apiKey|token|secret|password)/i.test(key) && value ? '[redacted]' : value,
+  ]));
+}
+
+function createCloudSnapshot(store: Store): Omit<Store, 'cloudSync'> {
+  return {
+    apiConfigs: store.apiConfigs.map(scrubApiConfigForCloud),
+    systemPrompt: store.systemPrompt,
+    conversations: store.conversations,
+    messages: store.messages,
+    settings: scrubSettingsForCloud(store.settings),
+    usageLogs: store.usageLogs,
+    telemetryEvents: store.telemetryEvents,
+    focusStats: store.focusStats,
+    timelineEntries: store.timelineEntries,
+    nextIds: store.nextIds,
+  };
+}
+
+function queueCloudBackup(store: Store, reason: string) {
+  if (!cloudBackupEnabled(store)) return;
+  const createdAt = now();
+  store.cloudSync.pendingBackup = {
+    id: `${store.cloudSync.deviceId}:${createdAt}`,
+    reason,
+    createdAt,
+    deviceId: store.cloudSync.deviceId,
+    snapshot: createCloudSnapshot(store),
+  };
+}
+
+function getCloudEndpoint(store: Store) {
+  const value = store.settings.cloudSyncEndpoint?.trim();
+  return value || null;
+}
+
+function getUnsyncedTelemetryEvents(store: Store) {
+  return store.telemetryEvents.filter((event) => !event.syncedAt);
+}
+
+function cloneTelemetryEvent(event: TelemetryEvent): TelemetryEvent {
+  return {
+    ...event,
+    metadata: { ...event.metadata },
+  };
+}
+
+function getActiveDates(store: Store) {
+  const dates = new Set<string>();
+  Object.values(store.focusStats).forEach((day) => {
+    if (day.focusMs > 0 || day.focusSessions > 0 || day.distractions > 0 || (day.codingMs ?? 0) > 0) dates.add(day.date);
+  });
+  store.timelineEntries.forEach((entry) => dates.add(entry.date));
+  store.telemetryEvents.forEach((event) => dates.add(localDateKey(new Date(event.createdAt))));
+  return dates;
 }
 
 function localDateKey(date = new Date()) {
@@ -183,11 +370,40 @@ function ensureFocusStatsDay(store: Store, dateKey: string): FocusStatsDay {
   return created;
 }
 
-function mutate<T>(fn: (store: Store) => T): T {
+function mutate<T>(fn: (store: Store) => T, options: { backup?: boolean; backupReason?: string } = {}): T {
   const store = loadStore();
   const result = fn(store);
+  if (options.backup !== false) queueCloudBackup(store, options.backupReason ?? 'local-change');
   saveStore(store);
   return result;
+}
+
+function appendTelemetryEvent(
+  store: Store,
+  eventName: string,
+  feature: TelemetryFeature,
+  count: number,
+  durationMs: number,
+  metadata: Record<string, unknown>,
+  createdAt = now(),
+) {
+  if (!analyticsEnabled(store)) return null;
+  const event: TelemetryEvent = {
+    id: store.nextIds.telemetryEvent,
+    eventName,
+    feature,
+    count: Math.max(1, Math.floor(count)),
+    durationMs: Math.max(0, Math.floor(durationMs)),
+    metadata,
+    createdAt,
+    syncedAt: null,
+  };
+  store.telemetryEvents.push(event);
+  store.nextIds.telemetryEvent += 1;
+  if (store.telemetryEvents.length > 10_000) {
+    store.telemetryEvents = store.telemetryEvents.slice(-10_000);
+  }
+  return event;
 }
 
 export async function query<T>(_sql: string, _values?: unknown[]): Promise<T[]> {
@@ -331,7 +547,8 @@ export async function insertMessage(
     store.nextIds.message += 1;
     const conversation = store.conversations.find((item) => item.id === conversationId);
     if (conversation) conversation.updated_at = timestamp;
-  });
+    appendTelemetryEvent(store, 'chat.message', 'chat', 1, 0, { role, hasImage: Boolean(imagePath), tokensUsed: tokensUsed ?? null });
+  }, { backupReason: 'chat-message' });
 }
 
 export async function insertUsageLog(
@@ -358,7 +575,7 @@ export async function insertUsageLog(
       created_at: now(),
     });
     store.nextIds.usageLog += 1;
-  });
+  }, { backupReason: 'usage-log' });
 }
 
 export async function getSetting(key: string): Promise<string | null> {
@@ -368,7 +585,7 @@ export async function getSetting(key: string): Promise<string | null> {
 export async function setSetting(key: string, value: string) {
   mutate((store) => {
     store.settings[key] = value;
-  });
+  }, { backupReason: `setting:${key}` });
 }
 
 export async function getAllSettings() {
@@ -383,8 +600,9 @@ export async function recordFocusSession(startedAt: number, endedAt = Date.now()
     const day = ensureFocusStatsDay(store, localDateKey(new Date(endedAt)));
     day.focusMs += duration;
     day.focusSessions += 1;
+    appendTelemetryEvent(store, 'focus.session', 'focus', 1, duration, { startedAt: new Date(startedAt).toISOString(), endedAt: new Date(endedAt).toISOString() });
     return { ...day };
-  });
+  }, { backupReason: 'focus-session' });
 }
 
 export async function recordDistraction(occurredAt = Date.now(), appName = 'Unknown', durationMs = 0) {
@@ -397,8 +615,9 @@ export async function recordDistraction(occurredAt = Date.now(), appName = 'Unkn
       count: current.count + 1,
       durationMs: current.durationMs + Math.max(0, durationMs),
     };
+    appendTelemetryEvent(store, 'focus.distraction', 'focus', 1, Math.max(0, durationMs), { appName: key, occurredAt: new Date(occurredAt).toISOString() });
     return { ...day };
-  });
+  }, { backupReason: 'focus-distraction' });
 }
 
 export async function recordCodingModeTime(startedAt: number, endedAt = Date.now()) {
@@ -407,8 +626,9 @@ export async function recordCodingModeTime(startedAt: number, endedAt = Date.now
   return mutate((store) => {
     const day = ensureFocusStatsDay(store, localDateKey(new Date(endedAt)));
     day.codingMs += duration;
+    appendTelemetryEvent(store, 'coding.session', 'coding', 1, duration, { startedAt: new Date(startedAt).toISOString(), endedAt: new Date(endedAt).toISOString() });
     return { ...day };
-  });
+  }, { backupReason: 'coding-session' });
 }
 
 export async function getFocusStatsDays(days = 14, endDate = localDateKey()): Promise<FocusStatsDay[]> {
@@ -471,8 +691,14 @@ export async function upsertTimelineEntry({
     }
     const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
     store.timelineEntries = store.timelineEntries.filter((entry) => new Date(entry.endedAt).getTime() >= cutoff);
+    appendTelemetryEvent(store, 'timeline.entry', 'timeline', 1, end - start, {
+      appName,
+      category,
+      domain,
+      foregroundVisible: foregroundVisible !== false,
+    });
     return { ...next, backgroundMarkers: next.backgroundMarkers.map((marker) => ({ ...marker })) };
-  });
+  }, { backupReason: 'timeline-entry' });
 }
 
 export async function getTimelineEntries(date = localDateKey()): Promise<TimelineEntry[]> {
@@ -501,4 +727,180 @@ export async function getTimelineEntries(date = localDateKey()): Promise<Timelin
         ? entry.backgroundMarkers.map((marker) => ({ ...marker }))
         : [],
     }));
+}
+
+export async function recordTelemetryEvent({
+  eventName,
+  feature,
+  count = 1,
+  durationMs = 0,
+  metadata = {},
+  createdAt,
+}: {
+  eventName: string;
+  feature: TelemetryFeature;
+  count?: number;
+  durationMs?: number;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+}): Promise<TelemetryEvent | null> {
+  return mutate((store) => {
+    const event = appendTelemetryEvent(store, eventName, feature, count, durationMs, metadata, createdAt);
+    return event ? cloneTelemetryEvent(event) : null;
+  }, { backupReason: `telemetry:${eventName}` });
+}
+
+export async function getTelemetryEvents(limit = 200): Promise<TelemetryEvent[]> {
+  const count = Math.max(1, Math.floor(limit));
+  return loadStore().telemetryEvents
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, count)
+    .map(cloneTelemetryEvent);
+}
+
+export async function getCloudSyncStatus(): Promise<CloudSyncStatus> {
+  const store = loadStore();
+  return {
+    deviceId: store.cloudSync.deviceId,
+    enabled: cloudBackupEnabled(store),
+    endpoint: getCloudEndpoint(store),
+    pendingBackup: Boolean(store.cloudSync.pendingBackup),
+    pendingTelemetryEvents: getUnsyncedTelemetryEvents(store).length,
+    lastBackupAt: store.cloudSync.lastBackupAt,
+    lastSyncAttemptAt: store.cloudSync.lastSyncAttemptAt,
+    lastSyncError: store.cloudSync.lastSyncError,
+  };
+}
+
+export async function getCloudBackupPayload(): Promise<CloudBackupPayload | null> {
+  const store = loadStore();
+  return store.cloudSync.pendingBackup
+    ? {
+      ...store.cloudSync.pendingBackup,
+      snapshot: createCloudSnapshot(store),
+    }
+    : null;
+}
+
+export async function getDeveloperAnalyticsDashboard(days = 30): Promise<AnalyticsDashboard> {
+  const store = loadStore();
+  const cutoff = Date.now() - Math.max(1, Math.floor(days)) * 24 * 60 * 60 * 1000;
+  const events = store.telemetryEvents.filter((event) => new Date(event.createdAt).getTime() >= cutoff);
+  const featureMap = new Map<TelemetryFeature, FeatureUsageSummary>();
+  for (const event of events) {
+    const current = featureMap.get(event.feature) ?? {
+      feature: event.feature,
+      eventCount: 0,
+      totalCount: 0,
+      totalDurationMs: 0,
+      lastUsedAt: null,
+    };
+    current.eventCount += 1;
+    current.totalCount += event.count;
+    current.totalDurationMs += event.durationMs;
+    if (!current.lastUsedAt || event.createdAt > current.lastUsedAt) current.lastUsedAt = event.createdAt;
+    featureMap.set(event.feature, current);
+  }
+
+  const today = localDateKey();
+  const activeDates = getActiveDates(store);
+  return {
+    deviceId: store.cloudSync.deviceId,
+    totalUsers: 1,
+    dau: activeDates.has(today) ? 1 : 0,
+    activeDays: activeDates.size,
+    totalUsageMs: events.reduce((sum, event) => sum + event.durationMs, 0),
+    featureUsage: Array.from(featureMap.values()).sort((a, b) => b.totalDurationMs - a.totalDurationMs || b.totalCount - a.totalCount),
+    recentEvents: events.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 50).map(cloneTelemetryEvent),
+  };
+}
+
+export async function syncCloudBackup(endpointOverride?: string): Promise<CloudSyncResult> {
+  const store = loadStore();
+  const endpoint = endpointOverride?.trim() || getCloudEndpoint(store);
+  const attemptedAt = now();
+  if (!endpoint) {
+    return mutate((draft) => {
+      draft.cloudSync.lastSyncAttemptAt = attemptedAt;
+      draft.cloudSync.lastSyncError = 'cloudSyncEndpoint is not configured';
+      return {
+        ok: false,
+        uploadedTelemetryEvents: 0,
+        deviceId: draft.cloudSync.deviceId,
+        enabled: cloudBackupEnabled(draft),
+        endpoint: null,
+        pendingBackup: Boolean(draft.cloudSync.pendingBackup),
+        pendingTelemetryEvents: getUnsyncedTelemetryEvents(draft).length,
+        lastBackupAt: draft.cloudSync.lastBackupAt,
+        lastSyncAttemptAt: draft.cloudSync.lastSyncAttemptAt,
+        lastSyncError: draft.cloudSync.lastSyncError,
+      };
+    }, { backup: false });
+  }
+
+  const telemetryEvents = getUnsyncedTelemetryEvents(store).map(cloneTelemetryEvent);
+  const backup = store.cloudSync.pendingBackup
+    ? { ...store.cloudSync.pendingBackup, snapshot: createCloudSnapshot(store) }
+    : null;
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-desksprite-device-id': store.cloudSync.deviceId,
+        ...(store.settings.cloudSyncIngestToken ? { 'x-desksprite-ingest-token': store.settings.cloudSyncIngestToken } : {}),
+      },
+      body: JSON.stringify({
+        deviceId: store.cloudSync.deviceId,
+        backup,
+        telemetryEvents,
+        sentAt: attemptedAt,
+      }),
+    });
+    if (!response.ok) throw new Error(`Cloud sync failed: ${response.status} ${response.statusText}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return mutate((draft) => {
+      draft.cloudSync.lastSyncAttemptAt = attemptedAt;
+      draft.cloudSync.lastSyncError = message;
+      return {
+        ok: false,
+        uploadedTelemetryEvents: 0,
+        deviceId: draft.cloudSync.deviceId,
+        enabled: cloudBackupEnabled(draft),
+        endpoint,
+        pendingBackup: Boolean(draft.cloudSync.pendingBackup),
+        pendingTelemetryEvents: getUnsyncedTelemetryEvents(draft).length,
+        lastBackupAt: draft.cloudSync.lastBackupAt,
+        lastSyncAttemptAt: draft.cloudSync.lastSyncAttemptAt,
+        lastSyncError: draft.cloudSync.lastSyncError,
+      };
+    }, { backup: false });
+  }
+
+  return mutate((draft) => {
+    const syncedAt = now();
+    const uploadedIds = new Set(telemetryEvents.map((event) => event.id));
+    draft.telemetryEvents.forEach((event) => {
+      if (uploadedIds.has(event.id)) event.syncedAt = syncedAt;
+    });
+    draft.cloudSync.pendingBackup = null;
+    draft.cloudSync.lastBackupAt = syncedAt;
+    draft.cloudSync.lastSyncAttemptAt = attemptedAt;
+    draft.cloudSync.lastSyncError = null;
+    return {
+      ok: true,
+      uploadedTelemetryEvents: uploadedIds.size,
+      deviceId: draft.cloudSync.deviceId,
+      enabled: cloudBackupEnabled(draft),
+      endpoint,
+      pendingBackup: false,
+      pendingTelemetryEvents: getUnsyncedTelemetryEvents(draft).length,
+      lastBackupAt: draft.cloudSync.lastBackupAt,
+      lastSyncAttemptAt: draft.cloudSync.lastSyncAttemptAt,
+      lastSyncError: null,
+    };
+  }, { backup: false });
 }
