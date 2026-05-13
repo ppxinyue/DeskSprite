@@ -112,10 +112,11 @@ Vercel setup:
 - Set Root Directory to `dashboard`.
 - Build Command: `npm run build`.
 - Output Directory: `dist`.
-- No server-side Vercel environment variables are required for the static build.
-- Open the site, paste the dashboard endpoint and dashboard token, then refresh.
+- Add environment variable `DASHBOARD_API_TOKEN` with the same value as `DESKCAT_DASHBOARD_TOKEN` / `DESKSPRITE_DASHBOARD_TOKEN`.
+- Add environment variable `DASHBOARD_API_URL` with the dashboard Edge Function URL.
+- Open the site and refresh. The browser calls Vercel `/api/metrics`; Vercel forwards to Supabase with the token.
 
-The dashboard token is stored only in the browser's local storage for the developer machine using the dashboard.
+The dashboard token is stored in Vercel environment variables, not in the browser bundle or browser local storage.
 
 ## Useful Dashboard SQL
 

@@ -1,6 +1,3 @@
-const DEFAULT_ENDPOINT = 'https://vuxzqebeirynkdyonzud.functions.supabase.co/deskcat-dashboard';
-const endpointInput = document.querySelector('#endpoint');
-const tokenInput = document.querySelector('#token');
 const daysInput = document.querySelector('#days');
 const form = document.querySelector('#settings-form');
 const statusEl = document.querySelector('#status');
@@ -13,8 +10,6 @@ const eventTableEl = document.querySelector('#event-table');
 const recentListEl = document.querySelector('#recent-list');
 
 const storage = {
-  endpoint: 'deskcat-dashboard:endpoint',
-  token: 'deskcat-dashboard:token',
   days: 'deskcat-dashboard:days',
 };
 
@@ -159,26 +154,13 @@ function render(data) {
 }
 
 async function loadDashboard() {
-  const endpoint = endpointInput.value.trim();
-  const token = tokenInput.value.trim();
   const days = daysInput.value;
-  localStorage.setItem(storage.endpoint, endpoint);
-  localStorage.setItem(storage.token, token);
   localStorage.setItem(storage.days, days);
 
-  if (!endpoint || !token) {
-    setStatus('Enter endpoint and dashboard token.', 'error');
-    return;
-  }
-
   setStatus('Loading...');
-  const url = new URL(endpoint);
+  const url = new URL('/api/metrics', window.location.origin);
   url.searchParams.set('days', days);
-  const response = await fetch(url, {
-    headers: {
-      'x-deskcat-dashboard-token': token,
-    },
-  });
+  const response = await fetch(url);
   const data = await response.json();
   if (!response.ok || !data.ok) {
     throw new Error(data.error || `Request failed: ${response.status}`);
@@ -187,8 +169,6 @@ async function loadDashboard() {
   setStatus('Live', 'ok');
 }
 
-endpointInput.value = getStored(storage.endpoint, DEFAULT_ENDPOINT);
-tokenInput.value = getStored(storage.token);
 daysInput.value = getStored(storage.days, '30');
 
 form.addEventListener('submit', (event) => {
@@ -199,6 +179,5 @@ form.addEventListener('submit', (event) => {
 });
 
 loadDashboard().catch(() => {
-  setStatus('Enter dashboard token to load metrics.');
+  setStatus('Dashboard API is not configured.');
 });
-

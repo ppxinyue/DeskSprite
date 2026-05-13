@@ -59,8 +59,8 @@ h2 {
   align-items: end;
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(280px, 1.3fr) minmax(180px, 0.8fr) 110px 92px;
-  max-width: 760px;
+  grid-template-columns: 130px 92px;
+  max-width: 240px;
   width: 100%;
 }
 
@@ -300,4 +300,3 @@ th {
   font-size: 12px;
   padding: 24px 0;
 }
-
