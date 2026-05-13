@@ -1499,6 +1499,14 @@ function PetWindow() {
     window.setTimeout(() => setChatBurst(false), 360);
   }, [positionCompactChatWindow]);
 
+  const isCompactChatActuallyVisible = useCallback(async () => {
+    try {
+      return await invoke<boolean>("is_compact_chat_visible");
+    } catch {
+      return false;
+    }
+  }, []);
+
   const animateRestPresentation = useCallback(async (target: RestPresentationSnapshot, options: { onDone?: () => void } = {}) => {
     if (restPresentationFrameRef.current) {
       window.cancelAnimationFrame(restPresentationFrameRef.current);
@@ -2388,8 +2396,11 @@ function PetWindow() {
   };
 
   const openLatestChat = async () => {
+    if (await isCompactChatActuallyVisible()) {
+      setCompactVisible(true);
+      return;
+    }
     if (settings.codingModeEnabled) {
-      if (compactVisible) return;
       await forceShowCodingChat();
       return;
     }
