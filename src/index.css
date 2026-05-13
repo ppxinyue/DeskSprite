@@ -51,6 +51,7 @@
   --color-chat-user-bubble: rgba(255, 255, 255, 0.78);
   --color-chat-assistant-bubble: transparent;
   --color-chat-bubble-border: rgba(54, 50, 43, 0.10);
+  --color-chat-surface-solid: #faf9f6;
   --color-chat-text: var(--text-primary);
   --color-chat-muted: var(--text-secondary);
   --color-chat-border: var(--border-color);
@@ -107,6 +108,7 @@
   --color-chat-user-bubble: rgba(255, 255, 255, 0.08);
   --color-chat-assistant-bubble: transparent;
   --color-chat-bubble-border: rgba(255, 255, 255, 0.10);
+  --color-chat-surface-solid: #343434;
   --color-chat-text: var(--text-primary);
   --color-chat-muted: var(--text-secondary);
   --color-chat-border: var(--border-color);
@@ -367,6 +369,10 @@
 
   .dark .chat-dialog form:focus-within {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-chat-accent) 16%, transparent) !important;
+  }
+
+  .chat-dialog .chat-surface-fill {
+    background: color-mix(in srgb, var(--color-chat-surface-solid) var(--chat-surface-alpha-pct, 68%), transparent) !important;
   }
 
   .app-drag-region {

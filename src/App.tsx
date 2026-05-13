@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
@@ -11,7 +11,9 @@ import { shouldSubmitMessage } from "@/features/chat/sendShortcut";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
 import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
+import { flushCloudSync, startCloudSyncScheduler } from "@/lib/cloudSyncScheduler";
 import { getThemeClassAction, shouldDeferWindowContent } from "@/lib/startupTheme";
+import { createFeatureTimer, trackFeatureUse } from "@/lib/telemetry";
 import { TimelineRecorder, type TimelineRecorderState, type TimelineSnapshot } from "@/lib/timelineRecorder";
 import { installDocumentTranslator } from "@/i18n";
 import type { ChatMessage } from "@/features/chat/chatStore";
@@ -108,19 +110,14 @@ function timelineDebugLog(payload: Record<string, unknown>) {
   invoke('timeline_debug_log', payload).catch(() => {});
 }
 
-function loadTimelineRecorderState(minSegmentMs: number): TimelineRecorderState | null {
+function loadTimelineRecorderState(): TimelineRecorderState | null {
   try {
     const raw = localStorage.getItem(TIMELINE_RECORDER_STATE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as TimelineRecorderState & { savedAt?: number; minSegmentMs?: number };
-    if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > Math.max(minSegmentMs * 2, 30 * 60_000)) {
-      localStorage.removeItem(TIMELINE_RECORDER_STATE_KEY);
-      return null;
-    }
-    if (typeof parsed.minSegmentMs === 'number' && parsed.minSegmentMs !== minSegmentMs) {
-      localStorage.removeItem(TIMELINE_RECORDER_STATE_KEY);
-      return null;
-    }
+    // Always restore parseable state. If it is stale, TimelineRecorder will
+    // persist the old segment at lastSeenAt and start a fresh segment instead
+    // of leaving a long historical span unrepairable.
     return parsed;
   } catch {
     localStorage.removeItem(TIMELINE_RECORDER_STATE_KEY);
@@ -199,6 +196,32 @@ function App() {
     if (!loaded) return;
     return installDocumentTranslator(settings.appLanguage);
   }, [loaded, settings.appLanguage]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    trackFeatureUse('app', 'app.window.open', { windowLabel });
+    const timer = createFeatureTimer('app', 'app.window.session', { windowLabel });
+    const stop = () => {
+      void timer.stop({ reason: 'beforeunload' });
+    };
+    window.addEventListener('beforeunload', stop);
+    return () => {
+      window.removeEventListener('beforeunload', stop);
+      void timer.stop({ reason: 'unmount' });
+    };
+  }, [loaded, windowLabel]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (windowLabel === 'pet') return startCloudSyncScheduler();
+    const flush = () => {
+      void flushCloudSync(`window-${windowLabel}-beforeunload`);
+    };
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+    };
+  }, [loaded, windowLabel]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -499,6 +522,7 @@ function CompactChatWindow() {
         {settings.codingModeEnabled ? (
           <CodingDialog
             compactFontSize={settings.compactChatFontSize}
+            dialogOpacity={settings.petOpacity}
             maxHeight={COMPACT_CHAT_PREFERRED_HEIGHT}
             onContentHeightChange={handleContentHeightChange}
           />
@@ -523,11 +547,13 @@ function CompactChatWindow() {
 
 function CodingDialog({
   compactFontSize,
+  dialogOpacity = 1,
   maxHeight,
   onContentHeightChange,
   standalone = false,
 }: {
   compactFontSize: number;
+  dialogOpacity?: number;
   maxHeight: number;
   onContentHeightChange?: (height: number) => void;
   standalone?: boolean;
@@ -565,9 +591,15 @@ function CodingDialog({
     setState(resolved);
     if (!inherited) return;
     setActiveInheritedSessionId((current) => {
-      if (current && resolved.sessions?.some((session) => session.id === current)) return current;
-      return resolved.sessions?.find((session) => session.status !== 'working')?.id
-        ?? resolved.sessions?.[0]?.id
+      const sessions = resolved.sessions ?? [];
+      const currentSession = current ? sessions.find((session) => session.id === current) : null;
+      const currentNeedsInput = currentSession?.status === 'needs-input' ? currentSession : null;
+      const firstNeedsInput = sessions.find((session) => session.status === 'needs-input');
+      if (currentNeedsInput) return currentNeedsInput.id;
+      if (firstNeedsInput) return firstNeedsInput.id;
+      if (currentSession) return currentSession.id;
+      return sessions.find((session) => session.status !== 'working')?.id
+        ?? sessions[0]?.id
         ?? null;
     });
   }, [inherited]);
@@ -743,9 +775,10 @@ function CodingDialog({
   const activeInheritedSession = (standalone || inherited)
     ? (standalone
       ? inheritedSessions.find((session) => session.id === activeInheritedSessionId) ?? null
-      : state.status === 'working'
+      : inheritedSessions.find((session) => session.status === 'needs-input')
+        ?? (state.status === 'working'
         ? inheritedSessions.find((session) => session.status === 'working') ?? inheritedSessions[0]
-        : inheritedSessions.find((session) => session.status !== 'working') ?? inheritedSessions[0])
+        : inheritedSessions.find((session) => session.status !== 'working') ?? inheritedSessions[0]))
     : null;
   const activeInheritedMessages = activeInheritedSession?.status === 'working' && activeInheritedSession.progressMessages?.length
     ? activeInheritedSession.progressMessages
@@ -930,10 +963,11 @@ function CodingDialog({
       style={{
         maxHeight,
         fontSize: compactFontSize,
+        '--chat-surface-alpha-pct': `${Math.round((standalone ? 1 : dialogOpacity) * 100)}%`,
         background: 'color-mix(in srgb, var(--surface-flat) 68%, transparent)',
         backdropFilter: 'blur(10px)',
         WebkitBackdropFilter: 'blur(10px)',
-      }}
+      } as CSSProperties}
     >
       <div
         ref={scrollRef}
@@ -1830,10 +1864,11 @@ function PetWindow() {
     let foregroundPaused = false;
     const minSegmentMs = Math.max(1, Math.min(20, settings.timelineMinSegmentMinutes)) * 60_000;
     timelineDebugLog({ stage: 'start', message: 'Timeline sampler started', minSegmentMs });
-    const initialTimelineState = loadTimelineRecorderState(minSegmentMs);
+    const initialTimelineState = loadTimelineRecorderState();
 
     const recorder = new TimelineRecorder({
       minSegmentMs,
+      maxSampleGapMs: minSegmentMs,
       log: timelineDebugLog,
       initialState: initialTimelineState,
       persist: async (payload) => {

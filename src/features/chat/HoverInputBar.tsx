@@ -7,6 +7,7 @@ import { usePetStore } from '@/features/pet/petStore';
 import { streamChat } from '@/features/ai/aiService';
 import { recordBuiltinUsage, resolveChatConfig } from '@/features/ai/defaultModel';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
+import { withSystemKnowledge } from '@/features/ai/systemKnowledge';
 import { getConversations, createConversation, insertMessage } from '@/lib/db';
 import { shouldSubmitMessage } from './sendShortcut';
 
@@ -66,11 +67,11 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
 
     try {
       const systemPrompt = await getActiveSystemPrompt();
-      const chatMessages = [
+      const chatMessages = await withSystemKnowledge([
         { role: 'system' as const, content: systemPrompt },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
         { role: 'user' as const, content: text },
-      ];
+      ], settings.systemKnowledgeEnabled);
 
       let fullContent = '';
       for await (const token of streamChat(chatMessages, apiConfig)) {

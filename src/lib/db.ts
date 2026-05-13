@@ -773,6 +773,13 @@ export async function getCloudSyncStatus(): Promise<CloudSyncStatus> {
   };
 }
 
+export async function hasPendingCloudSync(): Promise<boolean> {
+  const store = loadStore();
+  return cloudBackupEnabled(store)
+    && Boolean(getCloudEndpoint(store))
+    && (Boolean(store.cloudSync.pendingBackup) || getUnsyncedTelemetryEvents(store).length > 0);
+}
+
 export async function getCloudBackupPayload(): Promise<CloudBackupPayload | null> {
   const store = loadStore();
   return store.cloudSync.pendingBackup

@@ -16,6 +16,7 @@ import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
 import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getFocusStatsDays, getMessages, getSetting, getSystemPrompt, getTimelineEntries, setSetting, updateSystemPrompt, type FocusStatsDay, type TimelineCategory, type TimelineEntry } from '@/lib/db';
+import { trackFeatureUse } from '@/lib/telemetry';
 import { clipTimelineEntriesToDate, getShortForegroundRows, type BackgroundMarkerWithTime } from '@/lib/timelineView';
 import type { PetState } from '@/features/pet/animations';
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, STATE_META, getBuiltinAssetUrl, isBuiltinAsset, normalizePetMediaConfig, type PetStateMediaConfig } from '@/features/pet/animations';
@@ -152,7 +153,10 @@ export function SettingsPanel({
                     ? 'bg-white/64 text-foreground shadow-[0_8px_22px_rgba(52,64,84,0.075),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.075]'
                     : 'text-muted-foreground hover:bg-white/34 hover:text-foreground dark:hover:bg-white/[0.055]'
                 }`}
-                onClick={() => setActiveSection(s.id)}
+                onClick={() => {
+                  setActiveSection(s.id);
+                  trackFeatureUse('settings', 'settings.section.open', { section: s.id });
+                }}
               >
                 <Icon className={`h-4 w-4 shrink-0 transition-colors duration-200 ${activeSection === s.id ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} />
                 <span className="truncate">{s.label}</span>
@@ -630,6 +634,7 @@ function ProfileSection() {
       <TimelineSection
         date={selectedDate}
         entries={timelineEntries}
+        minSegmentMinutes={settings.timelineMinSegmentMinutes}
         selectedId={selectedTimelineId}
         onSelect={setSelectedTimelineId}
       />
@@ -863,11 +868,13 @@ const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
 function TimelineSection({
   date,
   entries,
+  minSegmentMinutes,
   selectedId,
   onSelect,
 }: {
   date: string;
   entries: TimelineEntry[];
+  minSegmentMinutes: number;
   selectedId: number | null;
   onSelect: (id: number | null) => void;
 }) {
@@ -875,7 +882,8 @@ function TimelineSection({
   const [backgroundDetail, setBackgroundDetail] = useState<BackgroundMarkerWithTime[] | null>(null);
   const [hoverCard, setHoverCard] = useState<TimelineHoverCard | null>(null);
   const isMockPreview = entries.some((entry) => entry.id < 0);
-  const timelineBlocks = getTimelineBlocks(entries);
+  const timelineGapMs = Math.max(1, Math.min(20, minSegmentMinutes)) * 60_000;
+  const timelineBlocks = getTimelineBlocks(entries, timelineGapMs);
   const selectedBlock = timelineBlocks.find((block) => block.entries.some((entry) => entry.id === selectedId)) ?? timelineBlocks.at(-1) ?? null;
   const selected = selectedBlock?.entries[0] ?? null;
   const selectedGroup = selectedBlock?.entries ?? [];
@@ -2054,13 +2062,16 @@ function formatFocusDuration(ms: number): string {
   return rest > 0 ? `${hours} 小时 ${rest} 分钟` : `${hours} 小时`;
 }
 
-function getTimelineBlocks(entries: TimelineEntry[]): TimelineBlock[] {
+function getTimelineBlocks(entries: TimelineEntry[], maxMergeGapMs = 0): TimelineBlock[] {
   const sorted = entries.slice().sort((a, b) => a.startedAt.localeCompare(b.startedAt));
   const blocks: TimelineBlock[] = [];
   for (const entry of sorted) {
     if (entry.foregroundVisible === false) continue;
     const previous = blocks.at(-1);
-    if (previous && previous.appName === entry.appName && previous.category === entry.category) {
+    const gapMs = previous
+      ? new Date(entry.startedAt).getTime() - new Date(previous.endedAt).getTime()
+      : Number.POSITIVE_INFINITY;
+    if (previous && previous.appName === entry.appName && previous.category === entry.category && gapMs <= maxMergeGapMs) {
       previous.entries.push(entry);
       previous.endedAt = entry.endedAt;
       continue;
@@ -2833,8 +2844,35 @@ function AISection({
     codex: { checking: false, error: '' },
     claude: { checking: false, error: '' },
   });
+  const [systemKnowledgeCheck, setSystemKnowledgeCheck] = useState<{ checking: boolean; message: string; ok: boolean | null }>({
+    checking: false,
+    message: '',
+    ok: null,
+  });
   const [systemPromptEditing, setSystemPromptEditing] = useState(false);
   const defaultConfig = configs.find((config) => config.isDefault) ?? configs[0] ?? null;
+
+  const requestSystemKnowledgePermissions = async () => {
+    setSystemKnowledgeCheck({ checking: true, message: '正在请求系统权限...', ok: null });
+    const result = await invoke<{
+      ok: boolean;
+      calendar?: { ok: boolean; message: string };
+      reminders?: { ok: boolean; message: string };
+    }>('request_system_knowledge_permissions').catch((error) => ({
+      ok: false,
+      calendar: { ok: false, message: error instanceof Error ? error.message : String(error) },
+      reminders: { ok: false, message: '' },
+    }));
+    const failed = [
+      result.calendar && !result.calendar.ok ? `日历：${result.calendar.message}` : '',
+      result.reminders && !result.reminders.ok ? `提醒事项：${result.reminders.message}` : '',
+    ].filter(Boolean);
+    setSystemKnowledgeCheck({
+      checking: false,
+      ok: result.ok,
+      message: result.ok ? '日历和提醒事项权限可用' : failed.join('；') || '权限不可用，已打开系统设置',
+    });
+  };
 
   const setCodingProviderEnabled = async (provider: CodingProvider, enabled: boolean) => {
     const otherProvider: CodingProvider = provider === 'claude' ? 'codex' : 'claude';
@@ -3056,6 +3094,37 @@ function AISection({
               <option value="default">默认</option>
               <option value="custom">自定义</option>
             </select>
+          </div>
+        </SettingRow>
+        <SettingRow
+          label="系统知识库"
+          hint="允许 AI 在相关问题中自动参考系统时间、天气、设备信息等本机基础信息"
+        >
+          <div className="flex min-w-[220px] flex-col items-end gap-1">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2"
+                disabled={systemKnowledgeCheck.checking || !settings.systemKnowledgeEnabled}
+                onClick={requestSystemKnowledgePermissions}
+              >
+                {systemKnowledgeCheck.checking ? <Loader2 className="h-3 w-3 animate-spin" /> : '授权/测试'}
+              </Button>
+              <Switch
+                checked={settings.systemKnowledgeEnabled}
+                onCheckedChange={async (v) => {
+                  await updateSetting('systemKnowledgeEnabled', v);
+                  if (v) requestSystemKnowledgePermissions();
+                  else setSystemKnowledgeCheck({ checking: false, message: '', ok: null });
+                }}
+              />
+            </div>
+            {systemKnowledgeCheck.message && (
+              <span className={`max-w-[300px] text-right text-[11px] leading-4 ${systemKnowledgeCheck.ok ? 'text-green-600' : 'text-red-600'}`}>
+                {systemKnowledgeCheck.message}
+              </span>
+            )}
           </div>
         </SettingRow>
         {settings.chatModelMode === 'custom' && (

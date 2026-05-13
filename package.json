@@ -10,7 +10,7 @@
     "build": "tsc -b && vite build",
     "electron:build": "pnpm build && electron-builder",
     "lint": "eslint .",
-    "test:timeline": "node --test src/lib/timelineRecorder.test.ts src/lib/timelineView.test.ts src/lib/db.timeline.test.ts",
+    "test:timeline": "node --test src/lib/timelineRecorder.test.ts src/lib/timelineView.test.ts src/lib/db.timeline.test.ts src/lib/cloudSyncScheduler.test.ts",
     "test:startup": "node --test src/lib/startupTheme.test.ts electron/windowLifecycle.test.cjs",
     "test": "pnpm test:timeline && pnpm test:startup",
     "preview": "vite preview"
@@ -33,6 +33,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@remotion/cli": "4.0.459",
+    "@remotion/gif": "4.0.459",
     "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/cli": "^2.10.1",
     "@types/node": "^24.12.2",
@@ -45,12 +47,15 @@
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "ffmpeg-static": "^5.3.0",
     "globals": "^17.5.0",
+    "remotion": "4.0.459",
     "tailwindcss": "^4.2.4",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
     "vite": "^8.0.10",
-    "wait-on": "^9.0.3"
+    "wait-on": "^9.0.3",
+    "zod": "4.3.6"
   },
   "build": {
     "appId": "com.desksprite.app",
@@ -63,7 +68,13 @@
     "mac": {
       "category": "public.app-category.productivity",
       "target": "dmg",
-      "icon": "src-tauri/icons/icon.icns"
+      "icon": "src-tauri/icons/icon.icns",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "DeskSprite needs Automation permission to read Calendar and Reminders for the System Knowledge Base.",
+        "NSCalendarsUsageDescription": "DeskSprite reads upcoming calendar events only when System Knowledge Base is enabled and relevant to your question.",
+        "NSRemindersUsageDescription": "DeskSprite reads upcoming reminders only when System Knowledge Base is enabled and relevant to your question.",
+        "NSLocationWhenInUseUsageDescription": "DeskSprite uses your approximate location to answer weather questions in System Knowledge Base."
+      }
     },
     "win": {
       "target": "nsis",

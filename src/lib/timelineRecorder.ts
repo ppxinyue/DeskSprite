@@ -152,17 +152,22 @@ export class TimelineRecorder {
   private backgroundOnly = emptySegment();
   private readonly options: {
     minSegmentMs: number;
+    maxSampleGapMs: number;
     persist: (payload: TimelinePersistPayload) => Promise<TimelinePersistResult>;
     log?: (payload: TimelineDebugPayload) => void;
   };
 
   constructor(options: {
     minSegmentMs: number;
+    maxSampleGapMs?: number;
     persist: (payload: TimelinePersistPayload) => Promise<TimelinePersistResult>;
     log?: (payload: TimelineDebugPayload) => void;
     initialState?: Partial<TimelineRecorderState> | null;
   }) {
-    this.options = options;
+    this.options = {
+      ...options,
+      maxSampleGapMs: options.maxSampleGapMs ?? Number.POSITIVE_INFINITY,
+    };
     if (options.initialState) {
       this.active = normalizeSegmentState(options.initialState.active);
       this.candidate = normalizeSegmentState(options.initialState.candidate);
@@ -207,6 +212,23 @@ export class TimelineRecorder {
       key,
       message: `background=${snapshot.background?.length ?? 0}`,
     });
+
+    if (this.active.key && checkedAt - this.active.lastSeenAt > this.options.maxSampleGapMs) {
+      await this.persistActive(this.active.lastSeenAt);
+      this.log({
+        stage: 'active:stale-split',
+        message: 'sampling gap longer than minimum segment duration',
+        appName: this.active.appName,
+        windowTitle: this.active.windowTitle,
+        url: this.active.url,
+        key: this.active.key,
+        durationMs: this.active.lastSeenAt - this.active.firstSeenAt,
+        gapMs: checkedAt - this.active.lastSeenAt,
+        minSegmentMs: this.options.maxSampleGapMs,
+      });
+      this.active = emptySegment();
+      this.candidate = emptySegment();
+    }
 
     if (!this.active.key) {
       this.active = {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { Check, ChevronDown, Columns3, Grid2X2, PanelRight, Plus, Rows3, X } from 'lucide-react';
@@ -11,6 +11,7 @@ import { streamChat } from '@/features/ai/aiService';
 import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
 import { getProviderName } from '@/features/ai/providers';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
+import { withSystemKnowledge } from '@/features/ai/systemKnowledge';
 import {
   speakWithCloudVoice,
   startAudioLevelMonitor,
@@ -218,11 +219,11 @@ export function ChatDialog({
 
     try {
       const systemPrompt = await getActiveSystemPrompt();
-      const chatMessages = [
+      const chatMessages = await withSystemKnowledge([
         { role: 'system' as const, content: systemPrompt },
         ...messages.map((m) => ({ role: m.role, content: m.content, imageDataUrl: m.imageDataUrl })),
         { role: 'user' as const, content: messageText, imageDataUrl: imageForMessage?.dataUrl },
-      ];
+      ], settings.systemKnowledgeEnabled);
 
       let fullContent = '';
       for await (const token of streamChat(chatMessages, apiConfig)) {
@@ -342,12 +343,12 @@ export function ChatDialog({
       style={{
         maxHeight: standalone ? undefined : maxHeight,
         height: standalone ? '100%' : undefined,
-        opacity: standalone ? 1 : dialogOpacity,
+        '--chat-surface-alpha-pct': `${Math.round((standalone ? 1 : dialogOpacity) * 100)}%`,
         fontSize: standalone ? undefined : compactFontSize,
         background: standalone ? undefined : 'color-mix(in srgb, var(--surface-flat) 68%, transparent)',
         backdropFilter: standalone ? undefined : 'blur(10px)',
         WebkitBackdropFilter: standalone ? undefined : 'blur(10px)',
-      }}
+      } as CSSProperties}
     >
       {mode === 'history' && (
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" style={{ maxHeight: standalone ? undefined : Math.max(120, maxHeight - 42) }}>
@@ -633,11 +634,11 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
 
     try {
       const systemPrompt = await getActiveSystemPrompt();
-      const chatMessages = [
+      const chatMessages = await withSystemKnowledge([
         { role: 'system' as const, content: systemPrompt },
         ...previousMessages.map((m) => ({ role: m.role, content: m.content, imageDataUrl: m.imageDataUrl })),
         { role: 'user' as const, content: messageText, imageDataUrl: imageForMessage?.dataUrl },
-      ];
+      ], settings.systemKnowledgeEnabled);
 
       let fullContent = '';
       for await (const token of streamChat(chatMessages, resolved.config)) {

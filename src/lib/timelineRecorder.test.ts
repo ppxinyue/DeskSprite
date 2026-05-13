@@ -13,13 +13,14 @@ function snapshot(appName: string, windowTitle: string, options: Partial<Timelin
   };
 }
 
-function createHarness(minSegmentMs = 60_000) {
+function createHarness(minSegmentMs = 60_000, maxSampleGapMs?: number) {
   let nextId = 1;
   const persisted: TimelinePersistPayload[] = [];
   const pushed: Array<{ kind: string; date: string }> = [];
   const logs: TimelineDebugPayload[] = [];
   const recorder = new TimelineRecorder({
     minSegmentMs,
+    maxSampleGapMs,
     log: (payload) => logs.push(payload),
     persist: async (payload): Promise<TimelinePersistResult> => {
       persisted.push({ ...payload, backgroundMarkers: payload.backgroundMarkers.map((marker) => ({ ...marker })) });
@@ -359,4 +360,24 @@ test('restores an unfinished active segment after sampler restart', async () => 
   assert.equal(persisted[0].startedAt, 0);
   assert.equal(persisted[0].endedAt, 390_000);
   assert.ok(logs.some((item) => item.stage === 'restore'));
+});
+
+test('splits an active segment when sampling resumes after a gap longer than the minimum duration', async () => {
+  const { recorder, persisted, logs } = createHarness(60_000, 60_000);
+  const resumedAt = 14 * 60 * 60_000;
+
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 60_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), resumedAt);
+  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), resumedAt + 60_000);
+
+  assert.equal(persisted.length, 3);
+  assert.equal(persisted[0].startedAt, 0);
+  assert.equal(persisted[0].endedAt, 60_000);
+  assert.equal(persisted[1].startedAt, 0);
+  assert.equal(persisted[1].endedAt, 60_000);
+  assert.equal(persisted[2].startedAt, resumedAt);
+  assert.equal(persisted[2].endedAt, resumedAt + 60_000);
+  assert.equal(persisted.some((item) => item.startedAt === 0 && item.endedAt === resumedAt), false);
+  assert.ok(logs.some((item) => item.stage === 'active:stale-split'));
 });

@@ -95,6 +95,8 @@ const EN: Record<string, string> = {
   '开启新 session': 'Start New Session',
   'Chat 模型': 'Chat Model',
   '模型': 'Model',
+  '系统知识库': 'System Knowledge Base',
+  '允许 AI 在相关问题中自动参考系统时间、天气、设备信息等本机基础信息': 'Allow AI to reference local basics such as system time, weather, and device information when relevant.',
   '默认': 'Default',
   '自定义': 'Custom',
   '自定义配置': 'Custom Configuration',

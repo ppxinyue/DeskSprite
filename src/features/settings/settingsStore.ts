@@ -34,6 +34,7 @@ export interface AppSettings {
   attachActivity: 'low' | 'medium' | 'high';
   alwaysOnTop: boolean;
   chatModelMode: ModelMode;
+  systemKnowledgeEnabled: boolean;
   codingModeEnabled: boolean;
   codingCodexEnabled: boolean;
   codingClaudeEnabled: boolean;
@@ -91,6 +92,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   attachActivity: 'medium',
   alwaysOnTop: true,
   chatModelMode: 'default',
+  systemKnowledgeEnabled: true,
   codingModeEnabled: false,
   codingCodexEnabled: true,
   codingClaudeEnabled: true,

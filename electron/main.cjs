@@ -17,6 +17,7 @@ const {
 } = require('electron');
 const fs = require('node:fs');
 const fsp = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const { randomUUID } = require('node:crypto');
@@ -1109,20 +1110,24 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
     x: Math.round(x),
     y: Math.round(y),
     transparent: true,
-    type: process.platform === 'darwin' ? 'panel' : undefined,
     frame: false,
+    focusable: true,
     resizable: false,
     movable: false,
+    acceptFirstMouse: true,
     skipTaskbar: process.platform !== 'darwin',
     hasShadow: false,
     alwaysOnTop: true,
   });
+  win.setFocusable(true);
   win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) });
   applyFloatingFullscreenBehavior(win, { force: show });
   if (show) {
-    win.showInactive();
+    win.show();
     applyFloatingFullscreenBehavior(win, { force: true });
     win.moveTop();
+    win.focus();
+    win.webContents.focus();
   }
 }
 
@@ -1326,6 +1331,220 @@ async function testAiConnection({ request }) {
   }
 }
 
+function readSystemKnowledgeDeviceInfo() {
+  const displays = screen.getAllDisplays().map((display) => ({
+    id: display.id,
+    bounds: display.bounds,
+    workArea: display.workArea,
+    scaleFactor: display.scaleFactor,
+    rotation: display.rotation,
+    touchSupport: display.touchSupport,
+  }));
+  const primaryDisplay = screen.getPrimaryDisplay();
+  return {
+    appName: app.getName(),
+    appVersion: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
+    osType: os.type(),
+    osRelease: os.release(),
+    osVersion: os.version?.() || '',
+    hostname: os.hostname(),
+    cpuModel: os.cpus()?.[0]?.model || '',
+    cpuCount: os.cpus()?.length || 0,
+    totalMemoryBytes: os.totalmem(),
+    freeMemoryBytes: os.freemem(),
+    uptimeSeconds: Math.round(os.uptime()),
+    locale: app.getLocale(),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    displays,
+    primaryDisplay: {
+      id: primaryDisplay.id,
+      bounds: primaryDisplay.bounds,
+      workArea: primaryDisplay.workArea,
+      scaleFactor: primaryDisplay.scaleFactor,
+    },
+  };
+}
+
+function runAppleScript(script, timeout = 2500) {
+  return new Promise((resolve, reject) => {
+    if (process.platform !== 'darwin') {
+      reject(new Error('AppleScript is only available on macOS.'));
+      return;
+    }
+    execFile('/usr/bin/osascript', ['-e', script], { timeout }, (error, stdout, stderr) => {
+      if (error) {
+        reject(new Error(stderr || error.message || String(error)));
+        return;
+      }
+      resolve(stdout || '');
+    });
+  });
+}
+
+function appleScriptTargets(appName, bundleId) {
+  return [
+    `application id "${bundleId}"`,
+    `application "${appName}"`,
+  ];
+}
+
+function calendarKnowledgeScript(target) {
+  return `
+set output to ""
+set nowDate to current date
+set endDate to nowDate + (7 * days)
+tell ${target}
+  repeat with calendarItem in calendars
+    try
+      set calendarName to name of calendarItem
+      set matchedEvents to every event of calendarItem whose start date is greater than or equal to nowDate and start date is less than or equal to endDate
+      repeat with eventItem in matchedEvents
+        set eventTitle to summary of eventItem
+        set eventStart to start date of eventItem
+        set eventEnd to end date of eventItem
+        set eventLocation to ""
+        try
+          set eventLocation to location of eventItem
+        end try
+        set output to output & "calendar" & tab & calendarName & tab & eventTitle & tab & (eventStart as string) & tab & (eventEnd as string) & tab & eventLocation & linefeed
+      end repeat
+    end try
+  end repeat
+end tell
+return output
+`;
+}
+
+function remindersKnowledgeScript(target) {
+  return `
+set output to ""
+set nowDate to current date
+set endDate to nowDate + (14 * days)
+tell ${target}
+  repeat with listItem in lists
+    try
+      set listName to name of listItem
+      set matchedReminders to every reminder of listItem whose completed is false
+      repeat with reminderItem in matchedReminders
+        set reminderTitle to name of reminderItem
+        set dueText to ""
+        try
+          set reminderDue to due date of reminderItem
+          if reminderDue is not missing value then
+            if reminderDue is less than or equal to endDate then set dueText to reminderDue as string
+          end if
+        end try
+        if dueText is not "" then
+          set output to output & "reminder" & tab & listName & tab & reminderTitle & tab & dueText & linefeed
+        end if
+      end repeat
+    end try
+  end repeat
+end tell
+return output
+`;
+}
+
+async function readSystemKnowledgeScheduleInfo() {
+  if (process.platform !== 'darwin') {
+    return { calendar: [], reminders: [], error: 'Calendar and Reminders integration is only available on macOS.' };
+  }
+  const [calendarResult, remindersResult] = await Promise.allSettled([
+    runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => calendarKnowledgeScript(target))),
+    runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => remindersKnowledgeScript(target))),
+  ]);
+  return {
+    calendar: calendarResult.status === 'fulfilled' ? parseTabRows(calendarResult.value, 'calendar') : [],
+    reminders: remindersResult.status === 'fulfilled' ? parseTabRows(remindersResult.value, 'reminder') : [],
+    error: [
+      calendarResult.status === 'rejected' ? `Calendar: ${humanizeAppleScriptAccessError(calendarResult.reason.message)}` : '',
+      remindersResult.status === 'rejected' ? `Reminders: ${humanizeAppleScriptAccessError(remindersResult.reason.message)}` : '',
+    ].filter(Boolean).join('; '),
+  };
+}
+
+async function runFirstSuccessfulAppleScript(scripts, timeout = 5000) {
+  const errors = [];
+  for (const script of scripts) {
+    try {
+      return await runAppleScript(script, timeout);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  throw new Error(errors.map(humanizeAppleScriptAccessError).join(' | '));
+}
+
+async function requestSystemKnowledgePermissions() {
+  if (process.platform !== 'darwin') {
+    return {
+      ok: false,
+      calendar: { ok: false, message: 'Only available on macOS.' },
+      reminders: { ok: false, message: 'Only available on macOS.' },
+    };
+  }
+  const [calendarResult, remindersResult] = await Promise.allSettled([
+    runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => `tell ${target} to return count of calendars`)),
+    runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => `tell ${target} to return count of lists`)),
+  ]);
+  const calendar = permissionResultFromSettled(calendarResult);
+  const reminders = permissionResultFromSettled(remindersResult);
+  if (!calendar.ok || !reminders.ok) {
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Automation').catch(() => {});
+  }
+  return {
+    ok: calendar.ok && reminders.ok,
+    calendar,
+    reminders,
+  };
+}
+
+function permissionResultFromSettled(result) {
+  if (result.status === 'fulfilled') {
+    return { ok: true, message: 'OK' };
+  }
+  return { ok: false, message: humanizeAppleScriptAccessError(result.reason?.message || result.reason) };
+}
+
+function humanizeAppleScriptAccessError(message) {
+  const text = String(message || '');
+  if (/not authorized|not allowed|拒绝|不被允许|没有权限|(-1743)|(-600)/i.test(text)) {
+    return 'permission denied. Enable access in macOS System Settings > Privacy & Security > Automation/Calendars/Reminders for DeskSprite or Electron.';
+  }
+  if (/(-1728)|不能获得|Can.t get/i.test(text)) {
+    return 'macOS could not resolve the Calendar/Reminders automation target in this runtime. Try the packaged DeskSprite app and run authorization again.';
+  }
+  return text.replace(/\s+/g, ' ').slice(0, 240);
+}
+
+function parseTabRows(text, type) {
+  return String(text || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split('\t'))
+    .filter((parts) => parts[0] === type)
+    .slice(0, 12)
+    .map((parts) => {
+      if (type === 'calendar') {
+        return {
+          calendar: parts[1] || '',
+          title: parts[2] || '',
+          startsAt: parts[3] || '',
+          endsAt: parts[4] || '',
+          location: parts[5] || '',
+        };
+      }
+      return {
+        list: parts[1] || '',
+        title: parts[2] || '',
+        dueAt: parts[3] || '',
+      };
+    });
+}
+
 async function transcribeAudio({ request }) {
   const apiKey = normalizeApiKey(request.apiKey);
   if (!apiKey) throw new Error('API Key 为空。');
@@ -1513,7 +1732,7 @@ function formatCodexNotice(method, params = {}) {
 
 function extractCodexEventText(event) {
   if (!event || typeof event !== 'object') return '';
-  if (event.type && /approval|permission|confirm|input/i.test(String(event.type))) {
+  if (event.type && /approv|approval|permission|confirm|input|requires_action|needs_input/i.test(String(event.type))) {
     codingState.status = CODEX_STATUS.NEEDS_INPUT;
     return `需要处理：${event.type}`;
   }
@@ -1659,7 +1878,7 @@ function handleCodexAppServerNotification(message) {
       hasError: false,
     };
     codingState.running = { type: 'app-server-turn', turnId };
-    codingState.status = CODEX_STATUS.WORKING;
+    if (codingState.status !== CODEX_STATUS.NEEDS_INPUT) codingState.status = CODEX_STATUS.WORKING;
     publishCodingState();
     return;
   }
@@ -1713,7 +1932,7 @@ function handleCodexAppServerNotification(message) {
     const isTransient = /Reconnecting|Falling back|retrying sampling request/i.test(messageText);
     if (method === 'error' || method === 'guardianWarning') {
       if (isTransient) {
-        codingState.status = CODEX_STATUS.WORKING;
+        if (codingState.status !== CODEX_STATUS.NEEDS_INPUT) codingState.status = CODEX_STATUS.WORKING;
       } else {
         if (codexAppServer.activeTurn) codexAppServer.activeTurn.hasError = true;
         codingState.running = null;
@@ -1771,9 +1990,9 @@ function ensureCodexAppServer() {
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
-        .filter((line) => /Reconnecting|Falling back|retrying sampling request|error|failed|permission|approval|authorize|confirm|login/i.test(line));
+        .filter((line) => /Reconnecting|Falling back|retrying sampling request|error|failed|permission|approv|approval|authorize|confirm|login/i.test(line));
       for (const line of lines) pushCodingMessage('system', line);
-      if (/approval|permission|authorize|confirm|login/i.test(text)) {
+      if (/approv|approval|permission|authorize|confirm|login/i.test(text)) {
         codingState.status = CODEX_STATUS.NEEDS_INPUT;
         publishCodingState();
       }
@@ -1844,7 +2063,7 @@ async function sendCodingMessage({ prompt }) {
   const text = String(prompt || '').trim();
   if (!text) throw new Error('输入为空。');
   if (codingState.running) {
-    codingState.status = CODEX_STATUS.WORKING;
+    if (codingState.status !== CODEX_STATUS.NEEDS_INPUT) codingState.status = CODEX_STATUS.WORKING;
     pushCodingMessage('system', 'Codex 正在工作，请等这次任务结束后再发送。');
     return publishCodingState();
   }
@@ -1915,7 +2134,7 @@ function handleClaudePrintEvent(event) {
       const toolOnly = Array.isArray(message.content) && message.content.every((part) => part?.type === 'tool_use');
       pushClaudeCodingMessage(toolOnly ? 'system' : 'codex', content);
     }
-    claudeCodingState.status = CODEX_STATUS.WORKING;
+    if (claudeCodingState.status !== CODEX_STATUS.NEEDS_INPUT) claudeCodingState.status = CODEX_STATUS.WORKING;
     publishClaudeCodingState();
     return;
   }
@@ -1946,7 +2165,7 @@ async function sendClaudeCodingMessage({ prompt }) {
   const text = String(prompt || '').trim();
   if (!text) throw new Error('输入为空。');
   if (claudeCodingState.running) {
-    claudeCodingState.status = CODEX_STATUS.WORKING;
+    if (claudeCodingState.status !== CODEX_STATUS.NEEDS_INPUT) claudeCodingState.status = CODEX_STATUS.WORKING;
     pushClaudeCodingMessage('system', 'Claude Code 正在工作，请等这次任务结束后再发送。');
     return publishClaudeCodingState();
   }
@@ -1995,11 +2214,11 @@ async function sendClaudeCodingMessage({ prompt }) {
     const textChunk = chunk.toString();
     const lines = textChunk.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     for (const line of lines) {
-      if (/permission|approval|authorize|confirm|login|error|failed|reconnect|retry/i.test(line)) {
+      if (/permission|approv|approval|authorize|confirm|login|error|failed|reconnect|retry/i.test(line)) {
         pushClaudeCodingMessage(/error|failed/i.test(line) ? 'error' : 'system', line);
       }
     }
-    if (/permission|approval|authorize|confirm|login/i.test(textChunk)) {
+    if (/permission|approv|approval|authorize|confirm|login/i.test(textChunk)) {
       claudeCodingState.status = CODEX_STATUS.NEEDS_INPUT;
       publishClaudeCodingState();
     }
@@ -2091,9 +2310,28 @@ function codexSessionTitle(session) {
 }
 
 function isCodexProblemEvent(type, payload, raw) {
-  const haystack = `${type || ''} ${payload?.type || ''} ${payload?.subtype || ''} ${raw || ''}`;
-  return /requestapproval|request_user_input|permission|approval|guardian|denied|blocked|requires_action|needs_input/i.test(haystack)
-    || /\berror\b|failed/i.test(haystack);
+  const structured = [
+    type,
+    payload?.type,
+    payload?.subtype,
+    payload?.status,
+    payload?.name,
+    payload?.method,
+    payload?.code,
+    payload?.reason,
+    payload?.error?.code,
+  ].filter(Boolean).join(' ');
+  if (/requestapproval|request_approval|approval_request|request_user_input|permission|approv|approval|guardian|denied|blocked|requires_action|needs_input|needs_approval|requires_approval|ask_user/i.test(structured)) {
+    return true;
+  }
+  const text = [
+    codexSessionEventText(payload),
+    extractCodexTextFromValue(payload?.error),
+    extractCodexTextFromValue(payload?.detail),
+    extractCodexTextFromValue(payload?.reason),
+    typeof raw === 'string' && raw.length < 2000 ? raw : '',
+  ].filter(Boolean).join(' ');
+  return /requestapproval|request_approval|approval_request|request_user_input|permission|approv|approval|guardian|denied|blocked|requires_action|needs_input|needs_approval|requires_approval|ask_user|\berror\b|failed/i.test(text);
 }
 
 function isFinalCodexSessionOutput(payload) {
@@ -2218,7 +2456,7 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
     createdAt: message.createdAt,
   }));
   const latestActivityAt = Math.max(lastUserAt, lastWorkAt, lastAssistantAt, lastProblemAt, mtimeMs);
-  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt && lastProblemAt >= lastWorkAt) {
+  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt) {
     session.status = CODEX_STATUS.NEEDS_INPUT;
     session.message = `${prefix} ${lastProblem}`;
     session.eventAt = lastProblemAt;
@@ -2487,7 +2725,7 @@ function parseClaudeSessionFile(filePath, text, mtimeMs) {
     createdAt: message.createdAt,
   }));
   const latestActivityAt = Math.max(lastUserAt, lastWorkAt, lastAssistantAt, lastProblemAt, mtimeMs);
-  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt && lastProblemAt >= lastWorkAt) {
+  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt) {
     session.status = CODEX_STATUS.NEEDS_INPUT;
     session.message = `${prefix} ${lastProblem}`;
     session.eventAt = lastProblemAt;
@@ -2645,10 +2883,12 @@ const handlers = {
   focus_compact_chat_window: () => {
     const win = windows.get('compact-chat');
     if (win && !win.isDestroyed()) {
+      win.setFocusable(true);
       applyFloatingFullscreenBehavior(win, { force: true });
       win.show();
       win.moveTop();
       win.focus();
+      win.webContents.focus();
     }
   },
   focus_compact_chat_input: () => broadcast('compact-chat:focus-input', {}),
@@ -2705,6 +2945,9 @@ const handlers = {
   open_external_url: ({ url }) => shell.openExternal(url),
   chat_completion: chatCompletion,
   test_ai_connection: testAiConnection,
+  read_system_knowledge_device_info: readSystemKnowledgeDeviceInfo,
+  read_system_knowledge_schedule_info: readSystemKnowledgeScheduleInfo,
+  request_system_knowledge_permissions: requestSystemKnowledgePermissions,
   transcribe_audio: transcribeAudio,
   synthesize_speech: synthesizeSpeech,
   can_start_speech_recognition: () => true,
