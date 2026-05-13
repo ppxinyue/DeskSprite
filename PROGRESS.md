@@ -1910,3 +1910,10 @@
 - 占位：系统知识库触发只看当前最后一条用户输入，避免历史关键词让普通对话也显示查询占位；占位文案从“查询中...”统一改为 `Querying...`。
 - 验证：`pnpm build`、`pnpm test` 通过；生产构建主包 497.79 kB，gzip 155.48 kB。
 - 文件：electron/main.cjs, systemKnowledge.ts, ChatDialog.tsx, HoverInputBar.tsx, ISSUES.md, PROGRESS.md
+
+### R250. 右键菜单二级菜单容错增强（2026-05-13）
+- 交互：灵宠右键菜单的“历史对话”和 “Coding 模式”二级菜单从纯 CSS hover 改为受控状态，支持 hover 打开、离开后延迟关闭。
+- 容错：一级菜单与二级菜单之间的透明桥接区加宽，并向上下扩展，提升鼠标横向移动时的命中容错。
+- 锁定：点击一级菜单项会固定展开对应二级菜单，避免用户在选择二级项前菜单提前消失。
+- 验证：`pnpm build` 通过；生产构建主包 498.85 kB，gzip 155.71 kB。
+- 文件：PetAvatar.tsx, ISSUES.md, PROGRESS.md

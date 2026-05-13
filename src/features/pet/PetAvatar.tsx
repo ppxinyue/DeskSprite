@@ -93,6 +93,8 @@ export function PetAvatar({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const [submenuSide, setSubmenuSide] = useState<'left' | 'right'>('right');
+  const [activeSubmenu, setActiveSubmenu] = useState<'history' | 'coding' | null>(null);
+  const [lockedSubmenu, setLockedSubmenu] = useState<'history' | 'coding' | null>(null);
   const [recentConversations, setRecentConversations] = useState<Array<{ id: number; title: string | null }>>([]);
   const [currentMotion, setCurrentMotion] = useState<PetMotionName | null>(() => pickNextMotion(motions, null));
   const didDrag = useRef(false);
@@ -100,18 +102,23 @@ export function PetAvatar({
   const petRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const submenuCloseTimer = useRef<number | null>(null);
+  const activeSubmenuRef = useRef<'history' | 'coding' | null>(null);
+  const lockedSubmenuRef = useRef<'history' | 'coding' | null>(null);
   const orbMode = renderMode === 'orb';
   const w = Math.round((orbMode ? 150 : 120) * scale);
   const h = Math.round(150 * scale);
   const animationsPaused = dragging;
-  const submenuBridgeClass = `pointer-events-auto absolute top-0 z-10 h-40 w-6 ${
+  const submenuBridgeClass = `pointer-events-auto absolute z-10 w-14 ${
     submenuSide === 'left' ? 'right-full -mr-1' : 'left-full -ml-1'
   }`;
-  const submenuBridgeStyle: CSSProperties = {
+  const getSubmenuBridgeStyle = (height: number): CSSProperties => ({
+    top: -12,
+    height,
     clipPath: submenuSide === 'left'
       ? 'polygon(100% 0, 0 16%, 0 84%, 100% 100%)'
       : 'polygon(0 0, 100% 16%, 100% 84%, 0 100%)',
-  };
+  });
 
   useEffect(() => {
     loadUserFrames();
@@ -148,6 +155,8 @@ export function PetAvatar({
     if (!menuOpen) return;
     const close = () => {
       setMenuOpen(false);
+      setActiveSubmenu(null);
+      setLockedSubmenu(null);
       onMenuOpenChange?.(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -163,9 +172,51 @@ export function PetAvatar({
     };
   }, [menuOpen, onMenuOpenChange]);
 
+  useEffect(() => () => {
+    if (submenuCloseTimer.current) window.clearTimeout(submenuCloseTimer.current);
+  }, []);
+
+  useEffect(() => {
+    activeSubmenuRef.current = activeSubmenu;
+  }, [activeSubmenu]);
+
+  useEffect(() => {
+    lockedSubmenuRef.current = lockedSubmenu;
+  }, [lockedSubmenu]);
+
+  const clearSubmenuCloseTimer = () => {
+    if (!submenuCloseTimer.current) return;
+    window.clearTimeout(submenuCloseTimer.current);
+    submenuCloseTimer.current = null;
+  };
+
+  const openSubmenu = (name: 'history' | 'coding', locked = false) => {
+    clearSubmenuCloseTimer();
+    setActiveSubmenu(name);
+    if (locked) setLockedSubmenu(name);
+  };
+
+  const scheduleSubmenuClose = (name: 'history' | 'coding') => {
+    clearSubmenuCloseTimer();
+    submenuCloseTimer.current = window.setTimeout(() => {
+      if (activeSubmenuRef.current === name && lockedSubmenuRef.current !== name) {
+        setActiveSubmenu(null);
+      }
+      submenuCloseTimer.current = null;
+    }, 260);
+  };
+
+  const handleSubmenuTriggerClick = (event: React.MouseEvent, name: 'history' | 'coding') => {
+    event.preventDefault();
+    event.stopPropagation();
+    openSubmenu(name, true);
+  };
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     setMenuOpen(false);
+    setActiveSubmenu(null);
+    setLockedSubmenu(null);
     onMenuOpenChange?.(false);
     didDrag.current = false;
     startPoint.current = { x: e.screenX, y: e.screenY };
@@ -209,6 +260,8 @@ export function PetAvatar({
 
   const handleContextMenu = async (action: string) => {
     setMenuOpen(false);
+    setActiveSubmenu(null);
+    setLockedSubmenu(null);
     onMenuOpenChange?.(false);
     switch (action) {
       case 'profile':
@@ -280,6 +333,8 @@ export function PetAvatar({
       const canOpenLeft = x - SUBMENU_WIDTH - MENU_MARGIN >= 0;
       setSubmenuSide(canOpenRight || !canOpenLeft ? 'right' : 'left');
       setMenuPos({ x, y });
+      setActiveSubmenu(null);
+      setLockedSubmenu(null);
       setMenuOpen(true);
     }, 40);
     getConversations()
@@ -421,12 +476,16 @@ export function PetAvatar({
         onPointerDown={(event) => {
           event.stopPropagation();
           setMenuOpen(false);
+          setActiveSubmenu(null);
+          setLockedSubmenu(null);
           onMenuOpenChange?.(false);
         }}
         onContextMenu={(event) => {
           event.preventDefault();
           event.stopPropagation();
           setMenuOpen(false);
+          setActiveSubmenu(null);
+          setLockedSubmenu(null);
           onMenuOpenChange?.(false);
         }}
       />
@@ -449,31 +508,44 @@ export function PetAvatar({
         {codingModeEnabled ? (
           <button className="block w-full cursor-not-allowed rounded px-2 py-1 text-left text-xs text-muted-foreground/45" disabled>历史对话</button>
         ) : (
-          <div className="group/history relative">
-            <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">历史对话</button>
-            <div className={submenuBridgeClass} style={submenuBridgeStyle} />
-            <div
-                className={`absolute top-0 hidden w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/history:block dark:bg-[#1c1b18] ${
+          <div
+            className="relative"
+            onPointerEnter={() => openSubmenu('history')}
+            onPointerLeave={() => scheduleSubmenuClose('history')}
+          >
+            <button
+              className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent"
+              onClick={(event) => handleSubmenuTriggerClick(event, 'history')}
+            >
+              历史对话
+            </button>
+            <div className={submenuBridgeClass} style={getSubmenuBridgeStyle(96)} />
+            {activeSubmenu === 'history' && (
+              <div
+                className={`absolute top-0 w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl dark:bg-[#1c1b18] ${
                 submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
               }`}
-          >
-            {recentConversations.length === 0 ? (
-              <div className="px-2 py-1 text-xs text-muted-foreground">暂无历史</div>
-            ) : recentConversations.map((item) => (
-              <button
-                key={item.id}
-                className="block w-full max-w-44 truncate rounded px-2 py-1 text-left text-xs hover:bg-accent"
-                onClick={() => {
-                  setMenuOpen(false);
-                  onMenuOpenChange?.(false);
-                  openChat('history', item.id);
-                  emit('pet:force-open-chat', { mode: 'history', conversationId: item.id }).catch(() => {});
-                }}
               >
-                {item.title || `对话 ${item.id}`}
-              </button>
-            ))}
-            </div>
+                {recentConversations.length === 0 ? (
+                  <div className="px-2 py-1 text-xs text-muted-foreground">暂无历史</div>
+                ) : recentConversations.map((item) => (
+                  <button
+                    key={item.id}
+                    className="block w-full max-w-44 truncate rounded px-2 py-1 text-left text-xs hover:bg-accent"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setActiveSubmenu(null);
+                      setLockedSubmenu(null);
+                      onMenuOpenChange?.(false);
+                      openChat('history', item.id);
+                      emit('pet:force-open-chat', { mode: 'history', conversationId: item.id }).catch(() => {});
+                    }}
+                  >
+                    {item.title || `对话 ${item.id}`}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <div className="my-1 h-px bg-border/60" />
@@ -485,34 +557,45 @@ export function PetAvatar({
             退出 Coding 模式
           </button>
         ) : (codingCodexEnabled || codingClaudeEnabled) ? (
-          <div className="group/coding relative">
-            <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent">Coding 模式</button>
-            <div className={submenuBridgeClass} style={{ ...submenuBridgeStyle, height: 190 }} />
-            <div
-              className={`absolute top-0 hidden w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl group-hover/coding:block dark:bg-[#1c1b18] ${
+          <div
+            className="relative"
+            onPointerEnter={() => openSubmenu('coding')}
+            onPointerLeave={() => scheduleSubmenuClose('coding')}
+          >
+            <button
+              className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent"
+              onClick={(event) => handleSubmenuTriggerClick(event, 'coding')}
+            >
+              Coding 模式
+            </button>
+            <div className={submenuBridgeClass} style={getSubmenuBridgeStyle(214)} />
+            {activeSubmenu === 'coding' && (
+              <div
+                className={`absolute top-0 w-[190px] rounded-md border border-border/70 bg-[#fbfaf8] px-1 py-1 shadow-xl dark:bg-[#1c1b18] ${
                 submenuSide === 'left' ? 'right-full mr-1' : 'left-full ml-1'
               }`}
-            >
-              {codingCodexEnabled && (
-                <>
-                  <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                    Codex{codingProvider === 'codex' ? ' · 当前' : ''}
-                  </div>
-                  <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-inherit')}>继承当前 session</button>
-                  <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-new')}>开启新 session</button>
-                </>
-              )}
-              {codingCodexEnabled && codingClaudeEnabled && <div className="my-1 h-px bg-border/60" />}
-              {codingClaudeEnabled && (
-                <>
-                  <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                    Claude Code{codingProvider === 'claude' ? ' · 当前' : ''}
-                  </div>
-                  <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-inherit')}>继承当前 session</button>
-                  <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-new')}>开启新 session</button>
-                </>
-              )}
-            </div>
+              >
+                {codingCodexEnabled && (
+                  <>
+                    <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      Codex{codingProvider === 'codex' ? ' · 当前' : ''}
+                    </div>
+                    <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-inherit')}>继承当前 session</button>
+                    <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-new')}>开启新 session</button>
+                  </>
+                )}
+                {codingCodexEnabled && codingClaudeEnabled && <div className="my-1 h-px bg-border/60" />}
+                {codingClaudeEnabled && (
+                  <>
+                    <div className="px-2 pb-0.5 pt-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      Claude Code{codingProvider === 'claude' ? ' · 当前' : ''}
+                    </div>
+                    <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-inherit')}>继承当前 session</button>
+                    <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('coding-claude-new')}>开启新 session</button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ) : null}
         <div className="my-1 h-px bg-border/60" />
