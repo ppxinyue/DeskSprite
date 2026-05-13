@@ -1110,24 +1110,20 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
     x: Math.round(x),
     y: Math.round(y),
     transparent: true,
+    type: process.platform === 'darwin' ? 'panel' : undefined,
     frame: false,
-    focusable: true,
     resizable: false,
     movable: false,
-    acceptFirstMouse: true,
     skipTaskbar: process.platform !== 'darwin',
     hasShadow: false,
     alwaysOnTop: true,
   });
-  win.setFocusable(true);
   win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) });
   applyFloatingFullscreenBehavior(win, { force: show });
   if (show) {
-    win.show();
+    win.showInactive();
     applyFloatingFullscreenBehavior(win, { force: true });
     win.moveTop();
-    win.focus();
-    win.webContents.focus();
   }
 }
 
@@ -2883,12 +2879,10 @@ const handlers = {
   focus_compact_chat_window: () => {
     const win = windows.get('compact-chat');
     if (win && !win.isDestroyed()) {
-      win.setFocusable(true);
       applyFloatingFullscreenBehavior(win, { force: true });
       win.show();
       win.moveTop();
       win.focus();
-      win.webContents.focus();
     }
   },
   focus_compact_chat_input: () => broadcast('compact-chat:focus-input', {}),

@@ -3011,3 +3011,15 @@
 - 涉及文件：`src/App.tsx`, `src/main.tsx`, `src/lib/startupTheme.ts`, `src/lib/startupTheme.test.ts`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：首帧问题不能只测业务状态机，还要覆盖“是否渲染完整 UI”“何时通知 main show”“原生窗口底色”这些真实显示链路。
 - 是否需更新技术文档：否。
+
+## ISSUE-253
+- 发现时间：2026-05-13
+- 发现者：用户反馈
+- 相关任务：小聊天框置顶回归与系统知识库占位
+- 严重程度：严重
+- 问题现象：从 `302fa5b Add system knowledge and compact chat focus fixes` 开始，小聊天框不再稳定置顶穿透全屏；多轮围绕输入法候选窗的窗口层级实验进一步影响小窗跟随、拖拽和 resize 体验；同时普通聊天也会误显示“查询中...”。
+- 原因分析：`302fa5b` 将小聊天框从原先稳定的 `panel + showInactive + screen-saver topmost guard` 路径改为 focusable/acceptFirstMouse/show/focus/webContents.focus，破坏了此前已验证的全屏 Space 置顶链路。后续 parent/child window、输入态冻结、重建窗口等尝试没有解决 IME，反而偏离了原小窗交互结构。“查询中...”误触发来自系统知识库判断把 system prompt 也纳入关键词匹配。
+- 解决方案：小聊天框创建、显示和 focus handler 精确还原到 `302fa5b^` 之前的稳定逻辑：macOS `panel`、`showInactive()`、不主动 webContents focus、不引入 parent/child window 或输入态窗口状态机；保留后续已打磨的 UI/业务代码。系统知识库触发判断改为只扫描用户消息，并让内部天气/设备/日历分支同样只看用户消息。
+- 涉及文件：`electron/main.cjs`, `src/features/chat/ChatPrimitives.tsx`, `src/features/ai/systemKnowledge.ts`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：macOS 输入法候选窗问题不能通过反复修改主小聊天框窗口本体来试错；主小窗的置顶/跟随/resize 链路已经验证过，修 IME 应另起独立输入承载方案或原生层方案，并用可回滚分支隔离。
+- 是否需更新技术文档：否。

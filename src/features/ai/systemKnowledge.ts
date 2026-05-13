@@ -57,17 +57,29 @@ const SCHEDULE_TRIGGER = /(日历|日程|待办|提醒|会议|安排|calendar|sc
 
 let weatherCache: { key: string; value: WeatherKnowledge; expiresAt: number } | null = null;
 
+export function shouldQuerySystemKnowledge(
+  messages: Message[],
+  enabled: boolean,
+): boolean {
+  if (!enabled) return false;
+  const queryText = messages
+    .filter((message) => message.role === 'user')
+    .slice(-4)
+    .map((message) => message.content)
+    .join('\n');
+  return SYSTEM_KNOWLEDGE_TRIGGER.test(queryText);
+}
+
 export async function buildSystemKnowledgePrompt(
   messages: Message[],
   enabled: boolean,
 ): Promise<string> {
-  if (!enabled) return '';
+  if (!shouldQuerySystemKnowledge(messages, enabled)) return '';
   const queryText = messages
-    .filter((message) => message.role !== 'assistant')
+    .filter((message) => message.role === 'user')
     .slice(-4)
     .map((message) => message.content)
     .join('\n');
-  if (!SYSTEM_KNOWLEDGE_TRIGGER.test(queryText)) return '';
 
   const now = new Date();
   const lines = [

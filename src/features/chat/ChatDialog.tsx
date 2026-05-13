@@ -11,7 +11,7 @@ import { streamChat } from '@/features/ai/aiService';
 import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
 import { getProviderName } from '@/features/ai/providers';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
-import { withSystemKnowledge } from '@/features/ai/systemKnowledge';
+import { shouldQuerySystemKnowledge, withSystemKnowledge } from '@/features/ai/systemKnowledge';
 import {
   speakWithCloudVoice,
   startAudioLevelMonitor,
@@ -219,13 +219,18 @@ export function ChatDialog({
 
     try {
       const systemPrompt = await getActiveSystemPrompt();
-      const chatMessages = await withSystemKnowledge([
+      const baseMessages = [
         { role: 'system' as const, content: systemPrompt },
         ...messages.map((m) => ({ role: m.role, content: m.content, imageDataUrl: m.imageDataUrl })),
         { role: 'user' as const, content: messageText, imageDataUrl: imageForMessage?.dataUrl },
-      ], settings.systemKnowledgeEnabled);
+      ];
+      if (shouldQuerySystemKnowledge(baseMessages, settings.systemKnowledgeEnabled)) {
+        updateLastAssistant('查询中...');
+      }
+      const chatMessages = await withSystemKnowledge(baseMessages, settings.systemKnowledgeEnabled);
 
       let fullContent = '';
+      updateLastAssistant('...');
       for await (const token of streamChat(chatMessages, apiConfig)) {
         fullContent += token;
         updateLastAssistant(fullContent || '...');

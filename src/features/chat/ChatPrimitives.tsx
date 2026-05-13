@@ -117,9 +117,6 @@ export function Composer({
               onMouseDown={() => {
                 if (compact) invoke('focus_compact_chat_window').catch(() => {});
               }}
-              onFocus={() => {
-                if (compact) invoke('focus_compact_chat_window').catch(() => {});
-              }}
               placeholder={isVoiceLoading ? '正在识别...' : '输入消息...'}
               className={`${compact ? 'min-h-[28px] px-1.5 py-1.5 leading-[1.35] overflow-hidden' : 'min-h-[34px] px-2 py-1.5 text-[14px] leading-[1.45] overflow-y-auto'} max-h-[112px] min-w-0 flex-1 resize-none border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
               style={{ fontSize: compact ? compactFontSize : undefined }}

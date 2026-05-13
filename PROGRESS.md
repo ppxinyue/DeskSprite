@@ -1895,3 +1895,11 @@
 - 灵宠：首个 layout 应用后等待两帧稳定绘制，再发送 `pet_window_layout_ready`，避免 main 进程在 React layout state 尚未完成绘制时 showInactive。
 - 验证：`pnpm test`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；生产构建主包 489.47 kB，未触发 chunk 体积 warning。
 - 文件：App.tsx, main.tsx, startupTheme.ts, startupTheme.test.ts, electron/main.cjs, PROGRESS.md, ISSUES.md
+
+### R248. 小聊天框置顶逻辑回滚到稳定基线（2026-05-13）
+- 回滚：以 `302fa5b^` 为基准恢复 compact chat 窗口逻辑，重新使用 macOS `panel`、`showInactive()` 和原有 `applyFloatingFullscreenBehavior`/topmost guard 链路。
+- 清理：移除输入态窗口状态机、parent/child window、强制重建 compact chat、webContents focus 等实验残留，避免破坏小窗置顶、拖拽跟随和动态 resize。
+- 知识库：修正“查询中...”误触发，只根据用户消息判断是否需要读取系统时间/天气/设备/日历等上下文；普通对话不再触发查询占位。
+- 记录：补充 ISSUE-253，明确输入法候选窗仍需独立方案处理，后续不应再直接扰动主小聊天框窗口结构。
+- 验证：`pnpm build`、`pnpm test:startup`、`git diff --check` 通过；生产构建主包 497.63 kB，gzip 155.41 kB。
+- 文件：electron/main.cjs, ChatPrimitives.tsx, systemKnowledge.ts, ChatDialog.tsx, HoverInputBar.tsx, ISSUES.md, PROGRESS.md
