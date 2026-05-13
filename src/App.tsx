@@ -591,12 +591,14 @@ function CodingDialog({
     setState(resolved);
     if (!inherited) return;
     setActiveInheritedSessionId((current) => {
-      const sessions = resolved.sessions ?? [];
+      const sessions = codingStateSessions(resolved);
       const currentSession = current ? sessions.find((session) => session.id === current) : null;
       const firstNeedsInput = sessions.find((session) => session.status === 'needs-input');
       if (currentSession) return currentSession.id;
       if (firstNeedsInput) return firstNeedsInput.id;
-      return sessions.find((session) => session.status !== 'working')?.id
+      return sessions.find((session) => session.status === 'working')?.id
+        ?? sessions.find((session) => session.status === 'done')?.id
+        ?? sessions.find((session) => session.status !== 'working')?.id
         ?? sessions[0]?.id
         ?? null;
     });
@@ -751,8 +753,8 @@ function CodingDialog({
   };
 
   const inheritedSessions = standalone
-    ? (inheritedState.allSessions || inheritedState.sessions || [])
-    : state.sessions || [];
+    ? codingStateSessions(inheritedState)
+    : codingStateSessions(state);
 
   useEffect(() => {
     if (!standalone) return;
@@ -776,6 +778,7 @@ function CodingDialog({
       if (current && inheritedSessions.some((session) => session.id === current)) return current;
       return inheritedSessions.find((session) => session.status === 'needs-input')?.id
         ?? inheritedSessions.find((session) => session.status === 'working')?.id
+        ?? inheritedSessions.find((session) => session.status === 'done')?.id
         ?? inheritedSessions[0]?.id
         ?? null;
     });
@@ -786,9 +789,9 @@ function CodingDialog({
       ? inheritedSessions.find((session) => session.id === activeInheritedSessionId) ?? null
       : inheritedSessions.find((session) => session.id === activeInheritedSessionId)
         ?? inheritedSessions.find((session) => session.status === 'needs-input')
-        ?? (state.status === 'working'
-        ? inheritedSessions.find((session) => session.status === 'working') ?? inheritedSessions[0]
-        : inheritedSessions.find((session) => session.status !== 'working') ?? inheritedSessions[0]))
+        ?? inheritedSessions.find((session) => session.status === 'working')
+        ?? inheritedSessions.find((session) => session.status === 'done')
+        ?? inheritedSessions[0])
     : null;
   const activeInheritedMessages = activeInheritedSession?.status === 'working' && activeInheritedSession.progressMessages?.length
     ? activeInheritedSession.progressMessages
@@ -925,19 +928,21 @@ function CodingDialog({
           </div>
           <div className="app-no-drag min-h-0 flex-1 overflow-hidden p-3">
             <section className="quiet-card flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] ring-2 ring-ring/16">
+              {showInheritedSessionButtons ? (
+                <div className="shrink-0 border-b border-border/45 px-4 py-2.5">
+                  <CodingSessionButtons
+                    sessions={inheritedSessions}
+                    activeSessionId={activeInheritedSession?.id ?? activeInheritedSessionId}
+                    onSelect={(sessionId) => {
+                      setArchivedMessages(null);
+                      setActiveArchivedConversationId(null);
+                      setActiveInheritedSessionId(sessionId);
+                    }}
+                  />
+                </div>
+              ) : null}
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 [overflow-wrap:anywhere]" onScroll={handleScroll}>
                 <div className="mx-auto w-full max-w-none min-w-0 space-y-3 overflow-x-hidden py-5 [overflow-wrap:anywhere]">
-                  {showInheritedSessionButtons ? (
-                    <CodingSessionButtons
-                      sessions={inheritedSessions}
-                      activeSessionId={activeInheritedSession?.id ?? activeInheritedSessionId}
-                      onSelect={(sessionId) => {
-                        setArchivedMessages(null);
-                        setActiveArchivedConversationId(null);
-                        setActiveInheritedSessionId(sessionId);
-                      }}
-                    />
-                  ) : null}
                   {visibleMessages.length === 0 ? (
                     <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">
                       {viewingInherited ? `${codingLabel} 继承 session` : state.threadId ? `已连接 ${codingLabel} 对话` : `输入第一条消息后会自动启动 ${codingLabel}`}
@@ -994,6 +999,16 @@ function CodingDialog({
         WebkitBackdropFilter: 'blur(10px)',
       } as CSSProperties}
     >
+      {showInheritedSessionButtons ? (
+        <div className="shrink-0 border-b border-[var(--color-chat-border)]/60 px-3 py-2">
+          <CodingSessionButtons
+            sessions={inheritedSessions}
+            activeSessionId={activeInheritedSession?.id ?? activeInheritedSessionId}
+            compact
+            onSelect={(sessionId) => setActiveInheritedSessionId(sessionId)}
+          />
+        </div>
+      ) : null}
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 [overflow-wrap:anywhere]"
@@ -1001,14 +1016,6 @@ function CodingDialog({
         style={{ maxHeight: Math.max(80, maxHeight - 60) }}
       >
         <div className="min-w-0 max-w-full space-y-2.5 overflow-x-hidden py-4 [overflow-wrap:anywhere]">
-          {showInheritedSessionButtons ? (
-            <CodingSessionButtons
-              sessions={inheritedSessions}
-              activeSessionId={activeInheritedSession?.id ?? activeInheritedSessionId}
-              compact
-              onSelect={(sessionId) => setActiveInheritedSessionId(sessionId)}
-            />
-          ) : null}
           {visibleMessages.length === 0 ? (
             <div className="py-8 text-center text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
               {inherited ? (state.status === 'idle' ? `没有新的 ${codingLabel} 通知` : `${codingLabel} 正在工作中`) : state.threadId ? `已连接 ${codingLabel} 对话` : `输入第一条消息后会自动启动 ${codingLabel}`}
@@ -1091,26 +1098,26 @@ function CodingSessionButtons({
   compact?: boolean;
 }) {
   return (
-    <div className={`overflow-x-auto overflow-y-hidden ${compact ? 'pb-1' : 'pb-2'}`}>
-      <div className={`flex min-w-max gap-2 ${compact ? '' : 'pr-2'}`}>
+    <div className="overflow-x-auto overflow-y-hidden">
+      <div className={`flex min-w-max gap-1.5 ${compact ? '' : 'pr-1'}`}>
         {sessions.map((session, index) => {
           const active = session.id === activeSessionId;
           return (
             <button
               key={session.id}
               type="button"
-              className={`group inline-flex max-w-[190px] items-center gap-2 rounded-full border px-3 py-1.5 text-left transition-all ${
+              className={`group inline-flex max-w-[164px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-left transition-all ${
                 active
-                  ? 'border-[#2f94ff]/45 bg-[#2f94ff]/14 text-[var(--text-primary)] shadow-sm'
-                  : 'border-border/60 bg-background/46 text-[var(--text-secondary)] hover:bg-background/68 hover:text-[var(--text-primary)]'
-              } ${compact ? 'text-[11px]' : 'text-[12px]'}`}
+                  ? 'border-[#2f94ff]/28 bg-[#2f94ff]/10 text-[var(--text-primary)]'
+                  : 'border-border/35 bg-background/26 text-[var(--text-secondary)] hover:bg-background/44 hover:text-[var(--text-primary)]'
+              } ${compact ? 'text-[10px]' : 'text-[11px]'}`}
               onClick={() => onSelect(session.id)}
             >
-              <span className={`h-2 w-2 shrink-0 rounded-full ${codingStatusDotClass(session.status)}`} />
-              <span className="truncate font-medium leading-[1.35]">
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${codingStatusDotClass(session.status)}`} />
+              <span className="truncate font-medium leading-[1.3]">
                 {`Chat ${index + 1}`}
               </span>
-              <span className="truncate opacity-80">
+              <span className="truncate opacity-70">
                 {codingSessionButtonLabel(session)}
               </span>
             </button>
@@ -1212,6 +1219,18 @@ function codingStatusColor(status: CodingStatus) {
   if (status === 'working') return '#ffbd2e';
   if (status === 'needs-input') return '#ff5f57';
   return '#28c840';
+}
+
+function codingStateSessions(state: CodingState) {
+  return state.allSessions || state.sessions || [];
+}
+
+function aggregateCodingStateStatus(state: CodingState): CodingStatus {
+  const sessions = codingStateSessions(state);
+  if (sessions.some((session) => session.status === 'needs-input')) return 'needs-input';
+  if (sessions.some((session) => session.status === 'working')) return 'working';
+  if (sessions.some((session) => session.status === 'done')) return 'done';
+  return state.status;
 }
 
 function codingConnectionErrorMessage(error: unknown, label = 'Codex') {
@@ -2370,6 +2389,7 @@ function PetWindow() {
 
   const openLatestChat = async () => {
     if (settings.codingModeEnabled) {
+      if (compactVisible) return;
       await forceShowCodingChat();
       return;
     }
@@ -2394,6 +2414,10 @@ function PetWindow() {
       .then(setCompactVisible)
       .catch(() => setCompactVisible(false));
   }, []);
+
+  const codingButtonStatus = settings.codingModeEnabled
+    ? aggregateCodingStateStatus(codingState)
+    : 'idle';
 
   return (
     <TooltipProvider>
@@ -2509,7 +2533,7 @@ function PetWindow() {
               opacity={settings.petOpacity}
               visible={settings.codingModeEnabled || (petHovering && !compactVisible && !restEndAt)}
               title={settings.codingModeEnabled ? "打开 Coding 模式" : "打开对话"}
-              accentColor={settings.codingModeEnabled ? codingStatusColor(codingState.status) : undefined}
+              accentColor={settings.codingModeEnabled ? codingStatusColor(codingButtonStatus) : undefined}
               onClick={() => {
                 openLatestChat();
               }}
