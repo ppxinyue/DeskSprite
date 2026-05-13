@@ -412,7 +412,8 @@ function codingSavedMessagesKey(provider: CodingProvider) {
 function CompactChatWindow() {
   const { settings } = useSettingsStore();
   const lastCompactHeightRef = useRef(0);
-  const [chatContentHeight, setChatContentHeight] = useState(MIN_DIALOG_HEIGHT - COMPACT_CHAT_TOP_CHROME - COMPACT_CHAT_BOTTOM_CHROME);
+  const defaultCompactContentHeight = MIN_DIALOG_HEIGHT - COMPACT_CHAT_TOP_CHROME - COMPACT_CHAT_BOTTOM_CHROME;
+  const [chatContentHeight, setChatContentHeight] = useState(defaultCompactContentHeight);
   const [session, setSession] = useState<CompactChatSession>(() => ({
     ...readCompactChatSession(),
     version: 0,
@@ -427,6 +428,8 @@ function CompactChatWindow() {
 
   useEffect(() => {
     const openListener = listen<{ mode: 'new' | 'history'; conversationId: number | null }>("compact-chat:open", ({ payload }) => {
+      lastCompactHeightRef.current = 0;
+      setChatContentHeight(defaultCompactContentHeight);
       setSession((current) => ({
         mode: payload.mode,
         conversationId: payload.conversationId ?? null,
@@ -448,7 +451,7 @@ function CompactChatWindow() {
       voiceListener.then((fn) => fn());
       focusListener.then((fn) => fn());
     };
-  }, []);
+  }, [defaultCompactContentHeight]);
 
   const expandToStandaloneChat = useCallback(async () => {
     if (settings.codingModeEnabled) {
@@ -521,6 +524,7 @@ function CompactChatWindow() {
       <div className="absolute left-[10px] right-[10px] top-[20px]">
         {settings.codingModeEnabled ? (
           <CodingDialog
+            key={`coding-${settings.codingProvider}-${settings.codingSessionMode}-${session.version}`}
             compactFontSize={settings.compactChatFontSize}
             dialogOpacity={settings.petOpacity}
             maxHeight={COMPACT_CHAT_PREFERRED_HEIGHT}
@@ -1493,7 +1497,10 @@ function PetWindow() {
   const forceShowCodingChat = useCallback(async () => {
     compactDismissedRef.current = false;
     localStorage.removeItem(COMPACT_CHAT_DISMISSED_KEY);
+    const payload = { mode: 'new' as const, conversationId: null };
+    localStorage.setItem(COMPACT_CHAT_KEY, JSON.stringify(payload));
     await positionCompactChatWindow({ show: true });
+    await emit("compact-chat:open", payload);
     setCompactVisible(true);
     setChatBurst(true);
     window.setTimeout(() => setChatBurst(false), 360);
