@@ -5,6 +5,30 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('/framer-motion/') || id.includes('/motion-dom/') || id.includes('/motion-utils/')) {
+            return 'vendor-motion';
+          }
+          if (id.includes('/react-markdown/') || id.includes('/remark-gfm/') || id.includes('/rehype-highlight/')) {
+            return 'vendor-markdown';
+          }
+          if (id.includes('/lucide-react/') || id.includes('/radix-ui/') || id.includes('/@radix-ui/')) {
+            return 'vendor-ui';
+          }
+          if (id.includes('/date-fns/') || id.includes('/zustand/') || id.includes('/zod/')) {
+            return 'vendor-data';
+          }
+        },
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
