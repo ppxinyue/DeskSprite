@@ -1422,17 +1422,29 @@ tell ${target}
   repeat with listItem in lists
     try
       set listName to name of listItem
-      set matchedReminders to every reminder of listItem whose completed is false
-      repeat with reminderItem in matchedReminders
-        set reminderTitle to name of reminderItem
-        set dueText to ""
+      repeat with reminderItem in reminders of listItem
+        set reminderCompleted to true
         try
-          set reminderDue to due date of reminderItem
-          if reminderDue is not missing value then
-            if reminderDue is less than or equal to endDate then set dueText to reminderDue as string
-          end if
+          set reminderCompleted to completed of reminderItem
         end try
-        if dueText is not "" then
+        if reminderCompleted is false then
+          set reminderTitle to name of reminderItem
+          set dueText to ""
+          try
+            set reminderDue to due date of reminderItem
+            if reminderDue is not missing value then
+              if reminderDue is less than or equal to endDate then set dueText to reminderDue as string
+            end if
+          end try
+          try
+            if dueText is "" then
+              set reminderDue to remind me date of reminderItem
+              if reminderDue is not missing value then
+                if reminderDue is less than or equal to endDate then set dueText to reminderDue as string
+              end if
+            end if
+          end try
+          if dueText is "" then set dueText to "undated"
           set output to output & "reminder" & tab & listName & tab & reminderTitle & tab & dueText & linefeed
         end if
       end repeat
@@ -1451,12 +1463,31 @@ async function readSystemKnowledgeScheduleInfo() {
     runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => calendarKnowledgeScript(target))),
     runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => remindersKnowledgeScript(target))),
   ]);
+  const calendarError = calendarResult.status === 'rejected'
+    ? humanizeAppleScriptAccessError(calendarResult.reason?.message || calendarResult.reason)
+    : '';
+  const remindersError = remindersResult.status === 'rejected'
+    ? humanizeAppleScriptAccessError(remindersResult.reason?.message || remindersResult.reason)
+    : '';
+  timelineDebugLog({
+    stage: 'system-knowledge:schedule',
+    message: [
+      `calendar=${calendarResult.status}`,
+      `reminders=${remindersResult.status}`,
+      calendarError ? `calendarError=${calendarError}` : '',
+      remindersError ? `remindersError=${remindersError}` : '',
+    ].filter(Boolean).join(' '),
+  });
   return {
     calendar: calendarResult.status === 'fulfilled' ? parseTabRows(calendarResult.value, 'calendar') : [],
     reminders: remindersResult.status === 'fulfilled' ? parseTabRows(remindersResult.value, 'reminder') : [],
+    calendarStatus: calendarResult.status === 'fulfilled' ? 'ok' : 'error',
+    remindersStatus: remindersResult.status === 'fulfilled' ? 'ok' : 'error',
+    calendarError,
+    remindersError,
     error: [
-      calendarResult.status === 'rejected' ? `Calendar: ${humanizeAppleScriptAccessError(calendarResult.reason.message)}` : '',
-      remindersResult.status === 'rejected' ? `Reminders: ${humanizeAppleScriptAccessError(remindersResult.reason.message)}` : '',
+      calendarError ? `Calendar: ${calendarError}` : '',
+      remindersError ? `Reminders: ${remindersError}` : '',
     ].filter(Boolean).join('; '),
   };
 }

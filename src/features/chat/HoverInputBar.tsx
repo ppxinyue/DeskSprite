@@ -73,7 +73,7 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
         { role: 'user' as const, content: text },
       ];
       if (shouldQuerySystemKnowledge(baseMessages, settings.systemKnowledgeEnabled)) {
-        setStreamingContent('查询中...');
+        setStreamingContent('Querying...');
       }
       const chatMessages = await withSystemKnowledge(baseMessages, settings.systemKnowledgeEnabled);
 

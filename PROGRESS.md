@@ -1903,3 +1903,10 @@
 - 记录：补充 ISSUE-253，明确输入法候选窗仍需独立方案处理，后续不应再直接扰动主小聊天框窗口结构。
 - 验证：`pnpm build`、`pnpm test:startup`、`git diff --check` 通过；生产构建主包 497.63 kB，gzip 155.41 kB。
 - 文件：electron/main.cjs, ChatPrimitives.tsx, systemKnowledge.ts, ChatDialog.tsx, HoverInputBar.tsx, ISSUES.md, PROGRESS.md
+
+### R249. 系统知识库日历/提醒事项状态分流（2026-05-13）
+- 日历/提醒：系统知识库 IPC 现在分别返回 Calendar 和 Reminders 的访问状态及错误；prompt 不再把单边失败概括成两者都无法读取。
+- 待办：Reminders 读取改为包含未完成的无日期待办，避免用户真实待办没有 due date 时被误说成没有数据。
+- 占位：系统知识库触发只看当前最后一条用户输入，避免历史关键词让普通对话也显示查询占位；占位文案从“查询中...”统一改为 `Querying...`。
+- 验证：`pnpm build`、`pnpm test` 通过；生产构建主包 497.79 kB，gzip 155.48 kB。
+- 文件：electron/main.cjs, systemKnowledge.ts, ChatDialog.tsx, HoverInputBar.tsx, ISSUES.md, PROGRESS.md

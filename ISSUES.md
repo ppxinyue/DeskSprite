@@ -3023,3 +3023,15 @@
 - 涉及文件：`electron/main.cjs`, `src/features/chat/ChatPrimitives.tsx`, `src/features/ai/systemKnowledge.ts`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：macOS 输入法候选窗问题不能通过反复修改主小聊天框窗口本体来试错；主小窗的置顶/跟随/resize 链路已经验证过，修 IME 应另起独立输入承载方案或原生层方案，并用可回滚分支隔离。
 - 是否需更新技术文档：否。
+
+## ISSUE-254
+- 发现时间：2026-05-13
+- 发现者：用户反馈
+- 相关任务：系统知识库日历/提醒事项读取与查询占位
+- 严重程度：一般
+- 问题现象：用户已经授权 Calendar/Reminders 后，LLM 仍回复无法读取日历和待办事项；同时只要前面问过系统知识库相关问题，后续普通输入也会显示“查询中...”。
+- 原因分析：日历和提醒事项读取结果只返回一个合并 `error`，前端 prompt 将任意单边失败描述成“Calendar/Reminders 都无法读取”，容易诱导模型否定已成功的数据源；提醒事项脚本只输出有截止日期的提醒，漏掉无日期待办。查询触发逻辑扫描最近多轮用户消息，历史命中的关键词会污染当前普通输入。
+- 解决方案：IPC 返回 `calendarStatus/remindersStatus` 和各自错误；prompt 明确区分“访问成功但没有事项”和“某一数据源失败”，并要求只说明失败的数据源。提醒事项读取改为包含未完成且无截止日期的待办。查询触发收窄到当前最后一条用户输入，占位文案统一改为 `Querying...`。
+- 涉及文件：`electron/main.cjs`, `src/features/ai/systemKnowledge.ts`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：系统知识库上下文必须保留数据源级状态，不能把部分失败汇总成笼统不可用；聊天查询占位只应由当前输入触发，不能被历史上下文拖住。
+- 是否需更新技术文档：否。

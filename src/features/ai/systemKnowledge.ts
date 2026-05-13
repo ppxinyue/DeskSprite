@@ -45,6 +45,10 @@ interface ScheduleKnowledge {
     title?: string;
     dueAt?: string;
   }>;
+  calendarStatus?: 'ok' | 'error';
+  remindersStatus?: 'ok' | 'error';
+  calendarError?: string;
+  remindersError?: string;
   error?: string;
 }
 
@@ -62,11 +66,7 @@ export function shouldQuerySystemKnowledge(
   enabled: boolean,
 ): boolean {
   if (!enabled) return false;
-  const queryText = messages
-    .filter((message) => message.role === 'user')
-    .slice(-4)
-    .map((message) => message.content)
-    .join('\n');
+  const queryText = getLatestUserQueryText(messages);
   return SYSTEM_KNOWLEDGE_TRIGGER.test(queryText);
 }
 
@@ -75,11 +75,7 @@ export async function buildSystemKnowledgePrompt(
   enabled: boolean,
 ): Promise<string> {
   if (!shouldQuerySystemKnowledge(messages, enabled)) return '';
-  const queryText = messages
-    .filter((message) => message.role === 'user')
-    .slice(-4)
-    .map((message) => message.content)
-    .join('\n');
+  const queryText = getLatestUserQueryText(messages);
 
   const now = new Date();
   const lines = [
@@ -225,13 +221,22 @@ function formatScheduleKnowledge(schedule: ScheduleKnowledge | null): string[] {
   if (!schedule) return [
     'Schedule integration status: unavailable. Do not claim to know the user calendar or reminders. Briefly say DeskSprite could not read the schedule integration status.',
   ];
-  const lines = ['Schedule: next 7 days calendar events and next 14 days dated reminders.'];
+  const calendarStatus = schedule.calendarStatus || (schedule.calendarError ? 'error' : 'ok');
+  const remindersStatus = schedule.remindersStatus || (schedule.remindersError ? 'error' : 'ok');
+  const lines = [
+    'Schedule: next 7 days calendar events and next 14 days incomplete reminders, including undated reminders.',
+    `Calendar access: ${calendarStatus}.`,
+    `Reminders access: ${remindersStatus}.`,
+    'If access is ok and no items are listed, say no matching items were found. Do not describe an ok source as inaccessible.',
+  ];
   const calendar = (schedule.calendar || []).slice(0, 8);
   const reminders = (schedule.reminders || []).slice(0, 8);
-  const hasAccessError = Boolean(schedule.error);
 
-  if (calendar.length === 0 && !hasAccessError) lines.push('Calendar events: none found.');
-  else {
+  if (calendarStatus === 'error') {
+    lines.push(`Calendar access error: ${schedule.calendarError || schedule.error || 'unknown error'}.`);
+  } else if (calendar.length === 0) {
+    lines.push('Calendar events: none found in the next 7 days.');
+  } else {
     if (calendar.length > 0) {
       lines.push('Calendar events:');
       for (const item of calendar) {
@@ -240,20 +245,30 @@ function formatScheduleKnowledge(schedule: ScheduleKnowledge | null): string[] {
     }
   }
 
-  if (reminders.length === 0 && !hasAccessError) lines.push('Dated reminders: none found.');
-  else {
+  if (remindersStatus === 'error') {
+    lines.push(`Reminders access error: ${schedule.remindersError || schedule.error || 'unknown error'}.`);
+  } else if (reminders.length === 0) {
+    lines.push('Incomplete reminders: none found in the next 14 days or without a due date.');
+  } else {
     if (reminders.length > 0) {
-      lines.push('Dated reminders:');
+      lines.push('Incomplete reminders:');
       for (const item of reminders) {
-        lines.push(`- ${item.title || 'Untitled'}; due: ${item.dueAt || 'unknown'}${item.list ? `; list: ${item.list}` : ''}`);
+        lines.push(`- ${item.title || 'Untitled'}; due: ${item.dueAt || 'undated'}${item.list ? `; list: ${item.list}` : ''}`);
       }
     }
   }
 
-  if (schedule.error) {
-    lines.push(`Schedule access note: ${schedule.error}. Do not say "check it yourself". Say DeskSprite still cannot read Calendar/Reminders from macOS and mention the exact permission area if useful.`);
+  if (schedule.error && (calendarStatus === 'error' || remindersStatus === 'error')) {
+    lines.push(`Schedule access note: ${schedule.error}. Mention only the source marked error; continue using any source marked ok.`);
   }
   return lines;
+}
+
+function getLatestUserQueryText(messages: Message[]): string {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'user') return messages[index].content || '';
+  }
+  return '';
 }
 
 function getBrowserPosition(): Promise<{ latitude: number; longitude: number; source: 'browser-location' } | null> {

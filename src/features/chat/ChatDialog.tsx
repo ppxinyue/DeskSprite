@@ -225,7 +225,7 @@ export function ChatDialog({
         { role: 'user' as const, content: messageText, imageDataUrl: imageForMessage?.dataUrl },
       ];
       if (shouldQuerySystemKnowledge(baseMessages, settings.systemKnowledgeEnabled)) {
-        updateLastAssistant('查询中...');
+        updateLastAssistant('Querying...');
       }
       const chatMessages = await withSystemKnowledge(baseMessages, settings.systemKnowledgeEnabled);
 
@@ -639,11 +639,18 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
 
     try {
       const systemPrompt = await getActiveSystemPrompt();
-      const chatMessages = await withSystemKnowledge([
+      const baseMessages = [
         { role: 'system' as const, content: systemPrompt },
         ...previousMessages.map((m) => ({ role: m.role, content: m.content, imageDataUrl: m.imageDataUrl })),
         { role: 'user' as const, content: messageText, imageDataUrl: imageForMessage?.dataUrl },
-      ], settings.systemKnowledgeEnabled);
+      ];
+      if (shouldQuerySystemKnowledge(baseMessages, settings.systemKnowledgeEnabled)) {
+        updatePanel(panelId, (current) => ({
+          ...current,
+          messages: replaceLastAssistant(current.messages, 'Querying...'),
+        }));
+      }
+      const chatMessages = await withSystemKnowledge(baseMessages, settings.systemKnowledgeEnabled);
 
       let fullContent = '';
       for await (const token of streamChat(chatMessages, resolved.config)) {
