@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DeskSprite Analytics</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Developer Dashboard</p>
+          <h1>DeskSprite Analytics</h1>
+        </div>
+        <form class="controls" id="settings-form">
+          <label>
+            Endpoint
+            <input id="endpoint" name="endpoint" type="url" autocomplete="off" />
+          </label>
+          <label>
+            Token
+            <input id="token" name="token" type="password" autocomplete="current-password" />
+          </label>
+          <label>
+            Range
+            <select id="days" name="days">
+              <option value="7">7 days</option>
+              <option value="30" selected>30 days</option>
+              <option value="90">90 days</option>
+              <option value="180">180 days</option>
+            </select>
+          </label>
+          <button type="submit">Refresh</button>
+        </form>
+      </header>
+
+      <section class="status-row">
+        <span id="status">Ready</span>
+        <span id="generated-at"></span>
+      </section>
+
+      <section class="metrics" id="metrics"></section>
+
+      <section class="grid">
+        <section class="panel span-2">
+          <div class="panel-header">
+            <h2>DAU and Usage Time</h2>
+            <span id="daily-summary"></span>
+          </div>
+          <div class="chart" id="daily-chart"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Feature Usage</h2>
+          </div>
+          <div class="feature-list" id="feature-list"></div>
+        </section>
+
+        <section class="panel span-2">
+          <div class="panel-header">
+            <h2>Top Events</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th>Event</th>
+                  <th>Uses</th>
+                  <th>Duration</th>
+                  <th>Events</th>
+                </tr>
+              </thead>
+              <tbody id="event-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Recent Events</h2>
+          </div>
+          <div class="recent-list" id="recent-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>
+

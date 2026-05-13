@@ -83,6 +83,40 @@ supabase functions deploy desksprite-sync --no-verify-jwt
 - Feature usage: grouped by `feature` and `eventName`, including count and duration.
 - Retention: active devices by first-seen cohort once the backend has enough history.
 
+## Vercel Dashboard
+
+The developer dashboard lives in `dashboard/`. It is a static Vite app designed for Vercel.
+
+Supabase Edge Function:
+
+```text
+https://<project-ref>.functions.supabase.co/desksprite-dashboard
+```
+
+Required Supabase secret:
+
+```text
+DESKSPRITE_DASHBOARD_TOKEN
+```
+
+Deploy the data API:
+
+```bash
+supabase secrets set DESKSPRITE_DASHBOARD_TOKEN=<private-dashboard-token>
+supabase functions deploy desksprite-dashboard --no-verify-jwt
+```
+
+Vercel setup:
+
+- Import the GitHub repository in Vercel.
+- Set Root Directory to `dashboard`.
+- Build Command: `npm run build`.
+- Output Directory: `dist`.
+- No server-side Vercel environment variables are required for the static build.
+- Open the site, paste the dashboard endpoint and dashboard token, then refresh.
+
+The dashboard token is stored only in the browser's local storage for the developer machine using the dashboard.
+
 ## Useful Dashboard SQL
 
 Total devices:
