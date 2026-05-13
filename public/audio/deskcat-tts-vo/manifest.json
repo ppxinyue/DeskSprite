@@ -1,0 +1,92 @@
+[
+  {
+    "name": "01-intro",
+    "from": 18,
+    "until": 210,
+    "text": "Introducing DeskCat. Your floating desktop companion.",
+    "speed": 1,
+    "duration": 3.288,
+    "targetSeconds": 6.133,
+    "file": "public/audio/deskcat-tts-vo/01-intro.wav"
+  },
+  {
+    "name": "03-appearance",
+    "from": 228,
+    "until": 344,
+    "text": "Upload any image to create a custom companion.",
+    "speed": 1,
+    "duration": 2.8,
+    "targetSeconds": 3.6,
+    "file": "public/audio/deskcat-tts-vo/03-appearance.wav"
+  },
+  {
+    "name": "04-resize",
+    "from": 334,
+    "until": 450,
+    "text": "DeskCat renders the new pet instantly on your desktop.",
+    "speed": 1,
+    "duration": 3.325,
+    "targetSeconds": 3.6,
+    "file": "public/audio/deskcat-tts-vo/04-resize.wav"
+  },
+  {
+    "name": "05-chat",
+    "from": 474,
+    "until": 674,
+    "text": "Hover to open chat. Type, speak, or send an image.",
+    "speed": 1,
+    "duration": 2.688,
+    "targetSeconds": 6.4,
+    "file": "public/audio/deskcat-tts-vo/05-chat.wav"
+  },
+  {
+    "name": "06-models",
+    "from": 674,
+    "until": 840,
+    "text": "And connect DeskCat to your own model provider.",
+    "speed": 1,
+    "duration": 2.913,
+    "targetSeconds": 5.267,
+    "file": "public/audio/deskcat-tts-vo/06-models.wav"
+  },
+  {
+    "name": "07-states",
+    "from": 858,
+    "until": 1020,
+    "text": "Choose between a pet sprite and a live Orb. Both respond to idle, work, and rest.",
+    "speed": 1,
+    "duration": 4.75,
+    "targetSeconds": 5.133,
+    "file": "public/audio/deskcat-tts-vo/07-states.wav"
+  },
+  {
+    "name": "08-modes",
+    "from": 1038,
+    "until": 1260,
+    "text": "Focus mode keeps DeskCat quiet when you need space. Coding mode mirrors Claude Code and Codex status.",
+    "speed": 1,
+    "duration": 6.188,
+    "targetSeconds": 7.133,
+    "file": "public/audio/deskcat-tts-vo/08-modes.wav"
+  },
+  {
+    "name": "09-timeline",
+    "from": 1278,
+    "until": 1560,
+    "text": "Timeline remembers the shape of your day. Including foreground windows, background activity, and terminal sessions, all in one calm view.",
+    "speed": 1,
+    "duration": 8.225,
+    "targetSeconds": 9.133,
+    "file": "public/audio/deskcat-tts-vo/09-timeline.wav"
+  },
+  {
+    "name": "10-finale",
+    "from": 1728,
+    "until": 1920,
+    "text": "DeskCat. The tiny desktop companion that keeps up with your day. Open source on GitHub.",
+    "speed": 1,
+    "duration": 5.213,
+    "targetSeconds": 6.133,
+    "file": "public/audio/deskcat-tts-vo/10-finale.wav"
+  }
+]
