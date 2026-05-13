@@ -22,6 +22,14 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const { randomUUID } = require('node:crypto');
 const { execFile, spawn } = require('node:child_process');
+const {
+  compactMessage: compactCodingStatusMessage,
+  describeCodexNotice,
+  describeCodexRequest,
+  describeCodexSessionProblemEvent,
+  extractTextFromValue: extractCodexTextFromValue,
+  resolveSessionStatus,
+} = require('./codingStatus.cjs');
 const { createDeferredWindowShowController, createPetVisibilityController } = require('./windowLifecycle.cjs');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -1715,32 +1723,9 @@ function pushClaudeCodingMessage(role, content) {
   publishClaudeCodingState();
 }
 
-function extractCodexTextFromValue(value) {
-  if (typeof value === 'string') return value.trim();
-  if (Array.isArray(value)) {
-    return value
-      .map((part) => extractCodexTextFromValue(part?.text ?? part?.content ?? part?.output_text ?? part))
-      .filter(Boolean)
-      .join('')
-      .trim();
-  }
-  if (value && typeof value === 'object') {
-    return extractCodexTextFromValue(
-      value.text
-      ?? value.content
-      ?? value.output_text
-      ?? value.summary_text
-      ?? value.message
-      ?? value.error
-      ?? value.detail
-      ?? value.reason
-      ?? value.cause,
-    );
-  }
-  return '';
-}
-
 function formatCodexNotice(method, params = {}) {
+  const specific = describeCodexNotice(method, params);
+  if (specific) return specific;
   const direct = extractCodexTextFromValue(params.message)
     || extractCodexTextFromValue(params.error)
     || extractCodexTextFromValue(params.detail)
@@ -1759,12 +1744,7 @@ function formatCodexNotice(method, params = {}) {
 
 function extractCodexEventText(event) {
   if (!event || typeof event !== 'object') return '';
-  if (event.type && /approv|approval|permission|confirm|input|requires_action|needs_input/i.test(String(event.type))) {
-    codingState.status = CODEX_STATUS.NEEDS_INPUT;
-    return `需要处理：${event.type}`;
-  }
-  if (event.type && /error|failed/i.test(String(event.type))) return `Codex 出错：${JSON.stringify(event)}`;
-  return '';
+  return describeCodexNotice(event.type || '', event);
 }
 
 function extractCodexItemText(item) {
@@ -1863,7 +1843,11 @@ function flushCodexAppServerAgentText(role = 'codex') {
 function handleCodexAppServerRequest(message) {
   const label = String(message.method || 'request');
   codingState.status = CODEX_STATUS.NEEDS_INPUT;
-  pushCodingMessage('error', `Codex 需要用户处理：${label}`);
+  if (codexAppServer.activeTurn) {
+    codexAppServer.activeTurn.hasBlockingIssue = true;
+    codexAppServer.activeTurn.lastIssue = describeCodexRequest(label, message.params || {});
+  }
+  pushCodingMessage('error', describeCodexRequest(label, message.params || {}));
   if (message.id != null) {
     try {
       codexWrite({
@@ -1903,20 +1887,34 @@ function handleCodexAppServerNotification(message) {
       pendingAgentTexts: [],
       lastAgentText: '',
       hasError: false,
+      hasBlockingIssue: false,
+      lastIssue: '',
     };
     codingState.running = { type: 'app-server-turn', turnId };
-    if (codingState.status !== CODEX_STATUS.NEEDS_INPUT) codingState.status = CODEX_STATUS.WORKING;
+    codingState.status = CODEX_STATUS.WORKING;
     publishCodingState();
     return;
   }
   if (method === 'item/agentMessage/delta') {
     if (!codexAppServer.activeTurn) return;
+    if (codexAppServer.activeTurn.hasBlockingIssue) {
+      codexAppServer.activeTurn.hasBlockingIssue = false;
+      codexAppServer.activeTurn.lastIssue = '';
+      codingState.status = CODEX_STATUS.WORKING;
+      publishCodingState();
+    }
     const itemId = String(params.itemId || 'agent');
     const previous = codexAppServer.activeTurn.deltaByItem.get(itemId) || '';
     codexAppServer.activeTurn.deltaByItem.set(itemId, previous + String(params.delta || ''));
     return;
   }
   if (method === 'item/completed' && params.item) {
+    if (codexAppServer.activeTurn?.hasBlockingIssue) {
+      codexAppServer.activeTurn.hasBlockingIssue = false;
+      codexAppServer.activeTurn.lastIssue = '';
+      codingState.status = CODEX_STATUS.WORKING;
+      publishCodingState();
+    }
     const itemType = String(params.item.type || '');
     if (itemType === 'agentMessage' || itemType === 'agent_message' || itemType === 'message') {
       const text = extractCodexItemText(params.item);
@@ -1945,7 +1943,12 @@ function handleCodexAppServerNotification(message) {
     const failed = params.turn?.status === 'failed' || Boolean(codexAppServer.activeTurn?.hasError);
     codingState.status = failed ? CODEX_STATUS.NEEDS_INPUT : CODEX_STATUS.DONE;
     if (failed) {
-      const message = extractCodexTextFromValue(params.turn?.error?.message) || 'Codex turn failed.';
+      const message = describeCodexNotice('turn/completed failed', {
+        ...params.turn,
+        error: params.turn?.error,
+        message: extractCodexTextFromValue(params.turn?.error?.message) || extractCodexTextFromValue(params.turn?.message),
+        detail: codexAppServer.activeTurn?.lastIssue,
+      }) || extractCodexTextFromValue(params.turn?.error?.message) || 'Codex turn failed.';
       pushCodingMessage('error', message);
     } else {
       pushCodingMessage('system', 'Codex 执行完毕。');
@@ -1959,9 +1962,13 @@ function handleCodexAppServerNotification(message) {
     const isTransient = /Reconnecting|Falling back|retrying sampling request/i.test(messageText);
     if (method === 'error' || method === 'guardianWarning') {
       if (isTransient) {
-        if (codingState.status !== CODEX_STATUS.NEEDS_INPUT) codingState.status = CODEX_STATUS.WORKING;
+        codingState.status = CODEX_STATUS.WORKING;
       } else {
-        if (codexAppServer.activeTurn) codexAppServer.activeTurn.hasError = true;
+        if (codexAppServer.activeTurn) {
+          codexAppServer.activeTurn.hasError = true;
+          codexAppServer.activeTurn.hasBlockingIssue = true;
+          codexAppServer.activeTurn.lastIssue = messageText;
+        }
         codingState.running = null;
         codingState.status = CODEX_STATUS.NEEDS_INPUT;
       }
@@ -2326,9 +2333,7 @@ function codexSessionEventText(payload) {
 }
 
 function compactCodexSessionMessage(text, fallback) {
-  const normalized = String(text || '').replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
-  if (!normalized) return fallback;
-  return normalized.length > 2400 ? `${normalized.slice(0, 2400).trim()}...` : normalized;
+  return compactCodingStatusMessage(text, fallback, 2400);
 }
 
 function codexSessionTitle(session) {
@@ -2337,28 +2342,7 @@ function codexSessionTitle(session) {
 }
 
 function isCodexProblemEvent(type, payload, raw) {
-  const structured = [
-    type,
-    payload?.type,
-    payload?.subtype,
-    payload?.status,
-    payload?.name,
-    payload?.method,
-    payload?.code,
-    payload?.reason,
-    payload?.error?.code,
-  ].filter(Boolean).join(' ');
-  if (/requestapproval|request_approval|approval_request|request_user_input|permission|approv|approval|guardian|denied|blocked|requires_action|needs_input|needs_approval|requires_approval|ask_user/i.test(structured)) {
-    return true;
-  }
-  const text = [
-    codexSessionEventText(payload),
-    extractCodexTextFromValue(payload?.error),
-    extractCodexTextFromValue(payload?.detail),
-    extractCodexTextFromValue(payload?.reason),
-    typeof raw === 'string' && raw.length < 2000 ? raw : '',
-  ].filter(Boolean).join(' ');
-  return /requestapproval|request_approval|approval_request|request_user_input|permission|approv|approval|guardian|denied|blocked|requires_action|needs_input|needs_approval|requires_approval|ask_user|\berror\b|failed/i.test(text);
+  return Boolean(describeCodexSessionProblemEvent(type, payload, raw));
 }
 
 function isFinalCodexSessionOutput(payload) {
@@ -2471,7 +2455,7 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
     const raw = line.toLowerCase();
     if (isCodexProblemEvent(event.type, payload, raw)) {
       lastProblemAt = eventAt;
-      lastProblem = compactCodexSessionMessage(codexSessionEventText(payload), '需要在 Codex 中处理');
+      lastProblem = describeCodexSessionProblemEvent(event.type, payload, raw) || compactCodexSessionMessage(codexSessionEventText(payload), '需要在 Codex 中处理');
     }
   }
   const title = codexSessionTitle(session);
@@ -2483,11 +2467,12 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
     createdAt: message.createdAt,
   }));
   const latestActivityAt = Math.max(lastUserAt, lastWorkAt, lastAssistantAt, lastProblemAt, mtimeMs);
-  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt) {
+  const resolvedStatus = resolveSessionStatus({ lastUserAt, lastWorkAt, lastAssistantAt, lastProblemAt });
+  if (resolvedStatus === CODEX_STATUS.NEEDS_INPUT) {
     session.status = CODEX_STATUS.NEEDS_INPUT;
     session.message = `${prefix} ${lastProblem}`;
     session.eventAt = lastProblemAt;
-  } else if (lastAssistantAt && lastAssistantAt >= lastUserAt && lastAssistantAt >= lastWorkAt) {
+  } else if (resolvedStatus === CODEX_STATUS.DONE) {
     session.status = CODEX_STATUS.DONE;
     session.message = `${prefix} ${lastAssistant}`;
     session.eventAt = lastAssistantAt;
@@ -2752,11 +2737,12 @@ function parseClaudeSessionFile(filePath, text, mtimeMs) {
     createdAt: message.createdAt,
   }));
   const latestActivityAt = Math.max(lastUserAt, lastWorkAt, lastAssistantAt, lastProblemAt, mtimeMs);
-  if (lastProblemAt && lastProblemAt >= lastAssistantAt && lastProblemAt >= lastUserAt) {
+  const resolvedStatus = resolveSessionStatus({ lastUserAt, lastWorkAt, lastAssistantAt, lastProblemAt });
+  if (resolvedStatus === CODEX_STATUS.NEEDS_INPUT) {
     session.status = CODEX_STATUS.NEEDS_INPUT;
     session.message = `${prefix} ${lastProblem}`;
     session.eventAt = lastProblemAt;
-  } else if (lastAssistantAt && lastAssistantAt >= lastUserAt && lastAssistantAt >= lastWorkAt) {
+  } else if (resolvedStatus === CODEX_STATUS.DONE) {
     session.status = CODEX_STATUS.DONE;
     session.message = `${prefix} ${lastAssistant}`;
     session.eventAt = lastAssistantAt;

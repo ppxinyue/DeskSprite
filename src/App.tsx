@@ -624,7 +624,7 @@ function CodingDialog({
             status: 'needs-input',
             messages: [{ id: 'coding-inherit-error', role: 'error', content: codingConnectionErrorMessage(error, codingLabel), createdAt: Date.now() }],
           }));
-      }, 2500);
+      }, 1000);
     }
     return () => {
       if (timer) window.clearInterval(timer);
@@ -645,7 +645,7 @@ function CodingDialog({
         });
     };
     loadInherited();
-    const timer = window.setInterval(loadInherited, 2500);
+    const timer = window.setInterval(loadInherited, 1000);
     return () => {
       alive = false;
       window.clearInterval(timer);
@@ -794,6 +794,9 @@ function CodingDialog({
   const isWorking = displayStatus === 'working';
   const messages = viewingInherited ? inheritedMessages : state.messages.map(codingMessageToChatMessage);
   const visibleMessages = archivedMessages ?? messages;
+  const inheritedFooterText = activeInheritedSession?.status === 'needs-input'
+    ? codingNeedsInputFooter(activeInheritedSession.message, codingLabel)
+    : `请回到 ${codingLabel} 中回复或处理。`;
 
   if (standalone) {
     return (
@@ -927,7 +930,7 @@ function CodingDialog({
               </div>
               {viewingInherited ? (
                 <p className="shrink-0 px-5 pb-4 pt-1 text-[12px] leading-5 text-destructive">
-                  请回到 {codingLabel} 中回复或处理。
+                  {inheritedFooterText}
                 </p>
               ) : (
                 <div className="shrink-0 px-2 pb-2">
@@ -1001,7 +1004,7 @@ function CodingDialog({
       </div>
       {inherited ? (
         <p className="px-3 pb-2 pt-1 text-[11px] leading-5 text-destructive">
-          请回到 {codingLabel} 中回复或处理。
+          {inheritedFooterText}
         </p>
       ) : (
         <div>
@@ -1083,6 +1086,13 @@ function formatCodingTimestamp(value: number) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function codingNeedsInputFooter(message: string, label: string) {
+  const normalized = String(message || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return `请回到 ${label} 中回复或处理。`;
+  const detail = normalized.length > 140 ? `${normalized.slice(0, 140).trim()}...` : normalized;
+  return `请回到 ${label} 处理：${detail}`;
 }
 
 async function ensureCodingHistoryConversation(messages: CodingMessage[], provider: CodingProvider = 'codex', label = 'Codex') {
