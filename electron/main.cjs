@@ -38,7 +38,9 @@ const windows = new Map();
 const windowShowController = createDeferredWindowShowController();
 const petVisibilityController = createPetVisibilityController();
 let topmostGuard = null;
+let panelKeyFix = undefined;
 let topmostSuppressed = false;
+let compactChatImeCompositionActive = false;
 let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'png', 'idle.png');
 let tray = null;
 let currentAppIcon = null;
@@ -129,6 +131,40 @@ function broadcast(channel, payload) {
   for (const win of windows.values()) send(win, channel, payload);
 }
 
+function loadPanelKeyFix() {
+  if (process.platform !== 'darwin') return null;
+  if (panelKeyFix !== undefined) return panelKeyFix;
+  try {
+    const addonPath = path.join(__dirname, 'native', 'panel_key_fix.node');
+    if (!fs.existsSync(addonPath)) throw new Error(`Missing native addon: ${addonPath}`);
+    panelKeyFix = require(addonPath);
+    return panelKeyFix;
+  } catch (error) {
+    panelKeyFix = null;
+    console.warn('[compact-chat] Failed to load panel key fix:', error.message || String(error));
+    return null;
+  }
+}
+
+function configureCompactChatPanel(win) {
+  if (process.platform !== 'darwin' || !win || win.isDestroyed()) return false;
+  const addon = loadPanelKeyFix();
+  if (!addon?.setPanelKeyable) return false;
+  try {
+    const handle = win.getNativeWindowHandle();
+    const configured = Boolean(addon.setPanelKeyable(handle));
+    if (!configured) return false;
+    const setLevel = compactChatImeCompositionActive
+      ? addon.setPanelLevelFloating
+      : addon.setPanelLevelScreenSaver;
+    if (setLevel) setLevel(handle);
+    return true;
+  } catch (error) {
+    console.warn('[compact-chat] Failed to configure panel:', error.message || String(error));
+    return false;
+  }
+}
+
 function applyFloatingFullscreenBehavior(win, options = {}) {
   if (!win || win.isDestroyed()) return;
   const force = Boolean(options.force);
@@ -148,6 +184,7 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
     win.setAlwaysOnTop(true, 'screen-saver', 1);
     floatingConfiguredWindows.add(win);
     if (force) win.moveTop();
+    if (win === windows.get('compact-chat')) configureCompactChatPanel(win);
   } else {
     if (!force && floatingConfiguredWindows.has(win) && win.isAlwaysOnTop()) return;
     win.setAlwaysOnTop(true, 'normal');
@@ -1112,6 +1149,7 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
   if (!show && existing && !existing.isDestroyed()) {
     existing.setPosition(Math.round(x), Math.round(y));
     applyFloatingFullscreenBehavior(existing);
+    configureCompactChatPanel(existing);
     return;
   }
   const win = createWindow('compact-chat', {
@@ -1128,10 +1166,12 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
     hasShadow: false,
     alwaysOnTop: true,
   });
+  configureCompactChatPanel(win);
   win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) });
   applyFloatingFullscreenBehavior(win, { force: show });
   if (show) {
     win.showInactive();
+    configureCompactChatPanel(win);
     applyFloatingFullscreenBehavior(win, { force: true });
     win.moveTop();
   }
@@ -2917,6 +2957,7 @@ const handlers = {
   focus_compact_chat_window: () => {
     const win = windows.get('compact-chat');
     if (win && !win.isDestroyed()) {
+      configureCompactChatPanel(win);
       applyFloatingFullscreenBehavior(win, { force: true });
       win.show();
       win.moveTop();
@@ -3031,6 +3072,21 @@ ipcMain.handle('desksprite:invoke', async (_event, command, args) => {
 });
 
 ipcMain.handle('desksprite:emit', (_event, channel, payload) => {
+  if (channel === 'compact-chat:ime-composition-start') {
+    compactChatImeCompositionActive = true;
+    const win = windows.get('compact-chat');
+    if (win && !win.isDestroyed()) configureCompactChatPanel(win);
+    return null;
+  }
+  if (channel === 'compact-chat:ime-composition-end') {
+    compactChatImeCompositionActive = false;
+    const win = windows.get('compact-chat');
+    if (win && !win.isDestroyed()) {
+      applyFloatingFullscreenBehavior(win, { force: true });
+      configureCompactChatPanel(win);
+    }
+    return null;
+  }
   broadcast(channel, payload);
 });
 
