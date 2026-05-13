@@ -593,11 +593,9 @@ function CodingDialog({
     setActiveInheritedSessionId((current) => {
       const sessions = resolved.sessions ?? [];
       const currentSession = current ? sessions.find((session) => session.id === current) : null;
-      const currentNeedsInput = currentSession?.status === 'needs-input' ? currentSession : null;
       const firstNeedsInput = sessions.find((session) => session.status === 'needs-input');
-      if (currentNeedsInput) return currentNeedsInput.id;
-      if (firstNeedsInput) return firstNeedsInput.id;
       if (currentSession) return currentSession.id;
+      if (firstNeedsInput) return firstNeedsInput.id;
       return sessions.find((session) => session.status !== 'working')?.id
         ?? sessions[0]?.id
         ?? null;
@@ -772,10 +770,22 @@ function CodingDialog({
     }
   }, [activeProvider, historyItems, inheritedSessions, standalone]);
 
+  useEffect(() => {
+    if (standalone || !inherited) return;
+    setActiveInheritedSessionId((current) => {
+      if (current && inheritedSessions.some((session) => session.id === current)) return current;
+      return inheritedSessions.find((session) => session.status === 'needs-input')?.id
+        ?? inheritedSessions.find((session) => session.status === 'working')?.id
+        ?? inheritedSessions[0]?.id
+        ?? null;
+    });
+  }, [inherited, inheritedSessions, standalone]);
+
   const activeInheritedSession = (standalone || inherited)
     ? (standalone
       ? inheritedSessions.find((session) => session.id === activeInheritedSessionId) ?? null
-      : inheritedSessions.find((session) => session.status === 'needs-input')
+      : inheritedSessions.find((session) => session.id === activeInheritedSessionId)
+        ?? inheritedSessions.find((session) => session.status === 'needs-input')
         ?? (state.status === 'working'
         ? inheritedSessions.find((session) => session.status === 'working') ?? inheritedSessions[0]
         : inheritedSessions.find((session) => session.status !== 'working') ?? inheritedSessions[0]))
@@ -797,6 +807,7 @@ function CodingDialog({
   const inheritedFooterText = activeInheritedSession?.status === 'needs-input'
     ? codingNeedsInputFooter(activeInheritedSession.message, codingLabel)
     : `请回到 ${codingLabel} 中回复或处理。`;
+  const showInheritedSessionButtons = inheritedSessions.length > 1 && !archivedMessages;
 
   if (standalone) {
     return (
@@ -916,6 +927,17 @@ function CodingDialog({
             <section className="quiet-card flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] ring-2 ring-ring/16">
               <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 [overflow-wrap:anywhere]" onScroll={handleScroll}>
                 <div className="mx-auto w-full max-w-none min-w-0 space-y-3 overflow-x-hidden py-5 [overflow-wrap:anywhere]">
+                  {showInheritedSessionButtons ? (
+                    <CodingSessionButtons
+                      sessions={inheritedSessions}
+                      activeSessionId={activeInheritedSession?.id ?? activeInheritedSessionId}
+                      onSelect={(sessionId) => {
+                        setArchivedMessages(null);
+                        setActiveArchivedConversationId(null);
+                        setActiveInheritedSessionId(sessionId);
+                      }}
+                    />
+                  ) : null}
                   {visibleMessages.length === 0 ? (
                     <div className="pt-16 text-center text-[14px] leading-[1.5] text-muted-foreground">
                       {viewingInherited ? `${codingLabel} 继承 session` : state.threadId ? `已连接 ${codingLabel} 对话` : `输入第一条消息后会自动启动 ${codingLabel}`}
@@ -979,6 +1001,14 @@ function CodingDialog({
         style={{ maxHeight: Math.max(80, maxHeight - 60) }}
       >
         <div className="min-w-0 max-w-full space-y-2.5 overflow-x-hidden py-4 [overflow-wrap:anywhere]">
+          {showInheritedSessionButtons ? (
+            <CodingSessionButtons
+              sessions={inheritedSessions}
+              activeSessionId={activeInheritedSession?.id ?? activeInheritedSessionId}
+              compact
+              onSelect={(sessionId) => setActiveInheritedSessionId(sessionId)}
+            />
+          ) : null}
           {visibleMessages.length === 0 ? (
             <div className="py-8 text-center text-[12px] leading-[1.5] text-[var(--color-chat-muted)]">
               {inherited ? (state.status === 'idle' ? `没有新的 ${codingLabel} 通知` : `${codingLabel} 正在工作中`) : state.threadId ? `已连接 ${codingLabel} 对话` : `输入第一条消息后会自动启动 ${codingLabel}`}
@@ -1047,6 +1077,55 @@ function codingMessageToChatMessage(message: CodingMessage): ChatMessage {
     content: message.content,
     timestamp: message.createdAt,
   };
+}
+
+function CodingSessionButtons({
+  sessions,
+  activeSessionId,
+  onSelect,
+  compact = false,
+}: {
+  sessions: CodingInheritedSession[];
+  activeSessionId: string | null;
+  onSelect: (sessionId: string) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className={`overflow-x-auto overflow-y-hidden ${compact ? 'pb-1' : 'pb-2'}`}>
+      <div className={`flex min-w-max gap-2 ${compact ? '' : 'pr-2'}`}>
+        {sessions.map((session, index) => {
+          const active = session.id === activeSessionId;
+          return (
+            <button
+              key={session.id}
+              type="button"
+              className={`group inline-flex max-w-[190px] items-center gap-2 rounded-full border px-3 py-1.5 text-left transition-all ${
+                active
+                  ? 'border-[#2f94ff]/45 bg-[#2f94ff]/14 text-[var(--text-primary)] shadow-sm'
+                  : 'border-border/60 bg-background/46 text-[var(--text-secondary)] hover:bg-background/68 hover:text-[var(--text-primary)]'
+              } ${compact ? 'text-[11px]' : 'text-[12px]'}`}
+              onClick={() => onSelect(session.id)}
+            >
+              <span className={`h-2 w-2 shrink-0 rounded-full ${codingStatusDotClass(session.status)}`} />
+              <span className="truncate font-medium leading-[1.35]">
+                {`Chat ${index + 1}`}
+              </span>
+              <span className="truncate opacity-80">
+                {codingSessionButtonLabel(session)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function codingSessionButtonLabel(session: CodingInheritedSession) {
+  const title = String(session.title || '').trim();
+  if (!title) return formatCodingTimestamp(session.updatedAt);
+  const shortTitle = title.replace(/\s*·\s*[a-z0-9]{6,}$/i, '').trim();
+  return shortTitle || title;
 }
 
 function readCodingSavedMessageIds(provider: CodingProvider = 'codex') {
