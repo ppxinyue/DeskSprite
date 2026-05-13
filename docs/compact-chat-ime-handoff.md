@@ -45,16 +45,16 @@ The compact chat renderer is now back to a normal single textarea path.
 
 Relevant files restored to the normal single-window path:
 
-- [src/App.tsx](/Users/pp/home/happy_coding/DeskSprite/src/App.tsx)
-- [src/features/chat/ChatPrimitives.tsx](/Users/pp/home/happy_coding/DeskSprite/src/features/chat/ChatPrimitives.tsx)
-- [src/features/chat/ChatDialog.tsx](/Users/pp/home/happy_coding/DeskSprite/src/features/chat/ChatDialog.tsx)
+- [src/App.tsx](/Users/pp/home/happy_coding/DeskCat/src/App.tsx)
+- [src/features/chat/ChatPrimitives.tsx](/Users/pp/home/happy_coding/DeskCat/src/features/chat/ChatPrimitives.tsx)
+- [src/features/chat/ChatDialog.tsx](/Users/pp/home/happy_coding/DeskCat/src/features/chat/ChatDialog.tsx)
 
 ### 2. Added a native macOS panel fix addon
 
 New files:
 
-- [electron/panel-key-fix.mm](/Users/pp/home/happy_coding/DeskSprite/electron/panel-key-fix.mm)
-- [scripts/build-panel-key-fix.mjs](/Users/pp/home/happy_coding/DeskSprite/scripts/build-panel-key-fix.mjs)
+- [electron/panel-key-fix.mm](/Users/pp/home/happy_coding/DeskCat/electron/panel-key-fix.mm)
+- [scripts/build-panel-key-fix.mjs](/Users/pp/home/happy_coding/DeskCat/scripts/build-panel-key-fix.mjs)
 
 What the addon does:
 
@@ -77,7 +77,7 @@ This is the key design change: the compact chat panel itself is now configured t
 
 Main-process changes are in:
 
-- [electron/main.cjs](/Users/pp/home/happy_coding/DeskSprite/electron/main.cjs)
+- [electron/main.cjs](/Users/pp/home/happy_coding/DeskCat/electron/main.cjs)
 
 Main additions:
 
@@ -94,7 +94,7 @@ The addon is applied when:
 
 Updated in:
 
-- [package.json](/Users/pp/home/happy_coding/DeskSprite/package.json)
+- [package.json](/Users/pp/home/happy_coding/DeskCat/package.json)
 
 New script:
 
@@ -112,9 +112,9 @@ So the user does not need to manually compile the addon before rerunning Electro
 
 Current change set:
 
-- [electron/panel-key-fix.mm](/Users/pp/home/happy_coding/DeskSprite/electron/panel-key-fix.mm)
-- [electron/main.cjs](/Users/pp/home/happy_coding/DeskSprite/electron/main.cjs)
-- [src/features/chat/ChatPrimitives.tsx](/Users/pp/home/happy_coding/DeskSprite/src/features/chat/ChatPrimitives.tsx)
+- [electron/panel-key-fix.mm](/Users/pp/home/happy_coding/DeskCat/electron/panel-key-fix.mm)
+- [electron/main.cjs](/Users/pp/home/happy_coding/DeskCat/electron/main.cjs)
+- [src/features/chat/ChatPrimitives.tsx](/Users/pp/home/happy_coding/DeskCat/src/features/chat/ChatPrimitives.tsx)
 
 What changed:
 
@@ -132,12 +132,12 @@ This is meant to preserve the existing fullscreen overlay behavior while avoidin
 
 ## Key Files
 
-- [electron/main.cjs](/Users/pp/home/happy_coding/DeskSprite/electron/main.cjs)
-- [electron/panel-key-fix.mm](/Users/pp/home/happy_coding/DeskSprite/electron/panel-key-fix.mm)
-- [scripts/build-panel-key-fix.mjs](/Users/pp/home/happy_coding/DeskSprite/scripts/build-panel-key-fix.mjs)
-- [src/App.tsx](/Users/pp/home/happy_coding/DeskSprite/src/App.tsx)
-- [src/features/chat/ChatPrimitives.tsx](/Users/pp/home/happy_coding/DeskSprite/src/features/chat/ChatPrimitives.tsx)
-- [src/features/chat/ChatDialog.tsx](/Users/pp/home/happy_coding/DeskSprite/src/features/chat/ChatDialog.tsx)
+- [electron/main.cjs](/Users/pp/home/happy_coding/DeskCat/electron/main.cjs)
+- [electron/panel-key-fix.mm](/Users/pp/home/happy_coding/DeskCat/electron/panel-key-fix.mm)
+- [scripts/build-panel-key-fix.mjs](/Users/pp/home/happy_coding/DeskCat/scripts/build-panel-key-fix.mjs)
+- [src/App.tsx](/Users/pp/home/happy_coding/DeskCat/src/App.tsx)
+- [src/features/chat/ChatPrimitives.tsx](/Users/pp/home/happy_coding/DeskCat/src/features/chat/ChatPrimitives.tsx)
+- [src/features/chat/ChatDialog.tsx](/Users/pp/home/happy_coding/DeskCat/src/features/chat/ChatDialog.tsx)
 
 ## What Is Already Verified
 
@@ -225,18 +225,18 @@ So the next fix should be aimed at:
 
 The most suspicious code path now is:
 
-- [electron/main.cjs](/Users/pp/home/happy_coding/DeskSprite/electron/main.cjs)
+- [electron/main.cjs](/Users/pp/home/happy_coding/DeskCat/electron/main.cjs)
   - `applyFloatingFullscreenBehavior(win, options)`
   - this still sets compact chat to `screen-saver` level outside composition
   - it now also needs to respect composition-active state so later reposition calls do not silently restore the high level
 
 The addon side that already solved the input-context part and now owns level switching is:
 
-- [electron/panel-key-fix.mm](/Users/pp/home/happy_coding/DeskSprite/electron/panel-key-fix.mm)
+- [electron/panel-key-fix.mm](/Users/pp/home/happy_coding/DeskCat/electron/panel-key-fix.mm)
 
 The renderer side that triggers composition state is:
 
-- [src/features/chat/ChatPrimitives.tsx](/Users/pp/home/happy_coding/DeskSprite/src/features/chat/ChatPrimitives.tsx)
+- [src/features/chat/ChatPrimitives.tsx](/Users/pp/home/happy_coding/DeskCat/src/features/chat/ChatPrimitives.tsx)
 
 ## Expected Outcome Of The Newest Patch
 

@@ -6,8 +6,8 @@ This is a developer-only data path. It must not appear in the user profile or us
 
 1. Create a Supabase project.
 2. Apply `supabase/migrations/202605110001_cloud_analytics.sql`.
-3. Deploy `supabase/functions/desksprite-sync`.
-4. Set the Edge Function secret `DESKSPRITE_INGEST_TOKEN` for private alpha builds.
+3. Deploy `supabase/functions/deskcat-sync`.
+4. Set the Edge Function secret `DESKCAT_INGEST_TOKEN` for private alpha builds.
 5. Store the function URL in local setting `cloudSyncEndpoint`.
 6. Store the same private alpha token in local setting `cloudSyncIngestToken`.
 7. Trigger `syncCloudBackup()` on app start, periodically, and before app shutdown.
@@ -15,7 +15,7 @@ This is a developer-only data path. It must not appear in the user profile or us
 The deployed endpoint will look like:
 
 ```text
-https://<project-ref>.functions.supabase.co/desksprite-sync
+https://<project-ref>.functions.supabase.co/deskcat-sync
 ```
 
 Recommended Supabase CLI flow:
@@ -24,11 +24,11 @@ Recommended Supabase CLI flow:
 supabase login
 supabase link --project-ref <project-ref>
 supabase db push
-supabase secrets set DESKSPRITE_INGEST_TOKEN=<private-alpha-token>
-supabase functions deploy desksprite-sync --no-verify-jwt
+supabase secrets set DESKCAT_INGEST_TOKEN=<private-alpha-token>
+supabase functions deploy deskcat-sync --no-verify-jwt
 ```
 
-`--no-verify-jwt` is intentional for the anonymous-device alpha path. The function still checks `DESKSPRITE_INGEST_TOKEN` when that secret is configured. Once user login exists, switch the endpoint to Supabase Auth JWT verification and bind devices to authenticated users.
+`--no-verify-jwt` is intentional for the anonymous-device alpha path. The function still checks `DESKCAT_INGEST_TOKEN` when that secret is configured. Once user login exists, switch the endpoint to Supabase Auth JWT verification and bind devices to authenticated users.
 
 ## Client Data Flow
 
@@ -90,20 +90,20 @@ The developer dashboard lives in `dashboard/`. It is a static Vite app designed 
 Supabase Edge Function:
 
 ```text
-https://<project-ref>.functions.supabase.co/desksprite-dashboard
+https://<project-ref>.functions.supabase.co/deskcat-dashboard
 ```
 
 Required Supabase secret:
 
 ```text
-DESKSPRITE_DASHBOARD_TOKEN
+DESKCAT_DASHBOARD_TOKEN
 ```
 
 Deploy the data API:
 
 ```bash
-supabase secrets set DESKSPRITE_DASHBOARD_TOKEN=<private-dashboard-token>
-supabase functions deploy desksprite-dashboard --no-verify-jwt
+supabase secrets set DESKCAT_DASHBOARD_TOKEN=<private-dashboard-token>
+supabase functions deploy deskcat-dashboard --no-verify-jwt
 ```
 
 Vercel setup:

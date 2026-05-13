@@ -1,46 +1,46 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-const label = process.argv.find((arg) => arg.startsWith('--desksprite-label='))?.split('=')[1] ?? 'pet';
+const label = process.argv.find((arg) => arg.startsWith('--deskcat-label='))?.split('=')[1] ?? 'pet';
 
-contextBridge.exposeInMainWorld('deskSprite', {
+contextBridge.exposeInMainWorld('deskCat', {
   label,
   invoke(command, args) {
-    return ipcRenderer.invoke('desksprite:invoke', command, args ?? {});
+    return ipcRenderer.invoke('deskcat:invoke', command, args ?? {});
   },
   emit(channel, payload) {
-    return ipcRenderer.invoke('desksprite:emit', channel, payload);
+    return ipcRenderer.invoke('deskcat:emit', channel, payload);
   },
   async listen(channel, callback) {
     const listener = (_event, payload) => callback({ event: channel, payload });
-    ipcRenderer.on(`desksprite:event:${channel}`, listener);
-    return () => ipcRenderer.removeListener(`desksprite:event:${channel}`, listener);
+    ipcRenderer.on(`deskcat:event:${channel}`, listener);
+    return () => ipcRenderer.removeListener(`deskcat:event:${channel}`, listener);
   },
   window: {
     outerPosition() {
-      return ipcRenderer.invoke('desksprite:window', 'outerPosition');
+      return ipcRenderer.invoke('deskcat:window', 'outerPosition');
     },
     outerSize() {
-      return ipcRenderer.invoke('desksprite:window', 'outerSize');
+      return ipcRenderer.invoke('deskcat:window', 'outerSize');
     },
     setPosition(position) {
-      return ipcRenderer.invoke('desksprite:window', 'setPosition', position);
+      return ipcRenderer.invoke('deskcat:window', 'setPosition', position);
     },
     setSize(size) {
-      return ipcRenderer.invoke('desksprite:window', 'setSize', size);
+      return ipcRenderer.invoke('deskcat:window', 'setSize', size);
     },
     async onMoved(callback) {
       const listener = () => callback();
-      ipcRenderer.on('desksprite:window:moved', listener);
-      return () => ipcRenderer.removeListener('desksprite:window:moved', listener);
+      ipcRenderer.on('deskcat:window:moved', listener);
+      return () => ipcRenderer.removeListener('deskcat:window:moved', listener);
     },
   },
   currentMonitor() {
-    return ipcRenderer.invoke('desksprite:current-monitor');
+    return ipcRenderer.invoke('deskcat:current-monitor');
   },
   openDialog(options) {
-    return ipcRenderer.invoke('desksprite:open-dialog', options ?? {});
+    return ipcRenderer.invoke('deskcat:open-dialog', options ?? {});
   },
   convertFileSrc(path) {
-    return `desksprite-file:///${encodeURIComponent(path)}`;
+    return `deskcat-file:///${encodeURIComponent(path)}`;
   },
 });

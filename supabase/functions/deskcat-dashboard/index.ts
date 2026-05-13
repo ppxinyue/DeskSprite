@@ -29,7 +29,7 @@ type RecentEvent = {
 
 const corsHeaders = {
   'access-control-allow-origin': '*',
-  'access-control-allow-headers': 'authorization, content-type, x-client-info, x-desksprite-dashboard-token',
+  'access-control-allow-headers': 'authorization, content-type, x-client-info, x-deskcat-dashboard-token, x-desksprite-dashboard-token',
   'access-control-allow-methods': 'GET, OPTIONS',
 };
 
@@ -57,9 +57,9 @@ function getSupabaseAdmin() {
 }
 
 function requireDashboardToken(req: Request) {
-  const expected = Deno.env.get('DESKSPRITE_DASHBOARD_TOKEN');
+  const expected = Deno.env.get('DESKCAT_DASHBOARD_TOKEN') || Deno.env.get('DESKSPRITE_DASHBOARD_TOKEN');
   if (!expected) throw new Error('Dashboard token is not configured');
-  const received = req.headers.get('x-desksprite-dashboard-token');
+  const received = req.headers.get('x-deskcat-dashboard-token') || req.headers.get('x-desksprite-dashboard-token');
   if (received !== expected) throw new Error('Unauthorized dashboard token');
 }
 
@@ -202,4 +202,3 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: message }, status);
   }
 });
-

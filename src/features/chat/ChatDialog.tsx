@@ -320,13 +320,13 @@ export function ChatDialog({
     const focusHandler = () => {
       textareaRef.current?.focus();
     };
-    window.addEventListener('desksprite:chat-image', imageHandler);
-    window.addEventListener('desksprite:chat-voice', voiceHandler);
-    window.addEventListener('desksprite:chat-focus', focusHandler);
+    window.addEventListener('deskcat:chat-image', imageHandler);
+    window.addEventListener('deskcat:chat-voice', voiceHandler);
+    window.addEventListener('deskcat:chat-focus', focusHandler);
     return () => {
-      window.removeEventListener('desksprite:chat-image', imageHandler);
-      window.removeEventListener('desksprite:chat-voice', voiceHandler);
-      window.removeEventListener('desksprite:chat-focus', focusHandler);
+      window.removeEventListener('deskcat:chat-image', imageHandler);
+      window.removeEventListener('deskcat:chat-voice', voiceHandler);
+      window.removeEventListener('deskcat:chat-focus', focusHandler);
     };
   }, [standalone]);
 

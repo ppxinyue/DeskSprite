@@ -1445,13 +1445,13 @@ function createMockTimelineEntries(dateKey: string): TimelineEntry[] {
       { type: 'music', name: 'Music', detail: 'Nujabes - Feather', startedAt: at('09:24'), endedAt: at('09:27') },
       { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev', startedAt: at('09:45'), endedAt: at('12:45') },
     ]),
-    item(-2, '09:45', '10:28', 'Cursor', 'DeskSprite · SettingsPanel.tsx', 'coding'),
+    item(-2, '09:45', '10:28', 'Cursor', 'DeskCat · SettingsPanel.tsx', 'coding'),
     item(-3, '10:31', '10:52', 'WeChat', 'WeChat', 'chat'),
     item(-4, '11:02', '11:38', 'Terminal', 'codex-electron-rewrite · pnpm build', 'coding'),
     item(-5, '13:16', '13:34', 'Safari', 'Apple Human Interface Guidelines', 'browser', 'https://developer.apple.com/design/human-interface-guidelines/'),
     item(-6, '13:34', '13:51', 'Safari', 'Radix UI Colors - Palette composition', 'browser', 'https://www.radix-ui.com/colors/docs/palette-composition/composing-a-palette'),
     item(-7, '13:51', '14:02', 'Safari', 'Transitions.dev - Number pop-in', 'browser', 'https://www.transitions.dev/docs/number-pop-in'),
-    item(-8, '14:05', '14:42', 'Keynote', 'DeskSprite Timeline UI Review.key', 'office'),
+    item(-8, '14:05', '14:42', 'Keynote', 'DeskCat Timeline UI Review.key', 'office'),
     item(-9, '15:03', '15:37', 'Slack', 'Slack - design-system', 'chat', null, [
       { type: 'music', name: 'Spotify', detail: 'Tycho - Awake', startedAt: at('15:03'), endedAt: at('15:21') },
       { type: 'music', name: 'Spotify', detail: 'Bonobo - Cirrus', startedAt: at('15:21'), endedAt: at('15:39') },
@@ -1459,7 +1459,7 @@ function createMockTimelineEntries(dateKey: string): TimelineEntry[] {
       { type: 'music', name: 'Spotify', detail: 'Kiasmos - Looped', startedAt: at('15:54'), endedAt: at('16:05') },
     ]),
     item(-10, '16:12', '16:54', 'Arc', 'YouTube - tiny desk concert', 'entertainment', 'https://www.youtube.com/watch?v=mock-preview'),
-    item(-11, '17:10', '18:08', 'Visual Studio Code', 'timeline-renderer.tsx - DeskSprite', 'coding'),
+    item(-11, '17:10', '18:08', 'Visual Studio Code', 'timeline-renderer.tsx - DeskCat', 'coding'),
   ];
 }
 
@@ -3346,7 +3346,7 @@ function GeneralSection({
             <SettingRow label="语言" hint="选择界面显示语言">
               <LanguageSelect value={settings.appLanguage} onChange={(value) => updateSetting('appLanguage', value)} />
             </SettingRow>
-            <SettingRow label="开机自启" hint="登录 macOS 后自动启动 DeskSprite">
+            <SettingRow label="开机自启" hint="登录 macOS 后自动启动 DeskCat">
               <Switch checked={settings.launchAtLogin} onCheckedChange={updateLaunchAtLogin} />
             </SettingRow>
             <SettingRow label="共享屏幕时隐藏灵宠" hint="默认开启，防止共享屏幕时灵宠进入画面">

@@ -1,4 +1,4 @@
-# DeskSprite 开发问题记录
+# DeskCat 开发问题记录
 
 ## ISSUE-001
 - 发现时间：2026-04-30
@@ -353,7 +353,7 @@
 - 发现者：用户反馈
 - 相关任务：H. 大对话窗口 UI
 - 严重程度：改进
-- 问题现象：大聊天窗口顶端仍显示 “DeskSprite Chat”；模型选择触发器显示了描述小字，入口不够干净；无用户 API 配置时菜单里“默认模型”和 CloseAI 重复。
+- 问题现象：大聊天窗口顶端仍显示 “DeskCat Chat”；模型选择触发器显示了描述小字，入口不够干净；无用户 API 配置时菜单里“默认模型”和 CloseAI 重复。
 - 原因分析：Tauri chat 窗口仍设置了原生 title；自定义模型触发器复用了菜单行项的标题/描述双行结构；模型选项没有根据用户配置数量做去重。
 - 解决方案：chat 窗口 title 改为空；触发器只保留模型名称和 chevron；当用户没有自定义 API 配置时，菜单只渲染一个 CloseAI 默认项。
 - 涉及文件：`src-tauri/src/commands/window.rs`, `src/features/chat/ChatDialog.tsx`, `PROGRESS.md`, `ISSUES.md`
@@ -1651,7 +1651,7 @@
 - 严重程度：重要
 - 问题现象：小聊天框的 Coding 模式每条消息都像新任务，和当前正在进行的 Codex 对话没有直接关系，也会反复出现“首次连接”提示。
 - 原因分析：上一版使用 `codex exec <prompt>`，每次都会启动一个新的非交互式 Codex thread；没有读取当前 Codex 桌面会话暴露的 `CODEX_THREAD_ID`，也没有使用 `codex exec resume`。
-- 解决方案：读取 `DESKSPRITE_CODEX_THREAD_ID` / `CODEX_THREAD_ID`，存在时使用 `codex exec resume <threadId> --json --output-last-message -`，prompt 通过 stdin 传入；缺失 thread id 时显示明确错误，不再自动新建任务。
+- 解决方案：读取 `DESKCAT_CODEX_THREAD_ID` / `CODEX_THREAD_ID`，存在时使用 `codex exec resume <threadId> --json --output-last-message -`，prompt 通过 stdin 传入；缺失 thread id 时显示明确错误，不再自动新建任务。
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：如果用户语义是“当前对话”，桥接层必须绑定 thread/session id；新建 exec 只能算同项目新任务。
 - 是否需更新技术文档：否。
@@ -2286,8 +2286,8 @@
 - 相关任务：Timeline 忽略自身窗口并稳定采样器生命周期
 - 严重程度：重要
 - 问题现象：启动后 Electron 自己先被记录为 active，Codex 变成 candidate；设置同步时出现 start/stop，采样器状态被重置，导致真实活动很难达到最小时长落库。
-- 原因分析：TimelineRecorder 没有过滤 DeskSprite / Electron 自身窗口；React effect 依赖整个 `settings` 对象，任意设置对象刷新都会销毁并重建 recorder。
-- 解决方案：在 recorder 中忽略 DeskSprite / PawPal / Electron；App 中用 `settingsRef` 给 fallback 调用读取最新设置，同时把 timeline effect 依赖收窄到实际会影响采样器生命周期的两个设置项。
+- 原因分析：TimelineRecorder 没有过滤 DeskCat / Electron 自身窗口；React effect 依赖整个 `settings` 对象，任意设置对象刷新都会销毁并重建 recorder。
+- 解决方案：在 recorder 中忽略 DeskCat / PawPal / Electron；App 中用 `settingsRef` 给 fallback 调用读取最新设置，同时把 timeline effect 依赖收窄到实际会影响采样器生命周期的两个设置项。
 - 涉及文件：`src/App.tsx`, `src/lib/timelineRecorder.ts`, `src/lib/timelineRecorder.test.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：采样器生命周期必须稳定，不能被无关状态刷新打断；自身窗口应视为不可记录噪声。
 - 是否需更新技术文档：否。

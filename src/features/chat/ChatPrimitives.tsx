@@ -59,7 +59,7 @@ export function Composer({
   shakeKey?: number;
 }) {
   function emitCompactChatImeComposition(active: boolean) {
-    if (!compact || window.deskSprite?.label !== 'compact-chat') return;
+    if (!compact || window.deskCat?.label !== 'compact-chat') return;
     emit(active ? 'compact-chat:ime-composition-start' : 'compact-chat:ime-composition-end', {}).catch(() => {});
   }
 

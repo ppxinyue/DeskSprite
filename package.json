@@ -1,5 +1,5 @@
 {
-  "name": "desksprite",
+  "name": "deskcat",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -59,8 +59,8 @@
     "zod": "4.3.6"
   },
   "build": {
-    "appId": "com.desksprite.app",
-    "productName": "DeskSprite",
+    "appId": "com.deskcat.app",
+    "productName": "DeskCat",
     "files": [
       "dist/**",
       "electron/**",
@@ -71,10 +71,10 @@
       "target": "dmg",
       "icon": "src-tauri/icons/icon.icns",
       "extendInfo": {
-        "NSAppleEventsUsageDescription": "DeskSprite needs Automation permission to read Calendar and Reminders for the System Knowledge Base.",
-        "NSCalendarsUsageDescription": "DeskSprite reads upcoming calendar events only when System Knowledge Base is enabled and relevant to your question.",
-        "NSRemindersUsageDescription": "DeskSprite reads upcoming reminders only when System Knowledge Base is enabled and relevant to your question.",
-        "NSLocationWhenInUseUsageDescription": "DeskSprite uses your approximate location to answer weather questions in System Knowledge Base."
+        "NSAppleEventsUsageDescription": "DeskCat needs Automation permission to read Calendar and Reminders for the System Knowledge Base.",
+        "NSCalendarsUsageDescription": "DeskCat reads upcoming calendar events only when System Knowledge Base is enabled and relevant to your question.",
+        "NSRemindersUsageDescription": "DeskCat reads upcoming reminders only when System Knowledge Base is enabled and relevant to your question.",
+        "NSLocationWhenInUseUsageDescription": "DeskCat uses your approximate location to answer weather questions in System Knowledge Base."
       }
     },
     "win": {

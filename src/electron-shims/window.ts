@@ -32,7 +32,7 @@ export class LogicalSize {
 }
 
 export function getCurrentWindow() {
-  if (!window.deskSprite) {
+  if (!window.deskCat) {
     const label = (window.location.hash.replace(/^#/, '') || 'pet').split(':')[0] || 'pet';
     return {
       label,
@@ -44,18 +44,18 @@ export function getCurrentWindow() {
     };
   }
   return {
-    label: window.deskSprite.label,
-    outerPosition: () => window.deskSprite.window.outerPosition(),
-    outerSize: () => window.deskSprite.window.outerSize(),
+    label: window.deskCat.label,
+    outerPosition: () => window.deskCat.window.outerPosition(),
+    outerSize: () => window.deskCat.window.outerSize(),
     setPosition: (position: LogicalPosition | PhysicalPosition) =>
-      window.deskSprite.window.setPosition(position),
-    setSize: (size: LogicalSize) => window.deskSprite.window.setSize(size),
-    onMoved: (callback: () => void) => window.deskSprite.window.onMoved(callback),
+      window.deskCat.window.setPosition(position),
+    setSize: (size: LogicalSize) => window.deskCat.window.setSize(size),
+    onMoved: (callback: () => void) => window.deskCat.window.onMoved(callback),
   };
 }
 
 export function currentMonitor() {
-  if (!window.deskSprite) {
+  if (!window.deskCat) {
     return Promise.resolve({
       scaleFactor: window.devicePixelRatio || 1,
       workArea: {
@@ -64,5 +64,5 @@ export function currentMonitor() {
       },
     });
   }
-  return window.deskSprite.currentMonitor();
+  return window.deskCat.currentMonitor();
 }

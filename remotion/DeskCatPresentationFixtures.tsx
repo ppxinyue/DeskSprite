@@ -106,9 +106,9 @@ export const timelineBlocks = [
   { appName: 'Cursor', title: 'DeskCat · SettingsPanel.tsx', category: 'coding', start: 22, width: 15, color: '#0090ff', time: '09:45 - 10:28' },
   { appName: 'WeChat', title: 'WeChat', category: 'chat', start: 39, width: 8, color: '#ffd6a3', time: '10:31 - 10:52' },
   { appName: 'Terminal', title: 'codex-electron-rewrite · pnpm build', category: 'coding', start: 50, width: 13, color: '#0090ff', time: '11:02 - 11:38' },
-  { appName: 'Keynote', title: 'DeskSprite Timeline UI Review.key', category: 'office', start: 66, width: 12, color: '#d4d7dc', time: '14:05 - 14:42' },
+  { appName: 'Keynote', title: 'DeskCat Timeline UI Review.key', category: 'office', start: 66, width: 12, color: '#d4d7dc', time: '14:05 - 14:42' },
   { appName: 'Slack', title: 'Slack - design-system', category: 'chat', start: 80, width: 11, color: '#ffd6a3', time: '15:03 - 15:37' },
-  { appName: 'VS Code', title: 'timeline-renderer.tsx - DeskSprite', category: 'coding', start: 92, width: 16, color: '#0090ff', time: '17:10 - 18:08' },
+  { appName: 'VS Code', title: 'timeline-renderer.tsx - DeskCat', category: 'coding', start: 92, width: 16, color: '#0090ff', time: '17:10 - 18:08' },
 ];
 
 export const backgroundMarkers = [

@@ -22,7 +22,7 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::err
     TrayIconBuilder::new()
         .icon(app.default_window_icon().cloned().unwrap())
         .menu(&menu)
-        .tooltip("DeskSprite")
+        .tooltip("DeskCat")
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "show" => {
                 if let Some(w) = app.get_webview_window("pet") {

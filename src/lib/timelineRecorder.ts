@@ -41,7 +41,7 @@ export type TimelineRecorderState = {
   paused: TimelineSegmentState;
 };
 
-const IGNORED_TIMELINE_APPS = new Set(['desksprite', 'pawpal', 'electron']);
+const IGNORED_TIMELINE_APPS = new Set(['deskcat', 'pawpal', 'electron']);
 
 type TimelineSegmentState = {
   key: string;

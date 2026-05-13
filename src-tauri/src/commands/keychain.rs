@@ -1,6 +1,6 @@
 use keyring::Entry;
 
-const SERVICE_NAME: &str = "com.desksprite.app";
+const SERVICE_NAME: &str = "com.deskcat.app";
 
 #[tauri::command]
 pub fn save_api_key(keyring_ref: String, key: String) -> Result<(), String> {

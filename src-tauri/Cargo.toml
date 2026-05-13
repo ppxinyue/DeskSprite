@@ -1,7 +1,7 @@
 [package]
-name = "desksprite"
+name = "deskcat"
 version = "0.1.0"
-description = "DeskSprite - AI Desktop Pet"
+description = "DeskCat - AI Desktop Pet"
 authors = ["pp"]
 license = ""
 repository = ""
@@ -24,7 +24,7 @@ log = "0.4"
 tauri = { version = "2.10.3", features = ["protocol-asset", "tray-icon", "macos-private-api"] }
 tauri-plugin-log = "2"
 
-# DeskSprite P0 dependencies
+# DeskCat P0 dependencies
 keyring = "3"
 base64 = "0.22"
 image = "0.25"

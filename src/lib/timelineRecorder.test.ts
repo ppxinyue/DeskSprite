@@ -93,7 +93,7 @@ test('keeps repeated short switches to the same app as separate visits', async (
   assert.equal(shortMarkers[1].endedAt, new Date(34 * 60_000).toISOString());
 });
 
-test('ignores DeskSprite/Electron foreground so startup chrome does not steal active segment', async () => {
+test('ignores DeskCat/Electron foreground so startup chrome does not steal active segment', async () => {
   const { recorder, persisted, logs } = createHarness();
 
   await recorder.handleSnapshot(snapshot('Electron', ''), 0);
@@ -106,12 +106,12 @@ test('ignores DeskSprite/Electron foreground so startup chrome does not steal ac
   assert.ok(logs.some((item) => item.stage === 'sample:ignore'));
 });
 
-test('keeps background markers sampled while DeskSprite/Electron is foreground', async () => {
+test('keeps background markers sampled while DeskCat/Electron is foreground', async () => {
   const { recorder, persisted } = createHarness();
 
   await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
   await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 65_000);
-  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings', {
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskCat settings', {
     background: [
       { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
       { type: 'music', name: 'NeteaseMusic', detail: 'running' },
@@ -130,7 +130,7 @@ test('does not extend foreground duration when only ignored app background marke
 
   await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
   await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 65_000);
-  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings', {
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskCat settings', {
     background: [{ type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' }],
   }), 180_000);
 
@@ -143,10 +143,10 @@ test('confirms a new app only after it passes the minimum duration', async () =>
 
   await recorder.handleSnapshot(snapshot('Codex', 'task1'), 0);
   await recorder.handleSnapshot(snapshot('Codex', 'task1'), 60_000);
-  await recorder.handleSnapshot(snapshot('Visual Studio Code', 'DeskSprite'), 85_000);
-  await recorder.handleSnapshot(snapshot('Visual Studio Code', 'DeskSprite'), 120_000);
-  await recorder.handleSnapshot(snapshot('Visual Studio Code', 'DeskSprite'), 145_000);
-  await recorder.handleSnapshot(snapshot('Visual Studio Code', 'DeskSprite'), 205_000);
+  await recorder.handleSnapshot(snapshot('Visual Studio Code', 'DeskCat'), 85_000);
+  await recorder.handleSnapshot(snapshot('Visual Studio Code', 'DeskCat'), 120_000);
+  await recorder.handleSnapshot(snapshot('Visual Studio Code', 'DeskCat'), 145_000);
+  await recorder.handleSnapshot(snapshot('Visual Studio Code', 'DeskCat'), 205_000);
 
   assert.ok(logs.some((item) => item.stage === 'candidate:confirm'));
   assert.equal(persisted[1].appName, 'Codex');
@@ -234,13 +234,13 @@ test('persists short foreground candidate when sampling stops before returning t
   assert.equal(shortMarkers[0].startedAt, new Date(90_000).toISOString());
 });
 
-test('persists short foreground candidate when DeskSprite becomes foreground before returning to active app', async () => {
+test('persists short foreground candidate when DeskCat becomes foreground before returning to active app', async () => {
   const { recorder, persisted } = createHarness();
 
   await recorder.handleSnapshot(snapshot('Codex', 'task1'), 0);
   await recorder.handleSnapshot(snapshot('Codex', 'task1'), 70_000);
   await recorder.handleSnapshot(snapshot('WeChat', '微信'), 90_000);
-  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings'), 120_000);
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskCat settings'), 120_000);
 
   const shortMarkers = persisted.at(-1)?.backgroundMarkers.filter((marker) => marker.type === 'foreground-short') ?? [];
   assert.equal(shortMarkers.length, 1);
@@ -250,10 +250,10 @@ test('persists short foreground candidate when DeskSprite becomes foreground bef
 test('persists background-only markers when no foreground segment can carry them', async () => {
   const { recorder, persisted } = createHarness();
 
-  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings', {
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskCat settings', {
     background: [{ type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' }],
   }), 0);
-  await recorder.handleSnapshot(snapshot('Electron', 'DeskSprite settings', {
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskCat settings', {
     background: [
       { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
       { type: 'music', name: 'NeteaseMusic', detail: 'running' },

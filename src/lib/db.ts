@@ -158,7 +158,7 @@ type Store = {
   };
 };
 
-const STORE_KEY = 'desksprite:electron-db:v1';
+const STORE_KEY = 'deskcat:electron-db:v1';
 
 function now() {
   return new Date().toISOString();
@@ -856,8 +856,8 @@ export async function syncCloudBackup(endpointOverride?: string): Promise<CloudS
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-desksprite-device-id': store.cloudSync.deviceId,
-        ...(store.settings.cloudSyncIngestToken ? { 'x-desksprite-ingest-token': store.settings.cloudSyncIngestToken } : {}),
+        'x-deskcat-device-id': store.cloudSync.deviceId,
+        ...(store.settings.cloudSyncIngestToken ? { 'x-deskcat-ingest-token': store.settings.cloudSyncIngestToken } : {}),
       },
       body: JSON.stringify({
         deviceId: store.cloudSync.deviceId,

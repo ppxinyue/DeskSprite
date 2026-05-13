@@ -159,7 +159,7 @@ function formatDeviceKnowledge(device: DeviceKnowledge): string[] {
     : 'unknown';
   return [
     `Device: ${device.osType || device.platform || 'unknown'} ${device.osRelease || ''} ${device.arch || ''}`.trim(),
-    `App: ${device.appName || 'DeskSprite'} ${device.appVersion || ''}`.trim(),
+    `App: ${device.appName || 'DeskCat'} ${device.appVersion || ''}`.trim(),
     `CPU: ${device.cpuModel || 'unknown'} (${device.cpuCount || 0} cores)`,
     `Memory: ${formatBytes(device.freeMemoryBytes)} free / ${formatBytes(device.totalMemoryBytes)} total`,
     `Display: ${primarySize}; displays=${device.displays?.length || 0}`,
@@ -219,7 +219,7 @@ async function readWeatherKnowledge(): Promise<WeatherKnowledge> {
 
 function formatScheduleKnowledge(schedule: ScheduleKnowledge | null): string[] {
   if (!schedule) return [
-    'Schedule integration status: unavailable. Do not claim to know the user calendar or reminders. Briefly say DeskSprite could not read the schedule integration status.',
+    'Schedule integration status: unavailable. Do not claim to know the user calendar or reminders. Briefly say DeskCat could not read the schedule integration status.',
   ];
   const calendarStatus = schedule.calendarStatus || (schedule.calendarError ? 'error' : 'ok');
   const remindersStatus = schedule.remindersStatus || (schedule.remindersError ? 'error' : 'ok');

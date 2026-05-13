@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "DeskSprite",
+  "productName": "DeskCat",
   "version": "0.1.0",
-  "identifier": "com.desksprite.app",
+  "identifier": "com.deskcat.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",

@@ -1,4 +1,4 @@
-const DEFAULT_ENDPOINT = 'https://vuxzqebeirynkdyonzud.functions.supabase.co/desksprite-dashboard';
+const DEFAULT_ENDPOINT = 'https://vuxzqebeirynkdyonzud.functions.supabase.co/deskcat-dashboard';
 const endpointInput = document.querySelector('#endpoint');
 const tokenInput = document.querySelector('#token');
 const daysInput = document.querySelector('#days');
@@ -13,9 +13,9 @@ const eventTableEl = document.querySelector('#event-table');
 const recentListEl = document.querySelector('#recent-list');
 
 const storage = {
-  endpoint: 'desksprite-dashboard:endpoint',
-  token: 'desksprite-dashboard:token',
-  days: 'desksprite-dashboard:days',
+  endpoint: 'deskcat-dashboard:endpoint',
+  token: 'deskcat-dashboard:token',
+  days: 'deskcat-dashboard:days',
 };
 
 function getStored(key, fallback = '') {
@@ -176,7 +176,7 @@ async function loadDashboard() {
   url.searchParams.set('days', days);
   const response = await fetch(url, {
     headers: {
-      'x-desksprite-dashboard-token': token,
+      'x-deskcat-dashboard-token': token,
     },
   });
   const data = await response.json();

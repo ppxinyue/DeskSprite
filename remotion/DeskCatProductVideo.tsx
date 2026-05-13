@@ -1648,7 +1648,7 @@ function FinaleScene() {
             transform: `translateY(${interpolate(subtitle, [0, 1], [18, 0], { easing: ease })}px)`,
           }}
         >
-          github.com/ppxinyue/DeskSprite
+          github.com/ppxinyue/DeskCat
         </div>
       </div>
     </AbsoluteFill>

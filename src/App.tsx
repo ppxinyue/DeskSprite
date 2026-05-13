@@ -23,12 +23,12 @@ import "./index.css";
 const SettingsPanel = lazy(() => import("@/features/settings/SettingsPanel").then((mod) => ({ default: mod.SettingsPanel })));
 const ChatDialog = lazy(() => import("@/features/chat/ChatDialog").then((mod) => ({ default: mod.ChatDialog })));
 
-const CHAT_HANDOFF_KEY = "desksprite:chat-handoff-conversation-id";
-const COMPACT_CHAT_KEY = "desksprite:compact-chat";
-const COMPACT_CHAT_DISMISSED_KEY = "desksprite:compact-chat-dismissed";
-const CODING_CONVERSATION_KEY = "desksprite:coding-conversation-id";
-const CODING_SAVED_MESSAGES_KEY = "desksprite:coding-saved-message-ids";
-const TIMELINE_RECORDER_STATE_KEY = "desksprite:timeline-recorder-state";
+const CHAT_HANDOFF_KEY = "deskcat:chat-handoff-conversation-id";
+const COMPACT_CHAT_KEY = "deskcat:compact-chat";
+const COMPACT_CHAT_DISMISSED_KEY = "deskcat:compact-chat-dismissed";
+const CODING_CONVERSATION_KEY = "deskcat:coding-conversation-id";
+const CODING_SAVED_MESSAGES_KEY = "deskcat:coding-saved-message-ids";
+const TIMELINE_RECORDER_STATE_KEY = "deskcat:timeline-recorder-state";
 const SCREEN_MARGIN = 16;
 const PET_CONTENT_MARGIN = 20;
 const MIN_DIALOG_WIDTH = 200;
@@ -437,13 +437,13 @@ function CompactChatWindow() {
       }));
     });
     const imageListener = listen("compact-chat:image", () => {
-      window.dispatchEvent(new CustomEvent("desksprite:chat-image"));
+      window.dispatchEvent(new CustomEvent("deskcat:chat-image"));
     });
     const voiceListener = listen("compact-chat:voice", () => {
-      window.dispatchEvent(new CustomEvent("desksprite:chat-voice"));
+      window.dispatchEvent(new CustomEvent("deskcat:chat-voice"));
     });
     const focusListener = listen("compact-chat:focus-input", () => {
-      window.dispatchEvent(new CustomEvent("desksprite:chat-focus"));
+      window.dispatchEvent(new CustomEvent("deskcat:chat-focus"));
     });
     return () => {
       openListener.then((fn) => fn());
@@ -1266,7 +1266,7 @@ function getTimelineSnapshotDistractionMatch(snapshot: TimelineSnapshot, setting
   const title = normalizeDistractionText(snapshot.windowTitle);
   const url = normalizeDistractionText(snapshot.url);
   if (!appName && !title && !url) return null;
-  if (['desksprite', 'pawpal', 'electron'].some((ignored) => appName.trim() === ignored)) return null;
+  if (['deskcat', 'pawpal', 'electron'].some((ignored) => appName.trim() === ignored)) return null;
   const blockedApp = settings.distractionBlockedApps
     .map((item) => item.trim().toLowerCase())
     .filter(Boolean)

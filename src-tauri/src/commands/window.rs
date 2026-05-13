@@ -111,7 +111,7 @@ pub fn create_pet_window<R: Runtime>(app: &AppHandle<R>) {
     };
 
     let window = WebviewWindowBuilder::new(app, "pet", WebviewUrl::App("index.html".into()))
-        .title("DeskSprite Pet")
+        .title("DeskCat Pet")
         .inner_size(220.0, 220.0)
         .position(x, y)
         .decorations(false)

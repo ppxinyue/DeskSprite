@@ -1135,7 +1135,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "desksprite"
+name = "deskcat"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",

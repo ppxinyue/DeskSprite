@@ -2,7 +2,7 @@ export {};
 
 declare global {
   interface Window {
-    deskSprite: {
+    deskCat: {
       label: string;
       invoke<T = unknown>(command: string, args?: Record<string, unknown>): Promise<T>;
       emit(channel: string, payload?: unknown): Promise<void>;

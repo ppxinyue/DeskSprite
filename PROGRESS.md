@@ -1,4 +1,4 @@
-# DeskSprite P0 开发进度
+# DeskCat P0 开发进度
 
 ## 总体状态
 - 开始时间：2026-04-30
@@ -160,7 +160,7 @@
 - 8 section → 4 section：外观 / AI 对话 / 快捷键 / 隐私与数据
 - 外观滑块走 draft/confirm 流程（点击"确认更改"才生效）
 - 形象上传即时生效，不需确认
-- SettingsLayout 视觉优化：侧边栏 DeskSprite 标题、间距、字体层级
+- SettingsLayout 视觉优化：侧边栏 DeskCat 标题、间距、字体层级
 - AI 对话 section 合并了：宠物名字 + API 配置 + System Prompt + 模型参数 + 语音
 - 文件：SettingsPanel.tsx, SettingsLayout.tsx
 
@@ -266,7 +266,7 @@
 - 文件：ChatDialog.tsx, index.css, db.ts, systemPrompt.ts, window.rs, Cargo.toml, Cargo.lock, 0001_initial.sql
 
 ### R22. 大窗标题清理与模型菜单减噪（2026-05-06）
-- 窗口：chat 窗口原生标题置空，去掉窗口顶端 app bar 中的 “DeskSprite Chat”。
+- 窗口：chat 窗口原生标题置空，去掉窗口顶端 app bar 中的 “DeskCat Chat”。
 - 模型入口：触发器只显示当前模型名称和 chevron，不再显示描述小字；描述仅保留在浮层菜单行项里。
 - 菜单：没有用户自定义 API 配置时，模型菜单只显示一个 `CloseAI · gpt-4o-mini`，避免“默认模型”和 CloseAI 重复。
 - 文件：window.rs, ChatDialog.tsx
@@ -1050,7 +1050,7 @@
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
 
 ### R134. Coding 连接当前 Codex Thread（2026-05-09）
-- 主进程：Coding 模式优先读取 `DESKSPRITE_CODEX_THREAD_ID` 或 `CODEX_THREAD_ID`，将小聊天框输入发送到当前 Codex thread。
+- 主进程：Coding 模式优先读取 `DESKCAT_CODEX_THREAD_ID` 或 `CODEX_THREAD_ID`，将小聊天框输入发送到当前 Codex thread。
 - Codex CLI：从每次 `codex exec` 新建任务改为 `codex exec resume <threadId> --json --output-last-message -`，prompt 通过 stdin 写入。
 - 语义：没有检测到当前 thread 时不再悄悄新开任务，而是明确红色提示需要从 Codex 环境启动应用或设置 thread id。
 - UI：小聊天框空状态改为显示是否已连接当前 Codex 对话。
@@ -1058,7 +1058,7 @@
 - 文件：main.cjs, App.tsx, ISSUES.md, PROGRESS.md
 
 ### R135. Coding 自动启动灵宠 Codex 会话（2026-05-09）
-- 主进程：没有 `DESKSPRITE_CODEX_THREAD_ID` / `CODEX_THREAD_ID` 时，不再报错，而是自动使用 `codex exec ... -` 启动新的 Codex thread。
+- 主进程：没有 `DESKCAT_CODEX_THREAD_ID` / `CODEX_THREAD_ID` 时，不再报错，而是自动使用 `codex exec ... -` 启动新的 Codex thread。
 - 会话：监听 `thread.started` 并保存 thread id，后续消息自动走 `codex exec resume <threadId>`，实现灵宠自己的持续 Codex 对话。
 - UI：空状态改为提示“输入第一条消息后会自动启动新的 Codex 对话”。
 - 语义：如果 Electron 从 Codex 环境启动，可连接当前 Codex thread；如果从普通终端启动，则自动唤起并维护独立 Codex 会话。
@@ -1317,7 +1317,7 @@
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
 
 ### R170. 自动记录焦点 Timeline（2026-05-10）
-- 启动：Electron ready 阶段默认开启 macOS 登录项，让 DeskSprite 随系统启动。
+- 启动：Electron ready 阶段默认开启 macOS 登录项，让 DeskCat 随系统启动。
 - 采集：主进程新增 timeline active window 快照，读取前台 app、窗口标题、浏览器当前 URL，并附带 Music / Spotify / Terminal / iTerm2 等轻量后台标记。
 - 记录：pet 主窗口每 3 秒采样一次，前台窗口稳定超过 8 秒后写入本地 timeline，并持续更新当前段的结束时间。
 - 存储：本地 storage 增加 `timelineEntries`，按天保存 app、标题、URL、域名、分类和后台标记；老数据自动补齐新字段。
@@ -1458,8 +1458,8 @@
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
 
 ### R187. Timeline 忽略自身窗口并稳定采样器生命周期（2026-05-10）
-- 根因：启动时 Electron / DeskSprite 自己可能先成为 active，导致真实 Codex 窗口被放入 candidate；同时 App effect 依赖整个 `settings` 对象，设置同步时会 stop/start，重置采样状态。
-- 修复：TimelineRecorder 过滤 DeskSprite / PawPal / Electron 自身窗口，不让它们进入 active/candidate。
+- 根因：启动时 Electron / DeskCat 自己可能先成为 active，导致真实 Codex 窗口被放入 candidate；同时 App effect 依赖整个 `settings` 对象，设置同步时会 stop/start，重置采样状态。
+- 修复：TimelineRecorder 过滤 DeskCat / PawPal / Electron 自身窗口，不让它们进入 active/candidate。
 - 生命周期：App 中新增 `settingsRef`，fallback 分心检测读取 ref，timeline effect 依赖收窄到 `timelineRecordingEnabled` 和 `timelineMinSegmentMinutes`，避免普通设置更新重启采样器。
 - 测试：新增 “Electron foreground ignored” 单测，覆盖启动自身窗口不抢占 active 的场景。
 - 验证：`pnpm test:timeline`、`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`git diff --check`、`pnpm build` 通过；构建仅保留既有 chunk 体积提示。

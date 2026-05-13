@@ -27,7 +27,7 @@ type SyncPayload = {
 
 const corsHeaders = {
   'access-control-allow-origin': '*',
-  'access-control-allow-headers': 'authorization, content-type, x-client-info, x-desksprite-device-id, x-desksprite-ingest-token',
+  'access-control-allow-headers': 'authorization, content-type, x-client-info, x-deskcat-device-id, x-deskcat-ingest-token, x-desksprite-device-id, x-desksprite-ingest-token',
   'access-control-allow-methods': 'POST, OPTIONS',
 };
 
@@ -54,9 +54,9 @@ function getSupabaseAdmin() {
 }
 
 function requireIngestToken(req: Request) {
-  const expected = Deno.env.get('DESKSPRITE_INGEST_TOKEN');
+  const expected = Deno.env.get('DESKCAT_INGEST_TOKEN') || Deno.env.get('DESKSPRITE_INGEST_TOKEN');
   if (!expected) return;
-  const received = req.headers.get('x-desksprite-ingest-token');
+  const received = req.headers.get('x-deskcat-ingest-token') || req.headers.get('x-desksprite-ingest-token');
   if (received !== expected) throw new Error('Unauthorized ingest token');
 }
 
@@ -84,9 +84,9 @@ Deno.serve(async (req) => {
         device_id: payload.deviceId,
         last_seen_at: now,
         metadata: {
-          source: 'desksprite',
+          source: 'deskcat',
           sentAt: payload.sentAt ?? null,
-          headerDeviceId: req.headers.get('x-desksprite-device-id'),
+          headerDeviceId: req.headers.get('x-deskcat-device-id') || req.headers.get('x-desksprite-device-id'),
         },
       }, { onConflict: 'device_id' });
     if (deviceError) throw deviceError;
@@ -137,4 +137,3 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: message }, status);
   }
 });
-

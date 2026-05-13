@@ -45,7 +45,7 @@ let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle',
 let tray = null;
 let currentAppIcon = null;
 const floatingConfiguredWindows = new WeakSet();
-const IGNORED_DISTRACTION_APPS = ['DeskSprite', 'PawPal', 'Electron'];
+const IGNORED_DISTRACTION_APPS = ['DeskCat', 'PawPal', 'Electron'];
 const CODEX_STATUS = {
   IDLE: 'idle',
   NEEDS_INPUT: 'needs-input',
@@ -54,7 +54,11 @@ const CODEX_STATUS = {
 };
 const DEFAULT_CODEX_HTTP_PROXY = 'http://127.0.0.1:6478';
 const DEFAULT_CODEX_SOCKS_PROXY = 'socks5://127.0.0.1:6478';
-const CURRENT_CODEX_THREAD_ID = process.env.DESKSPRITE_CODEX_THREAD_ID || process.env.CODEX_THREAD_ID || '';
+const CURRENT_CODEX_THREAD_ID =
+  process.env.DESKCAT_CODEX_THREAD_ID ||
+  process.env.DESKSPRITE_CODEX_THREAD_ID ||
+  process.env.CODEX_THREAD_ID ||
+  '';
 const codingState = {
   status: CODEX_STATUS.DONE,
   messages: [],
@@ -67,7 +71,7 @@ const claudeCodingState = {
   running: null,
   threadId: '',
 };
-const deskspriteStartedAt = Date.now();
+const deskcatStartedAt = Date.now();
 let claudeCodingSessionStarted = false;
 const CODEX_INHERIT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
@@ -83,12 +87,12 @@ const codexAppServer = {
   activeTurn: null,
 };
 
-app.setName('DeskSprite');
+app.setName('DeskCat');
 if (process.platform === 'darwin') app.setActivationPolicy('regular');
 
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: 'desksprite-app',
+    scheme: 'deskcat-app',
     privileges: {
       standard: true,
       secure: true,
@@ -97,7 +101,7 @@ protocol.registerSchemesAsPrivileged([
     },
   },
   {
-    scheme: 'desksprite-file',
+    scheme: 'deskcat-file',
     privileges: {
       standard: true,
       secure: true,
@@ -110,7 +114,7 @@ protocol.registerSchemesAsPrivileged([
 function preload(label) {
   return {
     preload: path.join(__dirname, 'preload.cjs'),
-    additionalArguments: [`--desksprite-label=${label}`],
+    additionalArguments: [`--deskcat-label=${label}`],
     contextIsolation: true,
     nodeIntegration: false,
     sandbox: false,
@@ -119,12 +123,12 @@ function preload(label) {
 
 function rendererUrl(label) {
   if (isDev) return `${devUrl}/#${label}`;
-  return `desksprite-app://localhost/index.html#${label}`;
+  return `deskcat-app://localhost/index.html#${label}`;
 }
 
 function send(win, channel, payload) {
   if (!win || win.isDestroyed()) return;
-  win.webContents.send(`desksprite:event:${channel}`, payload);
+  win.webContents.send(`deskcat:event:${channel}`, payload);
 }
 
 function broadcast(channel, payload) {
@@ -363,7 +367,7 @@ function setAppIcon(iconPath) {
   if (!trayImage.isEmpty()) {
     if (!tray) {
       tray = new Tray(trayImage);
-      tray.setToolTip('DeskSprite');
+      tray.setToolTip('DeskCat');
       updateTrayMenu();
       tray.on('right-click', updateTrayMenu);
       tray.on('click', updateTrayMenu);
@@ -1588,10 +1592,10 @@ function permissionResultFromSettled(result) {
 function humanizeAppleScriptAccessError(message) {
   const text = String(message || '');
   if (/not authorized|not allowed|拒绝|不被允许|没有权限|(-1743)|(-600)/i.test(text)) {
-    return 'permission denied. Enable access in macOS System Settings > Privacy & Security > Automation/Calendars/Reminders for DeskSprite or Electron.';
+    return 'permission denied. Enable access in macOS System Settings > Privacy & Security > Automation/Calendars/Reminders for DeskCat or Electron.';
   }
   if (/(-1728)|不能获得|Can.t get/i.test(text)) {
-    return 'macOS could not resolve the Calendar/Reminders automation target in this runtime. Try the packaged DeskSprite app and run authorization again.';
+    return 'macOS could not resolve the Calendar/Reminders automation target in this runtime. Try the packaged DeskCat app and run authorization again.';
   }
   return text.replace(/\s+/g, ' ').slice(0, 240);
 }
@@ -1896,7 +1900,7 @@ function handleCodexAppServerRequest(message) {
         id: message.id,
         error: {
           code: -32001,
-          message: 'DeskSprite 目前不能在小聊天框内处理这类 Codex 授权请求。',
+          message: 'DeskCat 目前不能在小聊天框内处理这类 Codex 授权请求。',
         },
       });
     } catch {
@@ -2089,7 +2093,7 @@ function ensureCodexAppServer() {
     });
     Promise.resolve()
       .then(() => codexRequest('initialize', {
-        clientInfo: { name: 'desksprite', title: 'DeskSprite', version: app.getVersion?.() || '0.1.0' },
+        clientInfo: { name: 'deskcat', title: 'DeskCat', version: app.getVersion?.() || '0.1.0' },
         capabilities: { experimentalApi: true },
       }))
       .then(() => {
@@ -2559,7 +2563,7 @@ async function getInheritedCodingState() {
     }
   }
   for (const session of sessions) {
-    if (session.status !== CODEX_STATUS.DONE || session.updatedAt >= deskspriteStartedAt) {
+    if (session.status !== CODEX_STATUS.DONE || session.updatedAt >= deskcatStartedAt) {
       inheritedCodingSeenActive.add(session.id);
     }
   }
@@ -2840,7 +2844,7 @@ async function getInheritedClaudeCodingState() {
     }
   }
   for (const session of sessions) {
-    if (session.status !== CODEX_STATUS.DONE || session.updatedAt >= deskspriteStartedAt) {
+    if (session.status !== CODEX_STATUS.DONE || session.updatedAt >= deskcatStartedAt) {
       inheritedClaudeSeenActive.add(session.id);
     }
   }
@@ -3065,13 +3069,13 @@ const handlers = {
   },
 };
 
-ipcMain.handle('desksprite:invoke', async (_event, command, args) => {
+ipcMain.handle('deskcat:invoke', async (_event, command, args) => {
   const handler = handlers[command];
   if (!handler) throw new Error(`Unknown command: ${command}`);
   return handler(args || {}, _event);
 });
 
-ipcMain.handle('desksprite:emit', (_event, channel, payload) => {
+ipcMain.handle('deskcat:emit', (_event, channel, payload) => {
   if (channel === 'compact-chat:ime-composition-start') {
     compactChatImeCompositionActive = true;
     const win = windows.get('compact-chat');
@@ -3090,7 +3094,7 @@ ipcMain.handle('desksprite:emit', (_event, channel, payload) => {
   broadcast(channel, payload);
 });
 
-ipcMain.handle('desksprite:window', (event, action, value) => {
+ipcMain.handle('deskcat:window', (event, action, value) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (!win) return null;
   if (action === 'outerPosition') {
@@ -3112,7 +3116,7 @@ ipcMain.handle('desksprite:window', (event, action, value) => {
   return null;
 });
 
-ipcMain.handle('desksprite:current-monitor', (event) => {
+ipcMain.handle('deskcat:current-monitor', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   const bounds = win?.getBounds() || screen.getPrimaryDisplay().bounds;
   const display = screen.getDisplayMatching(bounds);
@@ -3125,7 +3129,7 @@ ipcMain.handle('desksprite:current-monitor', (event) => {
   };
 });
 
-ipcMain.handle('desksprite:open-dialog', async (event, options) => {
+ipcMain.handle('deskcat:open-dialog', async (event, options) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   const parent = options.detached ? undefined : (win || undefined);
   const result = await dialog.showOpenDialog(parent, {
@@ -3157,10 +3161,10 @@ async function pickChatImage(event) {
   };
 }
 
-ipcMain.handle('desksprite:pick-chat-image', async (event) => pickChatImage(event));
+ipcMain.handle('deskcat:pick-chat-image', async (event) => pickChatImage(event));
 
 function registerProtocols() {
-  protocol.handle('desksprite-app', async (request) => {
+  protocol.handle('deskcat-app', async (request) => {
     const url = new URL(request.url);
     const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
     const filePath = path.join(app.getAppPath(), 'dist', pathname.replace(/^\/+/, ''));
@@ -3168,7 +3172,7 @@ function registerProtocols() {
       headers: { 'content-type': contentType(filePath) },
     });
   });
-  protocol.handle('desksprite-file', async (request) => {
+  protocol.handle('deskcat-file', async (request) => {
     const filePath = decodeURIComponent(new URL(request.url).pathname.replace(/^\/+/, ''));
     return new Response(await fsp.readFile(filePath), {
       headers: { 'content-type': contentType(filePath) },

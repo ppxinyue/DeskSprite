@@ -40,7 +40,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_sql::Builder::new().add_migrations(
-            "sqlite:desksprite.db",
+            "sqlite:deskcat.db",
             vec![
                 tauri_plugin_sql::Migration {
                     version: 1,
