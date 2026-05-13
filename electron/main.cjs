@@ -65,10 +65,12 @@ const claudeCodingState = {
   running: null,
   threadId: '',
 };
+const deskspriteStartedAt = Date.now();
 let claudeCodingSessionStarted = false;
 const CODEX_INHERIT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
 const inheritedCodingAcknowledged = new Map();
+const inheritedCodingSeenActive = new Set();
 const codexAppServer = {
   child: null,
   buffer: '',
@@ -2516,6 +2518,11 @@ async function getInheritedCodingState() {
       // Ignore unreadable sessions.
     }
   }
+  for (const session of sessions) {
+    if (session.status !== CODEX_STATUS.DONE || session.updatedAt >= deskspriteStartedAt) {
+      inheritedCodingSeenActive.add(session.id);
+    }
+  }
   const unacknowledged = sessions.filter((session) => (
     session.status === CODEX_STATUS.WORKING
     || inheritedCodingAcknowledged.get(session.id) !== session.ackKey
@@ -2562,11 +2569,15 @@ async function getInheritedCodingState() {
       createdAt: Date.now(),
     });
   }
+  const visibleSessions = sessions.filter((session) => (
+    session.status !== CODEX_STATUS.DONE
+    || inheritedCodingSeenActive.has(session.id)
+  ));
   return {
     provider: 'codex',
     status,
     messages,
-    allSessions: sessions.slice(0, 12).map((session) => ({
+    allSessions: visibleSessions.slice(0, 12).map((session) => ({
       id: session.id,
       ackKey: session.ackKey,
       title: session.title,
@@ -2611,6 +2622,7 @@ async function ackInheritedCodingSessions({ ackKeys } = {}) {
 }
 
 const inheritedClaudeAcknowledged = new Map();
+const inheritedClaudeSeenActive = new Set();
 
 function claudeSessionTitle(session) {
   const cwdName = session.cwd ? path.basename(session.cwd) : path.basename(path.dirname(session.path || '')) || 'Claude Code';
@@ -2787,6 +2799,11 @@ async function getInheritedClaudeCodingState() {
       // Ignore unreadable sessions.
     }
   }
+  for (const session of sessions) {
+    if (session.status !== CODEX_STATUS.DONE || session.updatedAt >= deskspriteStartedAt) {
+      inheritedClaudeSeenActive.add(session.id);
+    }
+  }
   const unacknowledged = sessions.filter((session) => (
     session.status === CODEX_STATUS.WORKING
     || inheritedClaudeAcknowledged.get(session.id) !== session.ackKey
@@ -2833,11 +2850,15 @@ async function getInheritedClaudeCodingState() {
       createdAt: Date.now(),
     });
   }
+  const visibleSessions = sessions.filter((session) => (
+    session.status !== CODEX_STATUS.DONE
+    || inheritedClaudeSeenActive.has(session.id)
+  ));
   return {
     provider: 'claude',
     status,
     messages,
-    allSessions: sessions.slice(0, 12).map((session) => ({
+    allSessions: visibleSessions.slice(0, 12).map((session) => ({
       id: session.id,
       ackKey: session.ackKey,
       title: session.title,
