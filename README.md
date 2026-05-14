@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  一只住在桌面上的 AI 灵宠，帮你聊天、专注、记录 Timeline，并在 Coding 时陪你工作。
+  一只住在桌面上的 AI 灵宠，陪你聊天、专注、记录 Timeline，并在 Coding 时陪你工作。
 </p>
 
 <p align="center">
