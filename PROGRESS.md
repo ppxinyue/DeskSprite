@@ -1973,3 +1973,10 @@
 - 调试：renderer 输出 `[compact-chat:ime-renderer]` 事件日志；main 进程在 `DESKSPRITE_DEBUG_COMPACT_CHAT=1` 或 `--debug-compact-chat` 下输出 `[compact-chat:debug]`，包含窗口可见性、focused、bounds、IME input/composition 状态和层级配置路径。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false` 通过。
 - 文件：ChatPrimitives.tsx, main.cjs, ISSUES.md, PROGRESS.md
+
+### R259. Compact Chat Pointer-First IME Focus（2026-05-14）
+- 修复：输入框首次点击改为 `pointerdown capture` 入口，阻止浏览器默认聚焦，先让 compact chat 原生窗口成为 key window，再手动 focus textarea，避免 `onFocus` 内 native focus 造成 blur/focus 抖动和按键重放。
+- 状态：所有输入态 focus 路径都会清理 pending blur timer；普通 `onFocus` 只发送 `compact-chat:ime-input-active` 标记并调整层级，不再执行 `win.focus()`。
+- 调试：renderer 的 `[compact-chat:ime-renderer]` 事件通过 `compact-chat:ime-debug` 转发到 main；main 对 IME/focus 相关 `[compact-chat:debug]` 默认输出到命令行，不再必须带 debug 启动参数。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false` 通过。
+- 文件：ChatPrimitives.tsx, main.cjs, ISSUES.md, PROGRESS.md

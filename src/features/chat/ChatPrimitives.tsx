@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { Check, Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -59,21 +60,30 @@ export function Composer({
 }) {
   const compactImeBlurTimerRef = useRef<number | null>(null);
   const compactImeInputActiveRef = useRef(false);
+  const compactImePointerFocusRef = useRef(false);
 
   function debugCompactChatIme(event: string, detail: Record<string, unknown> = {}) {
     if (!compact || window.deskCat?.label !== 'compact-chat') return;
-    console.info('[compact-chat:ime-renderer]', event, {
+    const payload = {
       ...detail,
       inputActive: compactImeInputActiveRef.current,
-      composing: false,
+      pointerFocus: compactImePointerFocusRef.current,
       focused: document.activeElement === textareaRef.current,
       at: Date.now(),
-    });
+    };
+    console.info('[compact-chat:ime-renderer]', event, payload);
+    emit('compact-chat:ime-debug', { event, payload }).catch(() => {});
+  }
+
+  function clearCompactImeBlurTimer() {
+    if (compactImeBlurTimerRef.current === null) return;
+    window.clearTimeout(compactImeBlurTimerRef.current);
+    compactImeBlurTimerRef.current = null;
   }
 
   useEffect(() => {
     return () => {
-      if (compactImeBlurTimerRef.current !== null) window.clearTimeout(compactImeBlurTimerRef.current);
+      clearCompactImeBlurTimer();
       if (compact && window.deskCat?.label === 'compact-chat') {
         debugCompactChatIme('unmount -> input-end');
         emit('compact-chat:ime-input-end', {}).catch(() => {});
@@ -83,10 +93,7 @@ export function Composer({
 
   function emitCompactChatImeInput(active: boolean) {
     if (!compact || window.deskCat?.label !== 'compact-chat') return;
-    if (compactImeBlurTimerRef.current !== null) {
-      window.clearTimeout(compactImeBlurTimerRef.current);
-      compactImeBlurTimerRef.current = null;
-    }
+    clearCompactImeBlurTimer();
     if (active) {
       if (compactImeInputActiveRef.current) {
         debugCompactChatIme('input-start skipped');
@@ -104,6 +111,25 @@ export function Composer({
       debugCompactChatIme('input-end');
       emit('compact-chat:ime-input-end', {}).catch(() => {});
     }, 260);
+  }
+
+  function handleCompactImePointerDown(event: React.PointerEvent<HTMLTextAreaElement>) {
+    if (!compact || window.deskCat?.label !== 'compact-chat') return;
+    if (document.activeElement === textareaRef.current && compactImeInputActiveRef.current) return;
+    event.preventDefault();
+    clearCompactImeBlurTimer();
+    compactImePointerFocusRef.current = true;
+    compactImeInputActiveRef.current = true;
+    debugCompactChatIme('pointerdown -> native-focus');
+    invoke('focus_compact_chat_window').finally(() => {
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus({ preventScroll: true });
+        compactImePointerFocusRef.current = false;
+        debugCompactChatIme('pointerdown -> textarea-focus');
+      });
+    }).catch(() => {
+      compactImePointerFocusRef.current = false;
+    });
   }
 
   function emitCompactChatImeComposition(active: boolean) {
@@ -169,7 +195,17 @@ export function Composer({
               onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={onKeyDown}
               onPaste={handlePaste}
-              onFocus={() => emitCompactChatImeInput(true)}
+              onPointerDownCapture={handleCompactImePointerDown}
+              onFocus={() => {
+                clearCompactImeBlurTimer();
+                if (compactImePointerFocusRef.current) {
+                  debugCompactChatIme('focus after pointer native-focus');
+                  return;
+                }
+                debugCompactChatIme('focus mark input-active');
+                compactImeInputActiveRef.current = true;
+                emit('compact-chat:ime-input-active', {}).catch(() => {});
+              }}
               onCompositionStart={() => {
                 emitCompactChatImeComposition(true);
               }}

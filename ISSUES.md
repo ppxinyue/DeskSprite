@@ -3143,3 +3143,15 @@
 - 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：输入法修复不能把多个 DOM 事件都映射成无条件 native focus；必须把“进入输入态”做成一次性状态转移，后续 composition/resize/topmost 只调整层级，不重复切换 key window。
 - 是否需更新技术文档：否。
+
+## ISSUE-264
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Chat IME 输入态二次修复
+- 严重程度：严重
+- 问题现象：用户测试仍看不到 IME 候选框；compact chat 输入时继续闪烁，输入 `nhnh` 后文本框实际出现重复字符。此前 debug 也没有在命令行中出现。
+- 原因分析：上一版在 textarea `onFocus` 中触发 native `win.focus()`，会让 DOM focus 和 macOS key-window focus 在同一个输入事件链中互相触发，产生 blur/focus 抖动和按键重放；临时 blur 后的延迟恢复 timer 又没有在后续 focus 中清理，进一步导致输入态反复恢复/重新进入。debug 方面，renderer 日志只在 compact 窗口自身控制台，main 日志默认需要启动参数。
+- 解决方案：将进入输入态提前到 textarea `pointerdown capture`，阻止默认聚焦，先调用 native focus，再手动 focus textarea；普通 `onFocus` 只标记输入态，不再 native focus。所有 focus 路径都会清理 pending blur timer。renderer IME debug 事件转发到 main，main 对 IME/focus 相关日志默认输出到命令行。
+- 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：全屏浮窗里的 IME 修复需要把 native focus 放在鼠标按下阶段并阻止浏览器默认聚焦，避免同一个用户输入同时走浏览器聚焦和原生窗口激活两条链路。
+- 是否需更新技术文档：否。

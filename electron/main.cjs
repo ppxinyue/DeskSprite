@@ -153,7 +153,8 @@ function compactChatWindowSnapshot(win) {
 }
 
 function debugCompactChat(message, details = {}) {
-  if (!debugCompactChatEnabled) return;
+  const isImeEvent = message.includes('ime') || message.includes('focus input') || message.includes('renderer');
+  if (!debugCompactChatEnabled && !isImeEvent) return;
   console.info('[compact-chat:debug]', message, {
     ...details,
     platform: process.platform,
@@ -3181,9 +3182,20 @@ ipcMain.handle('deskcat:invoke', async (_event, command, args) => {
 });
 
 ipcMain.handle('deskcat:emit', (_event, channel, payload) => {
+  if (channel === 'compact-chat:ime-debug') {
+    debugCompactChat('renderer ime event', payload || {});
+    return null;
+  }
   if (channel === 'compact-chat:ime-input-start') {
     debugCompactChat('ipc ime-input-start', { payload });
     focusCompactChatWindowForInput('ipc:ime-input-start');
+    return null;
+  }
+  if (channel === 'compact-chat:ime-input-active') {
+    compactChatImeInputActive = true;
+    const win = windows.get('compact-chat');
+    debugCompactChat('ipc ime-input-active', { payload, snapshot: compactChatWindowSnapshot(win) });
+    if (win && !win.isDestroyed()) configureCompactChatPanel(win);
     return null;
   }
   if (channel === 'compact-chat:ime-input-end') {
