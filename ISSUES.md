@@ -3119,3 +3119,27 @@
 - 涉及文件：`electron/main.cjs`, `electron/panel-key-fix.mm`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：输入法候选框问题不能靠提高应用窗口层级解决；正确方向是输入态让应用窗口停在系统候选弹窗之下，同时仍处在能覆盖全屏内容的层级。
 - 是否需更新技术文档：否。
+
+## ISSUE-262
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Chat 全屏输入法候选框焦点绑定
+- 严重程度：严重
+- 问题现象：仅在 IME composition 阶段调整 compact chat 层级后，用户实际输入时仍可能看不到输入法候选框；问题常发生在候选框出现前，说明系统输入法上下文没有稳定绑定到 compact chat 的 textarea。
+- 原因分析：compact chat 默认通过 `showInactive()` 作为非激活 panel 悬浮，全屏上方显示虽然稳定，但 macOS 输入法更依赖当前 key/focused window 建立候选框位置和层级关系；等到 `compositionstart` 再处理已经太晚，且非激活 panel 可能让输入法把候选框放在原全屏 App 的层级上下文里。
+- 解决方案：新增 compact chat 输入态 IPC。textarea focus、鼠标按下和 composition start 都会让 compact chat 短暂 `show()` / `focus()` 成为 key window，并启用 IME 友好层级；blur 后延迟恢复普通强置顶浮窗状态。Windows 同样在输入态使用 `pop-up-menu` always-on-top level。
+- 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：全屏悬浮输入框的 IME 方案需要同时满足两个条件：窗口层级低于系统候选框，以及输入框所在窗口在输入期间成为明确的 key/focused window。
+- 是否需更新技术文档：否。
+
+## ISSUE-263
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Chat 输入态焦点化回归修复与调试日志
+- 严重程度：严重
+- 问题现象：启用 textarea focus 期间 `show()` / `focus()` 后，IME 候选框仍不可见；同时输入时 compact chat 不断闪烁，按一次 `n` 会输入两个 `n`。
+- 原因分析：上一版同时在 `mousedown`、`focus` 和 `compositionstart` 链路触发输入态，main 进程每次收到事件都会重新 `show()` / `moveTop()` / `focus()`。透明 panel 的 key-window 切换被重复执行，导致焦点抖动、输入事件重放和字符重复。
+- 解决方案：移除 textarea `mousedown` 阶段的直接 focus 调用，只在真实 `focus` 时进入输入态；renderer 端用 ref 去重 input-start/input-end；main 端为 `focusCompactChatWindowForInput` 增加幂等保护，已经处于输入态且窗口已 focus 时不再重复抢焦点。同时补充 renderer IME 事件日志和 main 进程 compact chat 窗口快照日志。
+- 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：输入法修复不能把多个 DOM 事件都映射成无条件 native focus；必须把“进入输入态”做成一次性状态转移，后续 composition/resize/topmost 只调整层级，不重复切换 key window。
+- 是否需更新技术文档：否。

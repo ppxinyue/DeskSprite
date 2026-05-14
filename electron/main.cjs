@@ -34,12 +34,16 @@ const { createDeferredWindowShowController, createPetVisibilityController } = re
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
+const debugCompactChatEnabled =
+  process.env.DESKSPRITE_DEBUG_COMPACT_CHAT === '1' ||
+  process.argv.includes('--debug-compact-chat');
 const windows = new Map();
 const windowShowController = createDeferredWindowShowController();
 const petVisibilityController = createPetVisibilityController();
 let topmostGuard = null;
 let panelKeyFix = undefined;
 let topmostSuppressed = false;
+let compactChatImeInputActive = false;
 let compactChatImeCompositionActive = false;
 let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'png', 'idle.png');
 let tray = null;
@@ -135,6 +139,28 @@ function broadcast(channel, payload) {
   for (const win of windows.values()) send(win, channel, payload);
 }
 
+function compactChatWindowSnapshot(win) {
+  if (!win || win.isDestroyed()) return { exists: false };
+  return {
+    exists: true,
+    visible: win.isVisible(),
+    focused: win.isFocused(),
+    alwaysOnTop: win.isAlwaysOnTop(),
+    bounds: win.getBounds(),
+    inputActive: compactChatImeInputActive,
+    compositionActive: compactChatImeCompositionActive,
+  };
+}
+
+function debugCompactChat(message, details = {}) {
+  if (!debugCompactChatEnabled) return;
+  console.info('[compact-chat:debug]', message, {
+    ...details,
+    platform: process.platform,
+    at: Date.now(),
+  });
+}
+
 function loadPanelKeyFix() {
   if (process.platform !== 'darwin') return null;
   if (panelKeyFix !== undefined) return panelKeyFix;
@@ -151,17 +177,36 @@ function loadPanelKeyFix() {
 }
 
 function configureCompactChatPanel(win) {
-  if (process.platform !== 'darwin' || !win || win.isDestroyed()) return false;
+  if (process.platform !== 'darwin' || !win || win.isDestroyed()) {
+    debugCompactChat('configure panel skipped', { reason: process.platform !== 'darwin' ? 'not-darwin' : 'missing-window' });
+    return false;
+  }
   const addon = loadPanelKeyFix();
-  if (!addon?.setPanelKeyable) return false;
+  if (!addon?.setPanelKeyable) {
+    debugCompactChat('configure panel skipped', { reason: 'missing-addon' });
+    return false;
+  }
   try {
     const handle = win.getNativeWindowHandle();
     const configured = Boolean(addon.setPanelKeyable(handle));
+    const imeInputMode = compactChatImeInputActive || compactChatImeCompositionActive;
+    debugCompactChat('configure panel keyable', {
+      configured,
+      imeInputMode,
+      hasImeLevel: Boolean(addon.setPanelLevelImeComposition),
+      snapshot: compactChatWindowSnapshot(win),
+    });
     if (!configured) return false;
-    const setLevel = compactChatImeCompositionActive
+    const setLevel = imeInputMode
       ? (addon.setPanelLevelImeComposition || addon.setPanelLevelFloating)
       : addon.setPanelLevelScreenSaver;
-    if (setLevel) setLevel(handle);
+    if (setLevel) {
+      setLevel(handle);
+      debugCompactChat('configure panel level', {
+        level: imeInputMode ? 'ime-composition' : 'screen-saver',
+        snapshot: compactChatWindowSnapshot(win),
+      });
+    }
     return true;
   } catch (error) {
     console.warn('[compact-chat] Failed to configure panel:', error.message || String(error));
@@ -172,8 +217,13 @@ function configureCompactChatPanel(win) {
 function applyFloatingFullscreenBehavior(win, options = {}) {
   if (!win || win.isDestroyed()) return;
   const force = Boolean(options.force);
+  const isCompactChat = win === windows.get('compact-chat');
+  if (isCompactChat) {
+    debugCompactChat('apply floating requested', { force, snapshot: compactChatWindowSnapshot(win) });
+  }
   if (topmostSuppressed) {
     win.setAlwaysOnTop(false);
+    if (isCompactChat) debugCompactChat('apply floating suppressed', { snapshot: compactChatWindowSnapshot(win) });
     return;
   }
   if (process.platform === 'darwin') {
@@ -188,16 +238,20 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
     win.setAlwaysOnTop(true, 'screen-saver', 1);
     floatingConfiguredWindows.add(win);
     if (force) win.moveTop();
-    if (win === windows.get('compact-chat')) configureCompactChatPanel(win);
+    if (isCompactChat) {
+      configureCompactChatPanel(win);
+      debugCompactChat('apply floating darwin done', { force, snapshot: compactChatWindowSnapshot(win) });
+    }
   } else {
-    const isCompactChat = win === windows.get('compact-chat');
     if (!force && !isCompactChat && floatingConfiguredWindows.has(win) && win.isAlwaysOnTop()) return;
+    const imeInputMode = compactChatImeInputActive || compactChatImeCompositionActive;
     const level = isCompactChat
-      ? (compactChatImeCompositionActive && process.platform === 'win32' ? 'pop-up-menu' : 'screen-saver')
+      ? (imeInputMode && process.platform === 'win32' ? 'pop-up-menu' : 'screen-saver')
       : 'normal';
     win.setAlwaysOnTop(true, level);
     win.setSkipTaskbar(true);
     floatingConfiguredWindows.add(win);
+    if (isCompactChat) debugCompactChat('apply floating non-darwin done', { level, force, snapshot: compactChatWindowSnapshot(win) });
   }
 }
 
@@ -1155,6 +1209,11 @@ function showChatWindow() {
 function showCompactChatWindow({ x, y, w, h }, show = true) {
   const existing = windows.get('compact-chat');
   if (!show && existing && !existing.isDestroyed()) {
+    debugCompactChat('position compact chat', {
+      x: Math.round(x),
+      y: Math.round(y),
+      snapshot: compactChatWindowSnapshot(existing),
+    });
     existing.setPosition(Math.round(x), Math.round(y));
     applyFloatingFullscreenBehavior(existing);
     configureCompactChatPanel(existing);
@@ -1174,15 +1233,58 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
     hasShadow: false,
     alwaysOnTop: true,
   });
+  debugCompactChat('create compact chat', {
+    bounds: { x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) },
+    show,
+    snapshot: compactChatWindowSnapshot(win),
+  });
   configureCompactChatPanel(win);
   win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) });
   applyFloatingFullscreenBehavior(win, { force: show });
   if (show) {
     win.showInactive();
+    debugCompactChat('show compact chat inactive', { snapshot: compactChatWindowSnapshot(win) });
     configureCompactChatPanel(win);
     applyFloatingFullscreenBehavior(win, { force: true });
     win.moveTop();
   }
+}
+
+function focusCompactChatWindowForInput(reason = 'input-start') {
+  const win = windows.get('compact-chat');
+  if (!win || win.isDestroyed()) {
+    debugCompactChat('focus input skipped', { reason, skipped: 'missing-window' });
+    return;
+  }
+  const wasInputActive = compactChatImeInputActive;
+  compactChatImeInputActive = true;
+  debugCompactChat('focus input requested', { reason, wasInputActive, snapshot: compactChatWindowSnapshot(win) });
+  configureCompactChatPanel(win);
+  applyFloatingFullscreenBehavior(win, { force: true });
+  if (!win.isVisible()) win.show();
+  if (!wasInputActive || !win.isFocused()) {
+    win.moveTop();
+    win.focus();
+    debugCompactChat('focus input applied', { reason, snapshot: compactChatWindowSnapshot(win) });
+  } else {
+    debugCompactChat('focus input skipped duplicate focus', { reason, snapshot: compactChatWindowSnapshot(win) });
+  }
+}
+
+function restoreCompactChatWindowAfterInput(reason = 'input-end') {
+  const wasInputActive = compactChatImeInputActive;
+  const wasCompositionActive = compactChatImeCompositionActive;
+  compactChatImeInputActive = false;
+  compactChatImeCompositionActive = false;
+  const win = windows.get('compact-chat');
+  if (!win || win.isDestroyed()) {
+    debugCompactChat('restore input skipped', { reason, skipped: 'missing-window', wasInputActive, wasCompositionActive });
+    return;
+  }
+  debugCompactChat('restore input requested', { reason, wasInputActive, wasCompositionActive, snapshot: compactChatWindowSnapshot(win) });
+  applyFloatingFullscreenBehavior(win, { force: true });
+  configureCompactChatPanel(win);
+  debugCompactChat('restore input applied', { reason, snapshot: compactChatWindowSnapshot(win) });
 }
 
 function getAssetsDir(state) {
@@ -2957,20 +3059,18 @@ const handlers = {
   show_chat_window: () => showChatWindow(),
   show_compact_chat_window: (args) => showCompactChatWindow(args, true),
   position_compact_chat_window: (args) => showCompactChatWindow(args, false),
-  hide_compact_chat_window: () => windows.get('compact-chat')?.hide(),
+  hide_compact_chat_window: () => {
+    debugCompactChat('hide compact chat', { snapshot: compactChatWindowSnapshot(windows.get('compact-chat')) });
+    compactChatImeInputActive = false;
+    compactChatImeCompositionActive = false;
+    windows.get('compact-chat')?.hide();
+  },
   is_compact_chat_visible: () => {
     const win = windows.get('compact-chat');
     return Boolean(win && !win.isDestroyed() && win.isVisible());
   },
   focus_compact_chat_window: () => {
-    const win = windows.get('compact-chat');
-    if (win && !win.isDestroyed()) {
-      configureCompactChatPanel(win);
-      applyFloatingFullscreenBehavior(win, { force: true });
-      win.show();
-      win.moveTop();
-      win.focus();
-    }
+    focusCompactChatWindowForInput('invoke:focus_compact_chat_window');
   },
   focus_compact_chat_input: () => broadcast('compact-chat:focus-input', {}),
   show_pet_window: () => showPetWindow(),
@@ -3019,6 +3119,7 @@ const handlers = {
     const [width, currentHeight] = win.getSize();
     const nextHeight = Math.max(1, Math.round(Number(height) || currentHeight));
     if (Math.abs(currentHeight - nextHeight) <= 1) return;
+    debugCompactChat('resize compact chat', { currentHeight, nextHeight, snapshot: compactChatWindowSnapshot(win) });
     win.setSize(width, nextHeight);
     applyFloatingFullscreenBehavior(win);
   },
@@ -3080,15 +3181,30 @@ ipcMain.handle('deskcat:invoke', async (_event, command, args) => {
 });
 
 ipcMain.handle('deskcat:emit', (_event, channel, payload) => {
+  if (channel === 'compact-chat:ime-input-start') {
+    debugCompactChat('ipc ime-input-start', { payload });
+    focusCompactChatWindowForInput('ipc:ime-input-start');
+    return null;
+  }
+  if (channel === 'compact-chat:ime-input-end') {
+    debugCompactChat('ipc ime-input-end', { payload });
+    restoreCompactChatWindowAfterInput('ipc:ime-input-end');
+    return null;
+  }
   if (channel === 'compact-chat:ime-composition-start') {
     compactChatImeCompositionActive = true;
     const win = windows.get('compact-chat');
-    if (win && !win.isDestroyed()) configureCompactChatPanel(win);
+    debugCompactChat('ipc ime-composition-start', { payload, snapshot: compactChatWindowSnapshot(win) });
+    if (win && !win.isDestroyed()) {
+      configureCompactChatPanel(win);
+      applyFloatingFullscreenBehavior(win, { force: true });
+    }
     return null;
   }
   if (channel === 'compact-chat:ime-composition-end') {
     compactChatImeCompositionActive = false;
     const win = windows.get('compact-chat');
+    debugCompactChat('ipc ime-composition-end', { payload, snapshot: compactChatWindowSnapshot(win) });
     if (win && !win.isDestroyed()) {
       applyFloatingFullscreenBehavior(win, { force: true });
       configureCompactChatPanel(win);

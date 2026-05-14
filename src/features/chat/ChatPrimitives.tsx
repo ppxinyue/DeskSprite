@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { Check, Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -58,8 +57,58 @@ export function Composer({
   error?: string | null;
   shakeKey?: number;
 }) {
+  const compactImeBlurTimerRef = useRef<number | null>(null);
+  const compactImeInputActiveRef = useRef(false);
+
+  function debugCompactChatIme(event: string, detail: Record<string, unknown> = {}) {
+    if (!compact || window.deskCat?.label !== 'compact-chat') return;
+    console.info('[compact-chat:ime-renderer]', event, {
+      ...detail,
+      inputActive: compactImeInputActiveRef.current,
+      composing: false,
+      focused: document.activeElement === textareaRef.current,
+      at: Date.now(),
+    });
+  }
+
+  useEffect(() => {
+    return () => {
+      if (compactImeBlurTimerRef.current !== null) window.clearTimeout(compactImeBlurTimerRef.current);
+      if (compact && window.deskCat?.label === 'compact-chat') {
+        debugCompactChatIme('unmount -> input-end');
+        emit('compact-chat:ime-input-end', {}).catch(() => {});
+      }
+    };
+  }, [compact, textareaRef]);
+
+  function emitCompactChatImeInput(active: boolean) {
+    if (!compact || window.deskCat?.label !== 'compact-chat') return;
+    if (compactImeBlurTimerRef.current !== null) {
+      window.clearTimeout(compactImeBlurTimerRef.current);
+      compactImeBlurTimerRef.current = null;
+    }
+    if (active) {
+      if (compactImeInputActiveRef.current) {
+        debugCompactChatIme('input-start skipped');
+        return;
+      }
+      compactImeInputActiveRef.current = true;
+      debugCompactChatIme('input-start');
+      emit('compact-chat:ime-input-start', {}).catch(() => {});
+      return;
+    }
+    compactImeBlurTimerRef.current = window.setTimeout(() => {
+      compactImeBlurTimerRef.current = null;
+      if (!compactImeInputActiveRef.current) return;
+      compactImeInputActiveRef.current = false;
+      debugCompactChatIme('input-end');
+      emit('compact-chat:ime-input-end', {}).catch(() => {});
+    }, 260);
+  }
+
   function emitCompactChatImeComposition(active: boolean) {
     if (!compact || window.deskCat?.label !== 'compact-chat') return;
+    debugCompactChatIme(active ? 'composition-start' : 'composition-end');
     emit(active ? 'compact-chat:ime-composition-start' : 'compact-chat:ime-composition-end', {}).catch(() => {});
   }
 
@@ -120,12 +169,15 @@ export function Composer({
               onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={onKeyDown}
               onPaste={handlePaste}
-              onMouseDown={() => {
-                if (compact) invoke('focus_compact_chat_window').catch(() => {});
+              onFocus={() => emitCompactChatImeInput(true)}
+              onCompositionStart={() => {
+                emitCompactChatImeComposition(true);
               }}
-              onCompositionStart={() => emitCompactChatImeComposition(true)}
               onCompositionEnd={() => emitCompactChatImeComposition(false)}
-              onBlur={() => emitCompactChatImeComposition(false)}
+              onBlur={() => {
+                emitCompactChatImeComposition(false);
+                emitCompactChatImeInput(false);
+              }}
               placeholder={isVoiceLoading ? '正在识别...' : '输入消息...'}
               className={`${compact ? 'min-h-[28px] px-1.5 py-1.5 leading-[1.35] overflow-hidden' : 'min-h-[34px] px-2 py-1.5 text-[14px] leading-[1.45] overflow-y-auto'} max-h-[112px] min-w-0 flex-1 resize-none border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
               style={{ fontSize: compact ? compactFontSize : undefined }}

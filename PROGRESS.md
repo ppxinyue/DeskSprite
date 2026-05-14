@@ -1959,3 +1959,17 @@
 - 兼容：保留旧 addon 的 fallback，若没有新导出则退回 `setPanelLevelFloating`；composition end 后恢复强悬浮层级。
 - 验证：`node scripts/build-panel-key-fix.mjs`、`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline` 通过。
 - 文件：main.cjs, panel-key-fix.mm, ISSUES.md, PROGRESS.md
+
+### R257. Compact Chat 输入态焦点化以支持 IME 候选框（2026-05-14）
+- 输入态：compact textarea focus、鼠标按下和 composition start 会进入显式 IME input mode，main 进程对 compact chat 执行 `show()` / `focus()`，让系统输入法把候选框上下文绑定到这个 textarea。
+- 恢复：textarea blur 后延迟 180ms 退出输入态，恢复普通强置顶浮窗层级；隐藏 compact chat 时同步清理输入态和 composition 状态，避免残留。
+- 层级：macOS 输入态继续使用 `NSPopUpMenuWindowLevel - 1` 原生层级；Windows 输入态复用 `pop-up-menu` always-on-top level，非输入态恢复 `screen-saver`。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false` 通过。
+- 文件：ChatPrimitives.tsx, main.cjs, ISSUES.md, PROGRESS.md
+
+### R258. Compact Chat 输入态去重与 Debug 日志（2026-05-14）
+- 修复：移除 textarea `mousedown` 直接调用 native focus 的路径，避免和 `focus`/`compositionstart` 连续触发导致窗口闪烁、字符重复输入。
+- 幂等：renderer 端记录 compact IME input active 状态，重复 input-start 会被跳过；main 端 `focusCompactChatWindowForInput` 只在首次进入输入态或窗口未 focused 时执行 `moveTop()` / `focus()`。
+- 调试：renderer 输出 `[compact-chat:ime-renderer]` 事件日志；main 进程在 `DESKSPRITE_DEBUG_COMPACT_CHAT=1` 或 `--debug-compact-chat` 下输出 `[compact-chat:debug]`，包含窗口可见性、focused、bounds、IME input/composition 状态和层级配置路径。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false` 通过。
+- 文件：ChatPrimitives.tsx, main.cjs, ISSUES.md, PROGRESS.md
