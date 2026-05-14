@@ -341,20 +341,88 @@ function domainFromUrl(url: string | null | undefined) {
   }
 }
 
+const TIMELINE_EXACT_APP_CATEGORIES: Record<string, TimelineCategory> = {
+  code: 'coding',
+  'code.exe': 'coding',
+  'code - insiders': 'coding',
+  'code - insiders.exe': 'coding',
+  'code-insiders': 'coding',
+  'code-insiders.exe': 'coding',
+  cmd: 'coding',
+  'cmd.exe': 'coding',
+  powershell: 'coding',
+  'powershell.exe': 'coding',
+  pwsh: 'coding',
+  'pwsh.exe': 'coding',
+  wt: 'coding',
+  'wt.exe': 'coding',
+  devenv: 'coding',
+  'devenv.exe': 'coding',
+  idea: 'coding',
+  'idea.exe': 'coding',
+  'sublime_text': 'coding',
+  'sublime_text.exe': 'coding',
+  zed: 'coding',
+  'zed.exe': 'coding',
+  chrome: 'browser',
+  'chrome.exe': 'browser',
+  msedge: 'browser',
+  'msedge.exe': 'browser',
+  firefox: 'browser',
+  'firefox.exe': 'browser',
+  brave: 'browser',
+  'brave.exe': 'browser',
+  safari: 'browser',
+  arc: 'browser',
+  'arc.exe': 'browser',
+  wechat: 'chat',
+  'wechat.exe': 'chat',
+  qq: 'chat',
+  'qq.exe': 'chat',
+  slack: 'chat',
+  'slack.exe': 'chat',
+  discord: 'chat',
+  'discord.exe': 'chat',
+  telegram: 'chat',
+  'telegram.exe': 'chat',
+  teams: 'chat',
+  'teams.exe': 'chat',
+  outlook: 'chat',
+  'outlook.exe': 'chat',
+  winword: 'office',
+  'winword.exe': 'office',
+  excel: 'office',
+  'excel.exe': 'office',
+  powerpnt: 'office',
+  'powerpnt.exe': 'office',
+  onenote: 'office',
+  'onenote.exe': 'office',
+  explorer: 'office',
+  'explorer.exe': 'office',
+  spotify: 'entertainment',
+  'spotify.exe': 'entertainment',
+  steam: 'entertainment',
+  'steam.exe': 'entertainment',
+  vlc: 'entertainment',
+  'vlc.exe': 'entertainment',
+};
+
 function classifyTimelineCategory(appName: string, windowTitle: string, url: string | null | undefined): TimelineCategory {
   const app = appName.toLowerCase();
   const title = windowTitle.toLowerCase();
   const domain = domainFromUrl(url)?.toLowerCase() ?? '';
-  if (/(terminal|iterm|warp|cursor|visual studio code|xcode|github|codex|claude)/.test(app)) return 'coding';
-  if (/(wechat|微信|qq|feishu|飞书|slack|discord|telegram|messages|mail|outlook|teams)/.test(app)) return 'chat';
-  if (/(safari|chrome|chromium|brave|edge|arc|firefox|vivaldi)/.test(app)) {
+  const exactCategory = TIMELINE_EXACT_APP_CATEGORIES[app];
+  if (exactCategory) return exactCategory;
+  if (/(terminal|iterm|warp|cursor|visual studio code|vscodium|xcode|android studio|intellij idea|pycharm|webstorm|phpstorm|clion|goland|rider|datagrip|sublime text|github|gitkraken|sourcetree|docker desktop|postman|codex|claude)/.test(app)) return 'coding';
+  if (/(wechat|微信|feishu|飞书|lark|dingtalk|钉钉|slack|discord|telegram|messages|mail|outlook|teams)/.test(app)) return 'chat';
+  if (/(safari|chrome|chromium|brave|edge|msedge|arc|firefox|vivaldi|opera)/.test(app)) {
     if (/(youtube|bilibili|netflix|twitch|douyin|tiktok|weibo|xiaohongshu|reddit|instagram|twitter|x\.com)/.test(`${domain} ${title}`)) {
       return 'entertainment';
     }
     return 'browser';
   }
-  if (/(music|neteasemusic|spotify|steam|网易云|vlc|quicktime|tv|podcasts)/.test(app)) return 'entertainment';
-  if (/(pages|numbers|keynote|word|excel|powerpoint|preview|finder|notion|obsidian|figma|photoshop|illustrator)/.test(app)) return 'office';
+  if (/(music|neteasemusic|cloudmusic|qqmusic|spotify|steam|网易云|vlc|quicktime|potplayer|tv|podcasts)/.test(app)) return 'entertainment';
+  if (/(pages|numbers|keynote|word|excel|powerpoint|onenote|preview|finder|explorer|notion|obsidian|figma|photoshop|illustrator|acrobat)/.test(app)) return 'office';
   return 'other';
 }
 

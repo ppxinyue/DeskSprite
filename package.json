@@ -1,7 +1,7 @@
 {
   "name": "deskcat",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -10,6 +10,7 @@
     "electron:start": "pnpm native:build && electron .",
     "build": "tsc -b && vite build",
     "electron:build": "pnpm native:build && pnpm build && electron-builder",
+    "electron:build:mac": "pnpm native:build && pnpm build && electron-builder --mac dmg --x64 --arm64 --publish never",
     "lint": "eslint .",
     "test:timeline": "node --test src/lib/timelineRecorder.test.ts src/lib/timelineView.test.ts src/lib/db.timeline.test.ts src/lib/cloudSyncScheduler.test.ts",
     "test:startup": "node --test src/lib/startupTheme.test.ts electron/windowLifecycle.test.cjs electron/codingStatus.test.cjs",
@@ -61,6 +62,13 @@
   "build": {
     "appId": "com.deskcat.app",
     "productName": "DeskCat",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "asarUnpack": [
+      "electron/native/*.node"
+    ],
     "files": [
       "dist/**",
       "electron/**",
@@ -69,6 +77,7 @@
     "mac": {
       "category": "public.app-category.productivity",
       "target": "dmg",
+      "identity": "-",
       "icon": "src-tauri/icons/icon.icns",
       "extendInfo": {
         "NSAppleEventsUsageDescription": "DeskCat needs Automation permission to read Calendar and Reminders for the System Knowledge Base.",

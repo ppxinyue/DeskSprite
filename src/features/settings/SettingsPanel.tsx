@@ -489,6 +489,7 @@ function ProfileSection() {
   const todayKey = getLocalDateKey();
   const isExampleSelected = selectedDate === PROFILE_EXAMPLE_KEY;
   const selectedRealDate = isExampleSelected ? todayKey : selectedDate;
+  const exampleLabel = settings.appLanguage === 'en' ? 'example' : '示例';
 
   const loadProfileData = useCallback(() => {
     const loadDate = selectedDate === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : selectedDate;
@@ -569,70 +570,72 @@ function ProfileSection() {
       <div className="mb-5 flex items-center justify-between gap-3">
         <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.018em] text-foreground">个人档案</h1>
         <div className="flex flex-col items-end gap-1">
-          <div ref={calendarRef} className="relative flex items-center gap-1.5 rounded-[9px] bg-white/44 p-1 shadow-[0_8px_22px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.7)_inset] dark:bg-white/[0.045]">
+          <div className="flex items-center gap-1.5">
+            <div ref={calendarRef} className={`relative flex items-center gap-1.5 rounded-[9px] bg-white/44 p-1 shadow-[0_8px_22px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.7)_inset] dark:bg-white/[0.045] ${calendarOpen ? 'z-[200]' : 'z-0'}`}>
+              <button
+                type="button"
+                className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+                onClick={() => {
+                  setSelectedDate((date) => {
+                    const baseDate = date === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : date;
+                    return shiftDateKey(baseDate, -1);
+                  });
+                }}
+                aria-label="前一天"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="flex min-w-[128px] items-center justify-center gap-1.5 rounded-[7px] px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-background/70"
+                onClick={() => setCalendarOpen((open) => !open)}
+                aria-haspopup="dialog"
+                aria-expanded={calendarOpen}
+              >
+                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                {formatDateHeading(selectedRealDate)}
+              </button>
+              <button
+                type="button"
+                className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
+                onClick={() => {
+                  setSelectedDate((date) => {
+                    const baseDate = date === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : date;
+                    return shiftDateKey(baseDate, 1);
+                  });
+                }}
+                disabled={selectedRealDate >= todayKey}
+                aria-label="后一天"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+              {calendarOpen && (
+                <ProfileCalendar
+                  month={calendarMonth}
+                  selectedDate={selectedRealDate}
+                  todayKey={todayKey}
+                  onMonthChange={setCalendarMonth}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    setCalendarOpen(false);
+                  }}
+                />
+              )}
+            </div>
             <button
               type="button"
-              className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
-              onClick={() => {
-                setSelectedDate((date) => {
-                  const baseDate = date === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : date;
-                  return shiftDateKey(baseDate, -1);
-                });
-              }}
-              aria-label="前一天"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              className="flex min-w-[128px] items-center justify-center gap-1.5 rounded-[7px] px-2 text-[12px] font-medium text-foreground transition-colors hover:bg-background/70"
-              onClick={() => setCalendarOpen((open) => !open)}
-              aria-haspopup="dialog"
-              aria-expanded={calendarOpen}
-            >
-              <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-              {formatDateHeading(selectedRealDate)}
-            </button>
-            <button
-              type="button"
-              className={`flex h-7 items-center justify-center rounded-[7px] px-2 text-[11px] font-semibold transition-colors ${
+              className={`flex h-9 items-center justify-center rounded-[9px] px-3 text-[11px] font-semibold shadow-[0_8px_22px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.7)_inset] transition-colors dark:shadow-[0_8px_22px_rgba(0,0,0,0.16)] ${
                 isExampleSelected
-                  ? 'bg-[#2f8fff] text-white shadow-none'
-                  : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
+                  ? 'bg-[#2f8fff] text-white shadow-none dark:bg-[#5eb1ff] dark:text-[#102033]'
+                  : 'bg-white/44 text-muted-foreground hover:bg-white/62 hover:text-foreground dark:bg-white/[0.045] dark:hover:bg-white/[0.07]'
               }`}
               onClick={() => {
                 setSelectedDate(PROFILE_EXAMPLE_KEY);
                 setCalendarOpen(false);
               }}
             >
-              示例 / Example
+              {exampleLabel}
             </button>
-            <button
-              type="button"
-              className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
-              onClick={() => {
-                setSelectedDate((date) => {
-                  const baseDate = date === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : date;
-                  return shiftDateKey(baseDate, 1);
-                });
-              }}
-              disabled={selectedRealDate >= todayKey}
-              aria-label="后一天"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-            {calendarOpen && (
-              <ProfileCalendar
-                month={calendarMonth}
-                selectedDate={selectedRealDate}
-                todayKey={todayKey}
-                onMonthChange={setCalendarMonth}
-                onSelect={(date) => {
-                  setSelectedDate(date);
-                  setCalendarOpen(false);
-                }}
-              />
-            )}
           </div>
           {profileMockPreview && (
             <div className="text-right text-[10px] font-medium text-[#d13438] dark:text-[#ff8f8f]">
@@ -645,6 +648,7 @@ function ProfileSection() {
       <TimelineSection
         date={selectedDate}
         entries={timelineEntries}
+        exampleLabel={exampleLabel}
         minSegmentMinutes={settings.timelineMinSegmentMinutes}
         selectedId={selectedTimelineId}
         onSelect={setSelectedTimelineId}
@@ -879,12 +883,14 @@ const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
 function TimelineSection({
   date,
   entries,
+  exampleLabel,
   minSegmentMinutes,
   selectedId,
   onSelect,
 }: {
   date: string;
   entries: TimelineEntry[];
+  exampleLabel: string;
   minSegmentMinutes: number;
   selectedId: number | null;
   onSelect: (id: number | null) => void;
@@ -904,8 +910,8 @@ function TimelineSection({
   const visibleCategories = getVisibleTimelineCategoriesFromBlocks(timelineBlocks);
   const categoryStats = getTimelineCategoryStatsFromBlocks(timelineBlocks);
   const topApps = getTopTimelineApps(timelineBlocks);
-  const hourlyCounts = getHourlyTaskCounts(timelineBlocks);
-  const maxHourlyCount = Math.max(1, ...hourlyCounts.map((item) => item.count));
+  const hourlyActivity = getHourlyActivityStats(timelineBlocks);
+  const maxHourlyDurationMs = Math.max(1, ...hourlyActivity.map((item) => item.durationMs));
   const selectedBlockDurationMs = selectedBlock ? getTimelineBlockDurationMs(selectedBlock) : 0;
   const totalMs = timelineBlocks.reduce((sum, block) => sum + getTimelineBlockDurationMs(block), 0);
   const backgroundMarkers = entries.flatMap((entry) => entry.backgroundMarkers.map((marker) => ({
@@ -954,7 +960,7 @@ function TimelineSection({
             Timeline
             {isMockPreview && (
               <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-[#687076] shadow-[0_4px_12px_rgba(52,64,84,0.06)] dark:bg-white/7 dark:text-white/60">
-                示例 / Example
+                {exampleLabel}
               </span>
             )}
           </div>
@@ -1167,18 +1173,34 @@ function TimelineSection({
           <div className="mb-2 text-[12px] font-semibold text-foreground">全天活跃度</div>
           <div className="rounded-[10px] bg-[#f8f9fa] px-2 pb-2 pt-3 dark:bg-white/[0.035]">
             <div className="flex h-14 items-end gap-1.5">
-              {hourlyCounts.map((item) => (
-                <div key={`bar-${item.hour}`} className="group flex min-w-0 flex-1 items-end">
+              {hourlyActivity.map((item) => {
+                const durationLabel = item.durationMs > 0 ? formatTimelineDuration(item.durationMs) : '0 分钟';
+                return (
                   <div
-                    className="w-full rounded-t-[5px] bg-[#c1c8cd] transition-colors group-hover:bg-[#8b8d98]"
-                    style={{ height: `${Math.max(item.count > 0 ? 8 : 2, (item.count / maxHourlyCount) * 48)}px` }}
-                    title={`${String(item.hour).padStart(2, '0')}:00 · ${item.count} 个 task`}
-                  />
-                </div>
-              ))}
+                    key={`bar-${item.hour}`}
+                    className="group flex min-w-0 flex-1 items-end"
+                    onMouseEnter={(event) => setHoverCard(positionTimelineHoverCard(event, {
+                      eyebrow: '',
+                      title: durationLabel,
+                      body: '',
+                    }))}
+                    onMouseMove={(event) => setHoverCard(positionTimelineHoverCard(event, {
+                      eyebrow: '',
+                      title: durationLabel,
+                      body: '',
+                    }))}
+                    onMouseLeave={() => setHoverCard(null)}
+                  >
+                    <div
+                      className="w-full rounded-t-[5px] bg-[#c1c8cd] transition-colors group-hover:bg-[#8b8d98]"
+                      style={{ height: `${Math.max(item.durationMs > 0 ? 8 : 2, (item.durationMs / maxHourlyDurationMs) * 48)}px` }}
+                    />
+                  </div>
+                );
+              })}
             </div>
             <div className="mt-1.5 flex gap-1.5">
-              {hourlyCounts.map((item) => (
+              {hourlyActivity.map((item) => (
                 <div key={`label-${item.hour}`} className="min-w-0 flex-1 text-center text-[9px] leading-none text-[#8b8d98]">
                   {item.hour % 2 === 0 ? item.hour : ''}
                 </div>
@@ -1525,7 +1547,7 @@ function ProfileCalendar({
   const canGoNext = shiftMonthKey(month, 1) <= getMonthKey(todayKey);
   return (
     <div
-      className="glass-panel-strong absolute right-0 top-10 z-50 w-[268px] rounded-[11px] p-3 shadow-[0_18px_46px_rgba(42,38,31,0.16)]"
+      className="glass-panel-strong absolute right-0 top-10 z-[1000] w-[268px] rounded-[11px] p-3 shadow-[0_18px_46px_rgba(42,38,31,0.16)]"
       role="dialog"
       aria-label="选择统计日期"
       onPointerDown={(event) => event.stopPropagation()}
@@ -2262,7 +2284,7 @@ function getTopTimelineContent(entries: TimelineEntry[], appName: string): strin
   return top?.domain || top?.windowTitle || top?.url || '无标题活动';
 }
 
-function getHourlyTaskCounts(blocks: TimelineBlock[]): Array<{ hour: number; count: number }> {
+function getHourlyActivityStats(blocks: TimelineBlock[]): Array<{ hour: number; count: number; durationMs: number }> {
   return Array.from({ length: 24 }, (_, hour) => ({
     hour,
     count: blocks.filter((block) => {
@@ -2274,6 +2296,17 @@ function getHourlyTaskCounts(blocks: TimelineBlock[]): Array<{ hour: number; cou
       hourEnd.setHours(hour + 1, 0, 0, 0);
       return start < hourEnd && end > hourStart;
     }).length,
+    durationMs: blocks.reduce((sum, block) => {
+      const start = new Date(block.startedAt);
+      const end = new Date(block.endedAt);
+      const hourStart = new Date(start);
+      hourStart.setHours(hour, 0, 0, 0);
+      const hourEnd = new Date(hourStart);
+      hourEnd.setHours(hour + 1, 0, 0, 0);
+      const overlapStart = Math.max(start.getTime(), hourStart.getTime());
+      const overlapEnd = Math.min(end.getTime(), hourEnd.getTime());
+      return sum + Math.max(0, overlapEnd - overlapStart);
+    }, 0),
   }));
 }
 
@@ -3051,8 +3084,8 @@ function AISection({
       {view === 'coding' && (
         <>
       <SectionTitle>Coding 模式</SectionTitle>
-      <SettingsGroup>
-        {([
+	      <SettingsGroup>
+	        {([
           {
             provider: 'claude' as const,
             label: 'Claude Code',
@@ -3080,9 +3113,12 @@ function AISection({
                 <span className="max-w-[260px] text-right text-[11px] leading-4 text-red-600">{codingCheck[item.provider].error}</span>
               )}
             </div>
-          </SettingRow>
-        ))}
-      </SettingsGroup>
+	          </SettingRow>
+	        ))}
+	        <div className="px-4 py-3 text-[11px] leading-5 text-muted-foreground">
+	          状态灯规则：绿色表示任务完成，黄色表示正在工作，红色表示需要处理。红色会覆盖模型容量不足、rate limit、权限/授权请求、登录或权限错误、任务失败/中断，以及运行中 5 分钟没有任何新输出的卡住状态。
+	        </div>
+	      </SettingsGroup>
         </>
       )}
 
@@ -3362,6 +3398,11 @@ function GeneralSection({
             </SettingRow>
             <SettingRow label="共享屏幕时隐藏灵宠" hint="默认开启，防止共享屏幕时灵宠进入画面">
               <Switch checked={settings.hidePetDuringScreenShare} onCheckedChange={(v) => updateSetting('hidePetDuringScreenShare', v)} />
+            </SettingRow>
+            <SettingRow label="版本" hint="当前安装的 DeskCat 版本">
+              <span className="rounded-[8px] bg-white/60 px-2.5 py-1 text-[12px] font-semibold text-muted-foreground shadow-[0_1px_4px_rgba(15,23,42,0.05)] dark:bg-white/[0.055]">
+                v{__APP_VERSION__}
+              </span>
             </SettingRow>
           </SettingsGroup>
           <div className="space-y-2 pt-1">

@@ -86,6 +86,19 @@ function extractDetailText(payload = {}) {
   );
 }
 
+function extractCodeText(payload = {}) {
+  return compactMessage(
+    extractTextFromValue(payload.code)
+      || extractTextFromValue(payload.statusCode)
+      || extractTextFromValue(payload.status_code)
+      || extractTextFromValue(payload.error?.code)
+      || extractTextFromValue(payload.error?.status)
+      || '',
+    '',
+    180,
+  );
+}
+
 function extractToolName(payload = {}) {
   return compactMessage(
     extractTextFromValue(payload.tool)
@@ -145,13 +158,30 @@ function classifyProblem(method = '', payload = {}, raw = '') {
   ].filter(Boolean).join(' ').toLowerCase();
   const haystack = `${structured} ${text}`;
 
-  if (/\bfailed\b|turn\/completed failed|task_failed|command failed|non-zero exit/.test(haystack)) return 'failed';
+  if (/\bfailed\b|turn\/completed failed|task_failed|command failed|non-zero exit|interrupted|interrupt|cancelled|canceled|aborted/.test(haystack)) return 'failed';
+  if (/model (?:is )?at capa(?:c|t)ity|capacity|usage limit|rate limit|rate_limit|quota|too many requests|\b429\b|\b529\b|overloaded|temporarily unavailable|server_error|internal server error|maximum output tokens|max output tokens|context length|context_length_exceeded/.test(haystack)) return 'error';
   if (/\berror\b|exception|timeout|timed out/.test(haystack)) return 'error';
   if (/guardianwarning|guardian|blocked|forbidden|rejected/.test(haystack)) return 'guardian';
   if (/requestapproval|request_approval|approval_request|needs_approval|requires_approval|\bapproval\b|\bapprov/.test(haystack)) return 'approval';
   if (/request_user_input|ask_user|needs_input|requires_action|confirm|question|input required/.test(haystack)) return 'input';
   if (/permission|login|auth|signin|reauth|denied/.test(haystack)) return 'blocked';
   return '';
+}
+
+function isBlockingProblemText(value = '') {
+  const text = extractTextFromValue(value) || String(value || '');
+  return Boolean(classifyProblem('', { message: text }, text));
+}
+
+function isTransientProgressText(value = '') {
+  const text = String(value || '');
+  return /Reconnecting|Falling back|retrying sampling request|system\/api_retry/i.test(text)
+    && !isBlockingProblemText(text);
+}
+
+function describeNoOutput(providerLabel = 'Coding agent', elapsedMs = 0) {
+  const minutes = Math.max(1, Math.floor(elapsedMs / 60_000));
+  return `${providerLabel} 已经 ${minutes} 分钟没有新的输出，可能卡在模型容量、网络、权限或后台进程上。请检查终端/账号状态，或重新发起任务。`;
 }
 
 function describeProblem(method = '', payload = {}, raw = '') {
@@ -162,14 +192,19 @@ function describeProblem(method = '', payload = {}, raw = '') {
   const command = extractCommandText(payload);
   const tool = extractToolName(payload);
   const detail = extractDetailText(payload);
+  const code = extractCodeText(payload);
   const choices = extractChoiceText(payload);
 
   const lines = [label];
   if (command) lines.push(`命令：${command}`);
   if (tool && (!command || tool !== command)) lines.push(`工具：${tool}`);
+  if (code) lines.push(`代码：${code}`);
   if (question && question !== detail) lines.push(`内容：${question}`);
   if (detail && detail !== question) lines.push(`详情：${detail}`);
   if (choices) lines.push(`可选项：${choices}`);
+  if (lines.length === 1 && typeof raw === 'string' && raw.trim()) {
+    lines.push(`详情：${compactMessage(raw, '', 800)}`);
+  }
   return compactMessage(lines.join('\n'), label, 1800);
 }
 
@@ -200,6 +235,9 @@ module.exports = {
   describeCodexNotice,
   describeCodexRequest,
   describeCodexSessionProblemEvent,
+  describeNoOutput,
   extractTextFromValue,
+  isBlockingProblemText,
+  isTransientProgressText,
   resolveSessionStatus,
 };

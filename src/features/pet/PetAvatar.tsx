@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from 'react';
 import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { usePetStore } from './petStore';
@@ -102,6 +102,7 @@ export function PetAvatar({
   const petRootRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const motionsRef = useRef(motions);
   const submenuCloseTimer = useRef<number | null>(null);
   const activeSubmenuRef = useRef<'history' | 'coding' | null>(null);
   const lockedSubmenuRef = useRef<'history' | 'coding' | null>(null);
@@ -109,6 +110,9 @@ export function PetAvatar({
   const w = Math.round((orbMode ? 150 : 120) * scale);
   const h = Math.round(150 * scale);
   const animationsPaused = dragging;
+  const enabledMotionKey = MOTION_NAMES
+    .filter((name) => motions[name]?.enabled)
+    .join('|');
   const submenuBridgeClass = `pointer-events-auto absolute z-10 w-14 ${
     submenuSide === 'left' ? 'right-full -mr-1' : 'left-full -ml-1'
   }`;
@@ -119,6 +123,16 @@ export function PetAvatar({
       ? 'polygon(100% 0, 0 16%, 0 84%, 100% 100%)'
       : 'polygon(0 0, 100% 16%, 100% 84%, 0 100%)',
   });
+
+  const switchFrameAndMotion = useCallback(() => {
+    setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));
+    if (animationsPaused) return;
+    setCurrentMotion((motion) => pickNextMotion(motionsRef.current, motion));
+  }, [animationsPaused, frameSources.length]);
+
+  useEffect(() => {
+    motionsRef.current = motions;
+  }, [motions]);
 
   useEffect(() => {
     loadUserFrames();
@@ -131,25 +145,19 @@ export function PetAvatar({
       switchFrameAndMotion();
     }, getRandomFrameSwitchDelay());
     return () => clearTimeout(t);
-  }, [config.userAnimatedPath, dialogOpen, frameSources.length, currentFrame, currentMotion, motions]);
+  }, [config.userAnimatedPath, dialogOpen, frameSources.length, switchFrameAndMotion]);
 
   useEffect(() => {
     setCurrentFrame(frameSources.length > 1 ? Math.floor(Math.random() * frameSources.length) : 0);
-    setCurrentMotion((motion) => pickNextMotion(motions, motion));
-  }, [petState, config.userAnimatedPath, frameSources.length, motions]);
+  }, [petState, config.userAnimatedPath, frameSources.length]);
 
   useEffect(() => {
     setCurrentMotion((motion) => {
-      if (motion && motions[motion]?.enabled) return motion;
-      return pickNextMotion(motions, motion);
+      const nextMotions = motionsRef.current;
+      if (motion && nextMotions[motion]?.enabled) return motion;
+      return pickNextMotion(nextMotions, motion);
     });
-  }, [motions]);
-
-  const switchFrameAndMotion = () => {
-    setCurrentFrame((f) => getNextFrameIndex(f, frameSources.length));
-    if (animationsPaused) return;
-    setCurrentMotion((motion) => pickNextMotion(motions, motion));
-  };
+  }, [enabledMotionKey]);
 
   useEffect(() => {
     if (!menuOpen) return;

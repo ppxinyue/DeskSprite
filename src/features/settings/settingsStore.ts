@@ -115,7 +115,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   speakRate: 1.0,
   launchAtLogin: true,
   timelineRecordingEnabled: true,
-  timelineMinSegmentMinutes: 1,
+  timelineMinSegmentMinutes: 3,
   gameAppKeywords: [
     'Steam',
     'Epic Games',

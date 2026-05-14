@@ -4,6 +4,8 @@ const {
   describeCodexNotice,
   describeCodexRequest,
   describeCodexSessionProblemEvent,
+  describeNoOutput,
+  isBlockingProblemText,
   resolveSessionStatus,
 } = require('./codingStatus.cjs');
 
@@ -42,6 +44,29 @@ test('describeCodexSessionProblemEvent treats failed events as actionable and ke
   assert.match(message, /执行失败|出现错误/);
   assert.match(message, /Python tests failed/);
   assert.match(message, /Exit code 1/);
+});
+
+test('model capacity, interrupted, and permission text are blocking red states', () => {
+  assert.equal(isBlockingProblemText('model at capacity'), true);
+  assert.equal(isBlockingProblemText('turn interrupted by model provider'), true);
+  assert.equal(isBlockingProblemText('permission approval required before running command'), true);
+  assert.equal(isBlockingProblemText('system/api_retry reconnecting'), false);
+  assert.equal(isBlockingProblemText('{"max_output_tokens":20000}'), false);
+});
+
+test('session problem descriptions include explicit error codes', () => {
+  const message = describeCodexSessionProblemEvent('event_msg', {
+    type: 'error',
+    error: { code: 'rate_limit_exceeded', message: 'Model is at capacity' },
+  });
+
+  assert.match(message, /出现错误/);
+  assert.match(message, /rate_limit_exceeded/);
+  assert.match(message, /Model is at capacity/);
+});
+
+test('describeNoOutput explains stalled coding work', () => {
+  assert.match(describeNoOutput('Codex', 5 * 60_000), /Codex 已经 5 分钟没有新的输出/);
 });
 
 test('resolveSessionStatus clears needs-input once later work arrives', () => {

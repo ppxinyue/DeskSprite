@@ -28,6 +28,7 @@ const COMPACT_CHAT_KEY = "deskcat:compact-chat";
 const COMPACT_CHAT_DISMISSED_KEY = "deskcat:compact-chat-dismissed";
 const CODING_CONVERSATION_KEY = "deskcat:coding-conversation-id";
 const CODING_SAVED_MESSAGES_KEY = "deskcat:coding-saved-message-ids";
+const CODING_SESSION_ORDER_KEY = "deskcat:coding-session-order";
 const TIMELINE_RECORDER_STATE_KEY = "deskcat:timeline-recorder-state";
 const SCREEN_MARGIN = 16;
 const PET_CONTENT_MARGIN = 20;
@@ -409,6 +410,10 @@ function codingSavedMessagesKey(provider: CodingProvider) {
   return provider === 'claude' ? `${CODING_SAVED_MESSAGES_KEY}:claude` : CODING_SAVED_MESSAGES_KEY;
 }
 
+function codingSessionOrderKey(provider: CodingProvider) {
+  return provider === 'claude' ? `${CODING_SESSION_ORDER_KEY}:claude` : CODING_SESSION_ORDER_KEY;
+}
+
 function CompactChatWindow() {
   const { settings } = useSettingsStore();
   const lastCompactHeightRef = useRef(0);
@@ -576,6 +581,8 @@ function CodingDialog({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const autoOpenedHistoryProviderRef = useRef<CodingProvider | null>(null);
+  const inheritedSessionOrderRef = useRef<string[]>([]);
+  const activeInheritedSessionIdRef = useRef<string | null>(null);
   const enabledProviders = useMemo(() => getEnabledCodingProviders(settings), [settings.codingCodexEnabled, settings.codingClaudeEnabled]);
   const activeProvider = standalone ? standaloneProvider : settings.codingProvider;
   const effectiveSettings = useMemo(() => ({ ...settings, codingProvider: activeProvider }), [activeProvider, settings]);
@@ -590,6 +597,10 @@ function CodingDialog({
     if (!enabledProviders.includes(standaloneProvider)) setStandaloneProvider(enabledProviders[0]);
   }, [enabledProviders, standalone, standaloneProvider]);
 
+  useEffect(() => {
+    inheritedSessionOrderRef.current = readCodingSessionOrder(activeProvider);
+  }, [activeProvider]);
+
   const applyCodingState = useCallback((next: CodingState | null | undefined) => {
     const resolved = next ?? DEFAULT_CODING_STATE;
     setState(resolved);
@@ -597,7 +608,11 @@ function CodingDialog({
     setActiveInheritedSessionId((current) => {
       const sessions = codingStateSessions(resolved);
       const currentSession = current ? sessions.find((session) => session.id === current) : null;
+      const refSession = activeInheritedSessionIdRef.current
+        ? sessions.find((session) => session.id === activeInheritedSessionIdRef.current)
+        : null;
       const firstNeedsInput = sessions.find((session) => session.status === 'needs-input');
+      if (refSession) return refSession.id;
       if (currentSession) return currentSession.id;
       if (firstNeedsInput) return firstNeedsInput.id;
       return sessions.find((session) => session.status === 'working')?.id
@@ -698,11 +713,16 @@ function CodingDialog({
     setArchivedMessages(null);
     setActiveArchivedConversationId(null);
     setActiveInheritedSessionId(null);
+    activeInheritedSessionIdRef.current = null;
     setInheritedState(DEFAULT_CODING_STATE);
     setHistoryItems([]);
     autoOpenedHistoryProviderRef.current = null;
     stickToBottomRef.current = true;
   }, [activeProvider]);
+
+  useEffect(() => {
+    activeInheritedSessionIdRef.current = activeInheritedSessionId;
+  }, [activeInheritedSessionId]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -756,9 +776,10 @@ function CodingDialog({
     }
   };
 
-  const inheritedSessions = standalone
+  const rawInheritedSessions = standalone
     ? codingStateSessions(inheritedState)
     : codingStateSessions(state);
+  const inheritedSessions = stabilizeCodingSessions(rawInheritedSessions, inheritedSessionOrderRef, activeProvider);
 
   useEffect(() => {
     if (!standalone) return;
@@ -779,6 +800,10 @@ function CodingDialog({
   useEffect(() => {
     if (standalone || !inherited) return;
     setActiveInheritedSessionId((current) => {
+      const refSession = activeInheritedSessionIdRef.current
+        ? inheritedSessions.find((session) => session.id === activeInheritedSessionIdRef.current)
+        : null;
+      if (refSession) return refSession.id;
       if (current && inheritedSessions.some((session) => session.id === current)) return current;
       return inheritedSessions.find((session) => session.status === 'needs-input')?.id
         ?? inheritedSessions.find((session) => session.status === 'working')?.id
@@ -817,6 +842,7 @@ function CodingDialog({
   const showInheritedSessionButtons = inheritedSessions.length > 1 && !archivedMessages;
   const selectInheritedSession = useCallback((sessionId: string) => {
     stickToBottomRef.current = true;
+    activeInheritedSessionIdRef.current = sessionId;
     setArchivedMessages(null);
     setActiveArchivedConversationId(null);
     setActiveInheritedSessionId(sessionId);
@@ -835,11 +861,7 @@ function CodingDialog({
                 <button
                   key={session.id}
                   className={`block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52 ${activeInheritedSession?.id === session.id ? 'bg-background/58' : ''}`}
-                  onClick={() => {
-                  setArchivedMessages(null);
-                  setActiveArchivedConversationId(null);
-                  setActiveInheritedSessionId(session.id);
-                  }}
+                  onClick={() => selectInheritedSession(session.id)}
                 >
                   <div className="flex items-center gap-2">
                     <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(session.status)}`} />
@@ -859,10 +881,7 @@ function CodingDialog({
                   <button
                     key={`inherited-${session.id}`}
                     className={`block w-full rounded-[13px] px-3 py-2.5 text-left transition-all duration-200 hover:bg-background/52 ${activeInheritedSessionId === session.id ? 'bg-background/58' : ''}`}
-                    onClick={() => {
-                      setArchivedMessages(null);
-                      setActiveInheritedSessionId(session.id);
-                    }}
+                    onClick={() => selectInheritedSession(session.id)}
                   >
                     <div className="flex items-center gap-2">
                       <span className={`h-2 w-2 rounded-full ${codingStatusDotClass(session.status)}`} />
@@ -1103,26 +1122,12 @@ function CodingSessionButtons({
   onSelect: (sessionId: string) => void;
   compact?: boolean;
 }) {
-  const lastSelectedAtRef = useRef(0);
-  const activateFromEvent = (event: React.SyntheticEvent<HTMLElement>) => {
-    const target = event.target as HTMLElement | null;
-    const button = target?.closest<HTMLButtonElement>('[data-coding-session-id]');
-    const sessionId = button?.dataset.codingSessionId;
-    if (!sessionId) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const now = performance.now();
-    if (now - lastSelectedAtRef.current < 160) return;
-    lastSelectedAtRef.current = now;
-    onSelect(sessionId);
-  };
-
   return (
     <div
-      className="app-no-drag relative z-10 overflow-x-auto overflow-y-hidden"
-      onPointerDownCapture={activateFromEvent}
-      onMouseDownCapture={activateFromEvent}
-      onClickCapture={activateFromEvent}
+      className="app-no-drag pointer-events-auto relative z-20 overflow-x-auto overflow-y-hidden px-0"
+      role="tablist"
+      aria-label="Coding sessions"
+      style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
     >
       <div className={`flex min-w-max gap-1.5 ${compact ? '' : 'pr-1'}`}>
         {sessions.map((session, index) => {
@@ -1131,12 +1136,16 @@ function CodingSessionButtons({
             <button
               key={session.id}
               type="button"
-              data-coding-session-id={session.id}
-              className={`app-no-drag group inline-flex max-w-[164px] touch-manipulation select-none items-center gap-1.5 rounded-full border px-2.5 py-1 text-left transition-all ${
+              role="tab"
+              aria-selected={active}
+              draggable={false}
+              style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
+              className={`app-no-drag group inline-flex max-w-[164px] touch-manipulation select-none items-center gap-1.5 rounded-full border px-2.5 py-1 text-left transition-all duration-200 hover:bg-background/52 ${
                 active
                   ? 'border-[#2f94ff]/28 bg-[#2f94ff]/10 text-[var(--text-primary)]'
                   : 'border-border/35 bg-background/26 text-[var(--text-secondary)] hover:bg-background/44 hover:text-[var(--text-primary)]'
-              } ${compact ? 'text-[10px]' : 'text-[11px]'}`}
+                } ${compact ? 'text-[10px]' : 'text-[11px]'}`}
+              onClick={() => onSelect(session.id)}
             >
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${codingStatusDotClass(session.status)}`} />
               <span className="truncate font-medium leading-[1.3]">
@@ -1248,6 +1257,38 @@ function codingStatusColor(status: CodingStatus) {
 
 function codingStateSessions(state: CodingState) {
   return state.allSessions || state.sessions || [];
+}
+
+function readCodingSessionOrder(provider: CodingProvider) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(codingSessionOrderKey(provider)) || '[]');
+    return Array.isArray(parsed) ? parsed.filter((id) => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCodingSessionOrder(provider: CodingProvider, order: string[]) {
+  localStorage.setItem(codingSessionOrderKey(provider), JSON.stringify(order.slice(0, 24)));
+}
+
+function stabilizeCodingSessions(sessions: CodingInheritedSession[], orderRef: { current: string[] }, provider: CodingProvider) {
+  if (sessions.length === 0) {
+    return sessions;
+  }
+  const sessionIds = new Set(sessions.map((session) => session.id));
+  const nextOrder = orderRef.current.filter((id) => sessionIds.has(id));
+  for (const session of sessions) {
+    if (!nextOrder.includes(session.id)) nextOrder.push(session.id);
+  }
+  if (nextOrder.join('\n') !== orderRef.current.join('\n')) {
+    writeCodingSessionOrder(provider, nextOrder);
+  }
+  orderRef.current = nextOrder;
+  const byId = new Map(sessions.map((session) => [session.id, session]));
+  return nextOrder
+    .map((id) => byId.get(id))
+    .filter((session): session is CodingInheritedSession => Boolean(session));
 }
 
 function aggregateCodingStateStatus(state: CodingState): CodingStatus {

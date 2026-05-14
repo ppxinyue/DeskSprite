@@ -57,6 +57,61 @@ test('timeline query includes entries whose background markers overlap the selec
   assert.equal(entries[0].backgroundMarkers[0].endedAt, '2026-05-10T17:00:00.000Z');
 });
 
+test('classifies VS Code app short name as coding', async () => {
+  storage.clear();
+
+  await upsertTimelineEntry({
+    startedAt: new Date('2026-05-10T15:00:00.000Z').getTime(),
+    endedAt: new Date('2026-05-10T15:05:00.000Z').getTime(),
+    appName: 'Code',
+    windowTitle: 'SettingsPanel.tsx - DeskCat',
+  });
+
+  const entries = await getTimelineEntries('2026-05-10');
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].category, 'coding');
+});
+
+test('classifies common macOS and Windows app aliases', async () => {
+  storage.clear();
+  const cases: Array<{ appName: string; expected: string }> = [
+    { appName: 'Code.exe', expected: 'coding' },
+    { appName: 'Code - Insiders.exe', expected: 'coding' },
+    { appName: 'Windows Terminal', expected: 'coding' },
+    { appName: 'powershell.exe', expected: 'coding' },
+    { appName: 'devenv.exe', expected: 'coding' },
+    { appName: 'PyCharm', expected: 'coding' },
+    { appName: 'msedge.exe', expected: 'browser' },
+    { appName: 'Google Chrome', expected: 'browser' },
+    { appName: 'firefox.exe', expected: 'browser' },
+    { appName: 'WeChat.exe', expected: 'chat' },
+    { appName: 'DingTalk', expected: 'chat' },
+    { appName: 'Slack.exe', expected: 'chat' },
+    { appName: 'WINWORD.EXE', expected: 'office' },
+    { appName: 'POWERPNT.EXE', expected: 'office' },
+    { appName: 'explorer.exe', expected: 'office' },
+    { appName: 'Spotify.exe', expected: 'entertainment' },
+    { appName: 'steam.exe', expected: 'entertainment' },
+  ];
+
+  for (const [index, item] of cases.entries()) {
+    await upsertTimelineEntry({
+      startedAt: new Date(`2026-05-10T15:${String(index).padStart(2, '0')}:00.000Z`).getTime(),
+      endedAt: new Date(`2026-05-10T15:${String(index).padStart(2, '0')}:30.000Z`).getTime(),
+      appName: item.appName,
+      windowTitle: item.appName,
+    });
+  }
+
+  const entries = await getTimelineEntries('2026-05-10');
+  const categories = new Map(entries.map((entry) => [entry.appName, entry.category]));
+
+  for (const item of cases) {
+    assert.equal(categories.get(item.appName), item.expected, item.appName);
+  }
+});
+
 test('cloud backup payload redacts provider and settings secrets', async () => {
   storage.clear();
 

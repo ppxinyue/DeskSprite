@@ -27,7 +27,10 @@ const {
   describeCodexNotice,
   describeCodexRequest,
   describeCodexSessionProblemEvent,
+  describeNoOutput,
   extractTextFromValue: extractCodexTextFromValue,
+  isBlockingProblemText,
+  isTransientProgressText,
   resolveSessionStatus,
 } = require('./codingStatus.cjs');
 const { createDeferredWindowShowController, createPetVisibilityController } = require('./windowLifecycle.cjs');
@@ -79,6 +82,7 @@ const deskcatStartedAt = Date.now();
 let claudeCodingSessionStarted = false;
 const CODEX_INHERIT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
+const CODING_NO_OUTPUT_TIMEOUT_MS = 5 * 60 * 1000;
 const inheritedCodingAcknowledged = new Map();
 const inheritedCodingSeenActive = new Set();
 const codexAppServer = {
@@ -219,6 +223,7 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
   if (!win || win.isDestroyed()) return;
   const force = Boolean(options.force);
   const isCompactChat = win === windows.get('compact-chat');
+  const isPet = win === windows.get('pet');
   if (isCompactChat) {
     debugCompactChat('apply floating requested', { force, snapshot: compactChatWindowSnapshot(win) });
   }
@@ -228,6 +233,22 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
     return;
   }
   if (process.platform === 'darwin') {
+    if (isPet && windows.get('compact-chat')?.isVisible()) {
+      if (app.dock) app.dock.show();
+      win.setSkipTaskbar(false);
+      win.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+        skipTransformProcessType: true,
+      });
+      win.setFullScreenable(false);
+      win.setAlwaysOnTop(true, 'floating', 0);
+      floatingConfiguredWindows.add(win);
+      debugCompactChat('pet kept below compact during floating apply', {
+        petSnapshot: compactChatWindowSnapshot(win),
+        compactSnapshot: compactChatWindowSnapshot(windows.get('compact-chat')),
+      });
+      return;
+    }
     if (!force && floatingConfiguredWindows.has(win) && win.isAlwaysOnTop()) return;
     if (app.dock) app.dock.show();
     win.setSkipTaskbar(false);
@@ -244,6 +265,12 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
       debugCompactChat('apply floating darwin done', { force, snapshot: compactChatWindowSnapshot(win) });
     }
   } else {
+    if (isPet && windows.get('compact-chat')?.isVisible()) {
+      win.setAlwaysOnTop(true, 'normal');
+      win.setSkipTaskbar(true);
+      floatingConfiguredWindows.add(win);
+      return;
+    }
     if (!force && !isCompactChat && floatingConfiguredWindows.has(win) && win.isAlwaysOnTop()) return;
     const imeInputMode = compactChatImeInputActive || compactChatImeCompositionActive;
     const level = isCompactChat
@@ -1090,12 +1117,34 @@ function isPetVisible() {
   return Boolean(win && !win.isDestroyed() && win.isVisible());
 }
 
+function setPetLayerBelowCompact(enabled) {
+  const pet = windows.get('pet');
+  if (!pet || pet.isDestroyed()) return;
+  pet.setIgnoreMouseEvents(false, { forward: true });
+  if (enabled && windows.get('compact-chat')?.isVisible()) {
+    if (process.platform === 'darwin') {
+      pet.setAlwaysOnTop(true, 'floating', 0);
+    } else {
+      pet.setAlwaysOnTop(true, 'normal');
+    }
+    const compact = windows.get('compact-chat');
+    if (compact && !compact.isDestroyed()) compact.moveTop();
+  } else {
+    applyFloatingFullscreenBehavior(pet, { force: true });
+  }
+  debugCompactChat(enabled ? 'pet layered below compact' : 'pet layer restored', {
+    petSnapshot: compactChatWindowSnapshot(pet),
+    compactSnapshot: compactChatWindowSnapshot(windows.get('compact-chat')),
+  });
+}
+
 function showPetWindow() {
   const win = windows.get('pet') || createPetWindow();
   petVisibilityController.requestShow(win, {
     requestLayout: (target) => send(target, 'pet:request-initial-layout', {}),
     applyTopmost: (target) => applyFloatingFullscreenBehavior(target, { force: true }),
   });
+  if (windows.get('compact-chat')?.isVisible()) setPetLayerBelowCompact(true);
 }
 
 function hidePetWindow() {
@@ -1171,6 +1220,7 @@ function createPetWindow() {
 
 function showSettingsWindow(section) {
   windows.get('compact-chat')?.hide();
+  setPetLayerBelowCompact(false);
   broadcast('compact-chat:collapsed', {});
   const bounds = centerBoundsForSize(980, 760);
   const win = createWindow('settings', {
@@ -1192,6 +1242,7 @@ function showSettingsWindow(section) {
 
 function showChatWindow() {
   windows.get('compact-chat')?.hide();
+  setPetLayerBelowCompact(false);
   const bounds = centerBounds(0.8);
   const win = createWindow('chat', {
     ...bounds,
@@ -1218,6 +1269,10 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
     existing.setPosition(Math.round(x), Math.round(y));
     applyFloatingFullscreenBehavior(existing);
     configureCompactChatPanel(existing);
+    existing.setIgnoreMouseEvents(false);
+    existing.moveTop();
+    setPetLayerBelowCompact(true);
+    debugCompactChat('position compact chat moved top', { snapshot: compactChatWindowSnapshot(existing) });
     return;
   }
   const win = createWindow('compact-chat', {
@@ -1240,6 +1295,7 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
     snapshot: compactChatWindowSnapshot(win),
   });
   configureCompactChatPanel(win);
+  win.setIgnoreMouseEvents(false);
   win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) });
   applyFloatingFullscreenBehavior(win, { force: show });
   if (show) {
@@ -1248,6 +1304,7 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
     configureCompactChatPanel(win);
     applyFloatingFullscreenBehavior(win, { force: true });
     win.moveTop();
+    setPetLayerBelowCompact(true);
   }
 }
 
@@ -1850,6 +1907,29 @@ function publishClaudeCodingState() {
   return state;
 }
 
+function markCodingOutput(provider) {
+  const now = Date.now();
+  const state = provider === 'claude' ? claudeCodingState : codingState;
+  if (state.running) state.running.lastOutputAt = now;
+  if (provider === 'codex' && codexAppServer.activeTurn) codexAppServer.activeTurn.lastOutputAt = now;
+}
+
+function setCodingProblem(provider, message, options = {}) {
+  const state = provider === 'claude' ? claudeCodingState : codingState;
+  const publish = provider === 'claude' ? publishClaudeCodingState : publishCodingState;
+  const push = provider === 'claude' ? pushClaudeCodingMessage : pushCodingMessage;
+  const text = compactCodingStatusMessage(message, provider === 'claude' ? 'Claude Code 需要处理。' : 'Codex 需要处理。');
+  state.status = CODEX_STATUS.NEEDS_INPUT;
+  if (options.clearRunning) state.running = null;
+  if (provider === 'codex' && codexAppServer.activeTurn) {
+    codexAppServer.activeTurn.hasError = true;
+    codexAppServer.activeTurn.hasBlockingIssue = true;
+    codexAppServer.activeTurn.lastIssue = text;
+  }
+  push('error', text);
+  publish();
+}
+
 function pushCodingMessage(role, content) {
   const text = String(content || '').trim();
   if (!text) return;
@@ -1875,6 +1955,20 @@ function pushClaudeCodingMessage(role, content) {
   if (claudeCodingState.messages.length > 80) claudeCodingState.messages.splice(0, claudeCodingState.messages.length - 80);
   publishClaudeCodingState();
 }
+
+setInterval(() => {
+  const now = Date.now();
+  const checks = [
+    { provider: 'codex', label: 'Codex', state: codingState },
+    { provider: 'claude', label: 'Claude Code', state: claudeCodingState },
+  ];
+  for (const item of checks) {
+    if (!item.state.running || item.state.status !== CODEX_STATUS.WORKING) continue;
+    const lastOutputAt = item.state.running.lastOutputAt || item.state.running.startedAt || 0;
+    if (!lastOutputAt || now - lastOutputAt < CODING_NO_OUTPUT_TIMEOUT_MS) continue;
+    setCodingProblem(item.provider, describeNoOutput(item.label, now - lastOutputAt));
+  }
+}, 30_000).unref?.();
 
 function formatCodexNotice(method, params = {}) {
   const specific = describeCodexNotice(method, params);
@@ -2042,14 +2136,16 @@ function handleCodexAppServerNotification(message) {
       hasError: false,
       hasBlockingIssue: false,
       lastIssue: '',
+      lastOutputAt: Date.now(),
     };
-    codingState.running = { type: 'app-server-turn', turnId };
+    codingState.running = { type: 'app-server-turn', turnId, startedAt: Date.now(), lastOutputAt: Date.now() };
     codingState.status = CODEX_STATUS.WORKING;
     publishCodingState();
     return;
   }
   if (method === 'item/agentMessage/delta') {
     if (!codexAppServer.activeTurn) return;
+    markCodingOutput('codex');
     if (codexAppServer.activeTurn.hasBlockingIssue) {
       codexAppServer.activeTurn.hasBlockingIssue = false;
       codexAppServer.activeTurn.lastIssue = '';
@@ -2062,12 +2158,7 @@ function handleCodexAppServerNotification(message) {
     return;
   }
   if (method === 'item/completed' && params.item) {
-    if (codexAppServer.activeTurn?.hasBlockingIssue) {
-      codexAppServer.activeTurn.hasBlockingIssue = false;
-      codexAppServer.activeTurn.lastIssue = '';
-      codingState.status = CODEX_STATUS.WORKING;
-      publishCodingState();
-    }
+    markCodingOutput('codex');
     const itemType = String(params.item.type || '');
     if (itemType === 'agentMessage' || itemType === 'agent_message' || itemType === 'message') {
       const text = extractCodexItemText(params.item);
@@ -2093,13 +2184,23 @@ function handleCodexAppServerNotification(message) {
   if (method === 'turn/completed') {
     flushCodexAppServerAgentText('codex');
     codingState.running = null;
-    const failed = params.turn?.status === 'failed' || Boolean(codexAppServer.activeTurn?.hasError);
+    const turnText = [
+      params.turn?.status,
+      extractCodexTextFromValue(params.turn?.error?.message),
+      extractCodexTextFromValue(params.turn?.message),
+      codexAppServer.activeTurn?.lastIssue,
+    ].filter(Boolean).join(' ');
+    const failed = params.turn?.status === 'failed'
+      || params.turn?.status === 'interrupted'
+      || Boolean(codexAppServer.activeTurn?.hasError)
+      || Boolean(codexAppServer.activeTurn?.hasBlockingIssue)
+      || isBlockingProblemText(turnText);
     codingState.status = failed ? CODEX_STATUS.NEEDS_INPUT : CODEX_STATUS.DONE;
     if (failed) {
       const message = describeCodexNotice('turn/completed failed', {
         ...params.turn,
         error: params.turn?.error,
-        message: extractCodexTextFromValue(params.turn?.error?.message) || extractCodexTextFromValue(params.turn?.message),
+        message: extractCodexTextFromValue(params.turn?.error?.message) || extractCodexTextFromValue(params.turn?.message) || turnText,
         detail: codexAppServer.activeTurn?.lastIssue,
       }) || extractCodexTextFromValue(params.turn?.error?.message) || 'Codex turn failed.';
       pushCodingMessage('error', message);
@@ -2112,8 +2213,9 @@ function handleCodexAppServerNotification(message) {
   }
   if (method === 'error' || method === 'warning' || method === 'guardianWarning') {
     const messageText = formatCodexNotice(method, params);
-    const isTransient = /Reconnecting|Falling back|retrying sampling request/i.test(messageText);
-    if (method === 'error' || method === 'guardianWarning') {
+    const isBlocking = isBlockingProblemText(messageText);
+    const isTransient = isTransientProgressText(messageText);
+    if (method === 'error' || method === 'guardianWarning' || isBlocking) {
       if (isTransient) {
         codingState.status = CODEX_STATUS.WORKING;
       } else {
@@ -2126,7 +2228,7 @@ function handleCodexAppServerNotification(message) {
         codingState.status = CODEX_STATUS.NEEDS_INPUT;
       }
     }
-    pushCodingMessage(method === 'error' && !isTransient ? 'error' : 'system', messageText);
+    pushCodingMessage(isBlocking || (method === 'error' && !isTransient) ? 'error' : 'system', messageText);
     publishCodingState();
   }
 }
@@ -2177,11 +2279,10 @@ function ensureCodexAppServer() {
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
-        .filter((line) => /Reconnecting|Falling back|retrying sampling request|error|failed|permission|approv|approval|authorize|confirm|login/i.test(line));
-      for (const line of lines) pushCodingMessage('system', line);
-      if (/approv|approval|permission|authorize|confirm|login/i.test(text)) {
-        codingState.status = CODEX_STATUS.NEEDS_INPUT;
-        publishCodingState();
+        .filter((line) => /Reconnecting|Falling back|retrying sampling request|error|failed|permission|approv|approval|authorize|confirm|login|capacity|rate limit|quota|interrupted|cancel/i.test(line));
+      for (const line of lines) {
+        if (isBlockingProblemText(line)) setCodingProblem('codex', line);
+        else pushCodingMessage('system', line);
       }
     });
     child.on('error', (error) => {
@@ -2256,7 +2357,7 @@ async function sendCodingMessage({ prompt }) {
   }
 
   codingState.status = CODEX_STATUS.WORKING;
-  codingState.running = { type: 'app-server-starting' };
+  codingState.running = { type: 'app-server-starting', startedAt: Date.now(), lastOutputAt: Date.now() };
   pushCodingMessage('user', text);
   pushCodingMessage('system', codingState.threadId ? '已发送到 Codex 常驻连接，等待回复。' : '正在启动 Codex 常驻连接。');
   publishCodingState();
@@ -2270,13 +2371,16 @@ async function sendCodingMessage({ prompt }) {
       approvalPolicy: 'on-request',
     }, 60000);
     const turnId = result?.turn?.id;
-    codingState.running = { type: 'app-server-turn', turnId };
+    codingState.running = { type: 'app-server-turn', turnId, startedAt: Date.now(), lastOutputAt: Date.now() };
     codexAppServer.activeTurn = {
       id: turnId,
       deltaByItem: new Map(),
       pendingAgentTexts: [],
       lastAgentText: '',
       hasError: false,
+      hasBlockingIssue: false,
+      lastIssue: '',
+      lastOutputAt: Date.now(),
     };
     publishCodingState();
   } catch (error) {
@@ -2315,6 +2419,7 @@ function handleClaudePrintEvent(event) {
     return;
   }
   if (event.type === 'assistant') {
+    markCodingOutput('claude');
     const message = event.message || {};
     const content = extractClaudePrintContent(message.content ?? event.content);
     if (content) {
@@ -2327,10 +2432,11 @@ function handleClaudePrintEvent(event) {
   }
   if (event.type === 'result') {
     claudeCodingState.running = null;
-    const isError = Boolean(event.is_error) || /error|failed/i.test(String(event.subtype || ''));
+    const resultText = [event.result, event.error, event.subtype].filter(Boolean).join(' ');
+    const isError = Boolean(event.is_error) || /error|failed|interrupted|cancel/i.test(String(event.subtype || '')) || isBlockingProblemText(resultText);
     if (isError) {
       claudeCodingState.status = CODEX_STATUS.NEEDS_INPUT;
-      pushClaudeCodingMessage('error', event.result || event.error || 'Claude Code 执行失败。');
+      pushClaudeCodingMessage('error', event.result || event.error || resultText || 'Claude Code 执行失败。');
     } else {
       claudeCodingState.status = CODEX_STATUS.DONE;
       const lastMessage = claudeCodingState.messages[claudeCodingState.messages.length - 1];
@@ -2381,7 +2487,7 @@ async function sendClaudeCodingMessage({ prompt }) {
     env: getCodexEnv(),
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  claudeCodingState.running = { type: 'claude-print', pid: child.pid };
+  claudeCodingState.running = { type: 'claude-print', pid: child.pid, startedAt: Date.now(), lastOutputAt: Date.now() };
   let stdoutBuffer = '';
   child.stdout.on('data', (chunk) => {
     stdoutBuffer += chunk.toString();
@@ -2393,6 +2499,7 @@ async function sendClaudeCodingMessage({ prompt }) {
       try {
         handleClaudePrintEvent(JSON.parse(raw));
       } catch {
+        markCodingOutput('claude');
         pushClaudeCodingMessage('codex', raw);
       }
     }
@@ -2401,13 +2508,10 @@ async function sendClaudeCodingMessage({ prompt }) {
     const textChunk = chunk.toString();
     const lines = textChunk.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     for (const line of lines) {
-      if (/permission|approv|approval|authorize|confirm|login|error|failed|reconnect|retry/i.test(line)) {
-        pushClaudeCodingMessage(/error|failed/i.test(line) ? 'error' : 'system', line);
+      if (/permission|approv|approval|authorize|confirm|login|error|failed|reconnect|retry|capacity|rate limit|quota|interrupted|cancel/i.test(line)) {
+        if (isBlockingProblemText(line)) setCodingProblem('claude', line);
+        else pushClaudeCodingMessage(/error|failed/i.test(line) ? 'error' : 'system', line);
       }
-    }
-    if (/permission|approv|approval|authorize|confirm|login/i.test(textChunk)) {
-      claudeCodingState.status = CODEX_STATUS.NEEDS_INPUT;
-      publishClaudeCodingState();
     }
   });
   child.on('error', (error) => {
@@ -2494,8 +2598,53 @@ function codexSessionTitle(session) {
   return `${cwdName} · ${session.id.slice(0, 8)}`;
 }
 
-function isCodexProblemEvent(type, payload, raw) {
-  return Boolean(describeCodexSessionProblemEvent(type, payload, raw));
+function codexSessionProblemText(payload) {
+  return compactCodexSessionMessage(codexSessionEventText(payload), '');
+}
+
+function hasExplicitFailureField(payload = {}) {
+  const status = String(payload.status || payload.outcome || payload.result || '').toLowerCase();
+  const code = String(payload.code || payload.error?.code || '').toLowerCase();
+  return Boolean(
+    payload.error
+    || payload.is_error
+    || payload.failed
+    || status === 'failed'
+    || status === 'error'
+    || status === 'interrupted'
+    || status === 'cancelled'
+    || status === 'canceled'
+    || status === 'blocked'
+    || /failed|error|interrupted|cancelled|canceled|blocked|denied|rate_limit|capacity/.test(code),
+  );
+}
+
+function isActionableCodexEventType(type = '', payload = {}) {
+  const eventType = String(type || '').toLowerCase();
+  const payloadType = String(payload.type || payload.kind || payload.subtype || '').toLowerCase();
+  if (/session_meta|turn_context|token_count/.test(eventType) || /token_count/.test(payloadType)) return false;
+  if (/response_item/.test(eventType)) {
+    return hasExplicitFailureField(payload) || /error|failed|interrupted|cancelled|canceled|blocked|request_approval|requestapproval|needs_approval|requires_approval|request_user_input|needs_input|requires_action|guardian/.test(payloadType);
+  }
+  if (/event_msg/.test(eventType)) {
+    if (/agent_message|assistant_message|final_answer|task_complete|turn_complete|turn_completed|user_message|user_input|prompt|begin|started|running|exec_command|function_call|tool_call|patch_apply_begin|patch_apply_end|web_search_begin|web_search_end/.test(payloadType)) {
+      return hasExplicitFailureField(payload);
+    }
+    return hasExplicitFailureField(payload) || /error|failed|failure|interrupted|cancelled|canceled|blocked|denied|forbidden|guardian|request_approval|requestapproval|needs_approval|requires_approval|approval_request|request_user_input|needs_input|requires_action|permission/.test(payloadType);
+  }
+  return /error|failed|failure|interrupted|cancelled|canceled|blocked|denied|forbidden|guardian|approval|permission/.test(eventType)
+    || hasExplicitFailureField(payload);
+}
+
+function describeCodexSessionActionableProblem(type, payload) {
+  if (!isActionableCodexEventType(type, payload)) return '';
+  const message = describeCodexSessionProblemEvent(type, payload, codexSessionProblemText(payload));
+  if (message) return message;
+  return compactCodexSessionMessage(codexSessionEventText(payload), '需要在 Codex 中处理');
+}
+
+function isCodexProblemEvent(type, payload) {
+  return Boolean(describeCodexSessionActionableProblem(type, payload));
 }
 
 function isFinalCodexSessionOutput(payload) {
@@ -2605,10 +2754,9 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
       }
       continue;
     }
-    const raw = line.toLowerCase();
-    if (isCodexProblemEvent(event.type, payload, raw)) {
+    if (isCodexProblemEvent(event.type, payload)) {
       lastProblemAt = eventAt;
-      lastProblem = describeCodexSessionProblemEvent(event.type, payload, raw) || compactCodexSessionMessage(codexSessionEventText(payload), '需要在 Codex 中处理');
+      lastProblem = describeCodexSessionActionableProblem(event.type, payload);
     }
   }
   const title = codexSessionTitle(session);
@@ -2630,9 +2778,16 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
     session.message = `${prefix} ${lastAssistant}`;
     session.eventAt = lastAssistantAt;
   } else {
-    session.status = CODEX_STATUS.WORKING;
-    session.message = `${prefix} ${lastProgress || 'Codex 正在工作中'}`;
-    session.eventAt = latestActivityAt;
+    const stalledMs = Date.now() - latestActivityAt;
+    if (stalledMs >= CODING_NO_OUTPUT_TIMEOUT_MS) {
+      session.status = CODEX_STATUS.NEEDS_INPUT;
+      session.message = `${prefix} ${describeNoOutput('Codex', stalledMs)}`;
+      session.eventAt = latestActivityAt;
+    } else {
+      session.status = CODEX_STATUS.WORKING;
+      session.message = `${prefix} ${lastProgress || 'Codex 正在工作中'}`;
+      session.eventAt = latestActivityAt;
+    }
   }
   session.updatedAt = latestActivityAt;
   session.title = title;
@@ -2910,9 +3065,16 @@ function parseClaudeSessionFile(filePath, text, mtimeMs) {
     session.message = `${prefix} ${lastAssistant}`;
     session.eventAt = lastAssistantAt;
   } else {
-    session.status = CODEX_STATUS.WORKING;
-    session.message = `${prefix} ${lastProgress || 'Claude Code 正在工作中'}`;
-    session.eventAt = latestActivityAt;
+    const stalledMs = Date.now() - latestActivityAt;
+    if (stalledMs >= CODING_NO_OUTPUT_TIMEOUT_MS) {
+      session.status = CODEX_STATUS.NEEDS_INPUT;
+      session.message = `${prefix} ${describeNoOutput('Claude Code', stalledMs)}`;
+      session.eventAt = latestActivityAt;
+    } else {
+      session.status = CODEX_STATUS.WORKING;
+      session.message = `${prefix} ${lastProgress || 'Claude Code 正在工作中'}`;
+      session.eventAt = latestActivityAt;
+    }
   }
   session.updatedAt = latestActivityAt;
   session.title = title;
@@ -3065,6 +3227,7 @@ const handlers = {
     compactChatImeInputActive = false;
     compactChatImeCompositionActive = false;
     windows.get('compact-chat')?.hide();
+    setPetLayerBelowCompact(false);
   },
   is_compact_chat_visible: () => {
     const win = windows.get('compact-chat');

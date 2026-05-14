@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
+const script = fileURLToPath(import.meta.url);
 const source = path.join(root, 'electron', 'panel-key-fix.mm');
 const outputDir = path.join(root, 'electron', 'native');
 const output = path.join(outputDir, 'panel_key_fix.node');
@@ -25,12 +26,17 @@ if (!nodeInclude) {
   process.exit(1);
 }
 
-const [sourceStat, outputStat] = await Promise.all([
+const [sourceStat, scriptStat, outputStat] = await Promise.all([
   fs.stat(source),
+  fs.stat(script),
   fs.stat(output).catch(() => null),
 ]);
 
-if (outputStat && outputStat.mtimeMs >= sourceStat.mtimeMs) {
+if (
+  outputStat
+  && outputStat.mtimeMs >= Math.max(sourceStat.mtimeMs, scriptStat.mtimeMs)
+  && hasExpectedArchitectures(output)
+) {
   console.log('[native:build] panel_key_fix.node is up to date');
   process.exit(0);
 }
@@ -40,6 +46,11 @@ await fs.mkdir(outputDir, { recursive: true });
 const args = [
   '-std=c++17',
   '-fobjc-arc',
+  '-arch',
+  'arm64',
+  '-arch',
+  'x86_64',
+  '-mmacosx-version-min=11.0',
   '-I', nodeInclude,
   '-framework', 'Cocoa',
   '-bundle',
@@ -62,4 +73,14 @@ console.log('[native:build] Built electron/native/panel_key_fix.node');
 function asyncPathExists(target) {
   if (!target) return false;
   return existsSync(target);
+}
+
+function hasExpectedArchitectures(target) {
+  const result = spawnSync('/usr/bin/lipo', ['-info', target], {
+    cwd: root,
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) return false;
+  const outputText = `${result.stdout || ''}${result.stderr || ''}`;
+  return outputText.includes('arm64') && (outputText.includes('x86_64') || outputText.includes('i386'));
 }
