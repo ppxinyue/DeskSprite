@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { Check, Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -60,14 +59,12 @@ export function Composer({
 }) {
   const compactImeBlurTimerRef = useRef<number | null>(null);
   const compactImeInputActiveRef = useRef(false);
-  const compactImePointerFocusRef = useRef(false);
 
   function debugCompactChatIme(event: string, detail: Record<string, unknown> = {}) {
     if (!compact || window.deskCat?.label !== 'compact-chat') return;
     const payload = {
       ...detail,
       inputActive: compactImeInputActiveRef.current,
-      pointerFocus: compactImePointerFocusRef.current,
       focused: document.activeElement === textareaRef.current,
       at: Date.now(),
     };
@@ -101,7 +98,7 @@ export function Composer({
       }
       compactImeInputActiveRef.current = true;
       debugCompactChatIme('input-start');
-      emit('compact-chat:ime-input-start', {}).catch(() => {});
+      emit('compact-chat:ime-input-active', {}).catch(() => {});
       return;
     }
     compactImeBlurTimerRef.current = window.setTimeout(() => {
@@ -111,25 +108,6 @@ export function Composer({
       debugCompactChatIme('input-end');
       emit('compact-chat:ime-input-end', {}).catch(() => {});
     }, 260);
-  }
-
-  function handleCompactImePointerDown(event: React.PointerEvent<HTMLTextAreaElement>) {
-    if (!compact || window.deskCat?.label !== 'compact-chat') return;
-    if (document.activeElement === textareaRef.current && compactImeInputActiveRef.current) return;
-    event.preventDefault();
-    clearCompactImeBlurTimer();
-    compactImePointerFocusRef.current = true;
-    compactImeInputActiveRef.current = true;
-    debugCompactChatIme('pointerdown -> native-focus');
-    invoke('focus_compact_chat_window').finally(() => {
-      requestAnimationFrame(() => {
-        textareaRef.current?.focus({ preventScroll: true });
-        compactImePointerFocusRef.current = false;
-        debugCompactChatIme('pointerdown -> textarea-focus');
-      });
-    }).catch(() => {
-      compactImePointerFocusRef.current = false;
-    });
   }
 
   function emitCompactChatImeComposition(active: boolean) {
@@ -195,17 +173,7 @@ export function Composer({
               onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={onKeyDown}
               onPaste={handlePaste}
-              onPointerDownCapture={handleCompactImePointerDown}
-              onFocus={() => {
-                clearCompactImeBlurTimer();
-                if (compactImePointerFocusRef.current) {
-                  debugCompactChatIme('focus after pointer native-focus');
-                  return;
-                }
-                debugCompactChatIme('focus mark input-active');
-                compactImeInputActiveRef.current = true;
-                emit('compact-chat:ime-input-active', {}).catch(() => {});
-              }}
+              onFocus={() => emitCompactChatImeInput(true)}
               onCompositionStart={() => {
                 emitCompactChatImeComposition(true);
               }}

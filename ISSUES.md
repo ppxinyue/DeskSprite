@@ -3155,3 +3155,15 @@
 - 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：全屏浮窗里的 IME 修复需要把 native focus 放在鼠标按下阶段并阻止浏览器默认聚焦，避免同一个用户输入同时走浏览器聚焦和原生窗口激活两条链路。
 - 是否需更新技术文档：否。
+
+## ISSUE-265
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Chat 输入事件热路径止血
+- 严重程度：严重
+- 问题现象：pointer-first focus 方案后，compact chat 在全屏窗口和普通桌面上仍然闪烁，输入 `nhnh` 会被重复写入；说明问题不只来自全屏 Space 或 IME 候选框层级。
+- 原因分析：任何发生在 textarea `pointerdown`、`focus`、`compositionstart` 热路径里的 native `win.focus()` / `show()` 都会和 Chromium 自身的 DOM focus、controlled textarea value 更新以及 macOS key-window 同步互相打架，导致 blur/focus 抖动和键盘事件重放。继续在输入事件中抢 native focus 会扩大问题。
+- 解决方案：完全移除 textarea 热路径里的 native focus 调用；renderer 只发送 IME 输入态、结束、composition 和 debug 事件。main 进程把 `compact-chat:ime-input-start` 降级为输入态标记，不再 focus；compact chat 的一次性 `show()` / `focus()` 只发生在窗口打开边界。
+- 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：全屏浮窗输入框要把“窗口成为 key window”和“用户正在输入”分离；native window focus 只能放在窗口显示边界，不能放在文本输入事件链路里。
+- 是否需更新技术文档：否。

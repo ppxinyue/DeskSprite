@@ -1299,11 +1299,12 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
   win.setBounds({ x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) });
   applyFloatingFullscreenBehavior(win, { force: show });
   if (show) {
-    win.showInactive();
-    debugCompactChat('show compact chat inactive', { snapshot: compactChatWindowSnapshot(win) });
+    win.show();
+    debugCompactChat('show compact chat focused', { snapshot: compactChatWindowSnapshot(win) });
     configureCompactChatPanel(win);
     applyFloatingFullscreenBehavior(win, { force: true });
     win.moveTop();
+    win.focus();
     setPetLayerBelowCompact(true);
   }
 }
@@ -3351,7 +3352,9 @@ ipcMain.handle('deskcat:emit', (_event, channel, payload) => {
   }
   if (channel === 'compact-chat:ime-input-start') {
     debugCompactChat('ipc ime-input-start', { payload });
-    focusCompactChatWindowForInput('ipc:ime-input-start');
+    compactChatImeInputActive = true;
+    const win = windows.get('compact-chat');
+    if (win && !win.isDestroyed()) configureCompactChatPanel(win);
     return null;
   }
   if (channel === 'compact-chat:ime-input-active') {

@@ -1980,3 +1980,10 @@
 - 调试：renderer 的 `[compact-chat:ime-renderer]` 事件通过 `compact-chat:ime-debug` 转发到 main；main 对 IME/focus 相关 `[compact-chat:debug]` 默认输出到命令行，不再必须带 debug 启动参数。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false` 通过。
 - 文件：ChatPrimitives.tsx, main.cjs, ISSUES.md, PROGRESS.md
+
+### R260. Compact Chat 输入热路径止血（2026-05-14）
+- 止血：完全移除 textarea `pointerdown` / `focus` / composition 热路径中的 native `focus_compact_chat_window` 调用，避免 macOS key-window 切换和 Chromium DOM focus 互相触发造成闪烁、重复输入。
+- 窗口：compact chat 打开时从 `showInactive()` 改为一次性 `show()` / `focus()`；输入期间只发送 IME active/end/composition 状态，不再 `show()`、`moveTop()` 或 `focus()`。
+- 调试：保留 renderer -> main 的 IME debug 转发，IME/focus 相关 `[compact-chat:debug]` 默认打印到 Electron 启动命令行。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
+- 文件：ChatPrimitives.tsx, main.cjs, ISSUES.md, PROGRESS.md
