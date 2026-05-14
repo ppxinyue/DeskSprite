@@ -3071,3 +3071,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：透明非激活 panel 的关键控件不能只依赖小尺寸 click 命中；高频控制应使用足够大的 hit target，并在 pointer 阶段处理，避免窗口激活、拖拽区域和 React click 合成事件之间互相抢事件。
 - 是否需更新技术文档：否。
+
+## ISSUE-258
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Window 二次点击兜底
+- 严重程度：严重
+- 问题现象：第一次测试 compact 收起/放大按钮工作正常，但从第二次测试开始仍可能出现点按无反应；用户同时要求按钮命中区调整为 18px。
+- 原因分析：前一版只在 `pointerdown` 阶段触发，能修复首轮普通点击，但透明非激活 panel 在重新 show/hide、层级恢复或系统激活过程中仍可能丢掉单一事件链路。只依赖 `pointerdown` 没有足够后备。
+- 解决方案：将 compact 控制按钮命中区改为 18px；按钮同时监听 `pointerdown` 和 `click`，通过 220ms 去重避免双触发。Coding session 按钮也增加 `click` 兜底，保留 `pointerdown` 作为首选快速路径。
+- 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：对 macOS 透明 panel 上的关键控件，修复要按“事件链可能缺一条”的模型设计；pointer 和 click 双通道加去重比押单一事件更稳。
+- 是否需更新技术文档：否。

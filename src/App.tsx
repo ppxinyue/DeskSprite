@@ -1120,6 +1120,11 @@ function CodingSessionButtons({
                 event.stopPropagation();
                 onSelect(session.id);
               }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onSelect(session.id);
+              }}
             >
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${codingStatusDotClass(session.status)}`} />
               <span className="truncate font-medium leading-[1.3]">
@@ -2726,6 +2731,14 @@ function MacControlButton({
   onClick: () => void;
   children: React.ReactNode;
 }) {
+  const lastActivatedAtRef = useRef(0);
+  const activate = () => {
+    const now = performance.now();
+    if (now - lastActivatedAtRef.current < 220) return;
+    lastActivatedAtRef.current = now;
+    onClick();
+  };
+
   return (
     <button
       type="button"
@@ -2734,15 +2747,20 @@ function MacControlButton({
       onPointerDown={(event) => {
         event.preventDefault();
         event.stopPropagation();
-        onClick();
+        activate();
+      }}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        activate();
       }}
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
         event.stopPropagation();
-        onClick();
+        activate();
       }}
-      className="flex h-6 w-6 items-center justify-center rounded-[8px] text-muted-foreground transition-all duration-150 hover:bg-background/70 hover:text-foreground active:scale-95"
+      className="flex h-[18px] w-[18px] items-center justify-center rounded-[6px] text-muted-foreground transition-all duration-150 hover:bg-background/70 hover:text-foreground active:scale-95"
     >
       <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/80 bg-background/95 shadow-sm">
         {children}

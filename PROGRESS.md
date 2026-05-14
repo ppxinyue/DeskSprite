@@ -1931,3 +1931,10 @@
 - 层级：compact 控制区和 Coding session 条显式标记 `app-no-drag`，控制区提升到更高 z-index，避免和悬浮背景/拖拽修复残留冲突。
 - 验证：`pnpm exec tsc -b --pretty false`、`node --check electron/main.cjs`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R253. Compact Window 二次点击兜底（2026-05-14）
+- 命中：按测试反馈将 compact 收起/放大按钮点击区从 24px 调整为 18px，减少视觉外延过大的感觉。
+- 兜底：控制按钮增加 `click` 后备通道，并用 220ms 去重，避免重新 show/hide 后 `pointerdown` 或 `click` 任一链路被系统吞掉时完全无响应。
+- 切换：Coding session 按钮保留 `pointerdown`，同时增加 `click` 兜底，提升第二次测试和窗口重新激活后的切换可靠性。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md
