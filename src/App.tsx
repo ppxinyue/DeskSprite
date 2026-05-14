@@ -2878,6 +2878,12 @@ async function getCompactChatGeometry({
   const gap = 12;
   const petCenterX = petX + petImageWidth / 2;
   const petCenterY = petY + petImageHeight / 2;
+  const petRect = {
+    left: petX,
+    top: petY,
+    right: petX + petImageWidth,
+    bottom: petY + petImageHeight,
+  };
 
   type Candidate = {
     x: number;
@@ -2886,40 +2892,60 @@ async function getCompactChatGeometry({
     priority: number;
   };
 
-  const makeCandidate = (x: number, y: number, h: number, priority: number): Candidate | null => {
+  const makeCandidate = (rawX: number, rawY: number, rawHeight: number, priority: number): Candidate | null => {
+    const h = Math.min(maxOuterHeight, rawHeight);
     if (h < minOuterHeight) return null;
-    return { x, y, h: Math.min(maxOuterHeight, h), priority };
+    return {
+      x: clamp(rawX, safeLeft, Math.max(safeLeft, safeRight - outerWidth)),
+      y: clamp(rawY, safeTop, Math.max(safeTop, safeBottom - h)),
+      h,
+      priority,
+    };
   };
 
   const centeredX = petCenterX - outerWidth / 2;
   const centeredY = petCenterY - maxOuterHeight / 2;
+  const belowSpace = safeBottom - (petY + petImageHeight + gap);
+  const aboveSpace = petY - gap - safeTop;
+  const belowHeight = Math.min(maxOuterHeight, belowSpace);
+  const aboveHeight = Math.min(maxOuterHeight, aboveSpace);
   const candidates = [
-    makeCandidate(centeredX, petY + petImageHeight + gap, safeBottom - (petY + petImageHeight + gap), 0),
-    makeCandidate(centeredX, petY - gap - Math.min(maxOuterHeight, petY - gap - safeTop), petY - gap - safeTop, 1),
-    makeCandidate(petX + petImageWidth + gap, centeredY, maxOuterHeight, 2),
-    makeCandidate(petX - outerWidth - gap, centeredY, maxOuterHeight, 3),
-    makeCandidate(safeLeft + (safeWidth - outerWidth) / 2, safeTop + (safeHeight - maxOuterHeight) / 2, maxOuterHeight, 4),
+    makeCandidate(centeredX, petY + petImageHeight + gap, belowHeight, 0),
+    makeCandidate(centeredX, petY - gap - aboveHeight, aboveHeight, 1),
+    petX + petImageWidth + gap + outerWidth <= safeRight
+      ? makeCandidate(petX + petImageWidth + gap, centeredY, maxOuterHeight, 2)
+      : null,
+    petX - gap - outerWidth >= safeLeft
+      ? makeCandidate(petX - outerWidth - gap, centeredY, maxOuterHeight, 3)
+      : null,
   ].filter((item): item is Candidate => Boolean(item));
 
   const scoreCandidate = (candidate: Candidate) => {
-    const overflowX = Math.max(0, safeLeft - candidate.x) + Math.max(0, candidate.x + outerWidth - safeRight);
-    const overflowY = Math.max(0, safeTop - candidate.y) + Math.max(0, candidate.y + candidate.h - safeBottom);
+    const rect = {
+      left: candidate.x,
+      top: candidate.y,
+      right: candidate.x + outerWidth,
+      bottom: candidate.y + candidate.h,
+    };
+    const gapX = Math.max(0, petRect.left - rect.right, rect.left - petRect.right);
+    const gapY = Math.max(0, petRect.top - rect.bottom, rect.top - petRect.bottom);
+    const distance = Math.hypot(gapX, gapY);
     const heightLoss = maxOuterHeight - candidate.h;
-    return overflowX * 1000 + overflowY * 1000 + heightLoss * 10 + candidate.priority;
+    return distance * 100 + heightLoss * 6 + candidate.priority;
   };
 
-  const best = candidates
-    .sort((a, b) => scoreCandidate(a) - scoreCandidate(b))[0] ?? {
-      x: safeLeft + (safeWidth - outerWidth) / 2,
-      y: safeTop + (safeHeight - maxOuterHeight) / 2,
-      h: maxOuterHeight,
-      priority: 5,
-    };
+  const fallback = makeCandidate(centeredX, centeredY, maxOuterHeight, 9) ?? {
+    x: safeLeft + (safeWidth - outerWidth) / 2,
+    y: safeTop + (safeHeight - maxOuterHeight) / 2,
+    h: maxOuterHeight,
+    priority: 9,
+  };
+  const best = candidates.sort((a, b) => scoreCandidate(a) - scoreCandidate(b))[0] ?? fallback;
   const height = Math.max(minOuterHeight, Math.min(maxOuterHeight, best.h));
 
   return {
-    x: clamp(best.x, safeLeft, Math.max(safeLeft, safeRight - outerWidth)),
-    y: clamp(best.y, safeTop, Math.max(safeTop, safeBottom - height)),
+    x: best.x,
+    y: best.y,
     w: outerWidth,
     h: height,
   };

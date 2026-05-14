@@ -1938,3 +1938,10 @@
 - 切换：Coding session 按钮保留 `pointerdown`，同时增加 `click` 兜底，提升第二次测试和窗口重新激活后的切换可靠性。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R254. Compact Window 贴近灵宠定位（2026-05-14）
+- 几何：重写 compact window 候选位置评分，优先使用灵宠下方/上方/左右的近邻位置，并将候选 clamp 到屏幕安全区。
+- 修复：移除常规候选中的屏幕居中项，只有没有任何近邻候选可用时才使用贴近灵宠中心的 fallback，避免灵宠在右下角时 compact 跑到屏幕中间。
+- 评分：按 compact 矩形与灵宠矩形的真实间距排序，再考虑高度损失和方向优先级，默认让窗口贴近灵宠。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md
