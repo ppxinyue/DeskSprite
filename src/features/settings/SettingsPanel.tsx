@@ -48,6 +48,7 @@ export type SettingsSection =
 const ALLOWED_STATIC_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp']);
 const ALLOWED_GIF_EXTENSIONS = new Set(['gif']);
 const MASKED_API_KEY = '••••••••';
+const PROFILE_EXAMPLE_KEY = 'example';
 
 const SECTION_GROUPS: Array<{
   label: string;
@@ -485,26 +486,21 @@ function ProfileSection() {
   const [profileMockPreview, setProfileMockPreview] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null);
   const statsScrollRef = useRef<HTMLDivElement>(null);
+  const todayKey = getLocalDateKey();
+  const isExampleSelected = selectedDate === PROFILE_EXAMPLE_KEY;
+  const selectedRealDate = isExampleSelected ? todayKey : selectedDate;
 
   const loadProfileData = useCallback(() => {
+    const loadDate = selectedDate === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : selectedDate;
     Promise.all([
       getFocusStatsDays(365, getLocalDateKey()),
-      getTimelineEntries(selectedDate),
+      selectedDate === PROFILE_EXAMPLE_KEY ? Promise.resolve([]) : getTimelineEntries(loadDate),
     ])
       .then(([nextStats, nextTimeline]) => {
-        const clippedTimeline = clipTimelineEntriesToDate(selectedDate, nextTimeline);
-        const selectedFocusStats = nextStats.find((day) => day.date === selectedDate);
-        const hasSelectedFocusData = Boolean(
-          selectedFocusStats
-          && (selectedFocusStats.focusMs > 0 || selectedFocusStats.focusSessions > 0 || selectedFocusStats.distractions > 0 || (selectedFocusStats.codingMs ?? 0) > 0),
-        );
-        const shouldUseMockPreview = selectedDate === shiftDateKey(getLocalDateKey(), -1) && clippedTimeline.length === 0 && !hasSelectedFocusData;
-        const displayTimeline = clippedTimeline.length > 0
-          ? clippedTimeline
-          : shouldUseMockPreview
-            ? createMockTimelineEntries(selectedDate)
-            : [];
-        setStats(shouldUseMockPreview ? mergeMockFocusStats(nextStats, selectedDate) : nextStats);
+        const shouldUseMockPreview = selectedDate === PROFILE_EXAMPLE_KEY;
+        const clippedTimeline = shouldUseMockPreview ? [] : clipTimelineEntriesToDate(loadDate, nextTimeline);
+        const displayTimeline = shouldUseMockPreview ? createMockTimelineEntries(loadDate) : clippedTimeline;
+        setStats(shouldUseMockPreview ? mergeMockFocusStats(nextStats, loadDate) : nextStats);
         setTimelineEntries(displayTimeline);
         setProfileMockPreview(shouldUseMockPreview);
         setSelectedTimelineId((id) => displayTimeline.some((entry) => entry.id === id) ? id : displayTimeline.at(-1)?.id ?? null);
@@ -523,17 +519,18 @@ function ProfileSection() {
   }, [loadProfileData]);
 
   useEffect(() => {
+    if (selectedDate === PROFILE_EXAMPLE_KEY) return;
     setCalendarMonth(getMonthKey(selectedDate));
   }, [selectedDate]);
 
   useEffect(() => {
     const node = statsScrollRef.current;
     if (!node) return;
-    const selectedNode = node.querySelector<HTMLElement>(`[data-focus-date="${selectedDate}"]`);
+    const selectedNode = node.querySelector<HTMLElement>(`[data-focus-date="${selectedRealDate}"]`);
     if (!selectedNode) return;
     const target = selectedNode.offsetLeft - node.clientWidth / 2 + selectedNode.clientWidth / 2;
     node.scrollLeft = Math.max(0, target);
-  }, [selectedDate, stats]);
+  }, [selectedRealDate, stats]);
 
   useEffect(() => {
     if (!calendarOpen) return;
@@ -553,20 +550,20 @@ function ProfileSection() {
 
   useEffect(() => {
     const unlisten = listen<{ date?: string }>('profile:data-updated', ({ payload }) => {
+      if (selectedDate === PROFILE_EXAMPLE_KEY) return;
       if (!payload?.date || payload.date === selectedDate) loadProfileData();
     });
     return () => { unlisten.then((fn) => fn()); };
   }, [loadProfileData, selectedDate]);
 
-  const selectedStats = stats.find((day) => day.date === selectedDate) ?? stats[stats.length - 1] ?? { date: selectedDate, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0, distractionApps: {} };
-  const focusWindowStart = shiftDateKey(selectedDate, -13);
-  const focusWindowStats = stats.filter((day) => day.date >= focusWindowStart && day.date <= selectedDate);
+  const selectedStats = stats.find((day) => day.date === selectedRealDate) ?? stats[stats.length - 1] ?? { date: selectedRealDate, focusMs: 0, focusSessions: 0, distractions: 0, codingMs: 0, distractionApps: {} };
+  const focusWindowStart = shiftDateKey(selectedRealDate, -13);
+  const focusWindowStats = stats.filter((day) => day.date >= focusWindowStart && day.date <= selectedRealDate);
   const maxFocusMs = Math.max(1, ...stats.map((day) => day.focusMs));
   const totalFocusMs = focusWindowStats.reduce((sum, day) => sum + day.focusMs, 0);
   const totalSessions = focusWindowStats.reduce((sum, day) => sum + day.focusSessions, 0);
   const totalDistractions = focusWindowStats.reduce((sum, day) => sum + day.distractions, 0);
   const distractionContentStats = getDistractionContentStats(selectedStats.distractionApps ?? {}, timelineEntries, settings);
-  const todayKey = getLocalDateKey();
   return (
     <>
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -578,8 +575,8 @@ function ProfileSection() {
               className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
               onClick={() => {
                 setSelectedDate((date) => {
-                  const next = shiftDateKey(date, -1);
-                  return next;
+                  const baseDate = date === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : date;
+                  return shiftDateKey(baseDate, -1);
                 });
               }}
               aria-label="前一天"
@@ -594,18 +591,32 @@ function ProfileSection() {
               aria-expanded={calendarOpen}
             >
               <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-              {formatDateHeading(selectedDate)}
+              {formatDateHeading(selectedRealDate)}
+            </button>
+            <button
+              type="button"
+              className={`flex h-7 items-center justify-center rounded-[7px] px-2 text-[11px] font-semibold transition-colors ${
+                isExampleSelected
+                  ? 'bg-[#2f8fff] text-white shadow-none'
+                  : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
+              }`}
+              onClick={() => {
+                setSelectedDate(PROFILE_EXAMPLE_KEY);
+                setCalendarOpen(false);
+              }}
+            >
+              示例 / Example
             </button>
             <button
               type="button"
               className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
               onClick={() => {
                 setSelectedDate((date) => {
-                  const next = shiftDateKey(date, 1);
-                  return next;
+                  const baseDate = date === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : date;
+                  return shiftDateKey(baseDate, 1);
                 });
               }}
-              disabled={selectedDate >= todayKey}
+              disabled={selectedRealDate >= todayKey}
               aria-label="后一天"
             >
               <ChevronRight className="h-3.5 w-3.5" />
@@ -613,7 +624,7 @@ function ProfileSection() {
             {calendarOpen && (
               <ProfileCalendar
                 month={calendarMonth}
-                selectedDate={selectedDate}
+                selectedDate={selectedRealDate}
                 todayKey={todayKey}
                 onMonthChange={setCalendarMonth}
                 onSelect={(date) => {
@@ -647,7 +658,7 @@ function ProfileSection() {
               14 天专注
             </div>
             <div className="mt-1 text-[11px] text-muted-foreground">
-              {formatDateHeading(focusWindowStart)} - {formatDateHeading(selectedDate)} · 共 {formatFocusDuration(totalFocusMs)} · {totalSessions} 次专注 · {totalDistractions} 次分心
+              {formatDateHeading(focusWindowStart)} - {formatDateHeading(selectedRealDate)} · 共 {formatFocusDuration(totalFocusMs)} · {totalSessions} 次专注 · {totalDistractions} 次分心
             </div>
           </div>
 
@@ -663,7 +674,7 @@ function ProfileSection() {
                 >
                   {stats.map((day) => {
                     const height = Math.max(day.focusMs > 0 ? 8 : 2, (day.focusMs / maxFocusMs) * 72);
-                    const selected = day.date === selectedDate;
+                    const selected = day.date === selectedRealDate;
                     return (
                       <button
                         key={day.date}
@@ -943,7 +954,7 @@ function TimelineSection({
             Timeline
             {isMockPreview && (
               <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-medium text-[#687076] shadow-[0_4px_12px_rgba(52,64,84,0.06)] dark:bg-white/7 dark:text-white/60">
-                昨日示例
+                示例 / Example
               </span>
             )}
           </div>

@@ -1917,3 +1917,10 @@
 - 锁定：点击一级菜单项会固定展开对应二级菜单，避免用户在选择二级项前菜单提前消失。
 - 验证：`pnpm build` 通过；生产构建主包 498.85 kB，gzip 155.71 kB。
 - 文件：PetAvatar.tsx, ISSUES.md, PROGRESS.md
+
+### R251. Timeline 示例入口独立化（2026-05-14）
+- UI：个人档案顶部日期选择区新增 `示例 / Example` 按钮，点击后展示预置 mock timeline 和 mock 专注统计。
+- 修复：移除“昨天无真实数据时自动显示 mock”的兜底逻辑；昨天现在只显示真实记录或空态，避免示例数据污染真实日期认知。
+- 标识：Timeline 标题徽标从“昨日示例”改为“示例 / Example”，和顶部入口保持一致。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check` 通过。
+- 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
