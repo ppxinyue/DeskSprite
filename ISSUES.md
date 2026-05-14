@@ -3179,3 +3179,27 @@
 - 涉及文件：`electron/panel-key-fix.mm`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：IME 候选条能出现但被盖住时，说明焦点链路已基本打通，应优先降低应用窗口层级而不是继续改输入事件；隐藏浮窗则必须在 main 进程做短暂防重入，不能只靠 renderer 状态。
 - 是否需更新技术文档：否。
+
+## ISSUE-267
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Chat 输入态闪烁与右键菜单置顶回归
+- 严重程度：严重
+- 问题现象：compact window 仍然闪烁；灵宠右键菜单被 compact window 压在下面，违反右键菜单应永远最高置顶的交互规则。
+- 原因分析：macOS compact 输入态每次经过 `applyFloatingFullscreenBehavior` 时仍会先被 Electron `setAlwaysOnTop('screen-saver')` 拉到最高层，再由 native addon 降到 IME 友好层级，反复 resize/position/topmost 时会产生层级跳动。右键菜单渲染在 pet window 内，而此前为了让 compact 盖住灵宠，把整个 pet window 降到 `floating`，导致菜单一起被压低。
+- 解决方案：compact 输入态在 macOS 下不再先设 `screen-saver`，直接保持 native addon 的 IME 层级，避免反复升降造成闪烁。新增 `set_pet_context_menu_open` main handler，右键菜单打开时 pet window 强制回到最高层并 `moveTop()`；菜单关闭后才允许灵宠低于 compact。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：pet window 内的右键菜单不能和灵宠本体共享降层策略；菜单打开状态必须作为 main 进程窗口层级的一等输入。
+- 是否需更新技术文档：否。
+
+## ISSUE-268
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Chat IME 输入态闪烁与收起失败
+- 严重程度：严重
+- 问题现象：compact window 单独打开不闪，只有焦点进入输入框后才闪烁；输入框 focus 时仍无法稳定收起或最小化。
+- 原因分析：闪烁与普通窗口显示无关，而是 IME 输入态下 position/resize/composition 事件继续触发 `applyFloatingFullscreenBehavior`、`moveTop` 和 Electron always-on-top 链路，和 native IME level 反复争夺窗口层级。收起后 suppression 窗口过短，输入框 blur 与布局更新仍可能把窗口快速刷回。
+- 解决方案：IME 输入态下 `position_compact_chat_window` 只更新位置并重新应用 native panel 配置，不再 `applyFloatingFullscreenBehavior` 或 `moveTop`；`resize_compact_chat_window` 只改尺寸并保持 native IME level，不再触发 floating/topmost；composition start/end 不再强制完整 floating 链路；收起防重入窗口延长到 1500ms。
+- 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：IME 输入态必须被当作一个稳定窗口层级区间，期间不能让 resize/position/topmost guard 反复进入普通置顶路径。
+- 是否需更新技术文档：否。

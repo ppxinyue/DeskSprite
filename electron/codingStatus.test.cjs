@@ -22,6 +22,22 @@ test('describeCodexRequest includes the command and question for approvals', () 
   assert.match(message, /Approve \/ Deny/);
 });
 
+test('describeCodexSessionProblemEvent keeps pending approval details red-worthy', () => {
+  const message = describeCodexSessionProblemEvent('response_item', {
+    type: 'request_approval',
+    tool: 'exec_command',
+    command: 'git apply --cached .codex-ime-debug.patch',
+    question: '需要把精确的 compact chat IME debug hunk 暂存到 git index',
+    reason: 'require_escalated',
+    options: ['是', '否'],
+  });
+
+  assert.match(message, /需要批准/);
+  assert.match(message, /git apply --cached \.codex-ime-debug\.patch/);
+  assert.match(message, /compact chat IME debug hunk/);
+  assert.match(message, /是 \/ 否/);
+});
+
 test('describeCodexNotice includes detailed failure context for errors', () => {
   const message = describeCodexNotice('error', {
     message: 'Command failed with exit code 1',

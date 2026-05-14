@@ -2347,6 +2347,7 @@ function PetWindow() {
   }, [forceShowCompactChat, openChat]);
 
   useEffect(() => {
+    invoke("set_pet_context_menu_open", { open: contextMenuOpen }).catch(() => {});
     requestLayout({ contextMenuOpen }).catch(() => {});
   }, [contextMenuOpen, requestLayout]);
 
@@ -2963,14 +2964,14 @@ async function getCompactChatGeometry({
   const belowHeight = Math.min(maxOuterHeight, belowSpace);
   const aboveHeight = Math.min(maxOuterHeight, aboveSpace);
   const candidates = [
-    makeCandidate(centeredX, petY + petImageHeight + gap, belowHeight, 0),
-    makeCandidate(centeredX, petY - gap - aboveHeight, aboveHeight, 1),
     petX + petImageWidth + gap + outerWidth <= safeRight
-      ? makeCandidate(petX + petImageWidth + gap, centeredY, maxOuterHeight, 2)
+      ? makeCandidate(petX + petImageWidth + gap, centeredY, maxOuterHeight, 0)
       : null,
     petX - gap - outerWidth >= safeLeft
-      ? makeCandidate(petX - outerWidth - gap, centeredY, maxOuterHeight, 3)
+      ? makeCandidate(petX - outerWidth - gap, centeredY, maxOuterHeight, 1)
       : null,
+    makeCandidate(centeredX, petY + petImageHeight + gap, belowHeight, 20),
+    makeCandidate(centeredX, petY - gap - aboveHeight, aboveHeight, 21),
   ].filter((item): item is Candidate => Boolean(item));
 
   const scoreCandidate = (candidate: Candidate) => {
@@ -2984,7 +2985,7 @@ async function getCompactChatGeometry({
     const gapY = Math.max(0, petRect.top - rect.bottom, rect.top - petRect.bottom);
     const distance = Math.hypot(gapX, gapY);
     const heightLoss = maxOuterHeight - candidate.h;
-    return distance * 100 + heightLoss * 6 + candidate.priority;
+    return candidate.priority * 10_000 + heightLoss * 6 + distance;
   };
 
   const fallback = makeCandidate(centeredX, centeredY, maxOuterHeight, 9) ?? {

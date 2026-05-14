@@ -60,18 +60,6 @@ export function Composer({
   const compactImeBlurTimerRef = useRef<number | null>(null);
   const compactImeInputActiveRef = useRef(false);
 
-  function debugCompactChatIme(event: string, detail: Record<string, unknown> = {}) {
-    if (!compact || window.deskCat?.label !== 'compact-chat') return;
-    const payload = {
-      ...detail,
-      inputActive: compactImeInputActiveRef.current,
-      focused: document.activeElement === textareaRef.current,
-      at: Date.now(),
-    };
-    console.info('[compact-chat:ime-renderer]', event, payload);
-    emit('compact-chat:ime-debug', { event, payload }).catch(() => {});
-  }
-
   function clearCompactImeBlurTimer() {
     if (compactImeBlurTimerRef.current === null) return;
     window.clearTimeout(compactImeBlurTimerRef.current);
@@ -82,7 +70,6 @@ export function Composer({
     return () => {
       clearCompactImeBlurTimer();
       if (compact && window.deskCat?.label === 'compact-chat') {
-        debugCompactChatIme('unmount -> input-end');
         emit('compact-chat:ime-input-end', {}).catch(() => {});
       }
     };
@@ -93,11 +80,9 @@ export function Composer({
     clearCompactImeBlurTimer();
     if (active) {
       if (compactImeInputActiveRef.current) {
-        debugCompactChatIme('input-start skipped');
         return;
       }
       compactImeInputActiveRef.current = true;
-      debugCompactChatIme('input-start');
       emit('compact-chat:ime-input-active', {}).catch(() => {});
       return;
     }
@@ -105,14 +90,12 @@ export function Composer({
       compactImeBlurTimerRef.current = null;
       if (!compactImeInputActiveRef.current) return;
       compactImeInputActiveRef.current = false;
-      debugCompactChatIme('input-end');
       emit('compact-chat:ime-input-end', {}).catch(() => {});
     }, 260);
   }
 
   function emitCompactChatImeComposition(active: boolean) {
     if (!compact || window.deskCat?.label !== 'compact-chat') return;
-    debugCompactChatIme(active ? 'composition-start' : 'composition-end');
     emit(active ? 'compact-chat:ime-composition-start' : 'compact-chat:ime-composition-end', {}).catch(() => {});
   }
 

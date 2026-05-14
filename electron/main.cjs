@@ -37,9 +37,9 @@ const { createDeferredWindowShowController, createPetVisibilityController } = re
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
-const debugCompactChatEnabled =
-  process.env.DESKSPRITE_DEBUG_COMPACT_CHAT === '1' ||
-  process.argv.includes('--debug-compact-chat');
+const debugTimelineEnabled =
+  process.env.DESKSPRITE_DEBUG_TIMELINE === '1' ||
+  process.argv.includes('--debug-timeline');
 const windows = new Map();
 const windowShowController = createDeferredWindowShowController();
 const petVisibilityController = createPetVisibilityController();
@@ -49,6 +49,7 @@ let topmostSuppressed = false;
 let compactChatImeInputActive = false;
 let compactChatImeCompositionActive = false;
 let compactChatHiddenUntil = 0;
+let petContextMenuOpen = false;
 let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'png', 'idle.png');
 let tray = null;
 let currentAppIcon = null;
@@ -157,15 +158,7 @@ function compactChatWindowSnapshot(win) {
   };
 }
 
-function debugCompactChat(message, details = {}) {
-  const isImeEvent = message.includes('ime') || message.includes('focus input') || message.includes('renderer');
-  if (!debugCompactChatEnabled && !isImeEvent) return;
-  console.info('[compact-chat:debug]', message, {
-    ...details,
-    platform: process.platform,
-    at: Date.now(),
-  });
-}
+function debugCompactChat(_message, _details = {}) {}
 
 function loadPanelKeyFix() {
   if (process.platform !== 'darwin') return null;
@@ -225,6 +218,7 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
   const force = Boolean(options.force);
   const isCompactChat = win === windows.get('compact-chat');
   const isPet = win === windows.get('pet');
+  const compactImeLevelActive = isCompactChat && (compactChatImeInputActive || compactChatImeCompositionActive);
   if (isCompactChat) {
     debugCompactChat('apply floating requested', { force, snapshot: compactChatWindowSnapshot(win) });
   }
@@ -234,7 +228,7 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
     return;
   }
   if (process.platform === 'darwin') {
-    if (isPet && windows.get('compact-chat')?.isVisible()) {
+    if (isPet && windows.get('compact-chat')?.isVisible() && !petContextMenuOpen) {
       if (app.dock) app.dock.show();
       win.setSkipTaskbar(false);
       win.setVisibleOnAllWorkspaces(true, {
@@ -258,7 +252,7 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
       skipTransformProcessType: true,
     });
     win.setFullScreenable(false);
-    win.setAlwaysOnTop(true, 'screen-saver', 1);
+    if (!compactImeLevelActive) win.setAlwaysOnTop(true, 'screen-saver', 1);
     floatingConfiguredWindows.add(win);
     if (force) win.moveTop();
     if (isCompactChat) {
@@ -266,7 +260,7 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
       debugCompactChat('apply floating darwin done', { force, snapshot: compactChatWindowSnapshot(win) });
     }
   } else {
-    if (isPet && windows.get('compact-chat')?.isVisible()) {
+    if (isPet && windows.get('compact-chat')?.isVisible() && !petContextMenuOpen) {
       win.setAlwaysOnTop(true, 'normal');
       win.setSkipTaskbar(true);
       floatingConfiguredWindows.add(win);
@@ -976,6 +970,7 @@ function ensureAccessibilityPermission() {
 }
 
 function timelineDebugLog(payload = {}) {
+  if (!debugTimelineEnabled) return false;
   const nowLabel = new Date().toLocaleTimeString('zh-CN', { hour12: false });
   const stage = payload.stage || 'log';
   const message = payload.message || '';
@@ -1122,7 +1117,7 @@ function setPetLayerBelowCompact(enabled) {
   const pet = windows.get('pet');
   if (!pet || pet.isDestroyed()) return;
   pet.setIgnoreMouseEvents(false, { forward: true });
-  if (enabled && windows.get('compact-chat')?.isVisible()) {
+  if (enabled && windows.get('compact-chat')?.isVisible() && !petContextMenuOpen) {
     if (process.platform === 'darwin') {
       pet.setAlwaysOnTop(true, 'floating', 0);
     } else {
@@ -1266,15 +1261,21 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
   }
   const existing = windows.get('compact-chat');
   if (!show && existing && !existing.isDestroyed()) {
+    const compactImeLevelActive = compactChatImeInputActive || compactChatImeCompositionActive;
     debugCompactChat('position compact chat', {
       x: Math.round(x),
       y: Math.round(y),
+      imeLevelActive: compactImeLevelActive,
       snapshot: compactChatWindowSnapshot(existing),
     });
     existing.setPosition(Math.round(x), Math.round(y));
+    existing.setIgnoreMouseEvents(false);
+    if (compactImeLevelActive) {
+      configureCompactChatPanel(existing);
+      return;
+    }
     applyFloatingFullscreenBehavior(existing);
     configureCompactChatPanel(existing);
-    existing.setIgnoreMouseEvents(false);
     existing.moveTop();
     setPetLayerBelowCompact(true);
     debugCompactChat('position compact chat moved top', { snapshot: compactChatWindowSnapshot(existing) });
@@ -2625,12 +2626,51 @@ function hasExplicitFailureField(payload = {}) {
   );
 }
 
+function parseCodexToolArguments(payload = {}) {
+  const args = payload.arguments ?? payload.args ?? payload.params;
+  if (!args) return {};
+  if (typeof args === 'object') return args;
+  if (typeof args !== 'string') return {};
+  try {
+    const parsed = JSON.parse(args);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function codexFunctionCallApprovalPayload(payload = {}) {
+  const payloadType = String(payload.type || payload.kind || payload.subtype || '').toLowerCase();
+  if (!/function_call|tool_call|custom_tool_call/.test(payloadType)) return null;
+  const args = parseCodexToolArguments(payload);
+  const sandboxPermission = String(args.sandbox_permissions || args.sandboxPermissions || '').toLowerCase();
+  const approvalPolicy = String(args.approval_policy || args.approvalPolicy || '').toLowerCase();
+  const requiresApproval = args.requiresApproval === true
+    || args.requestApproval === true
+    || args.needsApproval === true
+    || args.requireApproval === true
+    || sandboxPermission === 'require_escalated'
+    || /requires?_approval|request_approval|require_escalated|escalat/.test(approvalPolicy);
+  if (!requiresApproval) return null;
+  const command = args.cmd || args.command || args.parsed_cmd || args.argv || '';
+  return {
+    type: 'request_approval',
+    tool: payload.name || payload.method || payload.tool || payloadType,
+    command,
+    question: args.justification || args.question || args.prompt || args.reason || '需要在 Codex 中批准命令执行。',
+    reason: args.sandbox_permissions || args.sandboxPermissions || args.approval_policy || args.approvalPolicy || '',
+    options: args.options || args.choices || ['批准', '拒绝'],
+  };
+}
+
 function isActionableCodexEventType(type = '', payload = {}) {
   const eventType = String(type || '').toLowerCase();
   const payloadType = String(payload.type || payload.kind || payload.subtype || '').toLowerCase();
   if (/session_meta|turn_context|token_count/.test(eventType) || /token_count/.test(payloadType)) return false;
   if (/response_item/.test(eventType)) {
-    return hasExplicitFailureField(payload) || /error|failed|interrupted|cancelled|canceled|blocked|request_approval|requestapproval|needs_approval|requires_approval|request_user_input|needs_input|requires_action|guardian/.test(payloadType);
+    return Boolean(codexFunctionCallApprovalPayload(payload))
+      || hasExplicitFailureField(payload)
+      || /error|failed|interrupted|cancelled|canceled|blocked|request_approval|requestapproval|needs_approval|requires_approval|request_user_input|needs_input|requires_action|guardian/.test(payloadType);
   }
   if (/event_msg/.test(eventType)) {
     if (/agent_message|assistant_message|final_answer|task_complete|turn_complete|turn_completed|user_message|user_input|prompt|begin|started|running|exec_command|function_call|tool_call|patch_apply_begin|patch_apply_end|web_search_begin|web_search_end/.test(payloadType)) {
@@ -2644,9 +2684,12 @@ function isActionableCodexEventType(type = '', payload = {}) {
 
 function describeCodexSessionActionableProblem(type, payload) {
   if (!isActionableCodexEventType(type, payload)) return '';
-  const message = describeCodexSessionProblemEvent(type, payload, codexSessionProblemText(payload));
+  const problemPayload = /response_item/i.test(String(type || ''))
+    ? (codexFunctionCallApprovalPayload(payload) || payload)
+    : payload;
+  const message = describeCodexSessionProblemEvent(type, problemPayload, codexSessionProblemText(problemPayload));
   if (message) return message;
-  return compactCodexSessionMessage(codexSessionEventText(payload), '需要在 Codex 中处理');
+  return compactCodexSessionMessage(codexSessionEventText(problemPayload), '需要在 Codex 中处理');
 }
 
 function isCodexProblemEvent(type, payload) {
@@ -2742,6 +2785,12 @@ function parseCodexSessionFile(filePath, text, mtimeMs) {
     if (event.type === 'response_item') {
       if (payload.role === 'user') {
         lastUserAt = Math.max(lastUserAt, eventAt);
+        continue;
+      }
+      const actionableProblem = describeCodexSessionActionableProblem(event.type, payload);
+      if (actionableProblem) {
+        lastProblemAt = eventAt;
+        lastProblem = actionableProblem;
         continue;
       }
       if (payload.role === 'assistant' || payload.type === 'message') {
@@ -3230,7 +3279,7 @@ const handlers = {
   position_compact_chat_window: (args) => showCompactChatWindow(args, false),
   hide_compact_chat_window: () => {
     debugCompactChat('hide compact chat', { snapshot: compactChatWindowSnapshot(windows.get('compact-chat')) });
-    compactChatHiddenUntil = Date.now() + 800;
+    compactChatHiddenUntil = Date.now() + 1500;
     compactChatImeInputActive = false;
     compactChatImeCompositionActive = false;
     windows.get('compact-chat')?.hide();
@@ -3259,6 +3308,20 @@ const handlers = {
       }
     }
     return topmostSuppressed;
+  },
+  set_pet_context_menu_open: ({ open }) => {
+    petContextMenuOpen = Boolean(open);
+    const pet = windows.get('pet');
+    if (pet && !pet.isDestroyed()) {
+      if (petContextMenuOpen) applyFloatingFullscreenBehavior(pet, { force: true });
+      else setPetLayerBelowCompact(windows.get('compact-chat')?.isVisible());
+      if (petContextMenuOpen) pet.moveTop();
+    }
+    debugCompactChat(petContextMenuOpen ? 'pet context menu raised' : 'pet context menu closed', {
+      petSnapshot: compactChatWindowSnapshot(pet),
+      compactSnapshot: compactChatWindowSnapshot(windows.get('compact-chat')),
+    });
+    return petContextMenuOpen;
   },
   start_topmost_guard: () => {
     ensureTopmostGuard();
@@ -3291,8 +3354,13 @@ const handlers = {
     const [width, currentHeight] = win.getSize();
     const nextHeight = Math.max(1, Math.round(Number(height) || currentHeight));
     if (Math.abs(currentHeight - nextHeight) <= 1) return;
-    debugCompactChat('resize compact chat', { currentHeight, nextHeight, snapshot: compactChatWindowSnapshot(win) });
+    const compactImeLevelActive = compactChatImeInputActive || compactChatImeCompositionActive;
+    debugCompactChat('resize compact chat', { currentHeight, nextHeight, imeLevelActive: compactImeLevelActive, snapshot: compactChatWindowSnapshot(win) });
     win.setSize(width, nextHeight);
+    if (compactImeLevelActive) {
+      configureCompactChatPanel(win);
+      return;
+    }
     applyFloatingFullscreenBehavior(win);
   },
   capture_screen_region: captureScreenRegion,
@@ -3353,10 +3421,6 @@ ipcMain.handle('deskcat:invoke', async (_event, command, args) => {
 });
 
 ipcMain.handle('deskcat:emit', (_event, channel, payload) => {
-  if (channel === 'compact-chat:ime-debug') {
-    debugCompactChat('renderer ime event', payload || {});
-    return null;
-  }
   if (channel === 'compact-chat:ime-input-start') {
     debugCompactChat('ipc ime-input-start', { payload });
     compactChatImeInputActive = true;
@@ -3382,7 +3446,6 @@ ipcMain.handle('deskcat:emit', (_event, channel, payload) => {
     debugCompactChat('ipc ime-composition-start', { payload, snapshot: compactChatWindowSnapshot(win) });
     if (win && !win.isDestroyed()) {
       configureCompactChatPanel(win);
-      applyFloatingFullscreenBehavior(win, { force: true });
     }
     return null;
   }
@@ -3391,8 +3454,8 @@ ipcMain.handle('deskcat:emit', (_event, channel, payload) => {
     const win = windows.get('compact-chat');
     debugCompactChat('ipc ime-composition-end', { payload, snapshot: compactChatWindowSnapshot(win) });
     if (win && !win.isDestroyed()) {
-      applyFloatingFullscreenBehavior(win, { force: true });
-      configureCompactChatPanel(win);
+      if (compactChatImeInputActive) configureCompactChatPanel(win);
+      else applyFloatingFullscreenBehavior(win, { force: true });
     }
     return null;
   }

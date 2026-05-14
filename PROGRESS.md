@@ -1993,3 +1993,9 @@
 - 收起：main 进程新增 `compactChatHiddenUntil`，收起后 800ms 内忽略 compact chat 的 show/position/resize 请求；resize 不再作用于隐藏窗口，避免输入框 blur 或布局更新把刚收起的小窗刷回来。
 - 验证：`node scripts/build-panel-key-fix.mjs`、`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
 - 文件：panel-key-fix.mm, main.cjs, ISSUES.md, PROGRESS.md
+
+### R262. Compact Chat 输入态窗口链路降噪（2026-05-14）
+- 闪烁：IME 输入态下 compact 的 position/resize/composition 更新不再进入普通 `applyFloatingFullscreenBehavior` / `moveTop` 路径，只重新应用 native panel IME level，避免 `screen-saver` 与 IME level 反复切换。
+- 收起：compact 收起后的防重入窗口从 800ms 延长到 1500ms；隐藏窗口期间 show/position/resize 继续 no-op，降低输入框 blur 和布局更新把窗口刷回来的概率。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
+- 文件：main.cjs, ISSUES.md, PROGRESS.md
