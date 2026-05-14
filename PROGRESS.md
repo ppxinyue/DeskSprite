@@ -1995,7 +1995,8 @@
 - 文件：panel-key-fix.mm, main.cjs, ISSUES.md, PROGRESS.md
 
 ### R262. Compact Chat 输入态窗口链路降噪（2026-05-14）
-- 闪烁：IME 输入态下 compact 的 position/resize/composition 更新不再进入普通 `applyFloatingFullscreenBehavior` / `moveTop` 路径，只重新应用 native panel IME level，避免 `screen-saver` 与 IME level 反复切换。
+- 闪烁：IME 输入态下 compact 的 position/composition 更新不再进入普通 `applyFloatingFullscreenBehavior` / `moveTop` 路径；resize 不再立即 `setSize`，只缓存最后一次高度，待输入态结束后一次性应用，避免输入法组合期间透明 panel 被频繁重排。
+- 层级：native panel level 对同一窗口同一模式做去重，减少重复 `setLevel` 对 IME client 的扰动；保留 IME 事件 debug 输出，便于继续定位 macOS InputMethodKit 日志。
 - 收起：compact 收起后的防重入窗口从 800ms 延长到 1500ms；隐藏窗口期间 show/position/resize 继续 no-op，降低输入框 blur 和布局更新把窗口刷回来的概率。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md

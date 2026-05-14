@@ -3198,8 +3198,8 @@
 - 相关任务：Compact Chat IME 输入态闪烁与收起失败
 - 严重程度：严重
 - 问题现象：compact window 单独打开不闪，只有焦点进入输入框后才闪烁；输入框 focus 时仍无法稳定收起或最小化。
-- 原因分析：闪烁与普通窗口显示无关，而是 IME 输入态下 position/resize/composition 事件继续触发 `applyFloatingFullscreenBehavior`、`moveTop` 和 Electron always-on-top 链路，和 native IME level 反复争夺窗口层级。收起后 suppression 窗口过短，输入框 blur 与布局更新仍可能把窗口快速刷回。
-- 解决方案：IME 输入态下 `position_compact_chat_window` 只更新位置并重新应用 native panel 配置，不再 `applyFloatingFullscreenBehavior` 或 `moveTop`；`resize_compact_chat_window` 只改尺寸并保持 native IME level，不再触发 floating/topmost；composition start/end 不再强制完整 floating 链路；收起防重入窗口延长到 1500ms。
+- 原因分析：闪烁与普通窗口显示无关，而是 IME 输入态下 position/resize/composition 事件继续触发 `applyFloatingFullscreenBehavior`、`moveTop`、`setLevel` 和 Electron always-on-top 链路，输入框内容变化还会频繁 `setSize`，导致透明 panel 与 IME client 反复重配。收起后 suppression 窗口过短，输入框 blur 与布局更新仍可能把窗口快速刷回。
+- 解决方案：IME 输入态下 `position_compact_chat_window` 只更新位置并保持 native panel 配置，不再 `applyFloatingFullscreenBehavior` 或 `moveTop`；`resize_compact_chat_window` 不再立即 `setSize`，只记录最后一次高度，待输入态结束后一次性应用；native panel level 对同一窗口同一模式去重，避免重复 `setLevel`；composition start/end 不再强制完整 floating 链路；收起防重入窗口延长到 1500ms。
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：IME 输入态必须被当作一个稳定窗口层级区间，期间不能让 resize/position/topmost guard 反复进入普通置顶路径。
 - 是否需更新技术文档：否。
