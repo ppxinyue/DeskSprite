@@ -136,10 +136,10 @@ static napi_value SetPanelLevelImeComposition(napi_env env, napi_callback_info i
   }
 
   if ([NSThread isMainThread]) {
-    set_window_level(window, NSPopUpMenuWindowLevel - 1);
+    set_window_level(window, NSFloatingWindowLevel);
   } else {
     dispatch_sync(dispatch_get_main_queue(), ^{
-      set_window_level(window, NSPopUpMenuWindowLevel - 1);
+      set_window_level(window, NSFloatingWindowLevel);
     });
   }
 

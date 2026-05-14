@@ -1987,3 +1987,9 @@
 - 调试：保留 renderer -> main 的 IME debug 转发，IME/focus 相关 `[compact-chat:debug]` 默认打印到 Electron 启动命令行。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
 - 文件：ChatPrimitives.tsx, main.cjs, ISSUES.md, PROGRESS.md
+
+### R261. Compact Chat IME 层级降低与收起防重入（2026-05-14）
+- IME：macOS native addon 的输入态层级从 `NSPopUpMenuWindowLevel - 1` 降到 `NSFloatingWindowLevel`，避免 compact chat 压住系统候选条；已重新构建 `electron/native/panel_key_fix.node`。
+- 收起：main 进程新增 `compactChatHiddenUntil`，收起后 800ms 内忽略 compact chat 的 show/position/resize 请求；resize 不再作用于隐藏窗口，避免输入框 blur 或布局更新把刚收起的小窗刷回来。
+- 验证：`node scripts/build-panel-key-fix.mjs`、`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
+- 文件：panel-key-fix.mm, main.cjs, ISSUES.md, PROGRESS.md

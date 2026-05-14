@@ -3167,3 +3167,15 @@
 - 涉及文件：`src/features/chat/ChatPrimitives.tsx`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：全屏浮窗输入框要把“窗口成为 key window”和“用户正在输入”分离；native window focus 只能放在窗口显示边界，不能放在文本输入事件链路里。
 - 是否需更新技术文档：否。
+
+## ISSUE-266
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Chat IME 层级与输入态收起
+- 严重程度：严重
+- 问题现象：重复输入止住后，普通桌面上 IME 候选条会出现但被 compact chat 压在下面；全屏窗口上候选条没有浮到全屏内容之上；当焦点仍在输入框内时点击 compact chat 收起按钮，窗口无法收起或短暂收起后又被刷出。
+- 原因分析：输入态 native panel 仍使用 `NSPopUpMenuWindowLevel - 1`，实际仍高于当前系统输入法候选条，导致候选条被 compact chat 遮挡。收起后，textarea blur、内容 resize 或 pet 侧 position effect 可能立即向 main 发送 compact chat 更新，把刚隐藏的窗口重新定位/显示。
+- 解决方案：macOS 输入态层级降为 `NSFloatingWindowLevel`，保留 AllSpaces/FullScreenAuxiliary 能力，让 IME 候选条位于 compact chat 上方；重编 `panel_key_fix.node`。main 进程新增 `compactChatHiddenUntil`，收起后短时间内忽略 compact chat show/position/resize 请求，并禁止 resize 作用于隐藏窗口。
+- 涉及文件：`electron/panel-key-fix.mm`, `electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：IME 候选条能出现但被盖住时，说明焦点链路已基本打通，应优先降低应用窗口层级而不是继续改输入事件；隐藏浮窗则必须在 main 进程做短暂防重入，不能只靠 renderer 状态。
+- 是否需更新技术文档：否。

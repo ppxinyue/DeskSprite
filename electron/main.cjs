@@ -48,6 +48,7 @@ let panelKeyFix = undefined;
 let topmostSuppressed = false;
 let compactChatImeInputActive = false;
 let compactChatImeCompositionActive = false;
+let compactChatHiddenUntil = 0;
 let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'png', 'idle.png');
 let tray = null;
 let currentAppIcon = null;
@@ -1259,6 +1260,10 @@ function showChatWindow() {
 }
 
 function showCompactChatWindow({ x, y, w, h }, show = true) {
+  if (Date.now() < compactChatHiddenUntil) {
+    debugCompactChat('compact chat update ignored after hide', { show, hiddenUntil: compactChatHiddenUntil });
+    return;
+  }
   const existing = windows.get('compact-chat');
   if (!show && existing && !existing.isDestroyed()) {
     debugCompactChat('position compact chat', {
@@ -3225,6 +3230,7 @@ const handlers = {
   position_compact_chat_window: (args) => showCompactChatWindow(args, false),
   hide_compact_chat_window: () => {
     debugCompactChat('hide compact chat', { snapshot: compactChatWindowSnapshot(windows.get('compact-chat')) });
+    compactChatHiddenUntil = Date.now() + 800;
     compactChatImeInputActive = false;
     compactChatImeCompositionActive = false;
     windows.get('compact-chat')?.hide();
@@ -3279,8 +3285,9 @@ const handlers = {
     });
   },
   resize_compact_chat_window: ({ height }) => {
+    if (Date.now() < compactChatHiddenUntil) return;
     const win = windows.get('compact-chat');
-    if (!win || win.isDestroyed()) return;
+    if (!win || win.isDestroyed() || !win.isVisible()) return;
     const [width, currentHeight] = win.getSize();
     const nextHeight = Math.max(1, Math.round(Number(height) || currentHeight));
     if (Math.abs(currentHeight - nextHeight) <= 1) return;
