@@ -3095,3 +3095,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：伴随型浮窗的位置算法应以目标对象距离为核心目标，屏幕居中只能是最后兜底；否则边缘位置很容易出现“合法但不相关”的远距离布局。
 - 是否需更新技术文档：否。
+
+## ISSUE-260
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Coding Compact Session 切换稳定性
+- 严重程度：严重
+- 问题现象：Coding mode 的 compact chat 顶部 session 切换按钮仍然不好使，常常点按后没有反应。
+- 原因分析：前一版将事件绑定在单个 session button 上，但按钮位于透明 macOS panel 内的横向 overflow 滚动容器中，事件可能在滚动/拖拽/窗口激活链路中被截断；同时 compact 和 standalone 的切换逻辑不完全一致，compact 只设置 active id，没有统一清理 archived view 等相关状态。
+- 解决方案：将 session 切换提升到滚动容器的捕获阶段事件委托，统一监听 `pointerdown`、`mousedown` 和 `click`，通过 `data-coding-session-id` 定位目标 session；新增统一 `selectInheritedSession`，切换时同步清理 archived 状态并设置 active session。
+- 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：透明 panel + 横向滚动条里的小按钮不适合只依赖子元素冒泡事件；关键切换应在容器捕获阶段做事件委托，并把视图状态切换集中到一个函数里。
+- 是否需更新技术文档：否。

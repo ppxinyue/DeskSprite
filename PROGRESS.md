@@ -1945,3 +1945,10 @@
 - 评分：按 compact 矩形与灵宠矩形的真实间距排序，再考虑高度损失和方向优先级，默认让窗口贴近灵宠。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R255. Coding Compact Session 切换事件委托（2026-05-14）
+- 事件：Coding compact 顶部 session 切换从每个 button 自己处理事件，改为滚动容器捕获阶段委托处理 `pointerdown`、`mousedown` 和 `click`。
+- 状态：新增统一的 `selectInheritedSession`，切换时同步清空 archived view、重置 active archived id、固定滚动到底部，避免选择后被其他视图状态抵消。
+- 稳定：session button 增加 `data-coding-session-id`、`app-no-drag`、`touch-manipulation` 和 `select-none`，降低横向 overflow 容器、透明 panel 和拖拽区域残留对点击的影响。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md

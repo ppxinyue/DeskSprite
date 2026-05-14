@@ -815,6 +815,12 @@ function CodingDialog({
     ? codingNeedsInputFooter(activeInheritedSession.message, codingLabel)
     : `请回到 ${codingLabel} 中回复或处理。`;
   const showInheritedSessionButtons = inheritedSessions.length > 1 && !archivedMessages;
+  const selectInheritedSession = useCallback((sessionId: string) => {
+    stickToBottomRef.current = true;
+    setArchivedMessages(null);
+    setActiveArchivedConversationId(null);
+    setActiveInheritedSessionId(sessionId);
+  }, []);
 
   if (standalone) {
     return (
@@ -937,11 +943,7 @@ function CodingDialog({
                   <CodingSessionButtons
                     sessions={inheritedSessions}
                     activeSessionId={activeInheritedSession?.id ?? activeInheritedSessionId}
-                    onSelect={(sessionId) => {
-                      setArchivedMessages(null);
-                      setActiveArchivedConversationId(null);
-                      setActiveInheritedSessionId(sessionId);
-                    }}
+                    onSelect={selectInheritedSession}
                   />
                 </div>
               ) : null}
@@ -1009,7 +1011,7 @@ function CodingDialog({
             sessions={inheritedSessions}
             activeSessionId={activeInheritedSession?.id ?? activeInheritedSessionId}
             compact
-            onSelect={(sessionId) => setActiveInheritedSessionId(sessionId)}
+            onSelect={selectInheritedSession}
           />
         </div>
       ) : null}
@@ -1101,8 +1103,27 @@ function CodingSessionButtons({
   onSelect: (sessionId: string) => void;
   compact?: boolean;
 }) {
+  const lastSelectedAtRef = useRef(0);
+  const activateFromEvent = (event: React.SyntheticEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement | null;
+    const button = target?.closest<HTMLButtonElement>('[data-coding-session-id]');
+    const sessionId = button?.dataset.codingSessionId;
+    if (!sessionId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const now = performance.now();
+    if (now - lastSelectedAtRef.current < 160) return;
+    lastSelectedAtRef.current = now;
+    onSelect(sessionId);
+  };
+
   return (
-    <div className="app-no-drag overflow-x-auto overflow-y-hidden">
+    <div
+      className="app-no-drag relative z-10 overflow-x-auto overflow-y-hidden"
+      onPointerDownCapture={activateFromEvent}
+      onMouseDownCapture={activateFromEvent}
+      onClickCapture={activateFromEvent}
+    >
       <div className={`flex min-w-max gap-1.5 ${compact ? '' : 'pr-1'}`}>
         {sessions.map((session, index) => {
           const active = session.id === activeSessionId;
@@ -1110,21 +1131,12 @@ function CodingSessionButtons({
             <button
               key={session.id}
               type="button"
-              className={`group inline-flex max-w-[164px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-left transition-all ${
+              data-coding-session-id={session.id}
+              className={`app-no-drag group inline-flex max-w-[164px] touch-manipulation select-none items-center gap-1.5 rounded-full border px-2.5 py-1 text-left transition-all ${
                 active
                   ? 'border-[#2f94ff]/28 bg-[#2f94ff]/10 text-[var(--text-primary)]'
                   : 'border-border/35 bg-background/26 text-[var(--text-secondary)] hover:bg-background/44 hover:text-[var(--text-primary)]'
               } ${compact ? 'text-[10px]' : 'text-[11px]'}`}
-              onPointerDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onSelect(session.id);
-              }}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onSelect(session.id);
-              }}
             >
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${codingStatusDotClass(session.status)}`} />
               <span className="truncate font-medium leading-[1.3]">
