@@ -106,3 +106,25 @@ test('resolveSessionStatus stays needs-input when the problem is still the lates
 
   assert.equal(status, 'needs-input');
 });
+
+test('resolveSessionStatus keeps a completed turn done after later idle time', () => {
+  const status = resolveSessionStatus({
+    lastUserAt: 100,
+    lastWorkAt: 180,
+    lastAssistantAt: 220,
+    lastProblemAt: 0,
+  });
+
+  assert.equal(status, 'done');
+});
+
+test('resolveSessionStatus treats new user input after done as working', () => {
+  const status = resolveSessionStatus({
+    lastUserAt: 260,
+    lastWorkAt: 180,
+    lastAssistantAt: 220,
+    lastProblemAt: 0,
+  });
+
+  assert.equal(status, 'working');
+});

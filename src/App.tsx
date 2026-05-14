@@ -1408,6 +1408,7 @@ function PetWindow() {
   const initialLayoutReadyRef = useRef(false);
   const dragSessionRef = useRef<BoundedDragSession | null>(null);
   const dragFrameRef = useRef<number | null>(null);
+  const dragMoveSeqRef = useRef(0);
   const pendingDragPointRef = useRef<{ screenX: number; screenY: number } | null>(null);
   const lastDragPositionRef = useRef<{ left: number; top: number } | null>(null);
   const suppressMovedUntilRef = useRef(0);
@@ -1567,14 +1568,6 @@ function PetWindow() {
     setChatBurst(true);
     window.setTimeout(() => setChatBurst(false), 360);
   }, [positionCompactChatWindow]);
-
-  const isCompactChatActuallyVisible = useCallback(async () => {
-    try {
-      return await invoke<boolean>("is_compact_chat_visible");
-    } catch {
-      return false;
-    }
-  }, []);
 
   const animateRestPresentation = useCallback(async (target: RestPresentationSnapshot, options: { onDone?: () => void } = {}) => {
     if (restPresentationFrameRef.current) {
@@ -2448,9 +2441,31 @@ function PetWindow() {
       if (last && Math.abs(last.left - nextLeft) < 0.5 && Math.abs(last.top - nextTop) < 0.5) return;
       lastDragPositionRef.current = { left: nextLeft, top: nextTop };
       suppressMovedUntilRef.current = Date.now() + 180;
-      getCurrentWindow().setPosition(new LogicalPosition(nextLeft, nextTop)).catch(() => {});
       if ((dialogOpen || (settings.codingModeEnabled && compactVisible)) && !compactDismissedRef.current && !isCompactChatDismissed()) {
-        positionCompactChatWindow({ show: false, windowLeft: nextLeft, windowTop: nextTop }).catch(() => {});
+        const seq = ++dragMoveSeqRef.current;
+        getCompactChatGeometry({
+          requestedDialogWidth: settings.dialogWidth,
+          compact: compactConversationIdRef.current == null,
+          petImageWidth,
+          petImageHeight,
+          layout: layoutRef.current,
+          windowLeft: nextLeft,
+          windowTop: nextTop,
+        })
+          .then((compactGeometry) => {
+            if (seq !== dragMoveSeqRef.current) return;
+            if (!compactGeometry) {
+              return getCurrentWindow().setPosition(new LogicalPosition(nextLeft, nextTop));
+            }
+            return invoke("move_pet_and_compact_chat", {
+              pet: { x: nextLeft, y: nextTop },
+              compact: compactGeometry,
+            });
+          })
+          .catch(() => {});
+      } else {
+        dragMoveSeqRef.current += 1;
+        getCurrentWindow().setPosition(new LogicalPosition(nextLeft, nextTop)).catch(() => {});
       }
     });
   };
@@ -2466,10 +2481,8 @@ function PetWindow() {
   };
 
   const openLatestChat = async () => {
-    if (await isCompactChatActuallyVisible()) {
-      setCompactVisible(true);
-      return;
-    }
+    compactDismissedRef.current = false;
+    localStorage.removeItem(COMPACT_CHAT_DISMISSED_KEY);
     if (settings.codingModeEnabled) {
       await forceShowCodingChat();
       return;
@@ -2674,7 +2687,7 @@ function FloatingToolButton({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`h-5 w-5 rounded-full border border-border/70 bg-background/95 p-0 text-muted-foreground shadow-sm transition-all hover:text-foreground ${
+      className={`h-7 w-7 rounded-full border border-border/70 bg-background/95 p-0 text-muted-foreground shadow-sm transition-all hover:text-foreground ${
         muted && !accentColor ? "saturate-0 hover:saturate-100" : ""
       }`}
       style={{

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { emit } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { Check, Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -57,48 +57,6 @@ export function Composer({
   error?: string | null;
   shakeKey?: number;
 }) {
-  const compactImeBlurTimerRef = useRef<number | null>(null);
-  const compactImeInputActiveRef = useRef(false);
-
-  function clearCompactImeBlurTimer() {
-    if (compactImeBlurTimerRef.current === null) return;
-    window.clearTimeout(compactImeBlurTimerRef.current);
-    compactImeBlurTimerRef.current = null;
-  }
-
-  useEffect(() => {
-    return () => {
-      clearCompactImeBlurTimer();
-      if (compact && window.deskCat?.label === 'compact-chat') {
-        emit('compact-chat:ime-input-end', {}).catch(() => {});
-      }
-    };
-  }, [compact, textareaRef]);
-
-  function emitCompactChatImeInput(active: boolean) {
-    if (!compact || window.deskCat?.label !== 'compact-chat') return;
-    clearCompactImeBlurTimer();
-    if (active) {
-      if (compactImeInputActiveRef.current) {
-        return;
-      }
-      compactImeInputActiveRef.current = true;
-      emit('compact-chat:ime-input-active', {}).catch(() => {});
-      return;
-    }
-    compactImeBlurTimerRef.current = window.setTimeout(() => {
-      compactImeBlurTimerRef.current = null;
-      if (!compactImeInputActiveRef.current) return;
-      compactImeInputActiveRef.current = false;
-      emit('compact-chat:ime-input-end', {}).catch(() => {});
-    }, 260);
-  }
-
-  function emitCompactChatImeComposition(active: boolean) {
-    if (!compact || window.deskCat?.label !== 'compact-chat') return;
-    emit(active ? 'compact-chat:ime-composition-start' : 'compact-chat:ime-composition-end', {}).catch(() => {});
-  }
-
   async function handlePaste(event: React.ClipboardEvent<HTMLTextAreaElement>) {
     if (!clipboardHasImage(event)) return;
     event.preventDefault();
@@ -156,14 +114,8 @@ export function Composer({
               onChange={(e) => onInputChange(e.target.value)}
               onKeyDown={onKeyDown}
               onPaste={handlePaste}
-              onFocus={() => emitCompactChatImeInput(true)}
-              onCompositionStart={() => {
-                emitCompactChatImeComposition(true);
-              }}
-              onCompositionEnd={() => emitCompactChatImeComposition(false)}
-              onBlur={() => {
-                emitCompactChatImeComposition(false);
-                emitCompactChatImeInput(false);
+              onMouseDown={() => {
+                if (compact) invoke('focus_compact_chat_window').catch(() => {});
               }}
               placeholder={isVoiceLoading ? '正在识别...' : '输入消息...'}
               className={`${compact ? 'min-h-[28px] px-1.5 py-1.5 leading-[1.35] overflow-hidden' : 'min-h-[34px] px-2 py-1.5 text-[14px] leading-[1.45] overflow-y-auto'} max-h-[112px] min-w-0 flex-1 resize-none border-0 bg-transparent text-[var(--color-chat-text)] shadow-none placeholder:text-[var(--color-chat-muted)] focus-visible:ring-0`}
