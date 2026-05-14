@@ -18,6 +18,23 @@ type DailyFeatureMetric = {
   duration_ms: number;
 };
 
+type DailyFeatureUserMetric = {
+  metric_date: string;
+  feature: string;
+  active_devices: number;
+  event_count: number;
+  use_count: number;
+  duration_ms: number;
+};
+
+type DailyDownloadMetric = {
+  metric_date: string;
+  source: string;
+  channel: string;
+  asset: string;
+  download_count: number;
+};
+
 type RecentEvent = {
   device_id: string;
   event_name: string;
@@ -140,6 +157,64 @@ function aggregateFeatures(rows: DailyFeatureMetric[]) {
   };
 }
 
+function aggregateFeatureUsers(rows: DailyFeatureUserMetric[]) {
+  return rows
+    .map((row) => ({
+      metricDate: row.metric_date,
+      feature: row.feature,
+      activeDevices: Number(row.active_devices ?? 0),
+      useCount: Number(row.use_count ?? 0),
+      eventCount: Number(row.event_count ?? 0),
+      durationMs: Number(row.duration_ms ?? 0),
+    }))
+    .sort((a, b) => String(b.metricDate).localeCompare(String(a.metricDate)) || b.activeDevices - a.activeDevices);
+}
+
+function aggregateProductDownloads(rows: DailyDownloadMetric[]) {
+  const byAsset = new Map<string, number>();
+  for (const row of rows) {
+    byAsset.set(row.asset, (byAsset.get(row.asset) ?? 0) + Number(row.download_count ?? 0));
+  }
+  return {
+    count: Array.from(byAsset.values()).reduce((total, value) => total + value, 0),
+    assets: Array.from(byAsset.entries())
+      .map(([asset, count]) => ({ asset, count }))
+      .sort((a, b) => b.count - a.count),
+    daily: rows,
+  };
+}
+
+async function getGithubDownloads() {
+  const repo = Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat';
+  const token = Deno.env.get('GITHUB_TOKEN');
+  const headers: Record<string, string> = {
+    accept: 'application/vnd.github+json',
+    'user-agent': 'deskcat-dashboard',
+  };
+  if (token) headers.authorization = `Bearer ${token}`;
+
+  const response = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, { headers });
+  if (!response.ok) throw new Error(`GitHub releases request failed: ${response.status}`);
+  const releases = await response.json() as Array<{
+    tag_name?: string;
+    assets?: Array<{ name?: string; download_count?: number }>;
+  }>;
+
+  const assets = releases.flatMap((release) =>
+    (release.assets ?? []).map((asset) => ({
+      release: release.tag_name ?? '',
+      asset: asset.name ?? '',
+      count: Number(asset.download_count ?? 0),
+    }))
+  );
+
+  return {
+    repo,
+    count: assets.reduce((total, asset) => total + asset.count, 0),
+    assets: assets.sort((a, b) => b.count - a.count).slice(0, 20),
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
@@ -156,6 +231,9 @@ Deno.serve(async (req) => {
       telemetry,
       daily,
       featureDaily,
+      featureUsersDaily,
+      downloads,
+      downloadsTotal,
       recent,
     ] = await Promise.all([
       supabase.from('devices').select('device_id', { count: 'exact', head: true }),
@@ -163,19 +241,31 @@ Deno.serve(async (req) => {
       supabase.from('telemetry_events').select('id', { count: 'exact', head: true }),
       supabase.from('daily_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: true }),
       supabase.from('daily_feature_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
+      supabase.from('daily_feature_user_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
+      supabase.from('daily_download_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
+      supabase.from('download_events').select('id', { count: 'exact', head: true }),
       supabase.from('telemetry_events')
         .select('device_id,event_name,feature,count,duration_ms,client_created_at')
         .order('client_created_at', { ascending: false })
         .limit(50),
     ]);
 
-    for (const result of [devices, backups, telemetry, daily, featureDaily, recent]) {
+    for (const result of [devices, backups, telemetry, daily, featureDaily, featureUsersDaily, downloads, downloadsTotal, recent]) {
       if (result.error) throw result.error;
     }
 
     const dailyRows = (daily.data ?? []) as DailyMetric[];
     const featureRows = (featureDaily.data ?? []) as DailyFeatureMetric[];
+    const featureUserRows = (featureUsersDaily.data ?? []) as DailyFeatureUserMetric[];
+    const downloadRows = (downloads.data ?? []) as DailyDownloadMetric[];
     const aggregates = aggregateFeatures(featureRows);
+    const productDownloads = aggregateProductDownloads(downloadRows);
+    const githubDownloads = await getGithubDownloads().catch((error) => ({
+      repo: Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat',
+      count: 0,
+      assets: [],
+      error: error instanceof Error ? error.message : String(error),
+    }));
     const latestDaily = dailyRows.at(-1);
 
     return json({
@@ -190,10 +280,22 @@ Deno.serve(async (req) => {
         eventCount: sum(dailyRows as unknown as Array<Record<string, unknown>>, 'event_count'),
         useCount: sum(dailyRows as unknown as Array<Record<string, unknown>>, 'feature_use_count'),
         durationMs: sum(dailyRows as unknown as Array<Record<string, unknown>>, 'total_duration_ms'),
+        downloads: Number(downloadsTotal.count ?? 0) + Number(githubDownloads.count ?? 0),
       },
       daily: dailyRows,
       featureUsage: aggregates.features,
+      featureDailyUsers: aggregateFeatureUsers(featureUserRows).slice(0, 80),
       eventUsage: aggregates.events.slice(0, 40),
+      downloads: {
+        productSite: {
+          total: downloadsTotal.count ?? 0,
+          range: productDownloads.count,
+          assets: productDownloads.assets,
+          daily: productDownloads.daily,
+        },
+        github: githubDownloads,
+        total: Number(downloadsTotal.count ?? 0) + Number(githubDownloads.count ?? 0),
+      },
       recentEvents: (recent.data ?? []) as RecentEvent[],
     });
   } catch (error) {

@@ -106,7 +106,7 @@ button {
 .metrics {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   margin-bottom: 12px;
 }
 
@@ -219,6 +219,7 @@ button {
 }
 
 .feature-list,
+.download-list,
 .recent-list {
   display: grid;
   gap: 10px;
@@ -252,9 +253,44 @@ button {
   height: 100%;
 }
 
+.download-row {
+  align-items: center;
+  border-bottom: 1px solid #edf0f2;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 0 0 10px;
+}
+
+.download-row div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.download-row strong {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-row span {
+  color: #687076;
+  font-size: 11px;
+}
+
+.download-row b {
+  font-size: 18px;
+}
+
 .table-wrap {
   max-height: 290px;
   overflow: auto;
+}
+
+.table-wrap.compact {
+  max-height: 264px;
 }
 
 table {

@@ -46,8 +46,37 @@
         <section class="panel">
           <div class="panel-header">
             <h2>Feature Usage</h2>
+            <span>Uses are summed event counts</span>
           </div>
           <div class="feature-list" id="feature-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Downloads</h2>
+            <span id="download-summary"></span>
+          </div>
+          <div class="download-list" id="download-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Daily Feature Users</h2>
+            <span>distinct devices per day</span>
+          </div>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Feature</th>
+                  <th>Users</th>
+                  <th>Uses</th>
+                </tr>
+              </thead>
+              <tbody id="feature-user-table"></tbody>
+            </table>
+          </div>
         </section>
 
         <section class="panel span-2">
@@ -60,6 +89,7 @@
                 <tr>
                   <th>Feature</th>
                   <th>Event</th>
+                  <th>Active Users</th>
                   <th>Uses</th>
                   <th>Duration</th>
                   <th>Events</th>

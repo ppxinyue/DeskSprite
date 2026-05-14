@@ -5,7 +5,7 @@ This is a developer-only data path. It must not appear in the user profile or us
 ## Supabase Landing Plan
 
 1. Create a Supabase project.
-2. Apply `supabase/migrations/202605110001_cloud_analytics.sql`.
+2. Apply `supabase/migrations/202605110001_cloud_analytics.sql` and newer migrations.
 3. Deploy `supabase/functions/deskcat-sync`.
 4. Set the Edge Function secret `DESKCAT_INGEST_TOKEN` for private alpha builds.
 5. Store the function URL in local setting `cloudSyncEndpoint`.
@@ -74,13 +74,18 @@ supabase functions deploy deskcat-sync --no-verify-jwt
 - `telemetry_events`: raw append-only events with feature, event name, count, duration, metadata, and created time.
 - `daily_metrics`: SQL view for DAU, event count, total usage count, and total duration.
 - `daily_feature_metrics`: SQL view for per-feature and per-event usage.
+- `daily_feature_user_metrics`: SQL view for daily distinct devices per feature.
+- `download_events`: product website download click events.
+- `daily_download_metrics`: SQL view for product website downloads by day and asset.
 
 ## Dashboard Metrics
 
 - Total users: distinct users or devices, depending on auth readiness.
 - DAU: distinct devices with telemetry or backup activity on a local date.
 - Usage duration: sum of event `durationMs`.
-- Feature usage: grouped by `feature` and `eventName`, including count and duration.
+- Feature usage: grouped by `feature` and `eventName`, including count and duration. `useCount` is the sum of telemetry `count`; raw event rows are shown as `eventCount`.
+- Daily feature users: distinct devices per feature per UTC day.
+- Downloads: product website download click events plus GitHub release asset `download_count`.
 - Retention: active devices by first-seen cohort once the backend has enough history.
 
 ## Vercel Dashboard
@@ -106,6 +111,13 @@ supabase secrets set DESKCAT_DASHBOARD_TOKEN=<private-dashboard-token>
 supabase functions deploy deskcat-dashboard --no-verify-jwt
 ```
 
+Optional dashboard secrets:
+
+```text
+DESKCAT_GITHUB_REPO=ppxinyue/DeskCat
+GITHUB_TOKEN=<github-token-for-higher-rate-limits>
+```
+
 Vercel setup:
 
 - Import the GitHub repository in Vercel.
@@ -117,6 +129,29 @@ Vercel setup:
 - Open the site and refresh. The browser calls Vercel `/api/metrics`; Vercel forwards to Supabase with the token.
 
 The dashboard token is stored in Vercel environment variables, not in the browser bundle or browser local storage.
+
+## Public Website Stats
+
+The product website can show the current total user count, product-site download count, GitHub release download count, and combined download count through a public read/write Edge Function. It also records product-site download clicks.
+
+```bash
+supabase functions deploy deskcat-public-stats --no-verify-jwt
+```
+
+The deployed endpoint will look like:
+
+```text
+https://<project-ref>.functions.supabase.co/deskcat-public-stats
+```
+
+Set `website/index.html` meta `deskcat-public-stats-url` to that URL, or define `window.DESKCAT_PUBLIC_STATS_URL` before `script.js` loads. The public endpoint only returns aggregate counts and accepts download click events; it does not expose raw devices, telemetry, backups, or dashboard data.
+
+Optional public stats secrets:
+
+```text
+DESKCAT_GITHUB_REPO=ppxinyue/DeskCat
+GITHUB_TOKEN=<github-token-for-higher-rate-limits>
+```
 
 ## Useful Dashboard SQL
 
@@ -138,6 +173,24 @@ Feature usage:
 select *
 from public.daily_feature_metrics
 order by metric_date desc, duration_ms desc, use_count desc
+limit 100;
+```
+
+Daily feature users:
+
+```sql
+select *
+from public.daily_feature_user_metrics
+order by metric_date desc, active_devices desc
+limit 100;
+```
+
+Product website downloads:
+
+```sql
+select *
+from public.daily_download_metrics
+order by metric_date desc, download_count desc
 limit 100;
 ```
 

@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#efff82" />
+    <meta
+      name="description"
+      content="DeskCat is a lightweight desktop AI companion for chat, focus, reminders, and smart timeline summaries."
+    />
+    <title>DeskCat | Lightweight desktop AI companion</title>
+    <link rel="icon" href="assets/icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="deskcat-public-stats-url" content="https://vuxzqebeirynkdyonzud.functions.supabase.co/deskcat-public-stats" />
+  </head>
+  <body data-lang="en">
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="DeskCat home">
+        <img src="assets/icon.png" alt="" />
+        <span>DeskCat</span>
+      </a>
+      <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#motion" data-i18n="navMotion">Motion</a>
+        <a href="#features" data-i18n="navFeatures">Features</a>
+        <a href="#download" data-i18n="navDownload">Download</a>
+        <a href="https://github.com/ppxinyue/DeskCat" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+      <button class="lang-toggle" type="button" data-lang-toggle aria-label="Switch language">中文</button>
+    </header>
+
+    <main id="top">
+      <section class="hero-canvas color-yellow" data-cat-field>
+        <div class="hero-noise" aria-hidden="true"></div>
+        <div class="cat-trail" data-cat-trail aria-hidden="true"></div>
+
+        <div class="hero-center">
+          <p class="eyebrow reveal" data-i18n="heroEyebrow">PRODUCT / MACOS / AI COMPANION</p>
+          <h1 class="wordmark reveal" aria-label="DeskCat">
+            <span>D</span><span>e</span><span>s</span><span>k</span><span class="logo-letter">C<img src="assets/icon.png" alt="" /></span><span>a</span><span>t</span>
+          </h1>
+          <p class="hero-subtitle reveal" data-i18n="heroSubtitle">
+            Not just a desktop companion — a reflection of how you work.
+          </p>
+        </div>
+
+        <div class="hero-footnote">
+          <span>@deskcat</span>
+          <span data-i18n="heroFootnote">Move your cursor. The cats follow.</span>
+          <span class="live-users" aria-live="polite">
+            <span data-i18n="liveUsersLabel">Total users</span>
+            <strong data-total-users>--</strong>
+          </span>
+          <span class="live-users" aria-live="polite">
+            <span data-i18n="liveDownloadsLabel">Downloads</span>
+            <strong data-total-downloads>--</strong>
+          </span>
+        </div>
+      </section>
+
+      <section id="motion" class="motion-section color-black">
+        <div class="motion-copy reveal">
+          <p class="eyebrow">01 / PRODUCT MOTION</p>
+          <h2 data-i18n="motionTitle">Lives quietly in the corner. Ready when you are.</h2>
+        </div>
+        <div class="video-frame reveal">
+          <video controls playsinline poster="assets/hero-desktop.png">
+            <source src="assets/product-video.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </section>
+
+      <section class="manifesto color-offwhite">
+        <div class="split-label reveal">
+          <span>02</span>
+          <span data-i18n="manifestoLabel">WHY IT EXISTS</span>
+        </div>
+        <h2 class="big-statement reveal" data-i18n="manifestoTitle">
+          You have more productivity tools than ever. None of them know what you actually did today.
+        </h2>
+        <p class="manifesto-body reveal" data-i18n="manifestoBody">
+          DeskCat is different — a lightweight desktop AI companion that lives quietly in the corner of your
+          screen, always present, never intrusive.
+        </p>
+      </section>
+
+      <section id="features" class="features color-offwhite">
+        <div class="section-kicker reveal">
+          <span>03</span>
+          <span data-i18n="featuresLabel">FOUR IN ONE</span>
+        </div>
+        <h2 class="section-title reveal" data-i18n="featuresTitle">
+          Desktop companion · AI chat · Focus guard · Smart timeline.
+        </h2>
+
+        <article class="feature-story reveal">
+          <div class="feature-copy progressive-copy">
+            <p class="eyebrow">COMPANION</p>
+            <h3 data-i18n="companionTitle">Companion, not clutter</h3>
+            <p data-i18n="companionBody">
+              A customizable desktop pet with its own look and persona. It stays out of your way until you
+              need it.
+            </p>
+          </div>
+          <div class="feature-media-flow">
+            <figure class="media-panel single">
+              <img src="assets/hero-desktop.png" alt="DeskCat living on the desktop" />
+            </figure>
+            <figure class="media-panel split">
+              <img src="assets/desktop-2.png" alt="DeskCat desktop companion mode" />
+              <img src="assets/custom-avatar.png" alt="DeskCat custom avatar settings" />
+            </figure>
+            <figure class="media-panel mosaic companion-mosaic">
+              <img src="assets/cats/idle-1.gif" alt="DeskCat idle animation" />
+              <img src="assets/cats/drinking.gif" alt="DeskCat rest reminder animation" />
+              <img src="assets/cats/playing.gif" alt="DeskCat playing animation" />
+              <img src="assets/desktop-4.png" alt="DeskCat desktop preview" />
+            </figure>
+          </div>
+        </article>
+
+        <article class="feature-story reveal">
+          <div class="feature-copy progressive-copy">
+            <p class="eyebrow">AI CHAT</p>
+            <h3 data-i18n="chatTitle">AI chat, your way</h3>
+            <p data-i18n="chatBody">
+              Ships with a free built-in model. Plug in any provider you prefer — OpenAI, Claude, or whatever
+              fits your stack.
+            </p>
+          </div>
+          <div class="feature-media-flow">
+            <figure class="media-panel single">
+              <img src="assets/ai-chat.png" alt="DeskCat AI chat preview" />
+            </figure>
+            <figure class="media-panel split asymmetric">
+              <img src="assets/chat-window.png" alt="DeskCat compact chat window" />
+              <img src="assets/ai-2.png" alt="DeskCat AI model configuration" />
+            </figure>
+            <figure class="media-panel mosaic ai-mosaic">
+              <img src="assets/ai-3.png" alt="DeskCat AI provider settings" />
+              <img src="assets/ai-4.png" alt="DeskCat AI workflow preview" />
+              <img src="assets/chat-window.png" alt="DeskCat compact chat window" />
+            </figure>
+          </div>
+        </article>
+
+        <article class="feature-story reveal">
+          <div class="feature-copy progressive-copy">
+            <p class="eyebrow">FOCUS</p>
+            <h3 data-i18n="focusTitle">Focus mode that actually works</h3>
+            <p data-i18n="focusBody">
+              Switch windows, open a chat app — DeskCat notices and nudges you back. Coding mode turns agent
+              state into quiet color signals.
+            </p>
+          </div>
+          <div class="feature-media-flow">
+            <figure class="media-panel portrait">
+              <img src="assets/focus-mode.png" alt="DeskCat focus mode reminder" />
+            </figure>
+            <figure class="media-panel mosaic focus-mosaic">
+              <img src="assets/focus-1.png" alt="DeskCat focus and reminder settings" />
+              <img src="assets/focus-2.png" alt="DeskCat focus rule settings" />
+              <img src="assets/focus-3.png" alt="DeskCat distraction reminder settings" />
+              <img src="assets/focus-4.png" alt="DeskCat rest reminder settings" />
+              <img src="assets/focus-5.png" alt="DeskCat focus summary settings" />
+            </figure>
+            <figure class="media-panel split">
+              <img src="assets/coding-green.png" alt="DeskCat coding mode green state" />
+              <img src="assets/coding-yellow.png" alt="DeskCat coding mode need input state" />
+            </figure>
+          </div>
+        </article>
+
+        <article class="feature-story reveal">
+          <div class="feature-copy progressive-copy">
+            <p class="eyebrow">TIMELINE</p>
+            <h3 data-i18n="timelineTitle">A timeline you did not have to write</h3>
+            <p data-i18n="timelineBody">
+              DeskCat tracks foreground apps, background activity, terminal sessions, and browser tabs, then
+              hands you a daily summary.
+            </p>
+          </div>
+          <div class="feature-media-flow">
+            <figure class="media-panel single">
+              <img src="assets/timeline-en.png" alt="DeskCat timeline dashboard preview" />
+            </figure>
+            <figure class="media-panel split">
+              <img src="assets/timeline-zh.png" alt="DeskCat Chinese timeline dashboard preview" />
+              <img src="assets/github.png" alt="DeskCat coding activity integration preview" />
+            </figure>
+            <figure class="media-panel single">
+              <img src="assets/desktop-4.png" alt="DeskCat daily activity desktop preview" />
+            </figure>
+          </div>
+        </article>
+      </section>
+
+      <section id="download" class="download color-offwhite">
+        <div class="download-copy reveal">
+          <p class="eyebrow">DOWNLOAD / V1.0.0</p>
+          <h2 data-i18n="downloadTitle">Choose your Mac.</h2>
+          <p data-i18n="downloadBody">
+            DeskCat is available for both Apple Silicon and Intel Macs. Current builds are ad-hoc signed for
+            early testing.
+          </p>
+        </div>
+        <div class="download-actions reveal">
+          <a class="download-button primary" href="../release/DeskCat-1.0.0-arm64.dmg" download data-download-asset="DeskCat-1.0.0-arm64.dmg">
+            <span>Apple Silicon</span>
+            <small>M1 / M2 / M3 / M4 · arm64 · 560M</small>
+          </a>
+          <a class="download-button" href="../release/DeskCat-1.0.0-x64.dmg" download data-download-asset="DeskCat-1.0.0-x64.dmg">
+            <span>Intel Mac</span>
+            <small>x64 · 567M</small>
+          </a>
+          <p class="download-live" aria-live="polite">
+            <span data-i18n="siteDownloadsLabel">Product site</span>
+            <strong data-product-downloads>--</strong>
+            <span>GitHub</span>
+            <strong data-github-downloads>--</strong>
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer color-black">
+      <div>
+        <img src="assets/icon.png" alt="" />
+        <p>DeskCat</p>
+      </div>
+      <p data-i18n="footerLine">Desktop companion · AI chat · Focus guard · Smart timeline</p>
+      <a href="#top" data-i18n="footerTop">Back to top</a>
+      <a href="https://github.com/ppxinyue/DeskCat" target="_blank" rel="noreferrer">GitHub</a>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

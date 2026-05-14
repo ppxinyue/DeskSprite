@@ -6,6 +6,9 @@ const metricsEl = document.querySelector('#metrics');
 const dailyChartEl = document.querySelector('#daily-chart');
 const dailySummaryEl = document.querySelector('#daily-summary');
 const featureListEl = document.querySelector('#feature-list');
+const featureUserTableEl = document.querySelector('#feature-user-table');
+const downloadListEl = document.querySelector('#download-list');
+const downloadSummaryEl = document.querySelector('#download-summary');
 const eventTableEl = document.querySelector('#event-table');
 const recentListEl = document.querySelector('#recent-list');
 
@@ -60,6 +63,7 @@ function renderMetrics(data) {
     metric('DAU', formatNumber(totals.dau), 'latest active day'),
     metric('Usage Time', formatDuration(totals.durationMs), `${data.range.days} day range`),
     metric('Feature Uses', formatNumber(totals.useCount), 'summed event count'),
+    metric('Downloads', formatNumber(totals.downloads), 'website + GitHub'),
     metric('Events', formatNumber(totals.telemetryEvents), 'raw telemetry'),
     metric('Backups', formatNumber(totals.backups), 'cloud snapshots'),
   ].join('');
@@ -113,16 +117,75 @@ function renderFeatures(data) {
   }).join('');
 }
 
+function renderFeatureUsers(data) {
+  const rows = data.featureDailyUsers || [];
+  if (rows.length === 0) {
+    featureUserTableEl.innerHTML = '<tr><td colspan="4" class="empty">No feature users yet.</td></tr>';
+    return;
+  }
+  featureUserTableEl.innerHTML = rows.map((row) => `
+    <tr>
+      <td>${row.metricDate}</td>
+      <td>${row.feature}</td>
+      <td>${formatNumber(row.activeDevices)}</td>
+      <td>${formatNumber(row.useCount)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderDownloads(data) {
+  const downloads = data.downloads || {};
+  const productSite = downloads.productSite || {};
+  const github = downloads.github || {};
+  const productAssets = productSite.assets || [];
+  const githubAssets = github.assets || [];
+  downloadSummaryEl.textContent = `${formatNumber(downloads.total)} total`;
+
+  const rows = [
+    {
+      label: 'Product website',
+      value: productSite.total,
+      sub: `${formatNumber(productSite.range)} in selected range`,
+    },
+    {
+      label: `GitHub${github.repo ? ` · ${github.repo}` : ''}`,
+      value: github.count,
+      sub: github.error || 'release asset downloads',
+    },
+    ...productAssets.slice(0, 4).map((asset) => ({
+      label: `Website · ${asset.asset}`,
+      value: asset.count,
+      sub: 'selected range',
+    })),
+    ...githubAssets.slice(0, 4).map((asset) => ({
+      label: `GitHub · ${asset.asset}`,
+      value: asset.count,
+      sub: asset.release,
+    })),
+  ];
+
+  downloadListEl.innerHTML = rows.map((row) => `
+    <div class="download-row">
+      <div>
+        <strong>${row.label}</strong>
+        <span>${row.sub || ''}</span>
+      </div>
+      <b>${formatNumber(row.value)}</b>
+    </div>
+  `).join('');
+}
+
 function renderEvents(data) {
   const rows = data.eventUsage || [];
   if (rows.length === 0) {
-    eventTableEl.innerHTML = '<tr><td colspan="5" class="empty">No events yet.</td></tr>';
+    eventTableEl.innerHTML = '<tr><td colspan="6" class="empty">No events yet.</td></tr>';
     return;
   }
   eventTableEl.innerHTML = rows.map((row) => `
     <tr>
       <td>${row.feature}</td>
       <td>${row.eventName}</td>
+      <td>${formatNumber(row.activeDevices)}</td>
       <td>${formatNumber(row.useCount)}</td>
       <td>${formatDuration(row.durationMs)}</td>
       <td>${formatNumber(row.eventCount)}</td>
@@ -148,6 +211,8 @@ function render(data) {
   renderMetrics(data);
   renderDaily(data);
   renderFeatures(data);
+  renderFeatureUsers(data);
+  renderDownloads(data);
   renderEvents(data);
   renderRecent(data);
   generatedAtEl.textContent = `Generated ${formatDate(data.generatedAt)}`;
