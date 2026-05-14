@@ -121,6 +121,31 @@ static napi_value SetPanelLevelFloating(napi_env env, napi_callback_info info) {
   return make_bool(env, window != nil);
 }
 
+static napi_value SetPanelLevelImeComposition(napi_env env, napi_callback_info info) {
+  size_t argc = 1;
+  napi_value args[1];
+  napi_status status = napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  if (status != napi_ok || argc < 1) {
+    throw_type_error(env, "Expected one argument");
+    return nullptr;
+  }
+
+  NSWindow* window = nil;
+  if (!get_window_from_handle(env, args[0], &window)) {
+    return nullptr;
+  }
+
+  if ([NSThread isMainThread]) {
+    set_window_level(window, NSPopUpMenuWindowLevel - 1);
+  } else {
+    dispatch_sync(dispatch_get_main_queue(), ^{
+      set_window_level(window, NSPopUpMenuWindowLevel - 1);
+    });
+  }
+
+  return make_bool(env, window != nil);
+}
+
 static napi_value SetPanelLevelScreenSaver(napi_env env, napi_callback_info info) {
   size_t argc = 1;
   napi_value args[1];
@@ -152,6 +177,8 @@ NAPI_MODULE_INIT() {
   napi_set_named_property(env, exports, "setPanelKeyable", fn);
   napi_create_function(env, "setPanelLevelFloating", NAPI_AUTO_LENGTH, SetPanelLevelFloating, nullptr, &fn);
   napi_set_named_property(env, exports, "setPanelLevelFloating", fn);
+  napi_create_function(env, "setPanelLevelImeComposition", NAPI_AUTO_LENGTH, SetPanelLevelImeComposition, nullptr, &fn);
+  napi_set_named_property(env, exports, "setPanelLevelImeComposition", fn);
   napi_create_function(env, "setPanelLevelScreenSaver", NAPI_AUTO_LENGTH, SetPanelLevelScreenSaver, nullptr, &fn);
   napi_set_named_property(env, exports, "setPanelLevelScreenSaver", fn);
   return exports;

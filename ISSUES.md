@@ -3107,3 +3107,15 @@
 - 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：透明 panel + 横向滚动条里的小按钮不适合只依赖子元素冒泡事件；关键切换应在容器捕获阶段做事件委托，并把视图状态切换集中到一个函数里。
 - 是否需更新技术文档：否。
+
+## ISSUE-261
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Chat 全屏输入法候选框层级
+- 严重程度：严重
+- 问题现象：灵宠和 compact chat 浮在全屏窗口之上时，用户在 compact chat 中输入中文，输入法候选框没有跟着浮上来，只能盲打。
+- 原因分析：compact chat 为了压过全屏窗口使用很高的 `screen-saver` 层级。系统输入法候选框通常是系统弹出/菜单类窗口，层级低于 screen-saver；因此候选框被 DeskCat 自己的 topmost panel 或全屏 Space 盖住。此前 composition start 时降到 `NSFloatingWindowLevel`，又过低，不能稳定留在全屏窗口之上。
+- 解决方案：macOS 原生 addon 新增 IME 组字层级，将 compact panel 设为 `NSPopUpMenuWindowLevel - 1`，低于候选框但仍高于普通全屏内容；Windows 在 IME 组字期间临时使用 Electron `pop-up-menu` always-on-top level，结束后恢复 `screen-saver`。
+- 涉及文件：`electron/main.cjs`, `electron/panel-key-fix.mm`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：输入法候选框问题不能靠提高应用窗口层级解决；正确方向是输入态让应用窗口停在系统候选弹窗之下，同时仍处在能覆盖全屏内容的层级。
+- 是否需更新技术文档：否。

@@ -1952,3 +1952,10 @@
 - 稳定：session button 增加 `data-coding-session-id`、`app-no-drag`、`touch-manipulation` 和 `select-none`，降低横向 overflow 容器、透明 panel 和拖拽区域残留对点击的影响。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
 - 文件：App.tsx, ISSUES.md, PROGRESS.md
+
+### R256. Compact Chat 全屏输入法候选框层级（2026-05-14）
+- macOS：原生 panel addon 新增 `setPanelLevelImeComposition`，输入法组字期间将 compact panel 设到 `NSPopUpMenuWindowLevel - 1`，避免 `screen-saver` 层级压住系统候选框，同时仍高于普通全屏内容。
+- Windows：compact chat 普通悬浮使用 `screen-saver` always-on-top level；IME 组字期间临时切到 `pop-up-menu` level，让系统输入法候选弹窗有机会显示在输入窗口之上。
+- 兼容：保留旧 addon 的 fallback，若没有新导出则退回 `setPanelLevelFloating`；composition end 后恢复强悬浮层级。
+- 验证：`node scripts/build-panel-key-fix.mjs`、`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline` 通过。
+- 文件：main.cjs, panel-key-fix.mm, ISSUES.md, PROGRESS.md

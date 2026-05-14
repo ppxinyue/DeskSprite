@@ -159,7 +159,7 @@ function configureCompactChatPanel(win) {
     const configured = Boolean(addon.setPanelKeyable(handle));
     if (!configured) return false;
     const setLevel = compactChatImeCompositionActive
-      ? addon.setPanelLevelFloating
+      ? (addon.setPanelLevelImeComposition || addon.setPanelLevelFloating)
       : addon.setPanelLevelScreenSaver;
     if (setLevel) setLevel(handle);
     return true;
@@ -190,8 +190,12 @@ function applyFloatingFullscreenBehavior(win, options = {}) {
     if (force) win.moveTop();
     if (win === windows.get('compact-chat')) configureCompactChatPanel(win);
   } else {
-    if (!force && floatingConfiguredWindows.has(win) && win.isAlwaysOnTop()) return;
-    win.setAlwaysOnTop(true, 'normal');
+    const isCompactChat = win === windows.get('compact-chat');
+    if (!force && !isCompactChat && floatingConfiguredWindows.has(win) && win.isAlwaysOnTop()) return;
+    const level = isCompactChat
+      ? (compactChatImeCompositionActive && process.platform === 'win32' ? 'pop-up-menu' : 'screen-saver')
+      : 'normal';
+    win.setAlwaysOnTop(true, level);
     win.setSkipTaskbar(true);
     floatingConfiguredWindows.add(win);
   }
