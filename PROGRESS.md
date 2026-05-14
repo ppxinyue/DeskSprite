@@ -1924,3 +1924,10 @@
 - 标识：Timeline 标题徽标从“昨日示例”改为“示例 / Example”，和顶部入口保持一致。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:timeline`、`git diff --check` 通过。
 - 文件：SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R252. Compact Window 控件点击稳定性修复（2026-05-14）
+- 命中：compact 右上角收起/放大按钮从 14px 小圆点扩为 24px 点击区，视觉仍保留 macOS 小圆点，减少透明 panel 中点不中的问题。
+- 事件：收起/放大和 Coding 顶部 session 切换改为 `pointerdown` 立即触发，并阻止事件继续冒泡，避免非激活 panel 的首个 click 被系统窗口激活或拖拽区域吞掉。
+- 层级：compact 控制区和 Coding session 条显式标记 `app-no-drag`，控制区提升到更高 z-index，避免和悬浮背景/拖拽修复残留冲突。
+- 验证：`pnpm exec tsc -b --pretty false`、`node --check electron/main.cjs`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
+- 文件：App.tsx, ISSUES.md, PROGRESS.md

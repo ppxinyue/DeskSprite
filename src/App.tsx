@@ -513,7 +513,7 @@ function CompactChatWindow() {
   return (
     <div className="group relative w-screen overflow-hidden bg-transparent p-0" style={{ height: hoverFrameHeight }}>
       <div className="pointer-events-none absolute left-0 right-0 top-0 rounded-[6px] border border-foreground/0 bg-background/0 opacity-0 shadow-[0_8px_26px_rgba(42,38,31,0.08)] backdrop-blur-[2px] transition-all duration-200 group-hover:border-foreground/22 group-hover:bg-background/24 group-hover:opacity-100" style={{ height: hoverFrameHeight }} />
-      <div className="absolute right-1 top-1 z-30 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+      <div className="app-no-drag absolute right-1 top-1 z-50 flex gap-0.5 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
         <MacControlButton title="收起" onClick={collapseCompactChat}>
           <Minus className="h-2.5 w-2.5" />
         </MacControlButton>
@@ -1102,7 +1102,7 @@ function CodingSessionButtons({
   compact?: boolean;
 }) {
   return (
-    <div className="overflow-x-auto overflow-y-hidden">
+    <div className="app-no-drag overflow-x-auto overflow-y-hidden">
       <div className={`flex min-w-max gap-1.5 ${compact ? '' : 'pr-1'}`}>
         {sessions.map((session, index) => {
           const active = session.id === activeSessionId;
@@ -1115,7 +1115,11 @@ function CodingSessionButtons({
                   ? 'border-[#2f94ff]/28 bg-[#2f94ff]/10 text-[var(--text-primary)]'
                   : 'border-border/35 bg-background/26 text-[var(--text-secondary)] hover:bg-background/44 hover:text-[var(--text-primary)]'
               } ${compact ? 'text-[10px]' : 'text-[11px]'}`}
-              onClick={() => onSelect(session.id)}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onSelect(session.id);
+              }}
             >
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${codingStatusDotClass(session.status)}`} />
               <span className="truncate font-medium leading-[1.3]">
@@ -2726,10 +2730,23 @@ function MacControlButton({
     <button
       type="button"
       title={title}
-      onClick={onClick}
-      className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/80 bg-background/95 text-muted-foreground shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:scale-110 hover:bg-muted hover:text-foreground active:translate-y-0 active:scale-95"
+      aria-label={title}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClick();
+      }}
+      className="flex h-6 w-6 items-center justify-center rounded-[8px] text-muted-foreground transition-all duration-150 hover:bg-background/70 hover:text-foreground active:scale-95"
     >
-      {children}
+      <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full border border-border/80 bg-background/95 shadow-sm">
+        {children}
+      </span>
     </button>
   );
 }

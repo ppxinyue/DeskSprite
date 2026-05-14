@@ -3059,3 +3059,15 @@
 - 涉及文件：`src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：演示数据应有显式入口和清晰标签，不能挂靠到真实日期的空态兜底上，否则会混淆真实记录与产品预览。
 - 是否需更新技术文档：否。
+
+## ISSUE-257
+- 发现时间：2026-05-14
+- 发现者：用户反馈
+- 相关任务：Compact Window 控件点击稳定性修复
+- 严重程度：严重
+- 问题现象：Coding mode 下 compact window 顶部 session/目录按钮无法稳定点击切换；Coding mode 和普通 chat 中，compact window 的放大、缩小/收起按钮经常点击无反应。
+- 原因分析：compact window 是透明、置顶、非激活显示的 macOS panel，首个 click 可能被系统用于激活/层级调整；右上角控制按钮实际命中区只有 14px，在透明窗口中容错过低。Coding session 切换同样只依赖 `click`，且此前多轮窗口拖拽和置顶修复留下了 `app-drag`/`app-no-drag` 交错风险。
+- 解决方案：将 compact 收起/放大按钮扩大为 24px 命中区，使用 `pointerdown` 立即触发并阻止冒泡；Coding 顶部 session 按钮也改用 `pointerdown` 切换；相关区域显式标记 `app-no-drag` 并提升控制层级。
+- 涉及文件：`src/App.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：透明非激活 panel 的关键控件不能只依赖小尺寸 click 命中；高频控制应使用足够大的 hit target，并在 pointer 阶段处理，避免窗口激活、拖拽区域和 React click 合成事件之间互相抢事件。
+- 是否需更新技术文档：否。
