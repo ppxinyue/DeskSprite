@@ -87,6 +87,7 @@ const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
 const CODING_NO_OUTPUT_TIMEOUT_MS = 5 * 60 * 1000;
 const PERMISSION_PROMPT_WIDTH = 376;
 const PERMISSION_PROMPT_HEIGHT = 232;
+const PERMISSION_SPACE_ANCHOR_SIZE = 1;
 const inheritedCodingAcknowledged = new Map();
 const inheritedCodingSeenActive = new Set();
 const permissionPromptResolvers = new Map();
@@ -346,6 +347,10 @@ function opaqueWindowBackgroundColor() {
   return nativeTheme.shouldUseDarkColors ? '#1f1f1f' : '#f4f5f7';
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function createWindow(label, options) {
   const existing = windows.get(label);
   if (existing && !existing.isDestroyed()) return existing;
@@ -363,6 +368,59 @@ function createWindow(label, options) {
   win.on('move', () => send(win, 'window:moved', null));
   win.on('closed', () => windows.delete(label));
   return win;
+}
+
+async function revealPermissionDialogSpace() {
+  if (process.platform !== 'darwin') return null;
+  const work = screen.getPrimaryDisplay().workArea;
+  const existing = windows.get('permission-space-anchor');
+  const win = existing && !existing.isDestroyed()
+    ? existing
+    : new BrowserWindow({
+      x: work.x + 1,
+      y: work.y + 1,
+      width: PERMISSION_SPACE_ANCHOR_SIZE,
+      height: PERMISSION_SPACE_ANCHOR_SIZE,
+      show: false,
+      frame: false,
+      transparent: true,
+      opacity: 0,
+      backgroundColor: '#00000000',
+      resizable: false,
+      movable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      focusable: true,
+      webPreferences: preload('permission-space-anchor'),
+    });
+  if (!windows.has('permission-space-anchor')) {
+    windows.set('permission-space-anchor', win);
+    win.loadURL('data:text/html,<html><body></body></html>').catch(() => {});
+    win.on('closed', () => windows.delete('permission-space-anchor'));
+  }
+  win.setVisibleOnAllWorkspaces(false);
+  if (!win.isVisible()) win.show();
+  app.focus({ steal: true });
+  win.focus();
+  win.moveTop();
+  await delay(220);
+  app.focus({ steal: true });
+  win.focus();
+  await delay(80);
+  return win;
+}
+
+async function withPermissionDialogSpaceFocus(operation) {
+  const anchor = await revealPermissionDialogSpace();
+  try {
+    return await operation(anchor);
+  } finally {
+    if (anchor && !anchor.isDestroyed()) {
+      setTimeout(() => {
+        if (!anchor.isDestroyed()) anchor.close();
+      }, 1200);
+    }
+  }
 }
 
 function showWindowAfterInitialPaint(win, { focus = false } = {}) {
@@ -915,9 +973,9 @@ async function readTimelineActiveWindow({ musicAppKeywords, minSegmentMs } = {})
   };
 }
 
-function ensureAccessibilityPermission() {
+async function ensureAccessibilityPermission() {
   if (process.platform !== 'darwin') return { supported: false, trusted: false };
-  const trusted = systemPreferences.isTrustedAccessibilityClient(true);
+  const trusted = await withPermissionDialogSpaceFocus(async () => systemPreferences.isTrustedAccessibilityClient(true));
   return { supported: true, trusted };
 }
 
@@ -1514,6 +1572,52 @@ function appleScriptTargets(appName, bundleId) {
   ];
 }
 
+function appProcessExistsScript(appName, bundleId) {
+  return `
+tell application "System Events"
+  repeat with appProcess in application processes
+    try
+      if bundle identifier of appProcess is "${bundleId}" then return "1"
+    end try
+    try
+      if name of appProcess is "${appName}" then return "1"
+    end try
+  end repeat
+end tell
+return "0"
+`;
+}
+
+async function isMacAppRunning(appName, bundleId) {
+  if (process.platform !== 'darwin') return false;
+  try {
+    const result = await runAppleScript(appProcessExistsScript(appName, bundleId), 1200);
+    return String(result).trim() === '1';
+  } catch {
+    return false;
+  }
+}
+
+async function quitMacAppIfWeLaunched(appName, bundleId, wasRunning) {
+  if (process.platform !== 'darwin' || wasRunning) return;
+  try {
+    const running = await isMacAppRunning(appName, bundleId);
+    if (!running) return;
+    await runAppleScript(`tell application id "${bundleId}" to quit`, 1500);
+  } catch {
+    // Best effort cleanup only. Never fail schedule reads because a helper app refused to quit.
+  }
+}
+
+async function runFirstSuccessfulAppAppleScript(appName, bundleId, scriptFactory, timeout = 5000) {
+  const wasRunning = await isMacAppRunning(appName, bundleId);
+  try {
+    return await runFirstSuccessfulAppleScript(appleScriptTargets(appName, bundleId).map((target) => scriptFactory(target)), timeout);
+  } finally {
+    await quitMacAppIfWeLaunched(appName, bundleId, wasRunning);
+  }
+}
+
 function calendarKnowledgeScript(target) {
   return `
 set output to ""
@@ -1638,14 +1742,12 @@ async function readSystemKnowledgeScheduleInfo(args = {}) {
   }
   const wantsCalendar = args.calendar !== false;
   const wantsReminders = args.reminders === true;
-  const [calendarResult, remindersResult] = await Promise.allSettled([
-    wantsCalendar
-      ? runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => calendarKnowledgeScript(target)), 12000)
-      : Promise.resolve(''),
-    wantsReminders
-      ? runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => remindersKnowledgeScript(target)))
-      : Promise.resolve(''),
-  ]);
+  const calendarResult = wantsCalendar
+    ? await settlePromise(runFirstSuccessfulAppAppleScript('Calendar', 'com.apple.iCal', calendarKnowledgeScript, 12000))
+    : { status: 'fulfilled', value: '' };
+  const remindersResult = wantsReminders
+    ? await settlePromise(runFirstSuccessfulAppAppleScript('Reminders', 'com.apple.reminders', remindersKnowledgeScript))
+    : { status: 'fulfilled', value: '' };
   const calendarError = wantsCalendar && calendarResult.status === 'rejected'
     ? humanizeAppleScriptAccessError(calendarResult.reason?.message || calendarResult.reason)
     : '';
@@ -1687,6 +1789,14 @@ async function runFirstSuccessfulAppleScript(scripts, timeout = 5000) {
   throw new Error(errors.map(humanizeAppleScriptAccessError).join(' | '));
 }
 
+async function settlePromise(promise) {
+  try {
+    return { status: 'fulfilled', value: await promise };
+  } catch (reason) {
+    return { status: 'rejected', reason };
+  }
+}
+
 async function requestSystemKnowledgePermissions(args = {}) {
   if (process.platform !== 'darwin') {
     return {
@@ -1707,46 +1817,49 @@ async function requestSystemKnowledgePermissions(args = {}) {
     : wantsReminders
       ? chooseLocaleText('用于回答待办和提醒问题。', 'Used to answer to-do and reminder questions.')
       : chooseLocaleText('用于回答日程和会议问题。', 'Used to answer schedule and meeting questions.');
-  const consent = await dialog.showMessageBox({
-    type: 'info',
-    buttons: [
-      chooseLocaleText('继续', 'Continue'),
-      chooseLocaleText('取消', 'Cancel'),
-    ],
-    defaultId: 0,
-    cancelId: 1,
-    title: permissionTitle,
-    message: permissionMessage,
-    detail: chooseLocaleText(
-      '只在相关提问中读取必要信息；默认本地存储，云端备份均作加密处理。',
-      'Only needed data is read for related questions. Local by default; cloud backups are encrypted.',
-    ),
-  });
-  if (consent.response !== 0) {
-    return {
-      ok: false,
-      calendar: { ok: !wantsCalendar, message: wantsCalendar ? 'User cancelled permission request.' : 'Not requested.' },
-      reminders: { ok: !wantsReminders, message: wantsReminders ? 'User cancelled permission request.' : 'Not requested.' },
+  return await withPermissionDialogSpaceFocus(async (permissionParent) => {
+    const messageBoxOptions = {
+      type: 'info',
+      buttons: [
+        chooseLocaleText('继续', 'Continue'),
+        chooseLocaleText('取消', 'Cancel'),
+      ],
+      defaultId: 0,
+      cancelId: 1,
+      title: permissionTitle,
+      message: permissionMessage,
+      detail: chooseLocaleText(
+        '只在相关提问中读取必要信息；默认本地存储，云端备份均作加密处理。',
+        'Only needed data is read for related questions. Local by default; cloud backups are encrypted.',
+      ),
     };
-  }
-  const [calendarResult, remindersResult] = await Promise.allSettled([
-    wantsCalendar
-      ? runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => `tell ${target} to return count of calendars`))
-      : Promise.resolve(''),
-    wantsReminders
-      ? runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => `tell ${target} to return count of lists`))
-      : Promise.resolve(''),
-  ]);
-  const calendar = wantsCalendar ? permissionResultFromSettled(calendarResult) : { ok: true, message: 'Not requested.' };
-  const reminders = wantsReminders ? permissionResultFromSettled(remindersResult) : { ok: true, message: 'Not requested.' };
-  if ((wantsCalendar && !calendar.ok) || (wantsReminders && !reminders.ok)) {
-    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Automation').catch(() => {});
-  }
-  return {
-    ok: calendar.ok && reminders.ok,
-    calendar,
-    reminders,
-  };
+    const consent = permissionParent && !permissionParent.isDestroyed()
+      ? await dialog.showMessageBox(permissionParent, messageBoxOptions)
+      : await dialog.showMessageBox(messageBoxOptions);
+    if (consent.response !== 0) {
+      return {
+        ok: false,
+        calendar: { ok: !wantsCalendar, message: wantsCalendar ? 'User cancelled permission request.' : 'Not requested.' },
+        reminders: { ok: !wantsReminders, message: wantsReminders ? 'User cancelled permission request.' : 'Not requested.' },
+      };
+    }
+    const calendarResult = wantsCalendar
+      ? await settlePromise(runFirstSuccessfulAppAppleScript('Calendar', 'com.apple.iCal', (target) => `tell ${target} to return count of calendars`))
+      : { status: 'fulfilled', value: '' };
+    const remindersResult = wantsReminders
+      ? await settlePromise(runFirstSuccessfulAppAppleScript('Reminders', 'com.apple.reminders', (target) => `tell ${target} to return count of lists`))
+      : { status: 'fulfilled', value: '' };
+    const calendar = wantsCalendar ? permissionResultFromSettled(calendarResult) : { ok: true, message: 'Not requested.' };
+    const reminders = wantsReminders ? permissionResultFromSettled(remindersResult) : { ok: true, message: 'Not requested.' };
+    if ((wantsCalendar && !calendar.ok) || (wantsReminders && !reminders.ok)) {
+      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Automation').catch(() => {});
+    }
+    return {
+      ok: calendar.ok && reminders.ok,
+      calendar,
+      reminders,
+    };
+  });
 }
 
 function showPermissionPromptOverlay(args = {}, event) {

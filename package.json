@@ -80,7 +80,8 @@
       "identity": "-",
       "icon": "src-tauri/icons/icon.icns",
       "extendInfo": {
-        "NSAppleEventsUsageDescription": "DeskCat needs Automation permission to read Calendar and Reminders for the System Knowledge Base.",
+        "NSAppleEventsUsageDescription": "DeskCat 使用自动化权限识别当前前台应用和窗口状态，并仅在你询问日程、会议、待办或提醒时读取日历和提醒事项；不会修改这些数据。",
+        "NSAccessibilityUsageDescription": "DeskCat 使用辅助功能权限识别当前窗口、全屏和屏幕共享状态，让灵宠悬浮显示与专注提醒更稳定；不会读取键盘输入或替你操作其他 App。",
         "NSCalendarsUsageDescription": "DeskCat reads upcoming calendar events only when System Knowledge Base is enabled and relevant to your question.",
         "NSRemindersUsageDescription": "DeskCat reads upcoming reminders only when System Knowledge Base is enabled and relevant to your question.",
         "NSLocationWhenInUseUsageDescription": "DeskCat uses your approximate location to answer weather questions in System Knowledge Base."
