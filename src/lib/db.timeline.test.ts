@@ -93,6 +93,8 @@ test('classifies common macOS and Windows app aliases', async () => {
     { appName: 'explorer.exe', expected: 'office' },
     { appName: 'Spotify.exe', expected: 'entertainment' },
     { appName: 'steam.exe', expected: 'entertainment' },
+    { appName: 'Minecraft', expected: 'entertainment' },
+    { appName: 'World of Warcraft', expected: 'entertainment' },
   ];
 
   for (const [index, item] of cases.entries()) {

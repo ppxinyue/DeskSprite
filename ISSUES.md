@@ -3215,3 +3215,15 @@
 - 涉及文件：`electron/main.cjs`, `src/lib/permissionPrompt.ts`, `src/features/ai/systemKnowledge.ts`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `src/features/chat/ChatPrimitives.tsx`, `src/features/chat/chatStore.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：权限说明弹窗在全屏 Space 中要避免普通窗口激活；权限拒绝应作为 UI 可识别的产品状态处理，而不是交给模型从系统上下文里推断。
 - 是否需更新技术文档：否。
+
+## ISSUE-270
+- 发现时间：2026-05-15
+- 发现者：用户反馈
+- 相关任务：Timeline 连续性、idle 暂停与全屏游戏记录
+- 严重程度：中等
+- 问题现象：Timeline 主轨道在电脑与灵宠都开启时仍可能出现空白；此前 idle 判定固定为 60 秒，用户读文档/看视频/思考时过早暂停前台记录；全屏游戏期间原逻辑只暂停 timeline，不会生成完整游戏色块。
+- 原因分析：系统活动状态只用固定 60 秒键鼠 idle 阈值，与用户配置的 Timeline 最小时长不一致；全屏游戏性能保护将前台采样完全停掉，导致 recorder 没有收到游戏前台样本，游戏时长只能表现为空白或暂停。
+- 解决方案：`read_system_activity_state` 支持传入 `idleThresholdSeconds`，前端按 `timelineMinSegmentMinutes * 60` 传入，让 idle 暂停阈值和 Timeline 最小时长一致；全屏游戏期间不跑完整窗口采样，而是基于 presence 检测生成轻量游戏 snapshot 交给 `TimelineRecorder`，短于最小时长时折回原色块，达到最小时长后形成独立游戏色块；游戏类 app 归入娱乐分类。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/lib/db.ts`, `src/lib/timelineRecorder.test.ts`, `src/lib/db.timeline.test.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：Timeline 的“不可观测暂停”和“短暂前台切换”应复用同一最小时长语义；性能保护场景不要直接丢弃前台语义，可以用低成本 synthetic snapshot 维持 recorder 的状态机一致性。
+- 是否需更新技术文档：否。

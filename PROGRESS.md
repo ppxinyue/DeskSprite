@@ -5,7 +5,7 @@
 - 当前阶段：P0（Electron 重构 + GIF 形象体系 + 桌面交互打磨）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + Electron 重构 + 对话/拖拽迭代修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：待提交：timeline self-recording, example toggle, pinch zoom
+- 最新提交：待提交：timeline idle 阈值与全屏游戏色块记录
 
 ## 任务进度
 
@@ -2016,3 +2016,11 @@
 - 数据排查：确认今天本机原始数据中主 timeline 空白来自前台 inactive/sleep 断段，terminal 作为 background marker 延伸显示，不是 UI 丢失主段。
 - 验证：`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`curl -I http://127.0.0.1:5173/` 通过。
 - 文件：SettingsPanel.tsx, timelineRecorder.ts, timelineRecorder.test.ts, PROGRESS.md
+
+### R265. Timeline idle 阈值与全屏游戏色块记录（2026-05-15）
+- Idle：系统活动检测不再固定 60 秒判定 inactive，而是由前端按 `Timeline 最小时长` 传入阈值；例如最小时长 3 分钟时，键鼠 3 分钟无输入才暂停前台 timeline。
+- 游戏：全屏游戏期间保持性能保护，不跑完整前台窗口采样；改为使用 presence 检测到的游戏 app/window 生成轻量 timeline snapshot。
+- 语义：短于最小时长的游戏会折回原前台色块并作为短前台记录；达到最小时长的游戏会形成独立娱乐色块，结束后后续 app 重新按普通候选段规则确认。
+- 稳定：timeline 采样增加 in-flight 防重入，上一轮读取还没完成时跳过本轮，避免并发更新 recorder 状态。
+- 验证：`pnpm test:timeline`、`pnpm test:startup` 通过。
+- 文件：App.tsx, main.cjs, db.ts, timelineRecorder.test.ts, db.timeline.test.ts, ISSUES.md, PROGRESS.md

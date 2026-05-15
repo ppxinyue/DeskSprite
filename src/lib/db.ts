@@ -445,13 +445,13 @@ function classifyTimelineCategory(appName: string, windowTitle: string, url: str
   if (exactCategory) return exactCategory;
   if (/(terminal|iterm|warp|cursor|visual studio code|vscodium|xcode|android studio|intellij idea|pycharm|webstorm|phpstorm|clion|goland|rider|datagrip|sublime text|github|gitkraken|sourcetree|docker desktop|postman|codex|claude)/.test(app)) return 'coding';
   if (/(wechat|微信|feishu|飞书|lark|dingtalk|钉钉|slack|discord|telegram|messages|mail|outlook|teams)/.test(app)) return 'chat';
+  if (/(music|neteasemusic|cloudmusic|qqmusic|spotify|steam|epic games|battle\.net|网易云|vlc|quicktime|potplayer|tv|podcasts|game|games|dota|minecraft|roblox|unity|unreal|godot|blizzard|world of warcraft|genshin|honkai|valorant|counter-strike|final fantasy|baldur|civilization|factorio)/.test(app)) return 'entertainment';
   if (/(safari|chrome|chromium|brave|edge|msedge|arc|firefox|vivaldi|opera)/.test(app)) {
     if (/(youtube|bilibili|netflix|twitch|douyin|tiktok|weibo|xiaohongshu|reddit|instagram|twitter|x\.com)/.test(`${domain} ${title}`)) {
       return 'entertainment';
     }
     return 'browser';
   }
-  if (/(music|neteasemusic|cloudmusic|qqmusic|spotify|steam|网易云|vlc|quicktime|potplayer|tv|podcasts)/.test(app)) return 'entertainment';
   if (/(pages|numbers|keynote|word|excel|powerpoint|onenote|preview|finder|explorer|notion|obsidian|figma|photoshop|illustrator|acrobat)/.test(app)) return 'office';
   return 'other';
 }

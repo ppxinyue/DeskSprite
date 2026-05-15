@@ -159,6 +159,40 @@ test('confirms a new app only after it passes the minimum duration', async () =>
   assert.equal(persisted.at(-1)?.appName, 'Visual Studio Code');
 });
 
+test('folds a short fullscreen game visit back into the previous segment', async () => {
+  const { recorder, persisted } = createHarness(180_000);
+
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 180_000);
+  await recorder.handleSnapshot(snapshot('Minecraft', 'Minecraft'), 240_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 300_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 360_000);
+
+  const latest = persisted.at(-1);
+  assert.equal(latest?.appName, 'Codex');
+  assert.equal(latest?.startedAt, 0);
+  assert.equal(latest?.endedAt, 360_000);
+  const shortMarkers = latest?.backgroundMarkers.filter((marker) => marker.type === 'foreground-short') ?? [];
+  assert.equal(shortMarkers.length, 1);
+  assert.equal(shortMarkers[0].name, 'Minecraft');
+});
+
+test('records a fullscreen game visit after it passes the minimum duration', async () => {
+  const { recorder, persisted } = createHarness(180_000);
+
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 0);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 180_000);
+  await recorder.handleSnapshot(snapshot('Minecraft', 'Minecraft'), 240_000);
+  await recorder.handleSnapshot(snapshot('Minecraft', 'Minecraft'), 420_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 480_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 660_000);
+  await recorder.handleSnapshot(snapshot('Codex', 'task1'), 840_000);
+
+  assert.equal(persisted.some((item) => item.appName === 'Minecraft' && item.startedAt === 240_000 && item.endedAt === 480_000), true);
+  assert.equal(persisted.at(-1)?.appName, 'Codex');
+  assert.equal(persisted.at(-1)?.startedAt, 480_000);
+});
+
 test('uses browser URL path as the stable key so title changes do not split a visit', async () => {
   const { recorder, persisted } = createHarness();
 
