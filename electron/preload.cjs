@@ -28,6 +28,9 @@ contextBridge.exposeInMainWorld('deskCat', {
     setSize(size) {
       return ipcRenderer.invoke('deskcat:window', 'setSize', size);
     },
+    setBounds(bounds) {
+      return ipcRenderer.invoke('deskcat:window', 'setBounds', bounds);
+    },
     async onMoved(callback) {
       const listener = () => callback();
       ipcRenderer.on('deskcat:window:moved', listener);

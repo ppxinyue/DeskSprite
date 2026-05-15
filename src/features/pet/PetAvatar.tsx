@@ -77,7 +77,7 @@ export function PetAvatar({
   onDragStart?: (point: { screenX: number; screenY: number }) => void;
   onDragMove?: (point: { screenX: number; screenY: number }) => void;
   onDragEnd?: () => void;
-  onMenuOpenChange?: (open: boolean) => void;
+  onMenuOpenChange?: (open: boolean, side?: 'left' | 'right') => void;
   onFocusToggle?: () => void;
   codingModeEnabled?: boolean;
   codingProvider?: CodingProvider;
@@ -317,9 +317,14 @@ export function PetAvatar({
   const handleContextMenuOpen = (e: React.MouseEvent) => {
     e.preventDefault();
     didDrag.current = true;
-    onMenuOpenChange?.(true);
     const clientX = e.clientX;
     const clientY = e.clientY;
+    const windowWidth = window.innerWidth;
+    const petRect = petRootRef.current?.getBoundingClientRect();
+    const shouldOpenLeft = petRect
+      ? petRect.right + MENU_WIDTH + SUBMENU_WIDTH + MENU_MARGIN * 2 > windowWidth || petRect.left > windowWidth * MENU_LEFT_SIDE_THRESHOLD
+      : clientX + MENU_WIDTH + SUBMENU_WIDTH + MENU_MARGIN * 2 > windowWidth || clientX > windowWidth * MENU_LEFT_SIDE_THRESHOLD;
+    onMenuOpenChange?.(true, shouldOpenLeft ? 'left' : 'right');
     window.setTimeout(() => {
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;

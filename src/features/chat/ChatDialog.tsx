@@ -12,6 +12,7 @@ import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveS
 import { getProviderName } from '@/features/ai/providers';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
 import { shouldQuerySystemKnowledge, withSystemKnowledge } from '@/features/ai/systemKnowledge';
+import { showPermissionPrompt } from '@/lib/permissionPrompt';
 import {
   speakWithCloudVoice,
   startAudioLevelMonitor,
@@ -47,6 +48,8 @@ interface SpeechRecognitionLike {
   start: () => void;
   stop: () => void;
 }
+
+let speechPermissionExplained = false;
 
 export function ChatDialog({
   dialogOpacity = 1,
@@ -933,6 +936,22 @@ async function startSpeechInput(
   }
 
   setPhase('recording');
+  if (!speechPermissionExplained) {
+    const microphoneState = await navigator.permissions?.query({ name: 'microphone' as PermissionName }).then((permission) => permission.state).catch(() => null);
+    speechPermissionExplained = true;
+    if (microphoneState !== 'granted') {
+      const accepted = await showPermissionPrompt({
+        title: '需要语音权限',
+        titleEn: 'Voice access needed',
+        feature: '用于把语音转成文字并填入输入框。',
+        featureEn: 'Used to turn your voice into chat text.',
+      });
+      if (!accepted) {
+        finish();
+        return;
+      }
+    }
+  }
   let canStart = true;
   try {
     canStart = await invoke<boolean>('can_start_speech_recognition');

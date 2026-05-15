@@ -3371,6 +3371,9 @@ function GeneralSection({
   updateSetting: import('./settingsStore').SettingsState['updateSetting'];
   view: 'general' | 'timeline' | 'games' | 'music' | 'shortcuts';
 }) {
+  const [gameDraft, setGameDraft] = useState(settings.gameAppKeywords);
+  const [musicDraft, setMusicDraft] = useState(settings.musicAppKeywords);
+
   useEffect(() => {
     invoke<boolean>('get_launch_at_login')
       .then((enabled) => {
@@ -3379,9 +3382,31 @@ function GeneralSection({
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    setGameDraft(settings.gameAppKeywords);
+  }, [settings.gameAppKeywords]);
+
+  useEffect(() => {
+    setMusicDraft(settings.musicAppKeywords);
+  }, [settings.musicAppKeywords]);
+
   const updateLaunchAtLogin = async (enabled: boolean) => {
     await updateSetting('launchAtLogin', enabled);
     invoke('set_launch_at_login', { enabled }).catch((error) => console.warn('Failed to update login item:', error));
+  };
+
+  const updateGameKeywords = (value: string[]) => {
+    setGameDraft(value);
+    const cleaned = cleanRuleList(value);
+    const unchangedExceptDraftEmpty = value.some((item) => item.trim() === '') && cleaned.join('\n') === settings.gameAppKeywords.join('\n');
+    if (!unchangedExceptDraftEmpty) updateSetting('gameAppKeywords', cleaned);
+  };
+
+  const updateMusicKeywords = (value: string[]) => {
+    setMusicDraft(value);
+    const cleaned = cleanRuleList(value);
+    const unchangedExceptDraftEmpty = value.some((item) => item.trim() === '') && cleaned.join('\n') === settings.musicAppKeywords.join('\n');
+    if (!unchangedExceptDraftEmpty) updateSetting('musicAppKeywords', cleaned);
   };
 
   return (
@@ -3437,7 +3462,7 @@ function GeneralSection({
             <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
               当用户正在进行以下游戏时，会自动取消置顶，并暂停 Timeline 刷新监测，以保证游戏性能。
             </p>
-            <RuleTokenEditor value={settings.gameAppKeywords} onChange={(value) => updateSetting('gameAppKeywords', cleanRuleList(value))} addLabel="添加游戏" />
+            <RuleTokenEditor value={gameDraft} onChange={updateGameKeywords} addLabel="添加游戏" />
           </SettingsGroup>
         </>
       )}
@@ -3449,7 +3474,7 @@ function GeneralSection({
             <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
               只有这些音乐软件处于播放状态时，才会作为后台音乐标注到 Timeline。
             </p>
-            <RuleTokenEditor value={settings.musicAppKeywords} onChange={(value) => updateSetting('musicAppKeywords', cleanRuleList(value))} addLabel="添加音乐软件" />
+            <RuleTokenEditor value={musicDraft} onChange={updateMusicKeywords} addLabel="添加音乐软件" />
           </SettingsGroup>
         </>
       )}

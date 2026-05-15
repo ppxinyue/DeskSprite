@@ -31,6 +31,21 @@ export class LogicalSize {
   }
 }
 
+export class LogicalBounds {
+  readonly type = 'logical';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+
+  constructor(x: number, y: number, width: number, height: number) {
+    this.x = x;
+    this.y = y;
+    this.width = width;
+    this.height = height;
+  }
+}
+
 export function getCurrentWindow() {
   if (!window.deskCat) {
     const label = (window.location.hash.replace(/^#/, '') || 'pet').split(':')[0] || 'pet';
@@ -40,6 +55,7 @@ export function getCurrentWindow() {
       outerSize: async () => ({ width: window.innerWidth, height: window.innerHeight }),
       setPosition: async () => {},
       setSize: async () => {},
+      setBounds: async () => {},
       onMoved: async () => () => {},
     };
   }
@@ -50,6 +66,7 @@ export function getCurrentWindow() {
     setPosition: (position: LogicalPosition | PhysicalPosition) =>
       window.deskCat.window.setPosition(position),
     setSize: (size: LogicalSize) => window.deskCat.window.setSize(size),
+    setBounds: (bounds: LogicalBounds) => window.deskCat.window.setBounds(bounds),
     onMoved: (callback: () => void) => window.deskCat.window.onMoved(callback),
   };
 }

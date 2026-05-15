@@ -87,6 +87,7 @@ const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
 const CODING_NO_OUTPUT_TIMEOUT_MS = 5 * 60 * 1000;
 const inheritedCodingAcknowledged = new Map();
 const inheritedCodingSeenActive = new Set();
+const permissionPromptResolvers = new Map();
 const codexAppServer = {
   child: null,
   buffer: '',
@@ -96,6 +97,23 @@ const codexAppServer = {
   loadedThreadId: '',
   activeTurn: null,
 };
+
+function isChineseLocale() {
+  return /^zh\b/i.test(app.getLocale?.() || '');
+}
+
+function chooseLocaleText(zh, en) {
+  return isChineseLocale() ? zh : en;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 app.setName('DeskCat');
 if (process.platform === 'darwin') app.setActivationPolicy('regular');
@@ -898,6 +916,12 @@ function ensureAccessibilityPermission() {
   return { supported: true, trusted };
 }
 
+function checkAccessibilityPermission() {
+  if (process.platform !== 'darwin') return { supported: false, trusted: false };
+  const trusted = systemPreferences.isTrustedAccessibilityClient(false);
+  return { supported: true, trusted };
+}
+
 function timelineDebugLog(payload = {}) {
   if (!debugTimelineEnabled) return false;
   const nowLabel = new Date().toLocaleTimeString('zh-CN', { hour12: false });
@@ -1611,6 +1635,28 @@ async function requestSystemKnowledgePermissions() {
       reminders: { ok: false, message: 'Only available on macOS.' },
     };
   }
+  const consent = await dialog.showMessageBox({
+    type: 'info',
+    buttons: [
+      chooseLocaleText('继续', 'Continue'),
+      chooseLocaleText('取消', 'Cancel'),
+    ],
+    defaultId: 0,
+    cancelId: 1,
+    title: chooseLocaleText('需要日历和提醒事项权限', 'Calendar and Reminders needed'),
+    message: chooseLocaleText('用于回答日程、会议、待办和提醒问题。', 'Used to answer schedule, meeting, to-do, and reminder questions.'),
+    detail: chooseLocaleText(
+      '只在相关提问中读取必要信息；默认本地存储，云端备份均作加密处理。',
+      'Only needed data is read for related questions. Local by default; cloud backups are encrypted.',
+    ),
+  });
+  if (consent.response !== 0) {
+    return {
+      ok: false,
+      calendar: { ok: false, message: 'User cancelled permission request.' },
+      reminders: { ok: false, message: 'User cancelled permission request.' },
+    };
+  }
   const [calendarResult, remindersResult] = await Promise.allSettled([
     runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => `tell ${target} to return count of calendars`)),
     runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => `tell ${target} to return count of lists`)),
@@ -1625,6 +1671,108 @@ async function requestSystemKnowledgePermissions() {
     calendar,
     reminders,
   };
+}
+
+function showPermissionPromptOverlay(args = {}, event) {
+  return new Promise((resolve) => {
+    const parent = event?.sender ? BrowserWindow.fromWebContents(event.sender) : windows.get('pet');
+    const parentBounds = parent && !parent.isDestroyed() ? parent.getBounds() : screen.getPrimaryDisplay().bounds;
+    const display = screen.getDisplayMatching(parentBounds);
+    const work = display.workArea;
+    const id = randomUUID();
+    const win = new BrowserWindow({
+      x: work.x,
+      y: work.y,
+      width: work.width,
+      height: work.height,
+      show: false,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      resizable: false,
+      movable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      focusable: true,
+      hasShadow: false,
+      webPreferences: preload('permission-prompt'),
+    });
+    const finish = (accepted) => {
+      if (!permissionPromptResolvers.has(id)) return;
+      permissionPromptResolvers.delete(id);
+      if (!win.isDestroyed()) win.close();
+      resolve(Boolean(accepted));
+    };
+    permissionPromptResolvers.set(id, finish);
+    win.once('closed', () => finish(false));
+    win.once('ready-to-show', () => {
+      applyFloatingFullscreenBehavior(win, { force: true });
+      win.show();
+      win.focus();
+    });
+
+    const iconPath = resolveAppIconPath(args.iconPath);
+    const iconSrc = fs.existsSync(iconPath) ? `deskcat-file:///${encodeURIComponent(iconPath)}` : '';
+    const title = escapeHtml(args.title);
+    const feature = escapeHtml(args.feature);
+    const privacy = escapeHtml(args.privacy);
+    const confirmLabel = escapeHtml(args.confirmLabel || 'Continue');
+    const cancelLabel = escapeHtml(args.cancelLabel || 'Cancel');
+    const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+html,body{width:100%;height:100%;margin:0;background:transparent;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;color:CanvasText;overflow:hidden}
+body{display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;background:transparent}
+.card{box-sizing:border-box;width:min(336px,calc(100vw - 24px));max-height:calc(100vh - 24px);display:flex;flex-direction:column;overflow:hidden;border-radius:15px;border:1px solid rgba(120,120,120,.32);background:color-mix(in srgb, Canvas 96%, transparent);box-shadow:0 12px 34px rgba(0,0,0,.20),0 1px 0 rgba(255,255,255,.42) inset;backdrop-filter:blur(16px);padding:12px;text-align:center}
+.content{overflow:auto;min-height:0;padding:2px 2px 10px}
+img{width:48px;height:48px;object-fit:contain;display:block;margin:0 auto 8px;border-radius:12px}
+.title{font-size:13px;font-weight:700;line-height:1.32;margin-bottom:6px}
+.feature{font-size:11px;font-weight:500;line-height:1.4;margin:0 auto 6px;max-width:288px}
+.privacy{font-size:10px;font-weight:500;line-height:1.38;opacity:.72;margin:0 auto;max-width:288px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0;padding-top:2px}
+button{height:30px;border:0;border-radius:9px;font-size:11px;font-weight:500;color:CanvasText}
+.cancel{background:rgba(120,120,120,.20)}
+.ok{background:#2f8fff;color:white;font-weight:650;box-shadow:0 6px 16px rgba(47,143,255,.24)}
+</style>
+</head>
+<body>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="title">
+    <div class="content">
+      ${iconSrc ? `<img src="${escapeHtml(iconSrc)}" alt="DeskCat">` : ''}
+      <div class="title" id="title">${title}</div>
+      <div class="feature">${feature}</div>
+      <div class="privacy">${privacy}</div>
+    </div>
+    <div class="actions">
+      <button class="cancel" id="cancel" type="button">${cancelLabel}</button>
+      <button class="ok" id="ok" type="button">${confirmLabel}</button>
+    </div>
+  </div>
+<script>
+const promptId = ${JSON.stringify(id)};
+function done(accepted){ window.deskCat.invoke('permission_prompt_result', { id: promptId, accepted }); }
+document.getElementById('cancel').addEventListener('click', () => done(false));
+document.getElementById('ok').addEventListener('click', () => done(true));
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') done(false);
+  if (event.key === 'Enter') done(true);
+});
+document.getElementById('ok').focus();
+</script>
+</body>
+</html>`;
+    win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  });
+}
+
+function resolvePermissionPromptResult({ id, accepted }) {
+  const finish = permissionPromptResolvers.get(String(id || ''));
+  if (!finish) return false;
+  finish(Boolean(accepted));
+  return true;
 }
 
 function permissionResultFromSettled(result) {
@@ -3259,11 +3407,14 @@ const handlers = {
   read_system_knowledge_device_info: readSystemKnowledgeDeviceInfo,
   read_system_knowledge_schedule_info: readSystemKnowledgeScheduleInfo,
   request_system_knowledge_permissions: requestSystemKnowledgePermissions,
+  show_permission_prompt_overlay: (args, event) => showPermissionPromptOverlay(args, event),
+  permission_prompt_result: resolvePermissionPromptResult,
   transcribe_audio: transcribeAudio,
   synthesize_speech: synthesizeSpeech,
   can_start_speech_recognition: () => true,
   check_distraction: checkDistraction,
   ensure_accessibility_permission: ensureAccessibilityPermission,
+  check_accessibility_permission: checkAccessibilityPermission,
   timeline_debug_log: timelineDebugLog,
   read_timeline_active_window: readTimelineActiveWindow,
   read_timeline_background_markers: readTimelineBackgroundOnly,
@@ -3350,6 +3501,15 @@ ipcMain.handle('deskcat:window', (event, action, value) => {
   }
   if (action === 'setSize') {
     win.setSize(Math.round(value.width), Math.round(value.height));
+    return null;
+  }
+  if (action === 'setBounds') {
+    win.setBounds({
+      x: Math.round(value.x),
+      y: Math.round(value.y),
+      width: Math.round(value.width),
+      height: Math.round(value.height),
+    });
     return null;
   }
   return null;

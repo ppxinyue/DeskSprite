@@ -17,6 +17,7 @@ declare global {
         outerSize(): Promise<{ width: number; height: number }>;
         setPosition(position: { x: number; y: number; type?: string }): Promise<void>;
         setSize(size: { width: number; height: number; type?: string }): Promise<void>;
+        setBounds(bounds: { x: number; y: number; width: number; height: number; type?: string }): Promise<void>;
         onMoved(callback: () => void): Promise<() => void>;
       };
       currentMonitor(): Promise<{

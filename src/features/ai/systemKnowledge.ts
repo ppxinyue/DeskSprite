@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { Message } from './types';
+import { showPermissionPrompt, setCurrentPetAsAppIcon } from '@/lib/permissionPrompt';
 
 interface DeviceKnowledge {
   appName?: string;
@@ -60,6 +61,8 @@ const DEVICE_TRIGGER = /(设备|电脑|系统|mac|windows|屏幕|显示器|内�
 const SCHEDULE_TRIGGER = /(日历|日程|待办|提醒|会议|安排|calendar|schedule|event|meeting|todo|task|reminder)/i;
 
 let weatherCache: { key: string; value: WeatherKnowledge; expiresAt: number } | null = null;
+let schedulePermissionRequestedInChat = false;
+let locationPermissionExplained = false;
 
 export function shouldQuerySystemKnowledge(
   messages: Message[],
@@ -101,6 +104,7 @@ export async function buildSystemKnowledgePrompt(
   }
 
   if (SCHEDULE_TRIGGER.test(queryText)) {
+    await requestScheduleKnowledgePermissionsFromChat();
     const schedule = await readScheduleKnowledge();
     const scheduleLines = formatScheduleKnowledge(schedule);
     if (scheduleLines.length > 0) lines.push(...scheduleLines);
@@ -150,6 +154,18 @@ async function readScheduleKnowledge(): Promise<ScheduleKnowledge | null> {
     return await invoke<ScheduleKnowledge>('read_system_knowledge_schedule_info');
   } catch {
     return null;
+  }
+}
+
+async function requestScheduleKnowledgePermissionsFromChat(): Promise<void> {
+  if (schedulePermissionRequestedInChat) return;
+  schedulePermissionRequestedInChat = true;
+  await setCurrentPetAsAppIcon();
+  try {
+    await invoke('request_system_knowledge_permissions');
+  } catch {
+    // Continue with the normal read path so the model can explain the specific
+    // unavailable source instead of failing the whole chat request.
   }
 }
 
@@ -271,8 +287,21 @@ function getLatestUserQueryText(messages: Message[]): string {
   return '';
 }
 
-function getBrowserPosition(): Promise<{ latitude: number; longitude: number; source: 'browser-location' } | null> {
+async function getBrowserPosition(): Promise<{ latitude: number; longitude: number; source: 'browser-location' } | null> {
   if (!navigator.geolocation) return Promise.resolve(null);
+  if (!locationPermissionExplained) {
+    const permissionState = await navigator.permissions?.query({ name: 'geolocation' }).then((permission) => permission.state).catch(() => null);
+    locationPermissionExplained = true;
+    if (permissionState !== 'granted') {
+      const accepted = await showPermissionPrompt({
+        title: '需要位置权限',
+        titleEn: 'Location needed',
+        feature: '用于查询你所在位置的天气、温度、降雨和风况。',
+        featureEn: 'Used for local weather, temperature, rain, and wind answers.',
+      });
+      if (!accepted) return Promise.resolve(null);
+    }
+  }
   return new Promise((resolve) => {
     navigator.geolocation.getCurrentPosition(
       (position) => resolve({

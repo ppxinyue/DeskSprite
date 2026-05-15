@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { currentMonitor, getCurrentWindow, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
+import { currentMonitor, getCurrentWindow, LogicalBounds, LogicalPosition, LogicalSize, PhysicalPosition } from "@tauri-apps/api/window";
 import { emit, listen } from "@tauri-apps/api/event";
 import { Check, MessageCircle, Minus, Maximize2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { flushCloudSync, startCloudSyncScheduler } from "@/lib/cloudSyncSchedule
 import { getThemeClassAction, shouldDeferWindowContent } from "@/lib/startupTheme";
 import { createFeatureTimer, trackFeatureUse } from "@/lib/telemetry";
 import { TimelineRecorder, type TimelineRecorderState, type TimelineSnapshot } from "@/lib/timelineRecorder";
+import { showPermissionPrompt } from "@/lib/permissionPrompt";
 import { installDocumentTranslator } from "@/i18n";
 import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
@@ -40,8 +41,8 @@ const COMPACT_CHAT_BOTTOM_CHROME = 10;
 const COMPACT_CHAT_PREFERRED_HEIGHT = 340;
 const CONTEXT_MENU_WIDTH = 136;
 const CONTEXT_SUBMENU_WIDTH = 190;
-const CONTEXT_MENU_HEIGHT = 312;
-const PET_RIGHT_EDGE_MENU_THRESHOLD = 0.62;
+const CONTEXT_MENU_HEIGHT = 334;
+const CONTEXT_MENU_MARGIN = 8;
 const PET_BUBBLE_TOP_SPACE = 78;
 const PET_PROMPT_BUBBLE_WIDTH = 196;
 const REST_PRESENTATION_SCREEN_RATIO = 0.8;
@@ -1344,7 +1345,7 @@ function getTimelineSnapshotDistractionMatch(snapshot: TimelineSnapshot, setting
 function PetWindow() {
   const { settings, updateSettings } = useSettingsStore();
   const { dialogOpen, chatMode, chatConversationId, openChat, closeChat, setPetState, petState, mediaConfig, userFrames, userGifs } = usePetStore();
-  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuLayout, setContextMenuLayout] = useState<PetContextMenuLayout>({ open: false, side: 'right' });
   const [chatBurst, setChatBurst] = useState(false);
   const [petHovering, setPetHovering] = useState(false);
   const [compactVisible, setCompactVisible] = useState(false);
@@ -1412,8 +1413,10 @@ function PetWindow() {
   const pendingDragPointRef = useRef<{ screenX: number; screenY: number } | null>(null);
   const lastDragPositionRef = useRef<{ left: number; top: number } | null>(null);
   const suppressMovedUntilRef = useRef(0);
+  const contextMenuRestoreTimerRef = useRef<number | null>(null);
   const compactConversationIdRef = useRef<number | null>(chatConversationId);
   const compactDismissedRef = useRef(false);
+  const compactOpenSeqRef = useRef(0);
   const applyLayoutState = useCallback((nextLayout: PetWindowLayout) => {
     layoutRef.current = nextLayout;
     setLayout(nextLayout);
@@ -1493,15 +1496,17 @@ function PetWindow() {
     };
   }, [settings.codingModeEnabled, settings.codingProvider, settings.codingSessionMode]);
 
-  const requestLayout = useCallback(async (overrides: { contextMenuOpen?: boolean } = {}) => {
+  const requestLayout = useCallback(async (overrides: { contextMenuOpen?: boolean; contextMenuLayout?: PetContextMenuLayout } = {}) => {
     if (restEndAtRef.current || restPresentationActiveRef.current) return;
     const targetDialogOpen = false;
-    const targetContextMenuOpen = overrides.contextMenuOpen ?? contextMenuOpen;
+    const targetContextMenuLayout = overrides.contextMenuLayout ?? contextMenuLayout;
+    const targetContextMenuOpen = overrides.contextMenuOpen ?? targetContextMenuLayout.open;
     layoutApplyingRef.current = true;
     try {
       await applyPetWindowLayout({
         dialogOpen: targetDialogOpen,
         contextMenuOpen: targetContextMenuOpen,
+        contextMenuSide: targetContextMenuLayout.side,
         requestedDialogWidth: 300,
         petImageWidth,
         petImageHeight,
@@ -1521,7 +1526,7 @@ function PetWindow() {
         layoutApplyingRef.current = false;
       }, 80);
     }
-  }, [applyLayoutState, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight, contextMenuOpen]);
+  }, [applyLayoutState, petImageWidth, petImageHeight, toolRowWidth, collapsedWidth, collapsedHeight, contextMenuLayout]);
 
   const positionCompactChatWindow = useCallback(async ({
     show,
@@ -1547,22 +1552,36 @@ function PetWindow() {
   }, [settings.dialogWidth, petImageWidth, petImageHeight]);
 
   const forceShowCompactChat = useCallback(async (mode: 'new' | 'history', conversationId: number | null = null) => {
+    const seq = ++compactOpenSeqRef.current;
+    if (contextMenuRestoreTimerRef.current) {
+      window.clearTimeout(contextMenuRestoreTimerRef.current);
+      contextMenuRestoreTimerRef.current = null;
+    }
     compactDismissedRef.current = false;
     localStorage.removeItem(COMPACT_CHAT_DISMISSED_KEY);
+    setCompactVisible(true);
     const payload = { mode, conversationId };
     localStorage.setItem(COMPACT_CHAT_KEY, JSON.stringify(payload));
     await positionCompactChatWindow({ show: true });
+    if (seq !== compactOpenSeqRef.current) return;
     await emit("compact-chat:open", payload);
     setChatBurst(true);
     window.setTimeout(() => setChatBurst(false), 360);
   }, [positionCompactChatWindow]);
 
   const forceShowCodingChat = useCallback(async () => {
+    const seq = ++compactOpenSeqRef.current;
+    if (contextMenuRestoreTimerRef.current) {
+      window.clearTimeout(contextMenuRestoreTimerRef.current);
+      contextMenuRestoreTimerRef.current = null;
+    }
     compactDismissedRef.current = false;
     localStorage.removeItem(COMPACT_CHAT_DISMISSED_KEY);
+    setCompactVisible(true);
     const payload = { mode: 'new' as const, conversationId: null };
     localStorage.setItem(COMPACT_CHAT_KEY, JSON.stringify(payload));
     await positionCompactChatWindow({ show: true });
+    if (seq !== compactOpenSeqRef.current) return;
     await emit("compact-chat:open", payload);
     setCompactVisible(true);
     setChatBurst(true);
@@ -1794,6 +1813,10 @@ function PetWindow() {
   const restorePetAfterRest = useCallback(async () => {
     const snapshot = restPresentationSnapshotRef.current;
     restPresentationSnapshotRef.current = null;
+    if (restPresentationFrameRef.current) {
+      window.cancelAnimationFrame(restPresentationFrameRef.current);
+      restPresentationFrameRef.current = null;
+    }
     if (!snapshot) {
       restPresentationActiveRef.current = false;
       setRestPresentationActive(false);
@@ -1801,16 +1824,20 @@ function PetWindow() {
       requestLayout().catch(() => {});
       return;
     }
-    await animateRestPresentation(snapshot, {
-      onDone: () => {
-        restPresentationActiveRef.current = false;
-        setRestPresentationActive(false);
-        visualPetScaleRef.current = settings.petScale;
-        setVisualPetScale(settings.petScale);
-        applyLayoutState(snapshot.layout);
-      },
-    });
-  }, [animateRestPresentation, applyLayoutState, requestLayout, settings.petScale]);
+    const win = getCurrentWindow();
+    layoutApplyingRef.current = true;
+    visualPetScaleRef.current = settings.petScale;
+    setVisualPetScale(settings.petScale);
+    applyLayoutState(snapshot.layout);
+    await win.setPosition(new LogicalPosition(snapshot.windowLeft, snapshot.windowTop)).catch(() => {});
+    await win.setSize(new LogicalSize(snapshot.windowWidth, snapshot.windowHeight)).catch(() => {});
+    await waitForStablePaint();
+    restPresentationActiveRef.current = false;
+    setRestPresentationActive(false);
+    window.setTimeout(() => {
+      layoutApplyingRef.current = false;
+    }, 80);
+  }, [applyLayoutState, requestLayout, settings.petScale]);
 
   const startRestAction = useCallback(() => {
     const endAt = Date.now() + Math.max(60, settings.restDurationSeconds) * 1000;
@@ -1912,9 +1939,9 @@ function PetWindow() {
     const shouldStartNextFocus = autoFocusAfterRestRef.current;
     autoFocusAfterRestRef.current = false;
     restEndAtRef.current = null;
-    setRestEndAt(null);
     setPetPrompt(null);
     await restorePetAfterRest().catch(() => {});
+    setRestEndAt(null);
     if (shouldStartNextFocus) startFocus();
     else setPetState('idle');
   }, [restorePetAfterRest, setPetState, startFocus]);
@@ -2089,7 +2116,18 @@ function PetWindow() {
       try {
         if (!accessibilityChecked) {
           accessibilityChecked = true;
-          const permission = await invoke<{ supported: boolean; trusted: boolean }>('ensure_accessibility_permission').catch((error) => {
+          const existingPermission = await invoke<{ supported: boolean; trusted: boolean }>('check_accessibility_permission').catch(() => null);
+          if (!existingPermission?.trusted && !accessibilityPermissionExplained) {
+            accessibilityPermissionExplained = true;
+            const accepted = await showPermissionPrompt({
+              title: '需要辅助功能权限',
+              titleEn: 'Accessibility needed',
+              feature: '用于读取当前窗口名称，记录 Timeline，并在专注模式中识别分心应用。',
+              featureEn: 'Used to read the current window name for Timeline and Focus app detection.',
+            });
+            if (!accepted) return;
+          }
+          const permission = existingPermission?.trusted ? existingPermission : await invoke<{ supported: boolean; trusted: boolean }>('ensure_accessibility_permission').catch((error) => {
             timelineDebugLog({ stage: 'accessibility:error', error: error instanceof Error ? error.message : String(error) });
             return null;
           });
@@ -2339,10 +2377,23 @@ function PetWindow() {
     return () => { unlisten.then((fn) => fn()); };
   }, [forceShowCompactChat, openChat]);
 
-  useEffect(() => {
-    invoke("set_pet_context_menu_open", { open: contextMenuOpen }).catch(() => {});
-    requestLayout({ contextMenuOpen }).catch(() => {});
-  }, [contextMenuOpen, requestLayout]);
+  const handleContextMenuOpenChange = useCallback((next: boolean, side: 'left' | 'right' = contextMenuLayout.side) => {
+    if (contextMenuRestoreTimerRef.current) {
+      window.clearTimeout(contextMenuRestoreTimerRef.current);
+      contextMenuRestoreTimerRef.current = null;
+    }
+    const nextLayout = { open: next, side };
+    setContextMenuLayout(nextLayout);
+    invoke("set_pet_context_menu_open", { open: next }).catch(() => {});
+    if (next) {
+      requestLayout({ contextMenuOpen: true, contextMenuLayout: nextLayout }).catch(() => {});
+      return;
+    }
+    contextMenuRestoreTimerRef.current = window.setTimeout(() => {
+      contextMenuRestoreTimerRef.current = null;
+      requestLayout({ contextMenuOpen: false, contextMenuLayout: nextLayout }).catch(() => {});
+    }, 120);
+  }, [contextMenuLayout.side, requestLayout]);
 
   useEffect(() => {
     const unlisten = getCurrentWindow().onMoved(() => {
@@ -2365,6 +2416,7 @@ function PetWindow() {
 
   useEffect(() => () => {
     if (movedTimerRef.current) window.clearTimeout(movedTimerRef.current);
+    if (contextMenuRestoreTimerRef.current) window.clearTimeout(contextMenuRestoreTimerRef.current);
     if (dragFrameRef.current) window.cancelAnimationFrame(dragFrameRef.current);
     if (restPresentationFrameRef.current) window.cancelAnimationFrame(restPresentationFrameRef.current);
   }, []);
@@ -2565,7 +2617,7 @@ function PetWindow() {
               onDragStart={handleBoundedDragStart}
               onDragMove={handleBoundedDragMove}
               onDragEnd={handleBoundedDragEnd}
-              onMenuOpenChange={setContextMenuOpen}
+              onMenuOpenChange={handleContextMenuOpenChange}
               onFocusToggle={toggleFocus}
               codingModeEnabled={settings.codingModeEnabled}
               codingProvider={settings.codingProvider}
@@ -2590,13 +2642,16 @@ function PetWindow() {
               }}
             />
             {restEndAt && (orbMode || !restPresentationActive) ? (
-              <div className="mt-2 flex flex-col items-center gap-2">
-                <div className="pointer-events-none text-center text-[18px] font-semibold leading-none tabular-nums text-[#4d4a45] drop-shadow-[0_2px_12px_rgba(32,28,22,0.12)]">
+              <div
+                className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/55 bg-background/88 px-2.5 py-1 text-[#4d4a45] shadow-[0_8px_22px_rgba(32,28,22,0.10),0_1px_0_rgba(255,255,255,0.55)_inset] backdrop-blur-md"
+                style={{ opacity: settings.petOpacity }}
+              >
+                <div className="pointer-events-none min-w-[4.5em] text-center text-[13px] font-semibold leading-none tabular-nums drop-shadow-[0_1px_8px_rgba(32,28,22,0.10)]">
                   {formatCountdown(Math.max(0, restEndAt - now))}
                 </div>
                 <button
                   type="button"
-                  className="rounded-[9px] border border-border/65 bg-background/90 px-4 py-1.5 text-[14px] font-medium leading-none text-muted-foreground shadow-[0_8px_22px_rgba(32,28,22,0.12)] backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:text-foreground active:translate-y-0"
+                  className="rounded-full border border-transparent bg-muted/55 px-2.5 py-1 text-[11px] font-medium leading-none text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-[0.98]"
                   onClick={() => finishRest().catch(() => {})}
                 >
                   提前结束
@@ -2606,8 +2661,9 @@ function PetWindow() {
               <div
                 className="pointer-events-none mx-auto mt-1 w-fit rounded-[9px] border px-2.5 py-1 text-center text-[11px] font-medium tabular-nums text-muted-foreground shadow-[0_8px_24px_rgba(32,28,22,0.10),0_1px_0_rgba(255,255,255,0.55)_inset] backdrop-blur-md"
                 style={{
-                  background: `color-mix(in srgb, var(--surface-flat) ${Math.round(settings.petOpacity * 88)}%, transparent)`,
-                  borderColor: `color-mix(in srgb, var(--color-chat-border) ${Math.round(settings.petOpacity * 72)}%, transparent)`,
+                  opacity: settings.petOpacity,
+                  background: 'var(--surface-flat)',
+                  borderColor: 'var(--color-chat-border)',
                 }}
               >
                 {formatCountdown(Math.max(0, focusEndAt - now))}
@@ -2638,13 +2694,16 @@ function PetWindow() {
 
           {restEndAt && !orbMode && restPresentationActive && (
             <div className="absolute inset-x-0 top-7 z-50 flex justify-center">
-              <div className="flex flex-col items-center gap-2 rounded-[12px] border border-border/70 bg-background px-4 py-3 text-foreground shadow-[0_12px_32px_rgba(32,28,22,0.16)]">
-                <div className="pointer-events-none text-center text-[18px] font-semibold leading-none tabular-nums text-[#4d4a45]">
+              <div
+                className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/90 px-2.5 py-1 text-[#4d4a45] shadow-[0_10px_28px_rgba(32,28,22,0.14),0_1px_0_rgba(255,255,255,0.55)_inset] backdrop-blur-md"
+                style={{ opacity: settings.petOpacity }}
+              >
+                <div className="pointer-events-none min-w-[4.5em] text-center text-[13px] font-semibold leading-none tabular-nums">
                   {formatCountdown(Math.max(0, restEndAt - now))}
                 </div>
                 <button
                   type="button"
-                  className="rounded-[9px] border border-border/65 bg-muted px-4 py-1.5 text-[14px] font-medium leading-none text-muted-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-muted/80 hover:text-foreground active:translate-y-0"
+                  className="rounded-full border border-transparent bg-muted/55 px-2.5 py-1 text-[11px] font-medium leading-none text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-[0.98]"
                   onClick={() => finishRest().catch(() => {})}
                 >
                   提前结束
@@ -2872,6 +2931,13 @@ interface PetWindowLayout {
   toolsTop: number;
 }
 
+type PetContextMenuLayout = {
+  open: boolean;
+  side: 'left' | 'right';
+};
+
+let accessibilityPermissionExplained = false;
+
 interface BoundedDragSession {
   startScreenX: number;
   startScreenY: number;
@@ -3036,6 +3102,7 @@ function createDefaultPetWindowLayout(width: number, height: number): PetWindowL
 async function applyPetWindowLayout({
   dialogOpen,
   contextMenuOpen,
+  contextMenuSide,
   requestedDialogWidth,
   petImageWidth,
   petImageHeight,
@@ -3055,6 +3122,7 @@ async function applyPetWindowLayout({
   previousLayout: PetWindowLayout;
   applyLayout: (layout: PetWindowLayout) => void;
   contextMenuOpen: boolean;
+  contextMenuSide: 'left' | 'right';
 }) {
   try {
     const win = getCurrentWindow();
@@ -3094,39 +3162,53 @@ async function applyPetWindowLayout({
     let layout: PetWindowLayout;
     if (!dialogOpen) {
       const compactPetTop = PET_CONTENT_MARGIN + PET_BUBBLE_TOP_SPACE;
+      const fullMenuWidth = CONTEXT_MENU_WIDTH + CONTEXT_SUBMENU_WIDTH + CONTEXT_MENU_MARGIN * 3;
+      const fullMenuHeight = CONTEXT_MENU_HEIGHT + CONTEXT_MENU_MARGIN * 2;
       const menuWindowWidth = contextMenuOpen
         ? Math.min(
             maxWindowWidth,
             Math.max(
               collapsedWidth,
-              petImageWidth + 8 + CONTEXT_MENU_WIDTH + CONTEXT_SUBMENU_WIDTH + PET_CONTENT_MARGIN * 2,
+              petImageWidth + fullMenuWidth + PET_CONTENT_MARGIN * 2,
             ),
           )
         : collapsedWidth;
       const menuWindowHeight = contextMenuOpen
         ? Math.min(
             maxWindowHeight,
-            Math.max(collapsedHeight, petImageHeight + PET_CONTENT_MARGIN * 2, CONTEXT_MENU_HEIGHT + PET_CONTENT_MARGIN * 2),
+            Math.max(collapsedHeight, petImageHeight + PET_CONTENT_MARGIN * 2, fullMenuHeight + PET_CONTENT_MARGIN * 2),
           )
         : collapsedHeight;
-      const petNearRightEdge = contextMenuOpen && safePetX > safeLeft + (safeRight - safeLeft) * PET_RIGHT_EDGE_MENU_THRESHOLD;
-      const petLeft = petNearRightEdge
-        ? Math.max(PET_CONTENT_MARGIN, menuWindowWidth - petImageWidth - PET_CONTENT_MARGIN)
-        : PET_CONTENT_MARGIN;
+      let petLeft = PET_CONTENT_MARGIN;
+      let petTop = compactPetTop;
+      let toolsLeft = PET_CONTENT_MARGIN + petImageWidth + 8;
+      let toolsTop = compactPetTop + petImageHeight - 28;
+      if (contextMenuOpen) {
+        petLeft = contextMenuSide === 'left'
+          ? Math.max(PET_CONTENT_MARGIN + fullMenuWidth, menuWindowWidth - petImageWidth - PET_CONTENT_MARGIN)
+          : PET_CONTENT_MARGIN;
+        petTop = PET_CONTENT_MARGIN;
+        toolsLeft = contextMenuSide === 'left'
+          ? Math.max(PET_CONTENT_MARGIN, petLeft - toolRowWidth - 8)
+          : Math.min(menuWindowWidth - PET_CONTENT_MARGIN - toolRowWidth, petLeft + petImageWidth + 8);
+        toolsTop = petTop + petImageHeight - 28;
+      }
       const toolsFitRight = petLeft + petImageWidth + 8 + toolRowWidth <= menuWindowWidth - PET_CONTENT_MARGIN;
       layout = {
         windowWidth: menuWindowWidth,
         windowHeight: menuWindowHeight,
         petLeft,
-        petTop: compactPetTop,
+        petTop,
         dialogLeft: PET_CONTENT_MARGIN,
         dialogTop: PET_CONTENT_MARGIN,
         dialogWidth: requestedDialogWidth,
         dialogMaxHeight: requestedDialogWidth,
-        toolsLeft: toolsFitRight
+        toolsLeft: contextMenuOpen
+          ? toolsLeft
+          : toolsFitRight
           ? petLeft + petImageWidth + 8
           : Math.max(PET_CONTENT_MARGIN, petLeft - toolRowWidth - 8),
-        toolsTop: compactPetTop + petImageHeight - 28,
+        toolsTop,
       };
     } else {
       const maxDialogWidth = Math.max(MIN_DIALOG_WIDTH, maxWindowWidth - PET_CONTENT_MARGIN * 2);
@@ -3219,20 +3301,18 @@ async function applyPetWindowLayout({
     const nextWindowTop = clamp(safePetY - layout.petTop, safeTop, Math.max(safeTop, safeBottom - layout.windowHeight));
     const nextX = Math.round(nextWindowLeft * scale);
     const nextY = Math.round(nextWindowTop * scale);
+    const nextWidth = Math.round(layout.windowWidth);
+    const nextHeight = Math.round(layout.windowHeight);
     const shouldMove = Math.abs(position.x - nextX) > 1 || Math.abs(position.y - nextY) > 1;
     const shouldResize =
       Math.abs(windowWidth - layout.windowWidth) > 1 ||
       Math.abs(windowHeight - layout.windowHeight) > 1;
-    const isExpanding = layout.windowWidth >= windowWidth || layout.windowHeight >= windowHeight;
-    if (shouldResize && isExpanding) {
-      await win.setSize(new LogicalSize(layout.windowWidth, layout.windowHeight));
-    }
-    if (shouldMove) {
-      await win.setPosition(new PhysicalPosition(nextX, nextY));
-    }
-    if (!layoutsEqual(previousLayout, layout)) applyLayout(layout);
-    if (shouldResize && !isExpanding) {
-      await win.setSize(new LogicalSize(layout.windowWidth, layout.windowHeight));
+    const shouldApplyLayout = !layoutsEqual(previousLayout, layout);
+    if (shouldMove || shouldResize) {
+      if (shouldApplyLayout) applyLayout(layout);
+      await win.setBounds(new LogicalBounds(nextX, nextY, nextWidth, nextHeight));
+    } else if (shouldApplyLayout) {
+      applyLayout(layout);
     }
   } catch (e) {
     console.warn("Failed to apply pet window layout:", e);
