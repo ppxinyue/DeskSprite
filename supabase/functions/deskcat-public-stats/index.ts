@@ -55,14 +55,16 @@ async function getGithubDownloads() {
   const response = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, { headers });
   if (!response.ok) throw new Error(`GitHub releases request failed: ${response.status}`);
   const releases = await response.json() as Array<{
-    assets?: Array<{ download_count?: number }>;
+    assets?: Array<{ name?: string; download_count?: number }>;
   }>;
 
   return releases.reduce((releaseTotal, release) => {
-    const assetTotal = (release.assets ?? []).reduce(
-      (total, asset) => total + Number(asset.download_count ?? 0),
-      0,
-    );
+    const assetTotal = (release.assets ?? [])
+      .filter((asset) => String(asset.name ?? '').endsWith('.dmg'))
+      .reduce(
+        (total, asset) => total + Number(asset.download_count ?? 0),
+        0,
+      );
     return releaseTotal + assetTotal;
   }, 0);
 }

@@ -201,11 +201,13 @@ async function getGithubDownloads() {
   }>;
 
   const assets = releases.flatMap((release) =>
-    (release.assets ?? []).map((asset) => ({
-      release: release.tag_name ?? '',
-      asset: asset.name ?? '',
-      count: Number(asset.download_count ?? 0),
-    }))
+    (release.assets ?? [])
+      .filter((asset) => String(asset.name ?? '').endsWith('.dmg'))
+      .map((asset) => ({
+        release: release.tag_name ?? '',
+        asset: asset.name ?? '',
+        count: Number(asset.download_count ?? 0),
+      }))
   );
 
   return {
