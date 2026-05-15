@@ -13,8 +13,9 @@
     "electron:build:mac": "pnpm native:build && pnpm build && electron-builder --mac dmg --x64 --arm64 --publish never",
     "lint": "eslint .",
     "test:timeline": "node --test src/lib/timelineRecorder.test.ts src/lib/timelineView.test.ts src/lib/db.timeline.test.ts src/lib/cloudSyncScheduler.test.ts",
+    "test:ai": "node --test src/features/ai/systemKnowledgeLogic.test.ts",
     "test:startup": "node --test src/lib/startupTheme.test.ts electron/windowLifecycle.test.cjs electron/codingStatus.test.cjs",
-    "test": "pnpm test:timeline && pnpm test:startup",
+    "test": "pnpm test:timeline && pnpm test:ai && pnpm test:startup",
     "preview": "vite preview"
   },
   "main": "electron/main.cjs",
