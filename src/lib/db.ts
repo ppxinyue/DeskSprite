@@ -299,12 +299,33 @@ function getCloudEndpoint(store: Store) {
 }
 
 function getClientPlatform() {
-  return navigator.platform || navigator.userAgent || null;
+  const userAgent = navigator.userAgent || '';
+  if (/Mac OS X|Macintosh|MacIntel/i.test(userAgent) || /Mac/i.test(navigator.platform)) return 'macOS';
+  if (/Windows/i.test(userAgent) || /Win/i.test(navigator.platform)) return 'Windows';
+  if (/Android/i.test(userAgent)) return 'Android';
+  if (/iPhone|iPad|iPod/i.test(userAgent)) return 'iOS';
+  if (/Linux/i.test(userAgent) || /Linux/i.test(navigator.platform)) return 'Linux';
+  return navigator.platform || userAgent || null;
 }
 
 function getClientAppVersion() {
   const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
   return env?.VITE_APP_VERSION?.trim() || null;
+}
+
+function getClientDeviceInfo() {
+  return {
+    userAgent: navigator.userAgent || null,
+    language: navigator.language || null,
+    languages: Array.isArray(navigator.languages) ? navigator.languages.slice(0, 6) : [],
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+    screen: {
+      width: window.screen?.width ?? null,
+      height: window.screen?.height ?? null,
+      devicePixelRatio: window.devicePixelRatio ?? null,
+    },
+    hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+  };
 }
 
 function getUnsyncedTelemetryEvents(store: Store) {
@@ -941,6 +962,7 @@ export async function syncCloudBackup(endpointOverride?: string): Promise<CloudS
         platform: getClientPlatform(),
         appVersion: getClientAppVersion(),
         userAgent: navigator.userAgent || null,
+        deviceInfo: getClientDeviceInfo(),
         backup,
         telemetryEvents,
         sentAt: attemptedAt,

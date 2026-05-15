@@ -243,6 +243,35 @@ function shortDeviceId(value) {
   return `${text.slice(0, 8)}...${text.slice(-4)}`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function formatLocation(metadata) {
+  const geo = metadata?.geo || {};
+  const deviceInfo = metadata?.deviceInfo || {};
+  const location = [geo.city, geo.region, geo.country].filter(Boolean).join(', ');
+  return location || geo.timezone || deviceInfo.timezone || '';
+}
+
+function formatUserMeta(user) {
+  const metadata = user.metadata || {};
+  const deviceInfo = metadata.deviceInfo || {};
+  const parts = [
+    user.platform,
+    user.appVersion,
+    formatLocation(metadata),
+    metadata.ip,
+    deviceInfo.language,
+  ].filter(Boolean);
+  return parts.length ? parts.map(escapeHtml).join(' · ') : 'No client metadata yet';
+}
+
 function renderDailyUserUsage(data) {
   const rows = data.dailyUserUsageByDay || [];
   if (rows.length === 0) {
@@ -269,13 +298,13 @@ function renderUserDetail(user) {
   const features = user.features || [];
   const daily = user.daily || [];
   const maxFeature = Math.max(1, ...features.map((row) => Number(row.durationMs || row.useCount || 0)));
-  const clientMeta = [user.platform, user.appVersion].filter(Boolean).join(' · ');
+  const clientMeta = formatUserMeta(user);
 
   userDetailEl.innerHTML = `
     <div class="user-detail-head">
       <div>
-        <h3 title="${user.deviceId}">${shortDeviceId(user.deviceId)}</h3>
-        ${clientMeta ? `<p>${clientMeta}</p>` : '<p>No client metadata yet</p>'}
+        <h3 title="${escapeHtml(user.deviceId)}">${shortDeviceId(user.deviceId)}</h3>
+        <p>${clientMeta}</p>
       </div>
       <div class="user-seen">
         <span>First ${formatShortDate(user.firstSeenAt)}</span>

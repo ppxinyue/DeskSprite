@@ -23,6 +23,7 @@ type SyncPayload = {
   platform?: string | null;
   appVersion?: string | null;
   userAgent?: string | null;
+  deviceInfo?: Record<string, unknown> | null;
   backup?: BackupPayload | null;
   telemetryEvents?: TelemetryEventPayload[];
   sentAt?: string;
@@ -77,6 +78,25 @@ function safeText(value: unknown, maxLength = 200) {
   return text ? text.slice(0, maxLength) : null;
 }
 
+function getRequestIp(req: Request) {
+  const forwardedFor = req.headers.get('x-forwarded-for');
+  const firstForwarded = forwardedFor?.split(',')[0]?.trim();
+  return (
+    safeText(req.headers.get('cf-connecting-ip'), 80) ||
+    safeText(req.headers.get('x-real-ip'), 80) ||
+    safeText(firstForwarded, 80)
+  );
+}
+
+function getRequestGeo(req: Request) {
+  return {
+    city: safeText(req.headers.get('x-vercel-ip-city') || req.headers.get('cf-ipcity'), 120),
+    region: safeText(req.headers.get('x-vercel-ip-country-region') || req.headers.get('cf-region'), 120),
+    country: safeText(req.headers.get('x-vercel-ip-country') || req.headers.get('cf-ipcountry'), 20),
+    timezone: safeText(req.headers.get('x-vercel-ip-timezone') || req.headers.get('cf-timezone'), 120),
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -88,6 +108,9 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
     const platform = safeText(payload.platform);
     const appVersion = safeText(payload.appVersion, 80);
+    const userAgent = safeText(payload.userAgent, 500);
+    const ip = getRequestIp(req);
+    const geo = getRequestGeo(req);
 
     const { error: deviceError } = await supabase
       .from('devices')
@@ -99,7 +122,10 @@ Deno.serve(async (req) => {
         metadata: {
           source: 'deskcat',
           sentAt: payload.sentAt ?? null,
-          userAgent: safeText(payload.userAgent, 500),
+          userAgent,
+          ip,
+          geo,
+          deviceInfo: payload.deviceInfo && typeof payload.deviceInfo === 'object' ? payload.deviceInfo : null,
           headerDeviceId: req.headers.get('x-deskcat-device-id') || req.headers.get('x-desksprite-device-id'),
         },
       }, { onConflict: 'device_id' });
