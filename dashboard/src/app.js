@@ -98,7 +98,7 @@ function renderDaily(data) {
   }
   const maxDau = Math.max(1, ...rows.map((row) => Number(row.dau || 0)));
   const maxDuration = Math.max(1, ...rows.map((row) => Number(row.total_duration_ms || 0)));
-  dailySummaryEl.textContent = `${rows.length} days`;
+  dailySummaryEl.textContent = `${data.range.days} days`;
   dailyChartEl.innerHTML = rows.map((row) => {
     const dauHeight = Math.max(2, (Number(row.dau || 0) / maxDau) * 184);
     const timeHeight = Math.max(2, (Number(row.total_duration_ms || 0) / maxDuration) * 184);

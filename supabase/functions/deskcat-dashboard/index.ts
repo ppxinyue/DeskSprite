@@ -192,6 +192,12 @@ function daysAgoDate(days: number) {
   return date.toISOString().slice(0, 10);
 }
 
+function addUtcDays(dateText: string, days: number) {
+  const date = new Date(`${dateText}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 function parseDays(req: Request) {
   const value = Number(new URL(req.url).searchParams.get('days') ?? 30);
   if (!Number.isFinite(value)) return 30;
@@ -200,6 +206,20 @@ function parseDays(req: Request) {
 
 function sum(rows: Array<Record<string, unknown>>, key: string) {
   return rows.reduce((total, row) => total + Number(row[key] ?? 0), 0);
+}
+
+function fillDailyRows(rows: DailyMetric[], startDate: string, days: number) {
+  const byDate = new Map(rows.map((row) => [row.metric_date, row]));
+  return Array.from({ length: days }, (_, index) => {
+    const metricDate = addUtcDays(startDate, index);
+    return byDate.get(metricDate) ?? {
+      metric_date: metricDate,
+      dau: 0,
+      event_count: 0,
+      feature_use_count: 0,
+      total_duration_ms: 0,
+    };
+  });
 }
 
 function aggregateFeatures(rows: DailyFeatureMetric[]) {
@@ -723,7 +743,7 @@ Deno.serve(async (req) => {
       if (result.error) throw result.error;
     }
 
-    const dailyRows = (daily.data ?? []) as DailyMetric[];
+    const dailyRows = fillDailyRows((daily.data ?? []) as DailyMetric[], startDate, days);
     const deviceRows = (devices.data ?? []) as DeviceMetric[];
     const featureRows = (featureDaily.data ?? []) as DailyFeatureMetric[];
     const featureUserRows = (featureUsersDaily.data ?? []) as DailyFeatureUserMetric[];
