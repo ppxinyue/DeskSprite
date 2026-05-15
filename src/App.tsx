@@ -1133,6 +1133,13 @@ function CodingSessionButtons({
       <div className={`flex min-w-max gap-1.5 ${compact ? '' : 'pr-1'}`}>
         {sessions.map((session, index) => {
           const active = session.id === activeSessionId;
+          const surfaceClass = compact
+            ? active
+              ? 'border-[#2f94ff]/45 bg-[color-mix(in_srgb,#2f94ff_13%,var(--color-chat-surface-solid))] text-[var(--text-primary)] hover:bg-[color-mix(in_srgb,#2f94ff_18%,var(--color-chat-surface-solid))]'
+              : 'border-[var(--color-chat-bubble-border)] bg-[var(--color-chat-surface-solid)] text-[var(--text-secondary)] hover:bg-[color-mix(in_srgb,var(--text-primary)_6%,var(--color-chat-surface-solid))] hover:text-[var(--text-primary)]'
+            : active
+              ? 'border-[#2f94ff]/28 bg-[#2f94ff]/10 text-[var(--text-primary)]'
+              : 'border-border/35 bg-background/26 text-[var(--text-secondary)] hover:bg-background/44 hover:text-[var(--text-primary)]';
           return (
             <button
               key={session.id}
@@ -1141,11 +1148,7 @@ function CodingSessionButtons({
               aria-selected={active}
               draggable={false}
               style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
-              className={`app-no-drag group inline-flex max-w-[164px] touch-manipulation select-none items-center gap-1.5 rounded-full border px-2.5 py-1 text-left transition-all duration-200 hover:bg-background/52 ${
-                active
-                  ? 'border-[#2f94ff]/28 bg-[#2f94ff]/10 text-[var(--text-primary)]'
-                  : 'border-border/35 bg-background/26 text-[var(--text-secondary)] hover:bg-background/44 hover:text-[var(--text-primary)]'
-                } ${compact ? 'text-[10px]' : 'text-[11px]'}`}
+              className={`app-no-drag group inline-flex max-w-[164px] touch-manipulation select-none items-center gap-1.5 rounded-full border px-2.5 py-1 text-left transition-all duration-200 ${surfaceClass} ${compact ? 'text-[10px] shadow-[0_1px_0_rgba(255,255,255,0.45)_inset]' : 'text-[11px]'}`}
               onClick={() => onSelect(session.id)}
             >
               <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${codingStatusDotClass(session.status)}`} />
@@ -2736,6 +2739,13 @@ function FloatingToolButton({
   children: React.ReactNode;
 }) {
   const [hovered, setHovered] = useState(false);
+  const lastActivatedAtRef = useRef(0);
+  const activate = () => {
+    const now = performance.now();
+    if (now - lastActivatedAtRef.current < 220) return;
+    lastActivatedAtRef.current = now;
+    onClick?.();
+  };
 
   return (
     <Button
@@ -2743,7 +2753,16 @@ function FloatingToolButton({
       variant="ghost"
       size="sm"
       title={title}
-      onClick={onClick}
+      onPointerDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        activate();
+      }}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        activate();
+      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={`h-7 w-7 rounded-full border border-border/70 bg-background/95 p-0 text-muted-foreground shadow-sm transition-all hover:text-foreground ${
