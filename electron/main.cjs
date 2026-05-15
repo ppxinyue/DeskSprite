@@ -85,6 +85,8 @@ let claudeCodingSessionStarted = false;
 const CODEX_INHERIT_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
 const CODING_NO_OUTPUT_TIMEOUT_MS = 5 * 60 * 1000;
+const PERMISSION_PROMPT_WIDTH = 376;
+const PERMISSION_PROMPT_HEIGHT = 232;
 const inheritedCodingAcknowledged = new Map();
 const inheritedCodingSeenActive = new Set();
 const permissionPromptResolvers = new Map();
@@ -1581,34 +1583,89 @@ return output
 `;
 }
 
-async function readSystemKnowledgeScheduleInfo() {
+function formatWeatherKnowledgeFromOpenMeteo(data, source) {
+  const current = data?.current || {};
+  const units = data?.current_units || {};
+  return {
+    status: 'available',
+    source,
+    summary: [
+      `source ${source}`,
+      `${current.temperature_2m ?? 'unknown'}${units.temperature_2m || 'C'}`,
+      `feels like ${current.apparent_temperature ?? 'unknown'}${units.apparent_temperature || 'C'}`,
+      `humidity ${current.relative_humidity_2m ?? 'unknown'}${units.relative_humidity_2m || '%'}`,
+      `wind ${current.wind_speed_10m ?? 'unknown'}${units.wind_speed_10m || 'km/h'}`,
+      `precipitation ${current.precipitation ?? 0}${units.precipitation || 'mm'}`,
+    ].join(', '),
+  };
+}
+
+async function readSystemKnowledgeWeatherInfo(args = {}) {
+  try {
+    let latitude = Number(args.latitude);
+    let longitude = Number(args.longitude);
+    let source = args.source === 'browser-location' ? 'browser-location' : 'ip-location';
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      const ipResponse = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(2500) });
+      if (!ipResponse.ok) throw new Error(ipResponse.statusText);
+      const ipData = await ipResponse.json();
+      latitude = Number(ipData.latitude);
+      longitude = Number(ipData.longitude);
+      source = 'ip-location';
+    }
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      throw new Error('location unavailable');
+    }
+    const url = new URL('https://api.open-meteo.com/v1/forecast');
+    url.searchParams.set('latitude', String(Number(latitude.toFixed(4))));
+    url.searchParams.set('longitude', String(Number(longitude.toFixed(4))));
+    url.searchParams.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,snowfall,weather_code,wind_speed_10m');
+    url.searchParams.set('timezone', 'auto');
+    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!response.ok) throw new Error(response.statusText);
+    return formatWeatherKnowledgeFromOpenMeteo(await response.json(), source);
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      summary: `unavailable because the weather service request failed (${error instanceof Error ? error.message : String(error)}). Ask the user for a city or try again later.`,
+    };
+  }
+}
+
+async function readSystemKnowledgeScheduleInfo(args = {}) {
   if (process.platform !== 'darwin') {
     return { calendar: [], reminders: [], error: 'Calendar and Reminders integration is only available on macOS.' };
   }
+  const wantsCalendar = args.calendar !== false;
+  const wantsReminders = args.reminders === true;
   const [calendarResult, remindersResult] = await Promise.allSettled([
-    runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => calendarKnowledgeScript(target))),
-    runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => remindersKnowledgeScript(target))),
+    wantsCalendar
+      ? runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => calendarKnowledgeScript(target)), 12000)
+      : Promise.resolve(''),
+    wantsReminders
+      ? runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => remindersKnowledgeScript(target)))
+      : Promise.resolve(''),
   ]);
-  const calendarError = calendarResult.status === 'rejected'
+  const calendarError = wantsCalendar && calendarResult.status === 'rejected'
     ? humanizeAppleScriptAccessError(calendarResult.reason?.message || calendarResult.reason)
     : '';
-  const remindersError = remindersResult.status === 'rejected'
+  const remindersError = wantsReminders && remindersResult.status === 'rejected'
     ? humanizeAppleScriptAccessError(remindersResult.reason?.message || remindersResult.reason)
     : '';
   timelineDebugLog({
     stage: 'system-knowledge:schedule',
     message: [
-      `calendar=${calendarResult.status}`,
-      `reminders=${remindersResult.status}`,
+      wantsCalendar ? `calendar=${calendarResult.status}` : 'calendar=skipped',
+      wantsReminders ? `reminders=${remindersResult.status}` : 'reminders=skipped',
       calendarError ? `calendarError=${calendarError}` : '',
       remindersError ? `remindersError=${remindersError}` : '',
     ].filter(Boolean).join(' '),
   });
   return {
-    calendar: calendarResult.status === 'fulfilled' ? parseTabRows(calendarResult.value, 'calendar') : [],
-    reminders: remindersResult.status === 'fulfilled' ? parseTabRows(remindersResult.value, 'reminder') : [],
-    calendarStatus: calendarResult.status === 'fulfilled' ? 'ok' : 'error',
-    remindersStatus: remindersResult.status === 'fulfilled' ? 'ok' : 'error',
+    calendar: wantsCalendar && calendarResult.status === 'fulfilled' ? parseTabRows(calendarResult.value, 'calendar') : [],
+    reminders: wantsReminders && remindersResult.status === 'fulfilled' ? parseTabRows(remindersResult.value, 'reminder') : [],
+    calendarStatus: !wantsCalendar || calendarResult.status === 'fulfilled' ? 'ok' : 'error',
+    remindersStatus: !wantsReminders || remindersResult.status === 'fulfilled' ? 'ok' : 'error',
     calendarError,
     remindersError,
     error: [
@@ -1630,7 +1687,7 @@ async function runFirstSuccessfulAppleScript(scripts, timeout = 5000) {
   throw new Error(errors.map(humanizeAppleScriptAccessError).join(' | '));
 }
 
-async function requestSystemKnowledgePermissions() {
+async function requestSystemKnowledgePermissions(args = {}) {
   if (process.platform !== 'darwin') {
     return {
       ok: false,
@@ -1638,6 +1695,18 @@ async function requestSystemKnowledgePermissions() {
       reminders: { ok: false, message: 'Only available on macOS.' },
     };
   }
+  const wantsCalendar = args.calendar !== false;
+  const wantsReminders = args.reminders === true;
+  const permissionTitle = wantsCalendar && wantsReminders
+    ? chooseLocaleText('需要日历和提醒事项权限', 'Calendar and Reminders needed')
+    : wantsReminders
+      ? chooseLocaleText('需要提醒事项权限', 'Reminders needed')
+      : chooseLocaleText('需要日历权限', 'Calendar needed');
+  const permissionMessage = wantsCalendar && wantsReminders
+    ? chooseLocaleText('用于回答日程、会议、待办和提醒问题。', 'Used to answer schedule, meeting, to-do, and reminder questions.')
+    : wantsReminders
+      ? chooseLocaleText('用于回答待办和提醒问题。', 'Used to answer to-do and reminder questions.')
+      : chooseLocaleText('用于回答日程和会议问题。', 'Used to answer schedule and meeting questions.');
   const consent = await dialog.showMessageBox({
     type: 'info',
     buttons: [
@@ -1646,8 +1715,8 @@ async function requestSystemKnowledgePermissions() {
     ],
     defaultId: 0,
     cancelId: 1,
-    title: chooseLocaleText('需要日历和提醒事项权限', 'Calendar and Reminders needed'),
-    message: chooseLocaleText('用于回答日程、会议、待办和提醒问题。', 'Used to answer schedule, meeting, to-do, and reminder questions.'),
+    title: permissionTitle,
+    message: permissionMessage,
     detail: chooseLocaleText(
       '只在相关提问中读取必要信息；默认本地存储，云端备份均作加密处理。',
       'Only needed data is read for related questions. Local by default; cloud backups are encrypted.',
@@ -1656,17 +1725,21 @@ async function requestSystemKnowledgePermissions() {
   if (consent.response !== 0) {
     return {
       ok: false,
-      calendar: { ok: false, message: 'User cancelled permission request.' },
-      reminders: { ok: false, message: 'User cancelled permission request.' },
+      calendar: { ok: !wantsCalendar, message: wantsCalendar ? 'User cancelled permission request.' : 'Not requested.' },
+      reminders: { ok: !wantsReminders, message: wantsReminders ? 'User cancelled permission request.' : 'Not requested.' },
     };
   }
   const [calendarResult, remindersResult] = await Promise.allSettled([
-    runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => `tell ${target} to return count of calendars`)),
-    runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => `tell ${target} to return count of lists`)),
+    wantsCalendar
+      ? runFirstSuccessfulAppleScript(appleScriptTargets('Calendar', 'com.apple.iCal').map((target) => `tell ${target} to return count of calendars`))
+      : Promise.resolve(''),
+    wantsReminders
+      ? runFirstSuccessfulAppleScript(appleScriptTargets('Reminders', 'com.apple.reminders').map((target) => `tell ${target} to return count of lists`))
+      : Promise.resolve(''),
   ]);
-  const calendar = permissionResultFromSettled(calendarResult);
-  const reminders = permissionResultFromSettled(remindersResult);
-  if (!calendar.ok || !reminders.ok) {
+  const calendar = wantsCalendar ? permissionResultFromSettled(calendarResult) : { ok: true, message: 'Not requested.' };
+  const reminders = wantsReminders ? permissionResultFromSettled(remindersResult) : { ok: true, message: 'Not requested.' };
+  if ((wantsCalendar && !calendar.ok) || (wantsReminders && !reminders.ok)) {
     shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Automation').catch(() => {});
   }
   return {
@@ -1683,13 +1756,13 @@ function showPermissionPromptOverlay(args = {}, event) {
     const display = screen.getDisplayMatching(parentBounds);
     const work = display.bounds;
     const id = randomUUID();
-    const owner = parent && !parent.isDestroyed() ? parent : undefined;
+    const promptX = Math.round(work.x + (work.width - PERMISSION_PROMPT_WIDTH) / 2);
+    const promptY = Math.round(work.y + (work.height - PERMISSION_PROMPT_HEIGHT) / 2);
     const win = new BrowserWindow({
-      x: work.x,
-      y: work.y,
-      width: work.width,
-      height: work.height,
-      parent: owner,
+      x: promptX,
+      y: promptY,
+      width: PERMISSION_PROMPT_WIDTH,
+      height: PERMISSION_PROMPT_HEIGHT,
       show: false,
       frame: false,
       transparent: true,
@@ -1697,12 +1770,20 @@ function showPermissionPromptOverlay(args = {}, event) {
       resizable: false,
       movable: false,
       fullscreenable: false,
-      skipTaskbar: true,
+      skipTaskbar: process.platform !== 'darwin',
       alwaysOnTop: true,
       focusable: true,
+      type: process.platform === 'darwin' ? 'panel' : undefined,
       hasShadow: false,
       webPreferences: preload('permission-prompt'),
     });
+    if (process.platform === 'darwin') {
+      win.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+        skipTransformProcessType: true,
+      });
+      win.setAlwaysOnTop(true, 'screen-saver', 3);
+    }
     const finish = (accepted) => {
       if (!permissionPromptResolvers.has(id)) return;
       permissionPromptResolvers.delete(id);
@@ -1711,17 +1792,25 @@ function showPermissionPromptOverlay(args = {}, event) {
     };
     permissionPromptResolvers.set(id, finish);
     win.once('closed', () => finish(false));
-    win.once('ready-to-show', () => {
-      applyFloatingFullscreenBehavior(win, { force: true });
+    const revealPrompt = () => {
+      if (win.isDestroyed()) return;
       if (process.platform === 'darwin') {
         win.setVisibleOnAllWorkspaces(true, {
           visibleOnFullScreen: true,
           skipTransformProcessType: true,
         });
         win.setAlwaysOnTop(true, 'screen-saver', 3);
+        app.focus({ steal: true });
       }
-      win.showInactive();
+      if (!win.isVisible()) win.show();
+      win.focus();
       win.moveTop();
+    };
+    win.once('ready-to-show', () => {
+      applyFloatingFullscreenBehavior(win, { force: true });
+      revealPrompt();
+      setTimeout(revealPrompt, 120);
+      setTimeout(revealPrompt, 360);
     });
 
     const requestedIconPath = resolveAppIconPath(args.iconPath);
@@ -1738,7 +1827,7 @@ function showPermissionPromptOverlay(args = {}, event) {
 <meta charset="utf-8">
 <style>
 html,body{width:100%;height:100%;margin:0;background:transparent;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;color:CanvasText;overflow:hidden}
-body{display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;background:transparent}
+body{display:flex;align-items:center;justify-content:center;padding:8px;box-sizing:border-box;background:transparent}
 .card{box-sizing:border-box;width:min(336px,calc(100vw - 24px));max-height:calc(100vh - 24px);display:flex;flex-direction:column;overflow:hidden;border-radius:15px;border:1px solid rgba(120,120,120,.32);background:color-mix(in srgb, Canvas 96%, transparent);box-shadow:0 12px 34px rgba(0,0,0,.20),0 1px 0 rgba(255,255,255,.42) inset;backdrop-filter:blur(16px);padding:12px;text-align:center}
 .content{overflow:auto;min-height:0;padding:2px 2px 10px}
 img{width:48px;height:48px;object-fit:contain;display:block;margin:0 auto 8px;border-radius:12px}
@@ -3418,6 +3507,7 @@ const handlers = {
   chat_completion: chatCompletion,
   test_ai_connection: testAiConnection,
   read_system_knowledge_device_info: readSystemKnowledgeDeviceInfo,
+  read_system_knowledge_weather_info: readSystemKnowledgeWeatherInfo,
   read_system_knowledge_schedule_info: readSystemKnowledgeScheduleInfo,
   request_system_knowledge_permissions: requestSystemKnowledgePermissions,
   show_permission_prompt_overlay: (args, event) => showPermissionPromptOverlay(args, event),

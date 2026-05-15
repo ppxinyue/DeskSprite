@@ -59,10 +59,12 @@ const SYSTEM_KNOWLEDGE_TRIGGER =
 const WEATHER_TRIGGER = /(天气|温度|下雨|下雪|风|空气|weather|temperature|rain|snow|wind)/i;
 const DEVICE_TRIGGER = /(设备|电脑|系统|mac|windows|屏幕|显示器|内存|cpu|芯片|电量|网络|device|system|computer|screen|display|memory|cpu|battery|network)/i;
 const SCHEDULE_TRIGGER = /(日历|日程|待办|提醒|会议|安排|calendar|schedule|event|meeting|todo|task|reminder)/i;
+const CALENDAR_TRIGGER = /(日历|日程|会议|安排|calendar|schedule|event|meeting)/i;
+const REMINDERS_TRIGGER = /(待办|提醒|todo|task|reminder)/i;
 
 let weatherCache: { key: string; value: WeatherKnowledge; expiresAt: number } | null = null;
-let schedulePermissionRequestedInChat = false;
-let schedulePermissionDeniedInChat = false;
+let schedulePermissionRequestedInChat = { calendar: false, reminders: false };
+let schedulePermissionDeniedInChat = { calendar: false, reminders: false };
 let locationPermissionExplained = false;
 
 export class SystemKnowledgePermissionError extends Error {
@@ -116,9 +118,10 @@ export async function buildSystemKnowledgePrompt(
   }
 
   if (SCHEDULE_TRIGGER.test(queryText)) {
-    await requestScheduleKnowledgePermissionsFromChat();
-    const schedule = await readScheduleKnowledge();
-    const scheduleLines = formatScheduleKnowledge(schedule);
+    const sources = getRequestedScheduleSources(queryText);
+    await requestScheduleKnowledgePermissionsFromChat(sources);
+    const schedule = await readScheduleKnowledge(sources);
+    const scheduleLines = formatScheduleKnowledge(schedule, sources);
     if (scheduleLines.length > 0) lines.push(...scheduleLines);
   }
 
@@ -161,31 +164,59 @@ async function readDeviceKnowledge(): Promise<DeviceKnowledge | null> {
   }
 }
 
-async function readScheduleKnowledge(): Promise<ScheduleKnowledge | null> {
+async function readScheduleKnowledge(sources?: { calendar: boolean; reminders: boolean }): Promise<ScheduleKnowledge | null> {
   try {
-    return await invoke<ScheduleKnowledge>('read_system_knowledge_schedule_info');
+    return await invoke<ScheduleKnowledge>('read_system_knowledge_schedule_info', sources);
   } catch {
     return null;
   }
 }
 
-async function requestScheduleKnowledgePermissionsFromChat(): Promise<void> {
-  if (schedulePermissionDeniedInChat) {
-    throw new SystemKnowledgePermissionError('无法获取日历或提醒事项授权，请在设置中开启。');
+function getRequestedScheduleSources(queryText: string) {
+  const wantsCalendar = CALENDAR_TRIGGER.test(queryText);
+  const wantsReminders = REMINDERS_TRIGGER.test(queryText);
+  return {
+    calendar: wantsCalendar || !wantsReminders,
+    reminders: wantsReminders,
+  };
+}
+
+async function requestScheduleKnowledgePermissionsFromChat(sources: { calendar: boolean; reminders: boolean }): Promise<void> {
+  if ((sources.calendar && schedulePermissionDeniedInChat.calendar) || (sources.reminders && schedulePermissionDeniedInChat.reminders)) {
+    throw new SystemKnowledgePermissionError(schedulePermissionErrorMessage(sources));
   }
-  if (schedulePermissionRequestedInChat) return;
-  schedulePermissionRequestedInChat = true;
+  const needsCalendarRequest = sources.calendar && !schedulePermissionRequestedInChat.calendar;
+  const needsRemindersRequest = sources.reminders && !schedulePermissionRequestedInChat.reminders;
+  if (!needsCalendarRequest && !needsRemindersRequest) return;
+  schedulePermissionRequestedInChat = {
+    calendar: schedulePermissionRequestedInChat.calendar || sources.calendar,
+    reminders: schedulePermissionRequestedInChat.reminders || sources.reminders,
+  };
   await setCurrentPetAsAppIcon();
   try {
-    const result = await invoke<{ ok?: boolean }>('request_system_knowledge_permissions');
-    if (result && result.ok === false) {
-      schedulePermissionDeniedInChat = true;
-      throw new SystemKnowledgePermissionError('无法获取日历或提醒事项授权，请在设置中开启。');
+    const result = await invoke<{ ok?: boolean; calendar?: { ok?: boolean }; reminders?: { ok?: boolean } }>('request_system_knowledge_permissions', sources);
+    const calendarDenied = sources.calendar && result?.calendar?.ok === false;
+    const remindersDenied = sources.reminders && result?.reminders?.ok === false;
+    if (calendarDenied || remindersDenied || (result && result.ok === false && !result.calendar && !result.reminders)) {
+      schedulePermissionDeniedInChat = {
+        calendar: schedulePermissionDeniedInChat.calendar || calendarDenied || (sources.calendar && !result?.calendar && result?.ok === false),
+        reminders: schedulePermissionDeniedInChat.reminders || remindersDenied || (sources.reminders && !result?.reminders && result?.ok === false),
+      };
+      throw new SystemKnowledgePermissionError(schedulePermissionErrorMessage(sources));
     }
   } catch {
-    schedulePermissionDeniedInChat = true;
-    throw new SystemKnowledgePermissionError('无法获取日历或提醒事项授权，请在设置中开启。');
+    schedulePermissionDeniedInChat = {
+      calendar: schedulePermissionDeniedInChat.calendar || sources.calendar,
+      reminders: schedulePermissionDeniedInChat.reminders || sources.reminders,
+    };
+    throw new SystemKnowledgePermissionError(schedulePermissionErrorMessage(sources));
   }
+}
+
+function schedulePermissionErrorMessage(sources: { calendar: boolean; reminders: boolean }) {
+  if (sources.calendar && !sources.reminders) return '无法获取日历授权，请在设置中开启。';
+  if (sources.reminders && !sources.calendar) return '无法获取提醒事项授权，请在设置中开启。';
+  return '无法获取日历或提醒事项授权，请在设置中开启。';
 }
 
 function formatDeviceKnowledge(device: DeviceKnowledge): string[] {
@@ -205,10 +236,7 @@ function formatDeviceKnowledge(device: DeviceKnowledge): string[] {
 async function readWeatherKnowledge(): Promise<WeatherKnowledge> {
   const position = await getBrowserPosition() ?? await getIpPosition();
   if (!position) {
-    return {
-      status: 'unavailable',
-      summary: 'unavailable because location could not be resolved. Ask the user to enable Location Services for the app or provide a city name.',
-    };
+    return readWeatherKnowledgeFromMain();
   }
   const cacheKey = `${position.source}:${position.latitude},${position.longitude}`;
   if (weatherCache && weatherCache.key === cacheKey && weatherCache.expiresAt > Date.now()) {
@@ -245,6 +273,18 @@ async function readWeatherKnowledge(): Promise<WeatherKnowledge> {
     weatherCache = { key: cacheKey, value, expiresAt: Date.now() + 10 * 60_000 };
     return value;
   } catch {
+    const fallback = await readWeatherKnowledgeFromMain(position);
+    if (fallback.status === 'available') {
+      weatherCache = { key: cacheKey, value: fallback, expiresAt: Date.now() + 10 * 60_000 };
+    }
+    return fallback;
+  }
+}
+
+async function readWeatherKnowledgeFromMain(position?: { latitude: number; longitude: number; source: 'browser-location' | 'ip-location' }): Promise<WeatherKnowledge> {
+  try {
+    return await invoke<WeatherKnowledge>('read_system_knowledge_weather_info', position ?? {});
+  } catch {
     return {
       status: 'unavailable',
       summary: 'unavailable because the weather service request failed. Ask the user for a city or try again later.',
@@ -252,7 +292,7 @@ async function readWeatherKnowledge(): Promise<WeatherKnowledge> {
   }
 }
 
-function formatScheduleKnowledge(schedule: ScheduleKnowledge | null): string[] {
+function formatScheduleKnowledge(schedule: ScheduleKnowledge | null, sources: { calendar: boolean; reminders: boolean }): string[] {
   if (!schedule) return [
     'Schedule integration status: unavailable. Do not claim to know the user calendar or reminders. Briefly say DeskCat could not read the schedule integration status.',
   ];
@@ -260,18 +300,18 @@ function formatScheduleKnowledge(schedule: ScheduleKnowledge | null): string[] {
   const remindersStatus = schedule.remindersStatus || (schedule.remindersError ? 'error' : 'ok');
   const lines = [
     'Schedule: next 7 days calendar events and next 14 days incomplete reminders, including undated reminders.',
-    `Calendar access: ${calendarStatus}.`,
-    `Reminders access: ${remindersStatus}.`,
+    sources.calendar ? `Calendar access: ${calendarStatus}.` : '',
+    sources.reminders ? `Reminders access: ${remindersStatus}.` : '',
     'If access is ok and no items are listed, say no matching items were found. Do not describe an ok source as inaccessible.',
-  ];
+  ].filter(Boolean);
   const calendar = (schedule.calendar || []).slice(0, 8);
   const reminders = (schedule.reminders || []).slice(0, 8);
 
-  if (calendarStatus === 'error') {
+  if (sources.calendar && calendarStatus === 'error') {
     lines.push(`Calendar access error: ${schedule.calendarError || schedule.error || 'unknown error'}.`);
-  } else if (calendar.length === 0) {
+  } else if (sources.calendar && calendar.length === 0) {
     lines.push('Calendar events: none found in the next 7 days.');
-  } else {
+  } else if (sources.calendar) {
     if (calendar.length > 0) {
       lines.push('Calendar events:');
       for (const item of calendar) {
@@ -280,11 +320,11 @@ function formatScheduleKnowledge(schedule: ScheduleKnowledge | null): string[] {
     }
   }
 
-  if (remindersStatus === 'error') {
+  if (sources.reminders && remindersStatus === 'error') {
     lines.push(`Reminders access error: ${schedule.remindersError || schedule.error || 'unknown error'}.`);
-  } else if (reminders.length === 0) {
+  } else if (sources.reminders && reminders.length === 0) {
     lines.push('Incomplete reminders: none found in the next 14 days or without a due date.');
-  } else {
+  } else if (sources.reminders) {
     if (reminders.length > 0) {
       lines.push('Incomplete reminders:');
       for (const item of reminders) {
@@ -293,7 +333,7 @@ function formatScheduleKnowledge(schedule: ScheduleKnowledge | null): string[] {
     }
   }
 
-  if (schedule.error && (calendarStatus === 'error' || remindersStatus === 'error')) {
+  if (schedule.error && ((sources.calendar && calendarStatus === 'error') || (sources.reminders && remindersStatus === 'error'))) {
     lines.push(`Schedule access note: ${schedule.error}. Mention only the source marked error; continue using any source marked ok.`);
   }
   return lines;

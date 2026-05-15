@@ -32,7 +32,7 @@ const MOTION_BASE_DURATION: Record<PetMotionName, number> = {
 const PET_DRAW_PADDING = 2;
 const SOURCE_EDGE_INSET_RATIO = 0.004;
 const MENU_WIDTH = 136;
-const MENU_HEIGHT = 334;
+const MENU_HEIGHT = 306;
 const SUBMENU_WIDTH = 190;
 const MENU_MARGIN = 8;
 const MENU_LEFT_SIDE_THRESHOLD = 0.62;
@@ -614,7 +614,6 @@ export function PetAvatar({
         <div className="my-1 h-px bg-border/60" />
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
-        <button className="block w-full rounded px-2 py-1 text-left text-xs text-destructive hover:bg-destructive/10" onClick={() => handleContextMenu('quit')}>退出</button>
       </div>
     </>
   );
