@@ -41,7 +41,7 @@ export type TimelineRecorderState = {
   paused: TimelineSegmentState;
 };
 
-const IGNORED_TIMELINE_APPS = new Set(['deskcat', 'pawpal', 'electron']);
+const DESKCAT_TIMELINE_APPS = new Set(['deskcat', 'pawpal', 'electron']);
 
 type TimelineSegmentState = {
   key: string;
@@ -108,6 +108,16 @@ function findLastMatchingBackgroundMarker(markers: TimelineBackgroundMarker[], m
     if (candidate.type === marker.type && candidate.name === marker.name && candidate.detail === marker.detail) return candidate;
   }
   return null;
+}
+
+function normalizeTimelineForeground(appName: string, windowTitle: string, url: string | null) {
+  const normalizedApp = appName.trim().toLowerCase();
+  if (!DESKCAT_TIMELINE_APPS.has(normalizedApp)) return { appName, windowTitle, url };
+  return {
+    appName: 'DeskCat',
+    windowTitle: windowTitle || 'DeskCat',
+    url: null,
+  };
 }
 
 function mergeRecordedBackgroundMarkers(existing: TimelineBackgroundMarker[], next: TimelineBackgroundMarker[]) {
@@ -193,15 +203,14 @@ export class TimelineRecorder {
       return;
     }
 
-    const appName = snapshot.appName?.trim() || 'Unknown';
-    const windowTitle = snapshot.windowTitle?.trim() || '';
-    const url = snapshot.url?.trim() || null;
-    if (IGNORED_TIMELINE_APPS.has(appName.toLowerCase())) {
-      this.log({ stage: 'sample:ignore', message: 'own app foreground ignored', appName, windowTitle });
-      await this.foldCandidateIntoActive(checkedAt);
-      await this.mergeBackgroundDuringIgnoredForeground(snapshot.background, checkedAt);
-      return;
-    }
+    const foreground = normalizeTimelineForeground(
+      snapshot.appName?.trim() || 'Unknown',
+      snapshot.windowTitle?.trim() || '',
+      snapshot.url?.trim() || null,
+    );
+    const appName = foreground.appName;
+    const windowTitle = foreground.windowTitle;
+    const url = foreground.url;
     const key = getTimelineSnapshotKey(appName, windowTitle, url);
 
     this.log({
@@ -389,21 +398,6 @@ export class TimelineRecorder {
     });
     this.candidate = emptySegment();
     if (persist) await this.persistActive(this.active.lastSeenAt || endedAt);
-  }
-
-  private async mergeBackgroundDuringIgnoredForeground(markers: TimelineBackgroundMarker[] | undefined, checkedAt: number) {
-    if (!markers || markers.length === 0) return;
-    if (this.active.key) {
-      this.active.backgroundMarkers = mergeBackgroundMarkers(this.active.backgroundMarkers, markers, checkedAt);
-      await this.persistActive(this.active.lastSeenAt || checkedAt);
-      return;
-    }
-    if (this.paused.key) {
-      this.paused.backgroundMarkers = mergeBackgroundMarkers(this.paused.backgroundMarkers, markers, checkedAt);
-      await this.persistPaused();
-      return;
-    }
-    await this.persistBackgroundOnly(markers, checkedAt);
   }
 
   private async persistActive(endedAt: number) {

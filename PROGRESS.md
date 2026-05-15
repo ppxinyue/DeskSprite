@@ -5,7 +5,7 @@
 - 当前阶段：P0（Electron 重构 + GIF 形象体系 + 桌面交互打磨）
 - 完成任务：11 / 11 (A-K) + 动画系统重构 + Electron 重构 + 对话/拖拽迭代修复
 - 当前 Agent 分工：[Agent 1]
-- 最新提交：待提交：electron rewrite, GIF avatars, UI and window interaction fixes
+- 最新提交：待提交：timeline self-recording, example toggle, pinch zoom
 
 ## 任务进度
 
@@ -2008,3 +2008,11 @@
 - 拒权：系统知识库在位置、日历或提醒事项授权被拒绝时抛出明确错误，chat/compact chat 直接显示红色小字“无法获取…授权，请在设置中开启。”，不再继续进入模型流。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false` 通过。
 - 文件：main.cjs, permissionPrompt.ts, systemKnowledge.ts, ChatDialog.tsx, HoverInputBar.tsx, ChatPrimitives.tsx, chatStore.ts, ISSUES.md, PROGRESS.md
+
+### R264. Timeline 自身记录、示例 Toggle 与触控板缩放（2026-05-15）
+- 记录口径：Timeline 不再忽略 `DeskCat` / `PawPal` / 开发态 `Electron` 前台窗口，而是统一归一为 `DeskCat` 并按普通前台活动记录；后台 terminal/music marker 继续挂载到当前前台段。
+- 示例入口：个人档案顶部 `示例 / Example` 按钮改为 toggle；进入示例前记住当前真实日期，再点一次恢复到原日期数据，日历、左右箭头和专注柱状图切换会同步更新真实日期记忆。
+- 缩放：Timeline 横向 overflow 容器支持触控板双指 pinch 缩放，按比例拉伸时间尺、主时间段和后台轨道，并尽量保持指尖所在时间点不漂移。
+- 数据排查：确认今天本机原始数据中主 timeline 空白来自前台 inactive/sleep 断段，terminal 作为 background marker 延伸显示，不是 UI 丢失主段。
+- 验证：`pnpm test:timeline`、`pnpm exec tsc -b --pretty false`、`curl -I http://127.0.0.1:5173/` 通过。
+- 文件：SettingsPanel.tsx, timelineRecorder.ts, timelineRecorder.test.ts, PROGRESS.md

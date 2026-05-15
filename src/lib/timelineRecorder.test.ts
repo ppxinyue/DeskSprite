@@ -93,39 +93,43 @@ test('keeps repeated short switches to the same app as separate visits', async (
   assert.equal(shortMarkers[1].endedAt, new Date(34 * 60_000).toISOString());
 });
 
-test('ignores DeskCat/Electron foreground so startup chrome does not steal active segment', async () => {
-  const { recorder, persisted, logs } = createHarness();
-
-  await recorder.handleSnapshot(snapshot('Electron', ''), 0);
-  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 3_000);
-  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 64_000);
-
-  assert.equal(persisted.length, 1);
-  assert.equal(persisted[0].appName, 'Codex');
-  assert.equal(persisted[0].startedAt, 3_000);
-  assert.ok(logs.some((item) => item.stage === 'sample:ignore'));
-});
-
-test('keeps background markers sampled while DeskCat/Electron is foreground', async () => {
+test('records DeskCat/Electron foreground as DeskCat activity', async () => {
   const { recorder, persisted } = createHarness();
 
-  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
-  await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 65_000);
+  await recorder.handleSnapshot(snapshot('Electron', ''), 0);
+  await recorder.handleSnapshot(snapshot('Electron', 'Settings'), 60_000);
+
+  assert.equal(persisted.length, 1);
+  assert.equal(persisted[0].appName, 'DeskCat');
+  assert.equal(persisted[0].windowTitle, 'Settings');
+  assert.equal(persisted[0].startedAt, 0);
+  assert.equal(persisted[0].endedAt, 60_000);
+});
+
+test('keeps background markers sampled while DeskCat is foreground', async () => {
+  const { recorder, persisted } = createHarness();
+
   await recorder.handleSnapshot(snapshot('Electron', 'DeskCat settings', {
     background: [
       { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
       { type: 'music', name: 'NeteaseMusic', detail: 'running' },
     ],
-  }), 120_000);
+  }), 0);
+  await recorder.handleSnapshot(snapshot('Electron', 'DeskCat settings', {
+    background: [
+      { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
+      { type: 'music', name: 'NeteaseMusic', detail: 'running' },
+    ],
+  }), 65_000);
 
   const latest = persisted.at(-1);
-  assert.equal(latest?.appName, 'Codex');
+  assert.equal(latest?.appName, 'DeskCat');
   assert.equal(latest?.endedAt, 65_000);
   assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'terminal' && marker.detail === 'pnpm electron:dev'), true);
   assert.equal(latest?.backgroundMarkers.some((marker) => marker.type === 'music' && marker.name === 'NeteaseMusic'), true);
 });
 
-test('does not extend foreground duration when only ignored app background markers are sampled', async () => {
+test('does not extend previous foreground duration when DeskCat has not passed the minimum', async () => {
   const { recorder, persisted } = createHarness();
 
   await recorder.handleSnapshot(snapshot('Codex', 'Codex'), 0);
@@ -250,15 +254,13 @@ test('persists short foreground candidate when DeskCat becomes foreground before
 test('persists background-only markers when no foreground segment can carry them', async () => {
   const { recorder, persisted } = createHarness();
 
-  await recorder.handleSnapshot(snapshot('Electron', 'DeskCat settings', {
-    background: [{ type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' }],
-  }), 0);
-  await recorder.handleSnapshot(snapshot('Electron', 'DeskCat settings', {
-    background: [
-      { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
-      { type: 'music', name: 'NeteaseMusic', detail: 'running' },
-    ],
-  }), 60_000);
+  await recorder.handleBackgroundMarkers([
+    { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
+  ], 0);
+  await recorder.handleBackgroundMarkers([
+    { type: 'terminal', name: 'Terminal', detail: 'pnpm electron:dev' },
+    { type: 'music', name: 'NeteaseMusic', detail: 'running' },
+  ], 60_000);
 
   const latest = persisted.at(-1);
   assert.equal(latest?.foregroundVisible, false);

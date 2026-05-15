@@ -25,7 +25,7 @@ import { LANGUAGE_OPTIONS } from '@/i18n';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
-import type { ComponentProps, MouseEvent, ReactNode } from 'react';
+import type { ComponentProps, MouseEvent, ReactNode, WheelEvent as ReactWheelEvent } from 'react';
 import { createPortal } from 'react-dom';
 
 export type SettingsSection =
@@ -487,10 +487,19 @@ function ProfileSection() {
   const [profileMockPreview, setProfileMockPreview] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null);
   const statsScrollRef = useRef<HTMLDivElement>(null);
+  const lastRealDateRef = useRef(getInitialProfileDate());
   const todayKey = getLocalDateKey();
   const isExampleSelected = selectedDate === PROFILE_EXAMPLE_KEY;
   const selectedRealDate = isExampleSelected ? todayKey : selectedDate;
   const exampleLabel = settings.appLanguage === 'en' ? 'example' : '示例';
+
+  const selectProfileDate = useCallback((nextDate: string | ((currentDate: string) => string)) => {
+    setSelectedDate((currentDate) => {
+      const resolvedDate = typeof nextDate === 'function' ? nextDate(currentDate) : nextDate;
+      if (resolvedDate !== PROFILE_EXAMPLE_KEY) lastRealDateRef.current = resolvedDate;
+      return resolvedDate;
+    });
+  }, []);
 
   const loadProfileData = useCallback(() => {
     const loadDate = selectedDate === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : selectedDate;
@@ -577,7 +586,7 @@ function ProfileSection() {
                 type="button"
                 className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
                 onClick={() => {
-                  setSelectedDate((date) => {
+                  selectProfileDate((date) => {
                     const baseDate = date === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : date;
                     return shiftDateKey(baseDate, -1);
                   });
@@ -600,7 +609,7 @@ function ProfileSection() {
                 type="button"
                 className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground disabled:opacity-35"
                 onClick={() => {
-                  setSelectedDate((date) => {
+                  selectProfileDate((date) => {
                     const baseDate = date === PROFILE_EXAMPLE_KEY ? getLocalDateKey() : date;
                     return shiftDateKey(baseDate, 1);
                   });
@@ -617,7 +626,7 @@ function ProfileSection() {
                   todayKey={todayKey}
                   onMonthChange={setCalendarMonth}
                   onSelect={(date) => {
-                    setSelectedDate(date);
+                    selectProfileDate(date);
                     setCalendarOpen(false);
                   }}
                 />
@@ -631,7 +640,12 @@ function ProfileSection() {
                   : 'bg-white/44 text-muted-foreground hover:bg-white/62 hover:text-foreground dark:bg-white/[0.045] dark:hover:bg-white/[0.07]'
               }`}
               onClick={() => {
-                setSelectedDate(PROFILE_EXAMPLE_KEY);
+                if (isExampleSelected) {
+                  selectProfileDate(lastRealDateRef.current || todayKey);
+                } else {
+                  lastRealDateRef.current = selectedDate;
+                  selectProfileDate(PROFILE_EXAMPLE_KEY);
+                }
                 setCalendarOpen(false);
               }}
             >
@@ -689,7 +703,7 @@ function ProfileSection() {
                           selected ? 'bg-white shadow-sm dark:bg-white/9' : 'hover:bg-white/55 dark:hover:bg-white/7'
                         }`}
                         onClick={() => {
-                          setSelectedDate(day.date);
+                          selectProfileDate(day.date);
                         }}
                         title={`${formatDateHeading(day.date)} · ${formatFocusDuration(day.focusMs)} · ${day.focusSessions} 次 · 分心 ${day.distractions} 次`}
                       >
@@ -866,6 +880,10 @@ function getDistractionContentStats(
   return next;
 }
 
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 const TIMELINE_CATEGORY_META: Record<TimelineCategory, {
   label: string;
   color: string;
@@ -899,6 +917,7 @@ function TimelineSection({
   const scrollRef = useRef<HTMLDivElement>(null);
   const [backgroundDetail, setBackgroundDetail] = useState<BackgroundMarkerWithTime[] | null>(null);
   const [hoverCard, setHoverCard] = useState<TimelineHoverCard | null>(null);
+  const [timelineScale, setTimelineScale] = useState(1);
   const isMockPreview = entries.some((entry) => entry.id < 0);
   const timelineGapMs = Math.max(1, Math.min(20, minSegmentMinutes)) * 60_000;
   const timelineBlocks = getTimelineBlocks(entries, timelineGapMs);
@@ -924,6 +943,25 @@ function TimelineSection({
   const backgroundProcessMarkers = backgroundMarkers.filter(isTimelineBackgroundProcessMarker);
   const musicMarkers = backgroundProcessMarkers.filter((marker) => marker.type === 'music');
   const terminalMarkers = backgroundProcessMarkers.filter((marker) => marker.type === 'terminal');
+  const timelineWidth = Math.round(960 * timelineScale);
+
+  const handleTimelineWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!event.ctrlKey) return;
+    const node = scrollRef.current;
+    if (!node) return;
+    event.preventDefault();
+    const rect = node.getBoundingClientRect();
+    const focusX = event.clientX - rect.left;
+    const currentWidth = Math.max(1, node.scrollWidth);
+    const focusProgress = (node.scrollLeft + focusX) / currentWidth;
+    const nextScale = clampNumber(timelineScale * Math.exp(-event.deltaY * 0.01), 1, 8);
+    if (Math.abs(nextScale - timelineScale) < 0.001) return;
+    const nextWidth = Math.round(960 * nextScale);
+    setTimelineScale(nextScale);
+    window.requestAnimationFrame(() => {
+      node.scrollLeft = Math.max(0, focusProgress * nextWidth - focusX);
+    });
+  }, [timelineScale]);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -994,8 +1032,8 @@ function TimelineSection({
         })}
       </div>
 
-      <div ref={scrollRef} className="overflow-x-auto pb-2">
-        <div className="min-w-[960px]">
+      <div ref={scrollRef} className="overflow-x-auto pb-2" onWheel={handleTimelineWheel}>
+        <div className="min-w-[960px]" style={{ width: timelineWidth }}>
           <div className="rounded-[16px] bg-white/38 p-4 shadow-[0_14px_34px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.035]">
             <div className="relative h-[74px]">
               {Array.from({ length: 13 }, (_, index) => index * 2).map((hour) => (
