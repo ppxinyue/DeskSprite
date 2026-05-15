@@ -150,6 +150,20 @@ type PublicStatsFallback = {
   githubStars?: number;
 };
 
+type GithubRepoStats = {
+  repo: string;
+  stars: number;
+  views: number;
+  uniqueViews: number;
+  viewsWindowDays: number;
+  viewsError: string | null;
+  dailyViews?: Array<{
+    date: string;
+    views: number;
+    uniqueViews: number;
+  }>;
+};
+
 const corsHeaders = {
   'access-control-allow-origin': '*',
   'access-control-allow-headers': 'authorization, content-type, x-client-info, x-deskcat-dashboard-token, x-desksprite-dashboard-token',
@@ -220,6 +234,41 @@ function fillDailyRows(rows: DailyMetric[], startDate: string, days: number) {
       total_duration_ms: 0,
     };
   });
+}
+
+function aggregateDailyDownloads(rows: DailyDownloadMetric[]) {
+  const byDate = new Map<string, number>();
+  for (const row of rows) {
+    byDate.set(row.metric_date, (byDate.get(row.metric_date) ?? 0) + Number(row.download_count ?? 0));
+  }
+  return byDate;
+}
+
+function aggregateDailyViews(rows: DailyPageViewMetric[]) {
+  const byDate = new Map<string, number>();
+  for (const row of rows) {
+    byDate.set(row.metric_date, (byDate.get(row.metric_date) ?? 0) + Number(row.view_count ?? 0));
+  }
+  return byDate;
+}
+
+function buildDailyTrends(
+  dailyRows: DailyMetric[],
+  downloadRows: DailyDownloadMetric[],
+  pageViewRows: DailyPageViewMetric[],
+  githubStats: GithubRepoStats,
+) {
+  const downloadsByDate = aggregateDailyDownloads(downloadRows);
+  const viewsByDate = aggregateDailyViews(pageViewRows);
+  for (const row of githubStats.dailyViews ?? []) {
+    viewsByDate.set(row.date, (viewsByDate.get(row.date) ?? 0) + Number(row.views ?? 0));
+  }
+  return dailyRows.map((row) => ({
+    metricDate: row.metric_date,
+    usageMs: Number(row.total_duration_ms ?? 0),
+    downloads: downloadsByDate.get(row.metric_date) ?? 0,
+    views: viewsByDate.get(row.metric_date) ?? 0,
+  }));
 }
 
 function aggregateFeatures(rows: DailyFeatureMetric[]) {
@@ -638,9 +687,27 @@ async function getGithubRepoStats() {
     try {
       const trafficResponse = await fetch(`https://api.github.com/repos/${repo}/traffic/views`, { headers });
       if (!trafficResponse.ok) throw new Error(`GitHub traffic request failed: ${trafficResponse.status}`);
-      const trafficData = await trafficResponse.json() as { count?: number; uniques?: number };
+      const trafficData = await trafficResponse.json() as {
+        count?: number;
+        uniques?: number;
+        views?: Array<{ timestamp?: string; count?: number; uniques?: number }>;
+      };
       views = Number(trafficData.count ?? 0);
       uniqueViews = Number(trafficData.uniques ?? 0);
+      const dailyViews = (trafficData.views ?? []).map((row) => ({
+        date: String(row.timestamp ?? '').slice(0, 10),
+        views: Number(row.count ?? 0),
+        uniqueViews: Number(row.uniques ?? 0),
+      })).filter((row) => row.date);
+      return {
+        repo,
+        stars: Number(repoData.stargazers_count ?? 0),
+        views,
+        uniqueViews,
+        viewsWindowDays: 14,
+        viewsError,
+        dailyViews,
+      };
     } catch (error) {
       viewsError = error instanceof Error ? error.message : String(error);
     }
@@ -791,6 +858,7 @@ Deno.serve(async (req) => {
         githubStars,
       },
       daily: dailyRows,
+      dailyTrends: buildDailyTrends(dailyRows, downloadRows, pageViewRows, githubStats),
       featureUsage: aggregates.features,
       featureDailyUsers: aggregateFeatureUsers(featureUserRows).slice(0, 80),
       dailyUserUsage: aggregateDeviceUsage(deviceUsageRows).slice(0, 200),

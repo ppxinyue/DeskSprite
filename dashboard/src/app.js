@@ -5,6 +5,7 @@ const generatedAtEl = document.querySelector('#generated-at');
 const metricsEl = document.querySelector('#metrics');
 const dailyChartEl = document.querySelector('#daily-chart');
 const dailySummaryEl = document.querySelector('#daily-summary');
+const trendChartEl = document.querySelector('#trend-chart');
 const featureListEl = document.querySelector('#feature-list');
 const featureUserTableEl = document.querySelector('#feature-user-table');
 const dailyUserUsageTableEl = document.querySelector('#daily-user-usage-table');
@@ -113,6 +114,46 @@ function renderDaily(data) {
       </div>
     `;
   }).join('');
+}
+
+function linePoints(rows, key, width, height, padding) {
+  const max = Math.max(1, ...rows.map((row) => Number(row[key] || 0)));
+  const innerWidth = width - padding * 2;
+  const innerHeight = height - padding * 2;
+  if (rows.length === 1) {
+    const y = padding + innerHeight - (Number(rows[0][key] || 0) / max) * innerHeight;
+    return `${padding},${y} ${width - padding},${y}`;
+  }
+  return rows.map((row, index) => {
+    const x = padding + (index / Math.max(1, rows.length - 1)) * innerWidth;
+    const y = padding + innerHeight - (Number(row[key] || 0) / max) * innerHeight;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+}
+
+function renderDailyTrends(data) {
+  const rows = data.dailyTrends || [];
+  if (rows.length === 0) {
+    trendChartEl.innerHTML = '<div class="empty">No daily trend data yet.</div>';
+    return;
+  }
+  const width = 760;
+  const height = 220;
+  const padding = 18;
+  const latest = rows.at(-1) || {};
+  trendChartEl.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Daily downloads, views, and usage time trends">
+      <line class="chart-axis" x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}"></line>
+      <polyline class="trend-line usage" points="${linePoints(rows, 'usageMs', width, height, padding)}"></polyline>
+      <polyline class="trend-line views" points="${linePoints(rows, 'views', width, height, padding)}"></polyline>
+      <polyline class="trend-line downloads" points="${linePoints(rows, 'downloads', width, height, padding)}"></polyline>
+    </svg>
+    <div class="trend-legend">
+      <span><i class="usage"></i>Usage ${formatDuration(latest.usageMs)}</span>
+      <span><i class="views"></i>Views ${formatNumber(latest.views)}</span>
+      <span><i class="downloads"></i>Downloads ${formatNumber(latest.downloads)}</span>
+    </div>
+  `;
 }
 
 function renderFeatures(data) {
@@ -425,6 +466,7 @@ function renderRecent(data) {
 function render(data) {
   renderMetrics(data);
   renderDaily(data);
+  renderDailyTrends(data);
   renderFeatures(data);
   renderFeatureUsers(data);
   renderDailyUserUsage(data);

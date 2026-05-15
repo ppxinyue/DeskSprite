@@ -184,6 +184,74 @@ button {
   padding-top: 18px;
 }
 
+.line-chart {
+  display: grid;
+  gap: 12px;
+}
+
+.line-chart svg {
+  background: linear-gradient(#fff, #fff) padding-box;
+  height: 236px;
+  width: 100%;
+}
+
+.chart-axis {
+  stroke: #d7dbdf;
+  stroke-width: 1;
+}
+
+.trend-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+}
+
+.trend-line.usage {
+  stroke: #46a758;
+}
+
+.trend-line.views {
+  stroke: #0090ff;
+}
+
+.trend-line.downloads {
+  stroke: #f76808;
+}
+
+.trend-legend {
+  color: #687076;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 14px;
+}
+
+.trend-legend span {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.trend-legend i {
+  border-radius: 999px;
+  display: inline-block;
+  height: 8px;
+  width: 18px;
+}
+
+.trend-legend i.usage {
+  background: #46a758;
+}
+
+.trend-legend i.views {
+  background: #0090ff;
+}
+
+.trend-legend i.downloads {
+  background: #f76808;
+}
+
 .bar {
   align-items: center;
   display: flex;
