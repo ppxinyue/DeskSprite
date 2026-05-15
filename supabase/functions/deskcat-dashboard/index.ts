@@ -27,6 +27,16 @@ type DailyFeatureUserMetric = {
   duration_ms: number;
 };
 
+type DailyDeviceUsageMetric = {
+  metric_date: string;
+  device_id: string;
+  event_count: number;
+  use_count: number;
+  duration_ms: number;
+  first_event_at: string;
+  last_event_at: string;
+};
+
 type DailyDownloadMetric = {
   metric_date: string;
   source: string;
@@ -177,6 +187,24 @@ function aggregateFeatureUsers(rows: DailyFeatureUserMetric[]) {
     .sort((a, b) => String(b.metricDate).localeCompare(String(a.metricDate)) || b.activeDevices - a.activeDevices);
 }
 
+function aggregateDeviceUsage(rows: DailyDeviceUsageMetric[]) {
+  return rows
+    .map((row) => ({
+      metricDate: row.metric_date,
+      deviceId: row.device_id,
+      durationMs: Number(row.duration_ms ?? 0),
+      useCount: Number(row.use_count ?? 0),
+      eventCount: Number(row.event_count ?? 0),
+      firstEventAt: row.first_event_at,
+      lastEventAt: row.last_event_at,
+    }))
+    .sort((a, b) =>
+      String(b.metricDate).localeCompare(String(a.metricDate)) ||
+      b.durationMs - a.durationMs ||
+      String(a.deviceId).localeCompare(String(b.deviceId))
+    );
+}
+
 function aggregateProductDownloads(rows: DailyDownloadMetric[]) {
   const byAsset = new Map<string, number>();
   for (const row of rows) {
@@ -293,6 +321,7 @@ Deno.serve(async (req) => {
       daily,
       featureDaily,
       featureUsersDaily,
+      deviceUsageDaily,
       downloads,
       downloadsTotal,
       pageViews,
@@ -305,6 +334,7 @@ Deno.serve(async (req) => {
       supabase.from('daily_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: true }),
       supabase.from('daily_feature_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
       supabase.from('daily_feature_user_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
+      supabase.from('daily_device_usage_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }).order('duration_ms', { ascending: false }),
       supabase.from('daily_download_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
       supabase.from('download_events').select('id', { count: 'exact', head: true }),
       supabase.from('daily_page_view_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
@@ -322,6 +352,7 @@ Deno.serve(async (req) => {
       daily,
       featureDaily,
       featureUsersDaily,
+      deviceUsageDaily,
       downloads,
       downloadsTotal,
       pageViews,
@@ -334,6 +365,7 @@ Deno.serve(async (req) => {
     const dailyRows = (daily.data ?? []) as DailyMetric[];
     const featureRows = (featureDaily.data ?? []) as DailyFeatureMetric[];
     const featureUserRows = (featureUsersDaily.data ?? []) as DailyFeatureUserMetric[];
+    const deviceUsageRows = (deviceUsageDaily.data ?? []) as DailyDeviceUsageMetric[];
     const downloadRows = (downloads.data ?? []) as DailyDownloadMetric[];
     const pageViewRows = (pageViews.data ?? []) as DailyPageViewMetric[];
     const aggregates = aggregateFeatures(featureRows);
@@ -374,6 +406,7 @@ Deno.serve(async (req) => {
       daily: dailyRows,
       featureUsage: aggregates.features,
       featureDailyUsers: aggregateFeatureUsers(featureUserRows).slice(0, 80),
+      dailyUserUsage: aggregateDeviceUsage(deviceUsageRows).slice(0, 200),
       eventUsage: aggregates.events.slice(0, 40),
       downloads: {
         productSite: {

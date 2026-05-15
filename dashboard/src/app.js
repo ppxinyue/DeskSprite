@@ -7,6 +7,7 @@ const dailyChartEl = document.querySelector('#daily-chart');
 const dailySummaryEl = document.querySelector('#daily-summary');
 const featureListEl = document.querySelector('#feature-list');
 const featureUserTableEl = document.querySelector('#feature-user-table');
+const dailyUserUsageTableEl = document.querySelector('#daily-user-usage-table');
 const downloadListEl = document.querySelector('#download-list');
 const downloadSummaryEl = document.querySelector('#download-summary');
 const reachListEl = document.querySelector('#reach-list');
@@ -137,6 +138,29 @@ function renderFeatureUsers(data) {
   `).join('');
 }
 
+function shortDeviceId(value) {
+  const text = String(value || '');
+  if (text.length <= 14) return text;
+  return `${text.slice(0, 8)}...${text.slice(-4)}`;
+}
+
+function renderDailyUserUsage(data) {
+  const rows = data.dailyUserUsage || [];
+  if (rows.length === 0) {
+    dailyUserUsageTableEl.innerHTML = '<tr><td colspan="5" class="empty">No user usage yet.</td></tr>';
+    return;
+  }
+  dailyUserUsageTableEl.innerHTML = rows.map((row) => `
+    <tr>
+      <td>${row.metricDate}</td>
+      <td title="${row.deviceId}">${shortDeviceId(row.deviceId)}</td>
+      <td>${formatDuration(row.durationMs)}</td>
+      <td>${formatNumber(row.useCount)}</td>
+      <td>${formatNumber(row.eventCount)}</td>
+    </tr>
+  `).join('');
+}
+
 function renderDownloads(data) {
   const downloads = data.downloads || {};
   const productSite = downloads.productSite || {};
@@ -262,6 +286,7 @@ function render(data) {
   renderDaily(data);
   renderFeatures(data);
   renderFeatureUsers(data);
+  renderDailyUserUsage(data);
   renderDownloads(data);
   renderReach(data);
   renderEvents(data);
