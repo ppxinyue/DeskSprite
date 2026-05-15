@@ -145,7 +145,7 @@ button {
 .grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   overflow: hidden;
 }
 
@@ -158,11 +158,6 @@ button {
   min-width: 0;
   min-height: 320px;
   padding: 16px;
-}
-
-.chart-panel {
-  justify-self: start;
-  width: min(100%, calc(66vw - 42px));
 }
 
 .users-panel {
