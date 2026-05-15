@@ -64,7 +64,7 @@ function renderMetrics(data) {
   metricsEl.innerHTML = [
     metric('Total Users', formatNumber(totals.devices), 'distinct devices'),
     metric('DAU', formatNumber(totals.dau), 'latest active day'),
-    metric('Usage Time', formatDuration(totals.durationMs), `${data.range.days} day range`),
+    metric('Usage Time', formatDuration(totals.durationMs), `capped · ${data.range.days} days`),
     metric('Feature Uses', formatNumber(totals.useCount), 'summed event count'),
     metric('Downloads', formatNumber(totals.downloads), 'website + GitHub'),
     metric('Views', formatNumber(totals.views), 'website + GitHub traffic'),
@@ -154,7 +154,7 @@ function renderDailyUserUsage(data) {
     <tr>
       <td>${row.metricDate}</td>
       <td title="${row.deviceId}">${shortDeviceId(row.deviceId)}</td>
-      <td>${formatDuration(row.durationMs)}</td>
+      <td title="Raw ${formatDuration(row.rawDurationMs)}">${formatDuration(row.durationMs)}</td>
       <td>${formatNumber(row.useCount)}</td>
       <td>${formatNumber(row.eventCount)}</td>
     </tr>
@@ -276,7 +276,7 @@ function renderRecent(data) {
   recentListEl.innerHTML = rows.slice(0, 12).map((row) => `
     <div class="recent-item">
       <div class="recent-title">${row.feature} · ${row.event_name}</div>
-      <div class="recent-meta">${formatDate(row.client_created_at)} · ${row.device_id} · ${formatDuration(row.duration_ms)}</div>
+      <div class="recent-meta">${formatDate(row.received_at || row.client_created_at)} · ${row.device_id} · ${formatDuration(row.duration_ms)}</div>
     </div>
   `).join('');
 }

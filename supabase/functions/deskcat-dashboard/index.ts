@@ -35,6 +35,7 @@ type DailyDeviceUsageMetric = {
   duration_ms: number;
   first_event_at: string;
   last_event_at: string;
+  raw_duration_ms?: number;
 };
 
 type DailyDownloadMetric = {
@@ -59,6 +60,15 @@ type RecentEvent = {
   count: number;
   duration_ms: number;
   client_created_at: string;
+  received_at: string;
+};
+
+type PublicStatsFallback = {
+  ok?: boolean;
+  productSiteViews?: number;
+  githubViews?: number;
+  totalViews?: number;
+  githubStars?: number;
 };
 
 const corsHeaders = {
@@ -197,6 +207,7 @@ function aggregateDeviceUsage(rows: DailyDeviceUsageMetric[]) {
       eventCount: Number(row.event_count ?? 0),
       firstEventAt: row.first_event_at,
       lastEventAt: row.last_event_at,
+      rawDurationMs: Number(row.raw_duration_ms ?? row.duration_ms ?? 0),
     }))
     .sort((a, b) =>
       String(b.metricDate).localeCompare(String(a.metricDate)) ||
@@ -304,6 +315,26 @@ async function getGithubRepoStats() {
   };
 }
 
+async function getPublicStatsFallback(): Promise<PublicStatsFallback | null> {
+  const configuredUrl = Deno.env.get('DESKCAT_PUBLIC_STATS_URL');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const derivedUrl = supabaseUrl
+    ? `${supabaseUrl.replace('https://', 'https://').replace('.supabase.co', '.functions.supabase.co')}/deskcat-public-stats`
+    : null;
+  const url = configuredUrl || derivedUrl;
+  if (!url) return null;
+
+  const response = await fetch(url, {
+    headers: {
+      accept: 'application/json',
+      'user-agent': 'deskcat-dashboard',
+    },
+  });
+  if (!response.ok) throw new Error(`Public stats fallback failed: ${response.status}`);
+  const payload = await response.json() as PublicStatsFallback;
+  return payload.ok === false ? null : payload;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
@@ -326,6 +357,7 @@ Deno.serve(async (req) => {
       downloadsTotal,
       pageViews,
       pageViewsTotal,
+      publicStats,
       recent,
     ] = await Promise.all([
       supabase.from('devices').select('device_id', { count: 'exact', head: true }),
@@ -339,9 +371,10 @@ Deno.serve(async (req) => {
       supabase.from('download_events').select('id', { count: 'exact', head: true }),
       supabase.from('daily_page_view_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
       supabase.from('page_view_events').select('id', { count: 'exact', head: true }),
+      getPublicStatsFallback().catch(() => null),
       supabase.from('telemetry_events')
-        .select('device_id,event_name,feature,count,duration_ms,client_created_at')
-        .order('client_created_at', { ascending: false })
+        .select('device_id,event_name,feature,count,duration_ms,client_created_at,received_at')
+        .order('received_at', { ascending: false })
         .limit(50),
     ]);
 
@@ -386,6 +419,9 @@ Deno.serve(async (req) => {
       viewsError: error instanceof Error ? error.message : String(error),
     }));
     const latestDaily = dailyRows.at(-1);
+    const productSiteViewsTotal = Number(pageViewsTotal.count ?? publicStats?.productSiteViews ?? 0);
+    const githubViews = Number(githubStats.views || publicStats?.githubViews || 0);
+    const githubStars = Number(githubStats.stars || publicStats?.githubStars || 0);
 
     return json({
       ok: true,
@@ -400,8 +436,8 @@ Deno.serve(async (req) => {
         useCount: sum(dailyRows as unknown as Array<Record<string, unknown>>, 'feature_use_count'),
         durationMs: sum(dailyRows as unknown as Array<Record<string, unknown>>, 'total_duration_ms'),
         downloads: Number(downloadsTotal.count ?? 0) + Number(githubDownloads.count ?? 0),
-        views: Number(pageViewsTotal.count ?? 0) + Number(githubStats.views ?? 0),
-        githubStars: Number(githubStats.stars ?? 0),
+        views: productSiteViewsTotal + githubViews,
+        githubStars,
       },
       daily: dailyRows,
       featureUsage: aggregates.features,
@@ -420,13 +456,17 @@ Deno.serve(async (req) => {
       },
       views: {
         productSite: {
-          total: pageViewsTotal.count ?? 0,
+          total: productSiteViewsTotal,
           range: productViews.count,
           paths: productViews.paths,
           daily: productViews.daily,
         },
-        github: githubStats,
-        total: Number(pageViewsTotal.count ?? 0) + Number(githubStats.views ?? 0),
+        github: {
+          ...githubStats,
+          views: githubViews,
+          stars: githubStars,
+        },
+        total: productSiteViewsTotal + githubViews,
       },
       recentEvents: (recent.data ?? []) as RecentEvent[],
     });
