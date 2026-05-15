@@ -1063,15 +1063,17 @@ async function readTimelineBackgroundOnly({ musicAppKeywords, minSegmentMs } = {
   return { supported: true, background, error: null, checkedAt: Date.now() };
 }
 
-function readSystemActivityState() {
+function readSystemActivityState({ idleThresholdSeconds } = {}) {
   if (!powerMonitor) return { supported: false, idleSeconds: 0, state: 'unknown', inactive: false };
+  const thresholdSeconds = Math.max(1, Math.min(24 * 60 * 60, Number(idleThresholdSeconds) || 60));
   const idleSeconds = powerMonitor.getSystemIdleTime();
-  const state = powerMonitor.getSystemIdleState(60);
+  const state = powerMonitor.getSystemIdleState(thresholdSeconds);
   return {
     supported: true,
     idleSeconds,
     state,
-    inactive: state !== 'active' || idleSeconds >= 60,
+    inactive: state !== 'active' || idleSeconds >= thresholdSeconds,
+    idleThresholdSeconds: thresholdSeconds,
   };
 }
 

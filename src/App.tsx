@@ -15,7 +15,6 @@ import { flushCloudSync, startCloudSyncScheduler } from "@/lib/cloudSyncSchedule
 import { getThemeClassAction, shouldDeferWindowContent } from "@/lib/startupTheme";
 import { createFeatureTimer, trackFeatureUse } from "@/lib/telemetry";
 import { TimelineRecorder, type TimelineRecorderState, type TimelineSnapshot } from "@/lib/timelineRecorder";
-import { showPermissionPrompt } from "@/lib/permissionPrompt";
 import { installDocumentTranslator } from "@/i18n";
 import type { ChatMessage } from "@/features/chat/chatStore";
 import { ALL_PET_STATES, DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from "@/features/pet/animations";
@@ -31,6 +30,7 @@ const CODING_CONVERSATION_KEY = "deskcat:coding-conversation-id";
 const CODING_SAVED_MESSAGES_KEY = "deskcat:coding-saved-message-ids";
 const CODING_SESSION_ORDER_KEY = "deskcat:coding-session-order";
 const TIMELINE_RECORDER_STATE_KEY = "deskcat:timeline-recorder-state";
+const ACCESSIBILITY_PERMISSION_REQUESTED_KEY = "deskcat:accessibility-permission-requested";
 const SCREEN_MARGIN = 16;
 const PET_CONTENT_MARGIN = 20;
 const MIN_DIALOG_WIDTH = 200;
@@ -1374,6 +1374,7 @@ function PetWindow() {
   const topmostSuppressedForGameRef = useRef(false);
   const timelinePausedForGameRef = useRef(false);
   const gameStartedAtRef = useRef<number | null>(null);
+  const gameTimelineSnapshotRef = useRef<TimelineSnapshot | null>(null);
   const autoFocusAfterRestRef = useRef(false);
   const restPresentationFrameRef = useRef<number | null>(null);
   const restPresentationSnapshotRef = useRef<RestPresentationSnapshot | null>(null);
@@ -2070,6 +2071,7 @@ function PetWindow() {
     let useFallbackSnapshot = false;
     let accessibilityChecked = false;
     let foregroundPaused = false;
+    let timelineCheckInFlight = false;
     const minSegmentMs = Math.max(1, Math.min(20, settings.timelineMinSegmentMinutes)) * 60_000;
     timelineDebugLog({ stage: 'start', message: 'Timeline sampler started', minSegmentMs });
     const initialTimelineState = loadTimelineRecorderState();
@@ -2116,30 +2118,38 @@ function PetWindow() {
     };
 
     const runTimelineCheck = async () => {
+      if (timelineCheckInFlight) {
+        timelineDebugLog({ stage: 'sample:skip', message: 'previous timeline check still running' });
+        return;
+      }
+      timelineCheckInFlight = true;
       try {
         if (!accessibilityChecked) {
           accessibilityChecked = true;
           const existingPermission = await invoke<{ supported: boolean; trusted: boolean }>('check_accessibility_permission').catch(() => null);
-          if (!existingPermission?.trusted && !accessibilityPermissionExplained) {
-            accessibilityPermissionExplained = true;
-            const accepted = await showPermissionPrompt({
-              title: '需要辅助功能权限',
-              titleEn: 'Accessibility needed',
-              feature: '用于读取当前窗口名称，记录 Timeline，并在专注模式中识别分心应用。',
-              featureEn: 'Used to read the current window name for Timeline and Focus app detection.',
+          let permission = existingPermission;
+          if (!existingPermission?.trusted) {
+            const requestedBefore = localStorage.getItem(ACCESSIBILITY_PERMISSION_REQUESTED_KEY) === '1';
+            if (requestedBefore) {
+              timelineDebugLog({ stage: 'accessibility:pending', message: 'Accessibility permission not granted; skipping repeated prompt' });
+              return;
+            }
+            localStorage.setItem(ACCESSIBILITY_PERMISSION_REQUESTED_KEY, '1');
+            permission = await invoke<{ supported: boolean; trusted: boolean }>('ensure_accessibility_permission').catch((error) => {
+              timelineDebugLog({ stage: 'accessibility:error', error: error instanceof Error ? error.message : String(error) });
+              return null;
             });
-            if (!accepted) return;
           }
-          const permission = existingPermission?.trusted ? existingPermission : await invoke<{ supported: boolean; trusted: boolean }>('ensure_accessibility_permission').catch((error) => {
-            timelineDebugLog({ stage: 'accessibility:error', error: error instanceof Error ? error.message : String(error) });
-            return null;
-          });
           if (permission) timelineDebugLog({ stage: 'accessibility', message: `trusted=${permission.trusted}` });
         }
         if (timelinePausedForGameRef.current) {
-          if (!foregroundPaused) {
-            foregroundPaused = true;
-            await recorder.pauseForeground(gameStartedAtRef.current ?? Date.now());
+          const gameSnapshot = gameTimelineSnapshotRef.current;
+          if (gameSnapshot) {
+            if (foregroundPaused) {
+              foregroundPaused = false;
+              recorder.resumeForeground(gameStartedAtRef.current ?? Date.now(), minSegmentMs);
+            }
+            await recorder.handleSnapshot(gameSnapshot, Date.now());
             saveTimelineRecorderState(recorder.getState(), minSegmentMs);
           }
           return;
@@ -2186,6 +2196,8 @@ function PetWindow() {
       } catch (error) {
         timelineDebugLog({ stage: 'error', error: error instanceof Error ? error.message : String(error) });
         if (!disposed) console.warn('Failed to record timeline:', error);
+      } finally {
+        timelineCheckInFlight = false;
       }
     };
 
@@ -2210,6 +2222,8 @@ function PetWindow() {
           supported: boolean;
           isFullscreenGame: boolean;
           isScreenSharing: boolean;
+          appName?: string;
+          windowTitle?: string;
         }>('read_pet_presence_context', { settings: settingsRef.current });
         if (disposed || !context.supported) return;
 
@@ -2217,11 +2231,34 @@ function PetWindow() {
         if (context.isFullscreenGame && !timelinePausedForGameRef.current) {
           timelinePausedForGameRef.current = true;
           gameStartedAtRef.current = Date.now();
-          timelineDebugLog({ stage: 'game:pause', message: 'Fullscreen game detected; timeline sampler paused' });
+          gameTimelineSnapshotRef.current = {
+            supported: true,
+            appName: context.appName?.trim() || 'Fullscreen Game',
+            windowTitle: context.windowTitle?.trim() || context.appName?.trim() || 'Fullscreen Game',
+            url: null,
+            background: [],
+            error: null,
+          };
+          timelineDebugLog({
+            stage: 'game:start',
+            message: 'Fullscreen game detected; using synthetic timeline samples',
+            appName: gameTimelineSnapshotRef.current.appName,
+            windowTitle: gameTimelineSnapshotRef.current.windowTitle,
+          });
+        } else if (context.isFullscreenGame && timelinePausedForGameRef.current) {
+          gameTimelineSnapshotRef.current = {
+            supported: true,
+            appName: context.appName?.trim() || gameTimelineSnapshotRef.current?.appName || 'Fullscreen Game',
+            windowTitle: context.windowTitle?.trim() || gameTimelineSnapshotRef.current?.windowTitle || context.appName?.trim() || 'Fullscreen Game',
+            url: null,
+            background: [],
+            error: null,
+          };
         } else if (!context.isFullscreenGame && timelinePausedForGameRef.current) {
           timelinePausedForGameRef.current = false;
           gameStartedAtRef.current = null;
-          timelineDebugLog({ stage: 'game:resume', message: 'Fullscreen game ended; timeline sampler resumed' });
+          gameTimelineSnapshotRef.current = null;
+          timelineDebugLog({ stage: 'game:end', message: 'Fullscreen game ended; timeline sampler resumed' });
         }
         if (topmostSuppressedForGameRef.current !== shouldSuppressTopmost) {
           topmostSuppressedForGameRef.current = shouldSuppressTopmost;
@@ -2258,6 +2295,7 @@ function PetWindow() {
       }
       timelinePausedForGameRef.current = false;
       gameStartedAtRef.current = null;
+      gameTimelineSnapshotRef.current = null;
     };
   }, [settings.alwaysOnTop, settings.hidePetDuringScreenShare, settings.gameAppKeywords]);
 
@@ -2324,9 +2362,10 @@ function PetWindow() {
 
     const checkActivity = async () => {
       try {
-        const state = await invoke<{ supported: boolean; inactive: boolean; idleSeconds: number; state: string }>('read_system_activity_state');
+        const idleThresholdSeconds = Math.max(1, Math.min(20, settingsRef.current.timelineMinSegmentMinutes)) * 60;
+        const state = await invoke<{ supported: boolean; inactive: boolean; idleSeconds: number; state: string }>('read_system_activity_state', { idleThresholdSeconds });
         if (disposed || !state.supported) return;
-        if (state.inactive || state.idleSeconds >= 60 || state.state !== 'active') pauseLiveStats(Date.now());
+        if (state.inactive || state.idleSeconds >= idleThresholdSeconds || state.state !== 'active') pauseLiveStats(Date.now());
         else resumeLiveStats(Date.now());
       } catch {
         resumeLiveStats(Date.now());
@@ -2954,8 +2993,6 @@ type PetContextMenuLayout = {
   open: boolean;
   side: 'left' | 'right';
 };
-
-let accessibilityPermissionExplained = false;
 
 interface BoundedDragSession {
   startScreenX: number;

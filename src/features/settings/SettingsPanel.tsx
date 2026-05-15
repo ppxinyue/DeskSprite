@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { BarChart3, Bell, Bot, BriefcaseBusiness, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, Gamepad2, Globe2, Keyboard, Loader2, MessageSquareText, Monitor, Music2, Palette, PawPrint, Pencil, Plus, Settings2, ShieldAlert, Sparkles, Terminal, Trash2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ import { LANGUAGE_OPTIONS } from '@/i18n';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
-import type { ComponentProps, MouseEvent, ReactNode, WheelEvent as ReactWheelEvent } from 'react';
+import type { ComponentProps, MouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 export type SettingsSection =
@@ -915,6 +915,9 @@ function TimelineSection({
   onSelect: (id: number | null) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const timelineContentRef = useRef<HTMLDivElement>(null);
+  const timelineScaleRef = useRef(1);
+  const pendingTimelineScrollLeftRef = useRef<number | null>(null);
   const [backgroundDetail, setBackgroundDetail] = useState<BackgroundMarkerWithTime[] | null>(null);
   const [hoverCard, setHoverCard] = useState<TimelineHoverCard | null>(null);
   const [timelineScale, setTimelineScale] = useState(1);
@@ -945,23 +948,51 @@ function TimelineSection({
   const terminalMarkers = backgroundProcessMarkers.filter((marker) => marker.type === 'terminal');
   const timelineWidth = Math.round(960 * timelineScale);
 
-  const handleTimelineWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
-    if (!event.ctrlKey) return;
+  useLayoutEffect(() => {
+    timelineScaleRef.current = timelineScale;
+    const node = scrollRef.current;
+    const pendingScrollLeft = pendingTimelineScrollLeftRef.current;
+    if (!node || pendingScrollLeft === null) return;
+    pendingTimelineScrollLeftRef.current = null;
+    const maxScrollLeft = Math.max(0, node.scrollWidth - node.clientWidth);
+    node.scrollLeft = clampNumber(pendingScrollLeft, 0, maxScrollLeft);
+  }, [timelineScale]);
+
+  useEffect(() => {
     const node = scrollRef.current;
     if (!node) return;
-    event.preventDefault();
-    const rect = node.getBoundingClientRect();
-    const focusX = event.clientX - rect.left;
-    const currentWidth = Math.max(1, node.scrollWidth);
-    const focusProgress = (node.scrollLeft + focusX) / currentWidth;
-    const nextScale = clampNumber(timelineScale * Math.exp(-event.deltaY * 0.01), 1, 8);
-    if (Math.abs(nextScale - timelineScale) < 0.001) return;
-    const nextWidth = Math.round(960 * nextScale);
-    setTimelineScale(nextScale);
-    window.requestAnimationFrame(() => {
-      node.scrollLeft = Math.max(0, focusProgress * nextWidth - focusX);
-    });
-  }, [timelineScale]);
+    const handleWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey) return;
+      if (event.cancelable) event.preventDefault();
+      event.stopPropagation();
+
+      const rect = node.getBoundingClientRect();
+      const pointerX = event.clientX >= rect.left && event.clientX <= rect.right
+        ? event.clientX - rect.left
+        : node.clientWidth / 2;
+      const currentScale = timelineScaleRef.current;
+      const currentWidth = Math.max(
+        1,
+        timelineContentRef.current?.offsetWidth ?? Math.round(960 * currentScale),
+      );
+      const rawDelta = Math.abs(event.deltaY) >= Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+      const zoomDelta = event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? rawDelta * 16
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? rawDelta * node.clientHeight
+          : rawDelta;
+      const nextScale = clampNumber(currentScale * Math.exp(-zoomDelta * 0.004), 1, 8);
+      if (Math.abs(nextScale - currentScale) < 0.001) return;
+
+      const anchorProgress = clampNumber((node.scrollLeft + pointerX) / currentWidth, 0, 1);
+      const nextWidth = Math.round(960 * nextScale);
+      timelineScaleRef.current = nextScale;
+      pendingTimelineScrollLeftRef.current = anchorProgress * nextWidth - pointerX;
+      setTimelineScale(nextScale);
+    };
+    node.addEventListener('wheel', handleWheel, { passive: false });
+    return () => node.removeEventListener('wheel', handleWheel);
+  }, []);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -1032,8 +1063,8 @@ function TimelineSection({
         })}
       </div>
 
-      <div ref={scrollRef} className="overflow-x-auto pb-2" onWheel={handleTimelineWheel}>
-        <div className="min-w-[960px]" style={{ width: timelineWidth }}>
+      <div ref={scrollRef} className="overflow-x-auto pb-2">
+        <div ref={timelineContentRef} className="min-w-[960px]" style={{ width: timelineWidth }}>
           <div className="rounded-[16px] bg-white/38 p-4 shadow-[0_14px_34px_rgba(52,64,84,0.055),0_1px_0_rgba(255,255,255,0.72)_inset] dark:bg-white/[0.035]">
             <div className="relative h-[74px]">
               {Array.from({ length: 13 }, (_, index) => index * 2).map((hour) => (
