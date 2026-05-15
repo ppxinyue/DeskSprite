@@ -34,6 +34,7 @@ const {
   resolveSessionStatus,
 } = require('./codingStatus.cjs');
 const { createDeferredWindowShowController, createPetVisibilityController } = require('./windowLifecycle.cjs');
+const { autoUpdater } = require('electron-updater');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://127.0.0.1:5173';
@@ -46,6 +47,14 @@ const debugTimelineEnabled =
 const windows = new Map();
 const windowShowController = createDeferredWindowShowController();
 const petVisibilityController = createPetVisibilityController();
+const updaterState = {
+  initialized: false,
+  checking: false,
+  downloaded: false,
+  installPromptOpen: false,
+  lastError: '',
+  lastCheckAt: 0,
+};
 let topmostGuard = null;
 let topmostSuppressed = false;
 let compactChatHiddenUntil = 0;
@@ -164,6 +173,123 @@ function send(win, channel, payload) {
 
 function broadcast(channel, payload) {
   for (const win of windows.values()) send(win, channel, payload);
+}
+
+function updateStatusPayload(extra = {}) {
+  return {
+    checking: updaterState.checking,
+    downloaded: updaterState.downloaded,
+    lastError: updaterState.lastError,
+    lastCheckAt: updaterState.lastCheckAt,
+    version: app.getVersion(),
+    ...extra,
+  };
+}
+
+function broadcastUpdateStatus(status, extra = {}) {
+  broadcast('app:update-status', updateStatusPayload({ status, ...extra }));
+}
+
+function setupAutoUpdater() {
+  if (updaterState.initialized) return;
+  updaterState.initialized = true;
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    updaterState.checking = true;
+    updaterState.lastError = '';
+    broadcastUpdateStatus('checking');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    broadcastUpdateStatus('available', {
+      updateVersion: info?.version || '',
+      releaseName: info?.releaseName || '',
+    });
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    updaterState.checking = false;
+    broadcastUpdateStatus('not-available', { updateVersion: info?.version || '' });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    broadcastUpdateStatus('downloading', {
+      percent: Math.round(Number(progress?.percent || 0)),
+      transferred: progress?.transferred || 0,
+      total: progress?.total || 0,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', async (info) => {
+    updaterState.checking = false;
+    updaterState.downloaded = true;
+    broadcastUpdateStatus('downloaded', { updateVersion: info?.version || '' });
+    await promptInstallDownloadedUpdate(info);
+  });
+
+  autoUpdater.on('error', (error) => {
+    updaterState.checking = false;
+    updaterState.lastError = error instanceof Error ? error.message : String(error || '');
+    broadcastUpdateStatus('error');
+  });
+}
+
+async function promptInstallDownloadedUpdate(info = {}) {
+  if (updaterState.installPromptOpen) return;
+  updaterState.installPromptOpen = true;
+  try {
+    const target = windows.get('settings') || windows.get('chat') || windows.get('pet');
+    const options = {
+      type: 'info',
+      buttons: [chooseLocaleText('重启安装', 'Restart and Install'), chooseLocaleText('稍后', 'Later')],
+      defaultId: 0,
+      cancelId: 1,
+      title: chooseLocaleText('DeskCat 更新已下载', 'DeskCat Update Downloaded'),
+      message: chooseLocaleText(
+        `DeskCat ${info?.version || ''} 已下载完成。`,
+        `DeskCat ${info?.version || ''} has been downloaded.`,
+      ),
+      detail: chooseLocaleText(
+        '重启后会自动安装新版本。',
+        'The new version will be installed after restart.',
+      ),
+    };
+    const result = target && !target.isDestroyed()
+      ? await dialog.showMessageBox(target, options)
+      : await dialog.showMessageBox(options);
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall(false, true);
+    }
+  } finally {
+    updaterState.installPromptOpen = false;
+  }
+}
+
+async function checkForAppUpdates({ manual = false } = {}) {
+  if (isDev || !app.isPackaged) {
+    const skipped = updateStatusPayload({ status: 'skipped', reason: 'development' });
+    if (manual) return skipped;
+    return null;
+  }
+  setupAutoUpdater();
+  if (updaterState.checking && !manual) return updateStatusPayload({ status: 'checking' });
+  updaterState.lastCheckAt = Date.now();
+  try {
+    const result = await autoUpdater.checkForUpdatesAndNotify();
+    return updateStatusPayload({
+      status: result?.updateInfo ? 'checked' : 'not-available',
+      updateVersion: result?.updateInfo?.version || '',
+    });
+  } catch (error) {
+    updaterState.checking = false;
+    updaterState.lastError = error instanceof Error ? error.message : String(error || '');
+    broadcastUpdateStatus('error');
+    if (manual) throw error;
+    return updateStatusPayload({ status: 'error' });
+  }
 }
 
 function compactChatWindowSnapshot(win) {
@@ -3631,6 +3757,12 @@ const handlers = {
   check_distraction: checkDistraction,
   ensure_accessibility_permission: ensureAccessibilityPermission,
   check_accessibility_permission: checkAccessibilityPermission,
+  check_for_updates: () => checkForAppUpdates({ manual: true }),
+  install_downloaded_update: () => {
+    if (!updaterState.downloaded) return false;
+    autoUpdater.quitAndInstall(false, true);
+    return true;
+  },
   timeline_debug_log: timelineDebugLog,
   read_timeline_active_window: readTimelineActiveWindow,
   read_timeline_background_markers: readTimelineBackgroundOnly,
@@ -3801,6 +3933,12 @@ app.whenReady().then(() => {
   setAppIcon('assets/idle/png/idle.png');
   createPetWindow();
   ensureTopmostGuard();
+  setTimeout(() => {
+    checkForAppUpdates().catch((error) => {
+      updaterState.lastError = error instanceof Error ? error.message : String(error || '');
+      broadcastUpdateStatus('error');
+    });
+  }, 5000);
   globalShortcut.register('CommandOrControl+Shift+Space', () => broadcast('shortcut:chat-focus', {}));
   app.on('activate', () => {
     if (!windows.get('pet')) createPetWindow();
