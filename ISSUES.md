@@ -3227,3 +3227,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/lib/db.ts`, `src/lib/timelineRecorder.test.ts`, `src/lib/db.timeline.test.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：Timeline 的“不可观测暂停”和“短暂前台切换”应复用同一最小时长语义；性能保护场景不要直接丢弃前台语义，可以用低成本 synthetic snapshot 维持 recorder 的状态机一致性。
 - 是否需更新技术文档：否。
+
+## ISSUE-271
+- 发现时间：2026-05-15
+- 发现者：用户反馈
+- 相关任务：首次安装权限说明弹窗
+- 严重程度：中等
+- 问题现象：首次安装时用户会连续看到 macOS 辅助功能和 System Events 等系统权限弹窗，但缺少统一解释；此前自定义前置弹窗看起来像额外权限，且按钮为继续/取消，容易让用户误以为同意了两份权限。
+- 原因分析：macOS 系统权限弹窗文案和按钮不可完全自定义，应用只能在系统请求前后自行解释；单个权限前置弹窗会和系统弹窗一一相邻，造成“重复授权”的认知负担。
+- 解决方案：新增首次安装欢迎/权限说明弹窗，只展示一次，顶部使用当前灵宠图标；集中解释辅助功能、System Events 自动化权限和其他按功能触发权限，强调仅读取、不修改控制执行、本地存储和云端加密备份；后续具体权限仍由 macOS 原生弹窗请求。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：权限教育应集中在首次安装的一次性欢迎说明里，避免每个系统权限前都弹自定义确认框；自定义弹窗只负责解释，不应制造额外“同意/拒绝”决策。
+- 是否需更新技术文档：否。

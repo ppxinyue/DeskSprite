@@ -2024,3 +2024,11 @@
 - 稳定：timeline 采样增加 in-flight 防重入，上一轮读取还没完成时跳过本轮，避免并发更新 recorder 状态。
 - 验证：`pnpm test:timeline`、`pnpm test:startup` 通过。
 - 文件：App.tsx, main.cjs, db.ts, timelineRecorder.test.ts, db.timeline.test.ts, ISSUES.md, PROGRESS.md
+
+### R266. 首次安装权限欢迎弹窗与 Timeline 缩放灵敏度（2026-05-15）
+- 欢迎弹窗：首次 pet 主窗口加载完成后展示一次欢迎/权限说明弹窗，顶部使用当前灵宠图标，主标题为“咪已成功登陆你的电脑”，按钮仅保留“好的 / OK”。
+- 权限文案：中英文说明辅助功能、System Events 自动化权限以及位置/日历/提醒事项/麦克风/屏幕录制等按功能触发权限；强调仅读取必要信息、不修改控制执行，详细使用数据本地存储，云端备份加密。
+- 触发：使用 `deskcat:welcome-permissions-v1` localStorage 标记，确认后不再重复展示；后续系统权限仍由 macOS 原生弹窗请求。
+- 缩放：Timeline pinch zoom 灵敏度从 `0.004` 提升到 `0.008`，同样触控板手势缩放幅度翻倍。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false` 通过；已用 Quick Look 生成弹窗样式预览。
+- 文件：electron/main.cjs, App.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md

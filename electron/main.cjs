@@ -96,6 +96,8 @@ const CODEX_INHERIT_ACTIVE_MS = 90 * 1000;
 const CODING_NO_OUTPUT_TIMEOUT_MS = 5 * 60 * 1000;
 const PERMISSION_PROMPT_WIDTH = 376;
 const PERMISSION_PROMPT_HEIGHT = 232;
+const WELCOME_PROMPT_WIDTH = 520;
+const WELCOME_PROMPT_HEIGHT = 560;
 const PERMISSION_SPACE_ANCHOR_SIZE = 1;
 const inheritedCodingAcknowledged = new Map();
 const inheritedCodingSeenActive = new Set();
@@ -566,6 +568,16 @@ function resolveAppIconPath(iconPath) {
   const publicPath = path.join(app.getAppPath(), 'public', iconPath.replace(/^\/+/, ''));
   if (fs.existsSync(publicPath)) return publicPath;
   return path.resolve(app.getAppPath(), iconPath);
+}
+
+function resolveBundledAppIconPath() {
+  const candidates = [
+    path.join(app.getAppPath(), 'dist', 'favicon.svg'),
+    path.join(app.getAppPath(), 'public', 'favicon.svg'),
+    path.join(app.getAppPath(), 'src-tauri', 'icons', 'icon.png'),
+    currentAppIconPath,
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate)) || currentAppIconPath;
 }
 
 function setAppIcon(iconPath) {
@@ -2102,6 +2114,173 @@ document.getElementById('ok').addEventListener('click', () => done(true));
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') done(false);
   if (event.key === 'Enter') done(true);
+});
+document.getElementById('ok').focus();
+</script>
+</body>
+</html>`;
+    win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  });
+}
+
+function showWelcomePermissionPrompt(event) {
+  return new Promise((resolve) => {
+    const parent = event?.sender ? BrowserWindow.fromWebContents(event.sender) : windows.get('pet');
+    const parentBounds = parent && !parent.isDestroyed() ? parent.getBounds() : screen.getPrimaryDisplay().bounds;
+    const display = screen.getDisplayMatching(parentBounds);
+    const work = display.bounds;
+    const id = randomUUID();
+    const promptX = Math.round(work.x + (work.width - WELCOME_PROMPT_WIDTH) / 2);
+    const promptY = Math.round(work.y + (work.height - WELCOME_PROMPT_HEIGHT) / 2);
+    const win = new BrowserWindow({
+      x: promptX,
+      y: promptY,
+      width: WELCOME_PROMPT_WIDTH,
+      height: WELCOME_PROMPT_HEIGHT,
+      show: false,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      resizable: false,
+      movable: false,
+      fullscreenable: false,
+      skipTaskbar: process.platform !== 'darwin',
+      alwaysOnTop: true,
+      focusable: true,
+      type: process.platform === 'darwin' ? 'panel' : undefined,
+      hasShadow: false,
+      webPreferences: preload('permission-prompt'),
+    });
+    if (process.platform === 'darwin') {
+      win.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+        skipTransformProcessType: true,
+      });
+      win.setAlwaysOnTop(true, 'screen-saver', 3);
+    }
+    const finish = (accepted) => {
+      if (!permissionPromptResolvers.has(id)) return;
+      permissionPromptResolvers.delete(id);
+      if (!win.isDestroyed()) win.close();
+      resolve(Boolean(accepted));
+    };
+    permissionPromptResolvers.set(id, finish);
+    win.once('closed', () => finish(true));
+    const revealPrompt = () => {
+      if (win.isDestroyed()) return;
+      if (process.platform === 'darwin') {
+        win.setVisibleOnAllWorkspaces(true, {
+          visibleOnFullScreen: true,
+          skipTransformProcessType: true,
+        });
+        win.setAlwaysOnTop(true, 'screen-saver', 3);
+        app.focus({ steal: true });
+      }
+      if (!win.isVisible()) win.show();
+      win.focus();
+      win.moveTop();
+    };
+    win.once('ready-to-show', () => {
+      applyFloatingFullscreenBehavior(win, { force: true });
+      revealPrompt();
+      setTimeout(revealPrompt, 120);
+      setTimeout(revealPrompt, 360);
+    });
+
+    const iconSrc = fs.existsSync(currentAppIconPath) ? `deskcat-file:///${encodeURIComponent(currentAppIconPath)}` : '';
+    const zh = isChineseLocale();
+    const eyebrow = zh ? '欢迎使用 DeskCat' : 'Welcome to DeskCat';
+    const title = zh ? '咪已成功登陆你的电脑' : 'Mimi has successfully moved into your computer';
+    const intro = zh
+      ? '为了让 DeskCat 正常陪伴你工作，它会在需要时请求以下系统权限：'
+      : 'To help DeskCat work properly, it may request the following system permissions when needed:';
+    const sections = zh ? [
+      {
+        label: '辅助功能权限',
+        text: '用于读取当前前台应用、窗口标题、全屏状态和系统闲置状态，以记录个人日志、识别专注模式中的分心应用，并让灵宠在桌面和全屏场景中更稳定地显示。',
+      },
+      {
+        label: 'System Events 自动化权限',
+        text: '用于通过 macOS System Events 读取前台窗口信息、运行中的应用列表和窗口状态，这是个人日志与专注识别所需的系统接口。',
+      },
+      {
+        label: '其他权限',
+        text: '位置、日历、提醒事项、麦克风、屏幕录制等权限，只会在你使用天气、日程/待办、语音输入、截图等相关功能时再请求。',
+      },
+    ] : [
+      {
+        label: 'Accessibility',
+        text: 'Used to read the current foreground app, window title, fullscreen state, and system idle state. This powers personal logging, Focus distraction detection, and stable DeskCat display across desktop and fullscreen spaces.',
+      },
+      {
+        label: 'System Events Automation',
+        text: 'Used through macOS System Events to read foreground window information, running app names, and window state. This is the system interface DeskCat uses for personal logging and Focus detection.',
+      },
+      {
+        label: 'Other permissions',
+        text: 'Location, Calendar, Reminders, Microphone, and Screen Recording permissions are requested only when you use related features such as weather, schedule/to-do answers, voice input, or screenshots.',
+      },
+    ];
+    const privacy = zh
+      ? '以上权限仅用于读取必要信息，不涉及修改、控制或执行无关操作。详细使用数据默认存储在本机；如果开启云端备份，备份内容会经过加密处理，请放心使用。'
+      : 'These permissions are used only to read necessary information. DeskCat does not modify system settings, control other apps, or perform unrelated actions. Detailed usage data is stored locally by default; if cloud backup is enabled, backup data is encrypted.';
+    const okLabel = zh ? '好的' : 'OK';
+    const sectionHtml = sections.map((section) => `
+      <section>
+        <h2>${escapeHtml(section.label)}</h2>
+        <p>${escapeHtml(section.text)}</p>
+      </section>
+    `).join('');
+    const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+html,body{width:100%;height:100%;margin:0;background:transparent;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;color:#1f2328;overflow:hidden}
+body{display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;background:transparent}
+.card{box-sizing:border-box;width:min(488px,calc(100vw - 24px));max-height:calc(100vh - 24px);display:flex;flex-direction:column;overflow:hidden;border-radius:22px;border:1px solid rgba(130,135,145,.34);background:rgba(250,251,252,.96);box-shadow:0 22px 70px rgba(15,23,42,.22),0 1px 0 rgba(255,255,255,.86) inset;backdrop-filter:blur(22px);padding:22px 24px 20px}
+.content{overflow:auto;min-height:0;padding-right:2px}
+img{width:62px;height:62px;object-fit:contain;display:block;margin:0 auto 13px;border-radius:16px;filter:drop-shadow(0 8px 18px rgba(15,23,42,.16))}
+.eyebrow{text-align:center;font-size:13px;font-weight:680;line-height:1.35;color:#59616c;margin:0 0 4px}
+.title{text-align:center;font-size:21px;font-weight:760;line-height:1.24;letter-spacing:0;margin:0 0 13px}
+.intro{border-top:1px solid rgba(31,35,40,.075);padding-top:12px;margin-bottom:12px}
+section{border-top:1px solid rgba(31,35,40,.075);padding:12px 0 0;margin:0 0 12px}
+h2{font-size:13px;font-weight:720;line-height:1.35;margin:0 0 4px;color:#24292f}
+p{font-size:12px;font-weight:500;line-height:1.62;margin:0;color:#59616c}
+.privacy{margin-top:2px;border-radius:14px;background:rgba(47,143,255,.075);padding:12px 13px;color:#315f89}
+.actions{flex-shrink:0;padding-top:16px}
+button{width:100%;height:38px;border:0;border-radius:12px;background:#2f8fff;color:white;font-size:13px;font-weight:700;box-shadow:0 9px 20px rgba(47,143,255,.24)}
+button:focus{outline:3px solid rgba(47,143,255,.26);outline-offset:2px}
+@media (prefers-color-scheme:dark){
+  html,body{color:#f2f4f8}
+  .card{border-color:rgba(255,255,255,.12);background:rgba(31,33,37,.94);box-shadow:0 22px 70px rgba(0,0,0,.38),0 1px 0 rgba(255,255,255,.10) inset}
+  .eyebrow,p{color:rgba(242,244,248,.66)}
+  section{border-top-color:rgba(255,255,255,.08)}
+  h2{color:rgba(255,255,255,.88)}
+  .privacy{background:rgba(94,177,255,.13);color:rgba(206,232,255,.86)}
+}
+</style>
+</head>
+<body>
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="title">
+    <div class="content">
+      ${iconSrc ? `<img src="${escapeHtml(iconSrc)}" alt="DeskCat">` : ''}
+      <div class="eyebrow">${escapeHtml(eyebrow)}</div>
+      <h1 class="title" id="title">${escapeHtml(title)}</h1>
+      <p class="intro">${escapeHtml(intro)}</p>
+      ${sectionHtml}
+      <p class="privacy">${escapeHtml(privacy)}</p>
+    </div>
+    <div class="actions">
+      <button id="ok" type="button">${escapeHtml(okLabel)}</button>
+    </div>
+  </div>
+<script>
+const promptId = ${JSON.stringify(id)};
+function done(){ window.deskCat.invoke('permission_prompt_result', { id: promptId, accepted: true }); }
+document.getElementById('ok').addEventListener('click', done);
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' || event.key === 'Enter') done();
 });
 document.getElementById('ok').focus();
 </script>
@@ -3752,6 +3931,7 @@ const handlers = {
   read_system_knowledge_schedule_info: readSystemKnowledgeScheduleInfo,
   request_system_knowledge_permissions: requestSystemKnowledgePermissions,
   show_permission_prompt_overlay: (args, event) => showPermissionPromptOverlay(args, event),
+  show_welcome_permission_prompt: (_args, event) => showWelcomePermissionPrompt(event),
   permission_prompt_result: resolvePermissionPromptResult,
   transcribe_audio: transcribeAudio,
   synthesize_speech: synthesizeSpeech,

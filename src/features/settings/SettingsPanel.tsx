@@ -981,7 +981,7 @@ function TimelineSection({
         : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
           ? rawDelta * node.clientHeight
           : rawDelta;
-      const nextScale = clampNumber(currentScale * Math.exp(-zoomDelta * 0.004), 1, 8);
+      const nextScale = clampNumber(currentScale * Math.exp(-zoomDelta * 0.008), 1, 8);
       if (Math.abs(nextScale - currentScale) < 0.001) return;
 
       const anchorProgress = clampNumber((node.scrollLeft + pointerX) / currentWidth, 0, 1);

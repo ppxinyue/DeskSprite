@@ -31,6 +31,7 @@ const CODING_SAVED_MESSAGES_KEY = "deskcat:coding-saved-message-ids";
 const CODING_SESSION_ORDER_KEY = "deskcat:coding-session-order";
 const TIMELINE_RECORDER_STATE_KEY = "deskcat:timeline-recorder-state";
 const ACCESSIBILITY_PERMISSION_REQUESTED_KEY = "deskcat:accessibility-permission-requested";
+const WELCOME_PERMISSION_PROMPT_KEY = "deskcat:welcome-permissions-v1";
 const SCREEN_MARGIN = 16;
 const PET_CONTENT_MARGIN = 20;
 const MIN_DIALOG_WIDTH = 200;
@@ -222,6 +223,20 @@ function App() {
     window.addEventListener('beforeunload', flush);
     return () => {
       window.removeEventListener('beforeunload', flush);
+    };
+  }, [loaded, windowLabel]);
+
+  useEffect(() => {
+    if (!loaded || windowLabel !== 'pet') return;
+    if (localStorage.getItem(WELCOME_PERMISSION_PROMPT_KEY) === '1') return;
+    let cancelled = false;
+    invoke('show_welcome_permission_prompt')
+      .catch(() => true)
+      .then(() => {
+        if (!cancelled) localStorage.setItem(WELCOME_PERMISSION_PROMPT_KEY, '1');
+      });
+    return () => {
+      cancelled = true;
     };
   }, [loaded, windowLabel]);
 
