@@ -2000,3 +2000,11 @@
 - 收起：compact 收起后的防重入窗口从 800ms 延长到 1500ms；隐藏窗口期间 show/position/resize 继续 no-op，降低输入框 blur 和布局更新把窗口刷回来的概率。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false`、`pnpm test:startup`、`pnpm test:timeline`、`git diff --check` 通过。
 - 文件：main.cjs, ISSUES.md, PROGRESS.md
+
+### R263. 权限弹窗与拒权反馈（2026-05-15）
+- 权限弹窗：新增 main 进程 overlay 承载自定义权限说明，弹窗宽度校准为 336px，按钮固定在底部；中英文文案保持简短，并统一“云端备份均作加密处理”的隐私说明。
+- 全屏：权限 overlay 使用当前显示器 bounds、All Spaces / full-screen auxiliary 和 `showInactive()` 展示，避免全屏场景下因为窗口激活切到非全屏桌面。
+- 图标：权限弹窗优先使用用户当前灵宠状态的第一张图片；图片路径无效时回退到当前 app 图标。
+- 拒权：系统知识库在位置、日历或提醒事项授权被拒绝时抛出明确错误，chat/compact chat 直接显示红色小字“无法获取…授权，请在设置中开启。”，不再继续进入模型流。
+- 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false` 通过。
+- 文件：main.cjs, permissionPrompt.ts, systemKnowledge.ts, ChatDialog.tsx, HoverInputBar.tsx, ChatPrimitives.tsx, chatStore.ts, ISSUES.md, PROGRESS.md

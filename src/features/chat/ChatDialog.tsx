@@ -11,7 +11,7 @@ import { streamChat } from '@/features/ai/aiService';
 import { BUILTIN_CLOSEAI_CONFIG, recordBuiltinUsage, resolveChatConfig, resolveStoredChatConfig } from '@/features/ai/defaultModel';
 import { getProviderName } from '@/features/ai/providers';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
-import { shouldQuerySystemKnowledge, withSystemKnowledge } from '@/features/ai/systemKnowledge';
+import { isSystemKnowledgePermissionError, shouldQuerySystemKnowledge, withSystemKnowledge } from '@/features/ai/systemKnowledge';
 import { showPermissionPrompt } from '@/lib/permissionPrompt';
 import {
   speakWithCloudVoice,
@@ -253,6 +253,21 @@ export function ChatDialog({
         speakAssistantText(fullContent, settings);
       }
     } catch (e) {
+      if (isSystemKnowledgePermissionError(e)) {
+        updateLastAssistant(e.message);
+        useChatStore.setState((state) => {
+          const msgs = [...state.messages];
+          for (let i = msgs.length - 1; i >= 0; i--) {
+            if (msgs[i].role === 'assistant') {
+              msgs[i] = { ...msgs[i], tone: 'error' };
+              break;
+            }
+          }
+          return { messages: msgs };
+        });
+        if (convoId) await insertMessage(convoId, 'assistant', e.message);
+        return;
+      }
       const errMsg = e instanceof Error ? e.message : String(e);
       updateLastAssistant(`出错了：${errMsg}`);
     } finally {
@@ -677,6 +692,15 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
         speakAssistantText(fullContent, settings);
       }
     } catch (e) {
+      if (isSystemKnowledgePermissionError(e)) {
+        updatePanel(panelId, (current) => ({
+          ...current,
+          isStreaming: false,
+          messages: replaceLastAssistant(current.messages, e.message, 'error'),
+        }));
+        if (convoId) await insertMessage(convoId, 'assistant', e.message);
+        return;
+      }
       const errMsg = e instanceof Error ? e.message : String(e);
       updatePanel(panelId, (current) => ({
         ...current,
@@ -837,11 +861,11 @@ function formatConversationTime(value: string) {
   }).format(date);
 }
 
-function replaceLastAssistant(messages: ChatMessage[], content: string) {
+function replaceLastAssistant(messages: ChatMessage[], content: string, tone?: ChatMessage['tone']) {
   const next = [...messages];
   for (let i = next.length - 1; i >= 0; i--) {
     if (next[i].role === 'assistant') {
-      next[i] = { ...next[i], content };
+      next[i] = { ...next[i], content, tone };
       break;
     }
   }

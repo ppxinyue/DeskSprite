@@ -7,7 +7,7 @@ import { usePetStore } from '@/features/pet/petStore';
 import { streamChat } from '@/features/ai/aiService';
 import { recordBuiltinUsage, resolveChatConfig } from '@/features/ai/defaultModel';
 import { getActiveSystemPrompt } from '@/features/ai/systemPrompt';
-import { shouldQuerySystemKnowledge, withSystemKnowledge } from '@/features/ai/systemKnowledge';
+import { isSystemKnowledgePermissionError, shouldQuerySystemKnowledge, withSystemKnowledge } from '@/features/ai/systemKnowledge';
 import { getConversations, createConversation, insertMessage } from '@/lib/db';
 import { shouldSubmitMessage } from './sendShortcut';
 
@@ -89,6 +89,11 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
       if (convoId) await insertMessage(convoId, 'assistant', fullContent);
       if (resolved.usingBuiltin) await recordBuiltinUsage(chatMessages, fullContent);
     } catch (e) {
+      if (isSystemKnowledgePermissionError(e)) {
+        addMessage(createMessage('assistant', e.message, { tone: 'error' }));
+        setPetState('idle');
+        return;
+      }
       const errMsg = e instanceof Error ? e.message : String(e);
       addMessage(createMessage('assistant', `出错了：${errMsg}`));
       setPetState('idle');

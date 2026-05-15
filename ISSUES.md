@@ -3203,3 +3203,15 @@
 - 涉及文件：`electron/main.cjs`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：IME 输入态必须被当作一个稳定窗口层级区间，期间不能让 resize/position/topmost guard 反复进入普通置顶路径。
 - 是否需更新技术文档：否。
+
+## ISSUE-269
+- 发现时间：2026-05-15
+- 发现者：用户反馈
+- 相关任务：权限弹窗全屏可见性与拒权反馈
+- 严重程度：中等
+- 问题现象：用户在全屏应用中触发授权时，权限说明弹窗可能显示到非全屏桌面，用户第一时间看不到；弹窗顶部图标仍可能显示 Electron 默认图标；用户拒绝授权后，chat 仍可能继续模型流程，无法用明显样式告知功能不可用。
+- 原因分析：权限说明使用独立 BrowserWindow 时，如果展示阶段触发普通 focus/show，macOS 可能切换到该窗口所属 Space；灵宠图标路径解析只覆盖部分内置路径，当前灵宠首帧无效时没有明确兜底；系统知识库只把拒权写进上下文或返回空结果，缺少“拒权即前端错误态”的短路信号。
+- 解决方案：权限 overlay 改为全屏辅助浮层并使用 `showInactive()`，避免激活切换 Space；弹窗 icon 优先使用当前灵宠状态第一张图片，失败时回退 app icon；系统知识库新增 `SystemKnowledgePermissionError`，chat 和 compact chat 捕获后直接显示红色小字提示用户去设置中开启授权。
+- 涉及文件：`electron/main.cjs`, `src/lib/permissionPrompt.ts`, `src/features/ai/systemKnowledge.ts`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `src/features/chat/ChatPrimitives.tsx`, `src/features/chat/chatStore.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：权限说明弹窗在全屏 Space 中要避免普通窗口激活；权限拒绝应作为 UI 可识别的产品状态处理，而不是交给模型从系统上下文里推断。
+- 是否需更新技术文档：否。

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { DEFAULT_MEDIA_CONFIG, getPetFrameSources } from '@/features/pet/animations';
+import { DEFAULT_MEDIA_CONFIG } from '@/features/pet/animations';
 import { usePetStore } from '@/features/pet/petStore';
 
 let activePrompt: Promise<boolean> | null = null;
@@ -16,7 +16,13 @@ function getCurrentPetIconPath() {
   const { petState, mediaConfig, userFrames, userGifs } = usePetStore.getState();
   const state = petState || 'idle';
   const config = mediaConfig[state] ?? DEFAULT_MEDIA_CONFIG[state] ?? DEFAULT_MEDIA_CONFIG.idle;
-  return getPetFrameSources(config, userFrames[state], userGifs[state])[0] ?? DEFAULT_MEDIA_CONFIG.idle.defaultAssets[0];
+  return userFrames[state]?.[0]
+    ?? config.userFrames?.[0]
+    ?? config.defaultAssets?.[0]
+    ?? userGifs[state]?.[0]
+    ?? config.userGifs?.[0]
+    ?? config.defaultGifAssets?.[0]
+    ?? DEFAULT_MEDIA_CONFIG.idle.defaultAssets[0];
 }
 
 export function showPermissionPrompt({

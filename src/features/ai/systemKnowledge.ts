@@ -62,7 +62,19 @@ const SCHEDULE_TRIGGER = /(日历|日程|待办|提醒|会议|安排|calendar|sc
 
 let weatherCache: { key: string; value: WeatherKnowledge; expiresAt: number } | null = null;
 let schedulePermissionRequestedInChat = false;
+let schedulePermissionDeniedInChat = false;
 let locationPermissionExplained = false;
+
+export class SystemKnowledgePermissionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SystemKnowledgePermissionError';
+  }
+}
+
+export function isSystemKnowledgePermissionError(error: unknown): error is SystemKnowledgePermissionError {
+  return error instanceof SystemKnowledgePermissionError;
+}
 
 export function shouldQuerySystemKnowledge(
   messages: Message[],
@@ -158,14 +170,21 @@ async function readScheduleKnowledge(): Promise<ScheduleKnowledge | null> {
 }
 
 async function requestScheduleKnowledgePermissionsFromChat(): Promise<void> {
+  if (schedulePermissionDeniedInChat) {
+    throw new SystemKnowledgePermissionError('无法获取日历或提醒事项授权，请在设置中开启。');
+  }
   if (schedulePermissionRequestedInChat) return;
   schedulePermissionRequestedInChat = true;
   await setCurrentPetAsAppIcon();
   try {
-    await invoke('request_system_knowledge_permissions');
+    const result = await invoke<{ ok?: boolean }>('request_system_knowledge_permissions');
+    if (result && result.ok === false) {
+      schedulePermissionDeniedInChat = true;
+      throw new SystemKnowledgePermissionError('无法获取日历或提醒事项授权，请在设置中开启。');
+    }
   } catch {
-    // Continue with the normal read path so the model can explain the specific
-    // unavailable source instead of failing the whole chat request.
+    schedulePermissionDeniedInChat = true;
+    throw new SystemKnowledgePermissionError('无法获取日历或提醒事项授权，请在设置中开启。');
   }
 }
 
@@ -299,17 +318,23 @@ async function getBrowserPosition(): Promise<{ latitude: number; longitude: numb
         feature: '用于查询你所在位置的天气、温度、降雨和风况。',
         featureEn: 'Used for local weather, temperature, rain, and wind answers.',
       });
-      if (!accepted) return Promise.resolve(null);
+      if (!accepted) throw new SystemKnowledgePermissionError('无法获取位置授权，请在设置中开启。');
     }
   }
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
       (position) => resolve({
         latitude: Number(position.coords.latitude.toFixed(4)),
         longitude: Number(position.coords.longitude.toFixed(4)),
         source: 'browser-location',
       }),
-      () => resolve(null),
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          reject(new SystemKnowledgePermissionError('无法获取位置授权，请在设置中开启。'));
+          return;
+        }
+        resolve(null);
+      },
       { maximumAge: 30 * 60_000, timeout: 1800, enableHighAccuracy: false },
     );
   });

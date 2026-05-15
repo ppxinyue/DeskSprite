@@ -209,8 +209,9 @@ export function MessageBubble({
 }) {
   const isUser = message.role === 'user';
   const isPending = message.role === 'assistant' && message.content === '...';
+  const isError = message.tone === 'error';
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const canSpeak = !isPending && Boolean(message.content) && !isUser;
+  const canSpeak = !isPending && Boolean(message.content) && !isUser && !isError;
   const canCopy = !isPending && Boolean(message.content);
 
   const handleSpeak = () => {
@@ -232,16 +233,18 @@ export function MessageBubble({
   return (
     <div className={`group flex w-full min-w-0 max-w-full flex-col overflow-x-hidden animate-[chatFadeIn_150ms_ease-out] ${isUser ? 'items-end' : 'items-start'}`}>
       <div
-        className={`relative min-w-0 max-w-full overflow-hidden border leading-[1.55] text-[var(--color-chat-text)] transition-all duration-200 [overflow-wrap:anywhere] ${
+        className={`relative min-w-0 max-w-full overflow-hidden border leading-[1.55] ${isError ? 'text-destructive' : 'text-[var(--color-chat-text)]'} transition-all duration-200 [overflow-wrap:anywhere] ${
           compact ? 'rounded-[7px] px-2.5 py-1.5' : 'rounded-[9px] px-3 py-2 text-[14px] leading-[1.55]'
         } ${
           fullWidth ? 'max-w-full' : 'max-w-[84%]'
         } ${
-          isUser
+          isError
+            ? 'border-transparent bg-transparent text-left shadow-none'
+            : isUser
             ? 'chat-surface-fill border-[var(--color-chat-bubble-border)] bg-[var(--surface-flat)] text-right shadow-[0_1px_0_rgba(255,255,255,0.55)_inset]'
             : (compact || bubble) ? 'chat-surface-fill border-[var(--color-chat-bubble-border)] bg-[var(--surface-flat)] text-left shadow-[0_1px_0_rgba(255,255,255,0.45)_inset]' : 'border-transparent bg-transparent text-left shadow-none'
         }`}
-        style={{ fontSize: compact ? compactFontSize : undefined }}
+        style={{ fontSize: isError ? 11 : compact ? compactFontSize : undefined }}
       >
         {(message.imageDataUrl || message.imageUrl) && (
           <img src={message.imageDataUrl || message.imageUrl} alt="" className="mb-2 max-h-48 rounded-[8px] object-contain" />

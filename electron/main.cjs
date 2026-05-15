@@ -376,7 +376,10 @@ function resolveAppIconPath(iconPath) {
   if (iconPath.startsWith('assets/')) {
     return path.join(app.getAppPath(), 'public', iconPath);
   }
-  return iconPath;
+  if (path.isAbsolute(iconPath)) return iconPath;
+  const publicPath = path.join(app.getAppPath(), 'public', iconPath.replace(/^\/+/, ''));
+  if (fs.existsSync(publicPath)) return publicPath;
+  return path.resolve(app.getAppPath(), iconPath);
 }
 
 function setAppIcon(iconPath) {
@@ -1678,13 +1681,15 @@ function showPermissionPromptOverlay(args = {}, event) {
     const parent = event?.sender ? BrowserWindow.fromWebContents(event.sender) : windows.get('pet');
     const parentBounds = parent && !parent.isDestroyed() ? parent.getBounds() : screen.getPrimaryDisplay().bounds;
     const display = screen.getDisplayMatching(parentBounds);
-    const work = display.workArea;
+    const work = display.bounds;
     const id = randomUUID();
+    const owner = parent && !parent.isDestroyed() ? parent : undefined;
     const win = new BrowserWindow({
       x: work.x,
       y: work.y,
       width: work.width,
       height: work.height,
+      parent: owner,
       show: false,
       frame: false,
       transparent: true,
@@ -1708,11 +1713,19 @@ function showPermissionPromptOverlay(args = {}, event) {
     win.once('closed', () => finish(false));
     win.once('ready-to-show', () => {
       applyFloatingFullscreenBehavior(win, { force: true });
-      win.show();
-      win.focus();
+      if (process.platform === 'darwin') {
+        win.setVisibleOnAllWorkspaces(true, {
+          visibleOnFullScreen: true,
+          skipTransformProcessType: true,
+        });
+        win.setAlwaysOnTop(true, 'screen-saver', 3);
+      }
+      win.showInactive();
+      win.moveTop();
     });
 
-    const iconPath = resolveAppIconPath(args.iconPath);
+    const requestedIconPath = resolveAppIconPath(args.iconPath);
+    const iconPath = fs.existsSync(requestedIconPath) ? requestedIconPath : currentAppIconPath;
     const iconSrc = fs.existsSync(iconPath) ? `deskcat-file:///${encodeURIComponent(iconPath)}` : '';
     const title = escapeHtml(args.title);
     const feature = escapeHtml(args.feature);
