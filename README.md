@@ -2,7 +2,7 @@
   <img src="public/assets/idle/png/idle.png" alt="cat15" width="180" />
 </p>
 
-<h1 align="center">cat15 猫十五</h1>
+<h1 align="center">DeskCat 猫十五</h1>
 
 <p align="center">
   An AI desktop companion for chat, focus, Timeline tracking, and coding workflows.
@@ -32,7 +32,7 @@
 
 ## English
 
-cat15 is an Electron desktop app. It lives on your screen as either a pet or an orb and provides AI chat, focus reminders, Timeline tracking, coding mode, and personal analytics. It is designed to be local-first, low-interruption, customizable, and visually close to a lightweight macOS glass interface.
+DeskCat is an Electron desktop app. It lives on your screen as either a pet or an orb and provides AI chat, focus reminders, Timeline tracking, coding mode, and personal analytics. It is designed to be local-first, low-interruption, customizable, and visually close to a lightweight macOS glass interface.
 
 ## Features
 
@@ -245,7 +245,7 @@ pnpm lint           # ESLint
 
 ## 中文
 
-cat15 猫十五是一个 Electron 桌面应用。它可以以灵宠或悬浮球的形式停在屏幕上，提供 AI 对话、专注提醒、Timeline 记录、Coding 模式和个人统计。它的设计目标是本地优先、低打扰、可定制，并尽量贴近 macOS 的轻量玻璃质感。
+DeskCat 猫十五是一个 Electron 桌面应用。它可以以灵宠或悬浮球的形式停在屏幕上，提供 AI 对话、专注提醒、Timeline 记录、Coding 模式和个人统计。它的设计目标是本地优先、低打扰、可定制，并尽量贴近 macOS 的轻量玻璃质感。
 
 ## 功能
 
