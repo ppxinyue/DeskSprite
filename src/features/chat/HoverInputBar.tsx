@@ -42,7 +42,7 @@ export function HoverInputBar({ petName, dialogWidth, onExpand }: HoverInputBarP
     const defaultConfig = settings.chatModelMode === 'custom' ? getDefaultConfig() : undefined;
     const resolved = await resolveChatConfig(defaultConfig);
     if (!resolved.config) {
-      addMessage(createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。'));
+      addMessage(createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。', { tone: 'error' }));
       return;
     }
     const apiConfig = resolved.config;

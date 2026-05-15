@@ -5,6 +5,7 @@ import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
 
 const BUILTIN_USAGE_KEY = 'builtinCloseAiTokenUsage';
 export const BUILTIN_TOKEN_LIMIT = 100_000;
+export const BUILTIN_QUOTA_EXHAUSTED_MESSAGE = '内置额度已用完，请配置个人 API。';
 
 export const BUILTIN_CLOSEAI_CONFIG: ApiConfig = {
   id: -1,
@@ -26,7 +27,7 @@ export async function resolveChatConfig(defaultConfig: StoredApiConfig | undefin
       return {
         config: null,
         usingBuiltin: true,
-        error: '内置默认模型额度已用完，请在设置中配置自己的 API Key。',
+        error: BUILTIN_QUOTA_EXHAUSTED_MESSAGE,
       };
     }
     return { config: BUILTIN_CLOSEAI_CONFIG, usingBuiltin: true };

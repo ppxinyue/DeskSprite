@@ -17,6 +17,7 @@ import {
   speakWithCloudVoice,
   startAudioLevelMonitor,
   transcribeWithCloudVoice,
+  BUILTIN_STT_FALLBACK_MESSAGE,
   type VoiceInputPhase,
 } from '@/features/voice/voiceService';
 import type { ApiConfig } from '@/features/ai/types';
@@ -183,7 +184,7 @@ export function ChatDialog({
     const defaultConfig = settings.chatModelMode === 'custom' ? getDefaultConfig() : undefined;
     const resolved = await resolveChatConfig(defaultConfig);
     if (!resolved.config) {
-      addMessage(createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。'));
+      addMessage(createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。', { tone: 'error' }));
       return;
     }
     const apiConfig = resolved.config;
@@ -594,7 +595,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
     return modelConfig
       ? { ...(await resolveStoredChatConfig(modelConfig)), usingBuiltin: false }
       : modelId === 'builtin'
-        ? { config: BUILTIN_CLOSEAI_CONFIG, usingBuiltin: true }
+        ? await resolveChatConfig(undefined)
         : await resolveChatConfig(defaultConfig);
   }
 
@@ -609,7 +610,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
     if (!resolved.config) {
       updatePanel(panelId, (current) => ({
         ...current,
-        messages: [...current.messages, createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。')],
+        messages: [...current.messages, createMessage('assistant', resolved.error ?? '请先在设置中配置 API Key。', { tone: 'error' })],
       }));
       return;
     }
@@ -952,7 +953,7 @@ async function startSpeechInput(
       console.warn('Cloud speech recognition failed, falling back to system speech:', e);
       finish();
       if (providerMode === 'cloud-auto') {
-        window.alert('内置语音输入额度已用完或云端识别暂不可用，已切换到系统语音输入。');
+        window.alert(BUILTIN_STT_FALLBACK_MESSAGE);
       } else if (providerMode === 'user-cloud') {
         window.alert('自定义 STT 未配置或暂不可用，已切换到系统语音输入。');
       }

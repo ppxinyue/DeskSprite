@@ -10,10 +10,11 @@ import { SettingsLayout } from '@/components/layouts/SettingsLayout';
 import { useSettingsStore, type AppLanguage, type AppSettings, type AvatarRenderMode, type CodingProvider, type ModelMode, type PetMotionName, type PetMotionSettings, type VoiceProviderMode } from '@/features/settings/settingsStore';
 import { useApiConfigStore, type ApiConfig } from '@/features/settings/apiConfigStore';
 import { usePetStore } from '@/features/pet/petStore';
-import { BUILTIN_CLOSEAI_CONFIG, getBuiltinUsageStats } from '@/features/ai/defaultModel';
+import { BUILTIN_CLOSEAI_CONFIG, BUILTIN_QUOTA_EXHAUSTED_MESSAGE, BUILTIN_TOKEN_LIMIT, getBuiltinUsageStats } from '@/features/ai/defaultModel';
+import { clearSystemKnowledgePermissionCache } from '@/features/ai/systemKnowledge';
 import { DEFAULT_SYSTEM_PROMPT, ORB_SYSTEM_PROMPT, normalizeOrbSystemPrompt, normalizeSystemPrompt } from '@/features/ai/systemPrompt';
 import { PROVIDER_PRESETS, getProviderName } from '@/features/ai/providers';
-import { BUILTIN_STT_MODEL, BUILTIN_TTS_MODEL, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
+import { BUILTIN_STT_MODEL, BUILTIN_TTS_CHARS_LIMIT, BUILTIN_TTS_MODEL, BUILTIN_STT_SECONDS_LIMIT, getBuiltinVoiceUsageStats } from '@/features/voice/voiceService';
 import { describeApiKey, resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getConversations, getFocusStatsDays, getMessages, getSetting, getSystemPrompt, getTimelineEntries, setSetting, updateSystemPrompt, type FocusStatsDay, type TimelineCategory, type TimelineEntry } from '@/lib/db';
 import { trackFeatureUse } from '@/lib/telemetry';
@@ -2895,6 +2896,11 @@ function AISection({
   });
   const [systemPromptEditing, setSystemPromptEditing] = useState(false);
   const defaultConfig = configs.find((config) => config.isDefault) ?? configs[0] ?? null;
+  const builtinQuotaExhausted = Boolean(builtinUsage && (
+    builtinUsage.chat.used >= builtinUsage.chat.limit ||
+    builtinUsage.voice.stt.used >= builtinUsage.voice.stt.limit ||
+    builtinUsage.voice.tts.used >= builtinUsage.voice.tts.limit
+  ));
 
   const requestSystemKnowledgePermissions = async () => {
     setSystemKnowledgeCheck({ checking: true, message: '正在请求系统权限...', ok: null });
@@ -2902,11 +2908,12 @@ function AISection({
       ok: boolean;
       calendar?: { ok: boolean; message: string };
       reminders?: { ok: boolean; message: string };
-    }>('request_system_knowledge_permissions').catch((error) => ({
+    }>('request_system_knowledge_permissions', { calendar: true, reminders: true }).catch((error) => ({
       ok: false,
       calendar: { ok: false, message: error instanceof Error ? error.message : String(error) },
       reminders: { ok: false, message: '' },
     }));
+    if (result.ok) clearSystemKnowledgePermissionCache();
     const failed = [
       result.calendar && !result.calendar.ok ? `日历：${result.calendar.message}` : '',
       result.reminders && !result.reminders.ok ? `提醒事项：${result.reminders.message}` : '',
@@ -3072,10 +3079,15 @@ function AISection({
                 <div>{BUILTIN_CLOSEAI_CONFIG.baseUrl}</div>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <UsageMeter label="Chat" value={builtinUsage?.chat.percent ?? 0} detail={`${formatCompactNumber(builtinUsage?.chat.used ?? 0)} / ${formatCompactNumber(builtinUsage?.chat.limit ?? 100000)} token`} />
-                <UsageMeter label="STT" value={builtinUsage?.voice.stt.percent ?? 0} detail={`${formatDurationSeconds(builtinUsage?.voice.stt.used ?? 0)} / ${formatDurationSeconds(builtinUsage?.voice.stt.limit ?? 3600)}`} />
-                <UsageMeter label="TTS" value={builtinUsage?.voice.tts.percent ?? 0} detail={`${formatCompactNumber(builtinUsage?.voice.tts.used ?? 0)} / ${formatCompactNumber(builtinUsage?.voice.tts.limit ?? 100000)} 字符`} />
+                <UsageMeter label="Chat" value={builtinUsage?.chat.percent ?? 0} detail={`${formatCompactNumber(builtinUsage?.chat.used ?? 0)} / ${formatCompactNumber(builtinUsage?.chat.limit ?? BUILTIN_TOKEN_LIMIT)} token`} />
+                <UsageMeter label="STT" value={builtinUsage?.voice.stt.percent ?? 0} detail={`${formatDurationSeconds(builtinUsage?.voice.stt.used ?? 0)} / ${formatDurationSeconds(builtinUsage?.voice.stt.limit ?? BUILTIN_STT_SECONDS_LIMIT)}`} />
+                <UsageMeter label="TTS" value={builtinUsage?.voice.tts.percent ?? 0} detail={`${formatCompactNumber(builtinUsage?.voice.tts.used ?? 0)} / ${formatCompactNumber(builtinUsage?.voice.tts.limit ?? BUILTIN_TTS_CHARS_LIMIT)} 字符`} />
               </div>
+              {builtinQuotaExhausted && (
+                <div className="mt-3 rounded-[10px] border border-destructive/25 bg-destructive/5 px-3 py-2 text-[12px] leading-5 text-destructive">
+                  {BUILTIN_QUOTA_EXHAUSTED_MESSAGE}
+                </div>
+              )}
             </div>
           </SettingsGroup>
         </>

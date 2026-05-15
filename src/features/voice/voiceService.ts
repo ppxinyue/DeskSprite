@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { BUILTIN_QUOTA_EXHAUSTED_MESSAGE } from '@/features/ai/defaultModel';
 import { getSetting, setSetting } from '@/lib/db';
 import type { AppSettings, VoiceProviderMode } from '@/features/settings/settingsStore';
 
@@ -9,8 +10,10 @@ export const BUILTIN_STT_MODEL = 'gpt-4o-mini-transcribe';
 const BUILTIN_STT_USAGE_KEY = 'builtinCloseAiSttSecondsUsage';
 const BUILTIN_TTS_USAGE_KEY = 'builtinCloseAiTtsCharsUsage';
 
-export const BUILTIN_STT_SECONDS_LIMIT = 3_600;
-export const BUILTIN_TTS_CHARS_LIMIT = 100_000;
+export const BUILTIN_STT_SECONDS_LIMIT = 15 * 60;
+export const BUILTIN_TTS_CHARS_LIMIT = 1_000;
+export const BUILTIN_STT_FALLBACK_MESSAGE = `${BUILTIN_QUOTA_EXHAUSTED_MESSAGE} 已切换到系统语音输入。`;
+export const BUILTIN_TTS_FALLBACK_MESSAGE = `${BUILTIN_QUOTA_EXHAUSTED_MESSAGE} 已切换到系统朗读。`;
 
 interface VoiceCloudConfig {
   baseUrl: string;
@@ -120,6 +123,7 @@ export async function speakWithCloudVoice(text: string, mode: VoiceProviderMode,
   const config = await resolveVoiceCloudConfig('tts', mode, settings);
   if (!config) return false;
   if (config.usingBuiltin && (await getBuiltinTtsUsage()) + cleanText.length > BUILTIN_TTS_CHARS_LIMIT) {
+    window.alert(BUILTIN_TTS_FALLBACK_MESSAGE);
     return false;
   }
 
