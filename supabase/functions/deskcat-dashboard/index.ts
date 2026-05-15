@@ -38,6 +38,85 @@ type DailyDeviceUsageMetric = {
   raw_duration_ms?: number;
 };
 
+type DailyDeviceFeatureMetric = {
+  metric_date: string;
+  device_id: string;
+  feature: string;
+  event_name: string;
+  event_count: number;
+  use_count: number;
+  duration_ms: number;
+  raw_duration_ms?: number;
+};
+
+type DeviceMetric = {
+  device_id: string;
+  platform: string | null;
+  app_version: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  metadata: Record<string, unknown> | null;
+};
+
+type DeviceBackupMetric = {
+  device_id: string;
+  backup_count: number;
+  first_backup_at: string | null;
+  last_backup_at: string | null;
+};
+
+type UserEventBuilder = {
+  eventName: string;
+  durationMs: number;
+  rawDurationMs: number;
+  useCount: number;
+  eventCount: number;
+};
+
+type UserFeatureBuilder = {
+  feature: string;
+  durationMs: number;
+  rawDurationMs: number;
+  useCount: number;
+  eventCount: number;
+  events: Map<string, UserEventBuilder>;
+};
+
+type UserDailyBuilder = {
+  metricDate: string;
+  durationMs: number;
+  rawDurationMs: number;
+  useCount: number;
+  eventCount: number;
+  firstEventAt: string;
+  lastEventAt: string;
+};
+
+type UserBuilder = {
+  deviceId: string;
+  platform: string | null;
+  appVersion: string | null;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+  metadata: Record<string, unknown> | null;
+  totals: {
+    durationMs: number;
+    rawDurationMs: number;
+    useCount: number;
+    eventCount: number;
+    activeDays: number;
+    backups: number;
+  };
+  backup: {
+    count: number;
+    firstBackupAt: string | null;
+    lastBackupAt: string | null;
+  };
+  daily: UserDailyBuilder[];
+  features: Map<string, UserFeatureBuilder>;
+  recentEvents: RecentEvent[];
+};
+
 type DailyDownloadMetric = {
   metric_date: string;
   source: string;
@@ -216,6 +295,164 @@ function aggregateDeviceUsage(rows: DailyDeviceUsageMetric[]) {
     );
 }
 
+function buildUsers(
+  devices: DeviceMetric[],
+  usageRows: DailyDeviceUsageMetric[],
+  featureRows: DailyDeviceFeatureMetric[],
+  backupRows: DeviceBackupMetric[],
+  recentRows: RecentEvent[],
+) {
+  const byDevice = new Map<string, UserBuilder>();
+
+  function ensure(deviceId: string) {
+    const existing = byDevice.get(deviceId);
+    if (existing) return existing;
+    const user: UserBuilder = {
+      deviceId,
+      platform: null,
+      appVersion: null,
+      firstSeenAt: null,
+      lastSeenAt: null,
+      metadata: null,
+      totals: {
+        durationMs: 0,
+        rawDurationMs: 0,
+        useCount: 0,
+        eventCount: 0,
+        activeDays: 0,
+        backups: 0,
+      },
+      backup: {
+        count: 0,
+        firstBackupAt: null,
+        lastBackupAt: null,
+      },
+      daily: [],
+      features: new Map(),
+      recentEvents: [],
+    };
+    byDevice.set(deviceId, user);
+    return user;
+  }
+
+  for (const device of devices) {
+    const user = ensure(device.device_id);
+    user.platform = device.platform;
+    user.appVersion = device.app_version;
+    user.firstSeenAt = device.first_seen_at;
+    user.lastSeenAt = device.last_seen_at;
+    user.metadata = device.metadata ?? null;
+  }
+
+  for (const row of usageRows) {
+    const user = ensure(row.device_id);
+    const durationMs = Number(row.duration_ms ?? 0);
+    const rawDurationMs = Number(row.raw_duration_ms ?? row.duration_ms ?? 0);
+    const useCount = Number(row.use_count ?? 0);
+    const eventCount = Number(row.event_count ?? 0);
+    user.totals.durationMs += durationMs;
+    user.totals.rawDurationMs += rawDurationMs;
+    user.totals.useCount += useCount;
+    user.totals.eventCount += eventCount;
+    user.daily.push({
+      metricDate: row.metric_date,
+      durationMs,
+      rawDurationMs,
+      useCount,
+      eventCount,
+      firstEventAt: row.first_event_at,
+      lastEventAt: row.last_event_at,
+    });
+  }
+
+  for (const row of featureRows) {
+    const user = ensure(row.device_id);
+    const feature = user.features.get(row.feature) ?? {
+      feature: row.feature,
+      durationMs: 0,
+      rawDurationMs: 0,
+      useCount: 0,
+      eventCount: 0,
+      events: new Map(),
+    };
+    const durationMs = Number(row.duration_ms ?? 0);
+    const rawDurationMs = Number(row.raw_duration_ms ?? row.duration_ms ?? 0);
+    const useCount = Number(row.use_count ?? 0);
+    const eventCount = Number(row.event_count ?? 0);
+    feature.durationMs += durationMs;
+    feature.rawDurationMs += rawDurationMs;
+    feature.useCount += useCount;
+    feature.eventCount += eventCount;
+
+    const event = feature.events.get(row.event_name) ?? {
+      eventName: row.event_name,
+      durationMs: 0,
+      rawDurationMs: 0,
+      useCount: 0,
+      eventCount: 0,
+    };
+    event.durationMs += durationMs;
+    event.rawDurationMs += rawDurationMs;
+    event.useCount += useCount;
+    event.eventCount += eventCount;
+    feature.events.set(row.event_name, event);
+    user.features.set(row.feature, feature);
+  }
+
+  for (const row of backupRows) {
+    const user = ensure(row.device_id);
+    user.backup = {
+      count: Number(row.backup_count ?? 0),
+      firstBackupAt: row.first_backup_at,
+      lastBackupAt: row.last_backup_at,
+    };
+    user.totals.backups = Number(row.backup_count ?? 0);
+  }
+
+  for (const event of recentRows) {
+    const user = ensure(event.device_id);
+    user.recentEvents.push(event);
+  }
+
+  return Array.from(byDevice.values())
+    .map((user) => {
+      const daily = user.daily
+        .sort((a, b) => String(b.metricDate).localeCompare(String(a.metricDate)));
+      const features = Array.from(user.features.values())
+        .map((feature) => ({
+          feature: feature.feature,
+          durationMs: feature.durationMs,
+          rawDurationMs: feature.rawDurationMs,
+          useCount: feature.useCount,
+          eventCount: feature.eventCount,
+          events: Array.from(feature.events.values())
+            .sort((a, b) => b.durationMs - a.durationMs || b.useCount - a.useCount),
+        }))
+        .sort((a, b) => b.durationMs - a.durationMs || b.useCount - a.useCount);
+      return {
+        deviceId: user.deviceId,
+        platform: user.platform,
+        appVersion: user.appVersion,
+        firstSeenAt: user.firstSeenAt,
+        lastSeenAt: user.lastSeenAt,
+        metadata: user.metadata,
+        totals: {
+          ...user.totals,
+          activeDays: daily.length,
+        },
+        backup: user.backup,
+        daily,
+        features,
+        recentEvents: user.recentEvents.slice(0, 20),
+      };
+    })
+    .sort((a, b) =>
+      b.totals.durationMs - a.totals.durationMs ||
+      String(b.lastSeenAt ?? '').localeCompare(String(a.lastSeenAt ?? '')) ||
+      String(a.deviceId).localeCompare(String(b.deviceId))
+    );
+}
+
 function aggregateProductDownloads(rows: DailyDownloadMetric[]) {
   const byAsset = new Map<string, number>();
   for (const row of rows) {
@@ -353,6 +590,8 @@ Deno.serve(async (req) => {
       featureDaily,
       featureUsersDaily,
       deviceUsageDaily,
+      deviceFeatureDaily,
+      deviceBackups,
       downloads,
       downloadsTotal,
       pageViews,
@@ -360,13 +599,15 @@ Deno.serve(async (req) => {
       publicStats,
       recent,
     ] = await Promise.all([
-      supabase.from('devices').select('device_id', { count: 'exact', head: true }),
+      supabase.from('devices').select('device_id,platform,app_version,first_seen_at,last_seen_at,metadata', { count: 'exact' }).order('last_seen_at', { ascending: false }),
       supabase.from('cloud_backups').select('id', { count: 'exact', head: true }),
       supabase.from('telemetry_events').select('id', { count: 'exact', head: true }),
       supabase.from('daily_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: true }),
       supabase.from('daily_feature_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
       supabase.from('daily_feature_user_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
       supabase.from('daily_device_usage_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }).order('duration_ms', { ascending: false }),
+      supabase.from('daily_device_feature_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }).order('duration_ms', { ascending: false }),
+      supabase.from('device_backup_metrics').select('*'),
       supabase.from('daily_download_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
       supabase.from('download_events').select('id', { count: 'exact', head: true }),
       supabase.from('daily_page_view_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
@@ -374,8 +615,9 @@ Deno.serve(async (req) => {
       getPublicStatsFallback().catch(() => null),
       supabase.from('telemetry_events')
         .select('device_id,event_name,feature,count,duration_ms,client_created_at,received_at')
+        .gte('received_at', `${startDate}T00:00:00.000Z`)
         .order('received_at', { ascending: false })
-        .limit(50),
+        .limit(1000),
     ]);
 
     for (const result of [
@@ -386,6 +628,8 @@ Deno.serve(async (req) => {
       featureDaily,
       featureUsersDaily,
       deviceUsageDaily,
+      deviceFeatureDaily,
+      deviceBackups,
       downloads,
       downloadsTotal,
       pageViews,
@@ -396,9 +640,12 @@ Deno.serve(async (req) => {
     }
 
     const dailyRows = (daily.data ?? []) as DailyMetric[];
+    const deviceRows = (devices.data ?? []) as DeviceMetric[];
     const featureRows = (featureDaily.data ?? []) as DailyFeatureMetric[];
     const featureUserRows = (featureUsersDaily.data ?? []) as DailyFeatureUserMetric[];
     const deviceUsageRows = (deviceUsageDaily.data ?? []) as DailyDeviceUsageMetric[];
+    const deviceFeatureRows = (deviceFeatureDaily.data ?? []) as DailyDeviceFeatureMetric[];
+    const deviceBackupRows = (deviceBackups.data ?? []) as DeviceBackupMetric[];
     const downloadRows = (downloads.data ?? []) as DailyDownloadMetric[];
     const pageViewRows = (pageViews.data ?? []) as DailyPageViewMetric[];
     const aggregates = aggregateFeatures(featureRows);
@@ -443,6 +690,13 @@ Deno.serve(async (req) => {
       featureUsage: aggregates.features,
       featureDailyUsers: aggregateFeatureUsers(featureUserRows).slice(0, 80),
       dailyUserUsage: aggregateDeviceUsage(deviceUsageRows).slice(0, 200),
+      users: buildUsers(
+        deviceRows,
+        deviceUsageRows,
+        deviceFeatureRows,
+        deviceBackupRows,
+        (recent.data ?? []) as RecentEvent[],
+      ),
       eventUsage: aggregates.events.slice(0, 40),
       downloads: {
         productSite: {

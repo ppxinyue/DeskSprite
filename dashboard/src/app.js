@@ -8,6 +8,9 @@ const dailySummaryEl = document.querySelector('#daily-summary');
 const featureListEl = document.querySelector('#feature-list');
 const featureUserTableEl = document.querySelector('#feature-user-table');
 const dailyUserUsageTableEl = document.querySelector('#daily-user-usage-table');
+const userListEl = document.querySelector('#user-list');
+const userDetailEl = document.querySelector('#user-detail');
+const usersSummaryEl = document.querySelector('#users-summary');
 const downloadListEl = document.querySelector('#download-list');
 const downloadSummaryEl = document.querySelector('#download-summary');
 const reachListEl = document.querySelector('#reach-list');
@@ -17,7 +20,10 @@ const recentListEl = document.querySelector('#recent-list');
 
 const storage = {
   days: 'deskcat-dashboard:days',
+  selectedUser: 'deskcat-dashboard:selected-user',
 };
+
+let selectedUserId = getStored(storage.selectedUser, '');
 
 function getStored(key, fallback = '') {
   return localStorage.getItem(key) || fallback;
@@ -41,11 +47,20 @@ function formatDuration(ms) {
 }
 
 function formatDate(value) {
+  if (!value) return '—';
   return new Date(value).toLocaleString('zh-CN', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+  });
+}
+
+function formatShortDate(value) {
+  if (!value) return '—';
+  return new Date(value).toLocaleDateString('zh-CN', {
+    month: 'short',
+    day: 'numeric',
   });
 }
 
@@ -159,6 +174,132 @@ function renderDailyUserUsage(data) {
       <td>${formatNumber(row.eventCount)}</td>
     </tr>
   `).join('');
+}
+
+function renderUserDetail(user) {
+  if (!user) {
+    userDetailEl.innerHTML = '<div class="empty">Select a user to inspect their metrics.</div>';
+    return;
+  }
+
+  const features = user.features || [];
+  const daily = user.daily || [];
+  const recent = user.recentEvents || [];
+  const maxFeature = Math.max(1, ...features.map((row) => Number(row.durationMs || row.useCount || 0)));
+
+  userDetailEl.innerHTML = `
+    <div class="user-detail-head">
+      <div>
+        <h3 title="${user.deviceId}">${shortDeviceId(user.deviceId)}</h3>
+        <p>${user.platform || 'unknown platform'} · ${user.appVersion || 'unknown version'}</p>
+      </div>
+      <div class="user-seen">
+        <span>First ${formatShortDate(user.firstSeenAt)}</span>
+        <span>Last ${formatShortDate(user.lastSeenAt)}</span>
+      </div>
+    </div>
+
+    <div class="user-metrics">
+      ${metric('Usage', formatDuration(user.totals?.durationMs), `raw ${formatDuration(user.totals?.rawDurationMs)}`)}
+      ${metric('Active Days', formatNumber(user.totals?.activeDays), 'selected range')}
+      ${metric('Uses', formatNumber(user.totals?.useCount), 'feature counts')}
+      ${metric('Events', formatNumber(user.totals?.eventCount), 'raw events')}
+      ${metric('Backups', formatNumber(user.totals?.backups), 'cloud snapshots')}
+    </div>
+
+    <div class="user-detail-grid">
+      <section>
+        <h4>Feature Breakdown</h4>
+        <div class="feature-list compact-list">
+          ${features.length ? features.slice(0, 8).map((row) => {
+            const value = Number(row.durationMs || row.useCount || 0);
+            const width = Math.max(3, (value / maxFeature) * 100);
+            return `
+              <div class="feature-row">
+                <div class="feature-top">
+                  <span class="feature-name">${row.feature}</span>
+                  <span>${formatDuration(row.durationMs)} · ${formatNumber(row.useCount)} uses</span>
+                </div>
+                <div class="feature-track"><div class="feature-fill" style="width:${width}%"></div></div>
+              </div>
+            `;
+          }).join('') : '<div class="empty">No feature metrics for this range.</div>'}
+        </div>
+      </section>
+
+      <section>
+        <h4>Daily Usage</h4>
+        <div class="table-wrap compact user-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Duration</th>
+                <th>Uses</th>
+                <th>Events</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${daily.length ? daily.slice(0, 12).map((row) => `
+                <tr>
+                  <td>${row.metricDate}</td>
+                  <td title="Raw ${formatDuration(row.rawDurationMs)}">${formatDuration(row.durationMs)}</td>
+                  <td>${formatNumber(row.useCount)}</td>
+                  <td>${formatNumber(row.eventCount)}</td>
+                </tr>
+              `).join('') : '<tr><td colspan="4" class="empty">No daily usage.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <section class="user-recent">
+      <h4>Recent Events</h4>
+      <div class="recent-list">
+        ${recent.length ? recent.slice(0, 8).map((row) => `
+          <div class="recent-item">
+            <div class="recent-title">${row.feature} · ${row.event_name}</div>
+            <div class="recent-meta">${formatDate(row.received_at || row.client_created_at)} · ${formatDuration(row.duration_ms)}</div>
+          </div>
+        `).join('') : '<div class="empty">No recent events for this user.</div>'}
+      </div>
+    </section>
+  `;
+}
+
+function renderUsers(data) {
+  const users = data.users || [];
+  usersSummaryEl.textContent = `${formatNumber(users.length)} users`;
+  if (users.length === 0) {
+    userListEl.innerHTML = '<div class="empty">No users yet.</div>';
+    renderUserDetail(null);
+    return;
+  }
+
+  if (!selectedUserId || !users.some((user) => user.deviceId === selectedUserId)) {
+    selectedUserId = users[0].deviceId;
+  }
+  localStorage.setItem(storage.selectedUser, selectedUserId);
+  const selected = users.find((user) => user.deviceId === selectedUserId);
+
+  userListEl.innerHTML = users.map((user) => `
+    <button class="user-row ${user.deviceId === selectedUserId ? 'is-active' : ''}" type="button" data-user-id="${user.deviceId}">
+      <span title="${user.deviceId}">${shortDeviceId(user.deviceId)}</span>
+      <strong>${formatDuration(user.totals?.durationMs)}</strong>
+      <small>${formatNumber(user.totals?.eventCount)} events · ${formatNumber(user.totals?.backups)} backups</small>
+    </button>
+  `).join('');
+
+  for (const button of userListEl.querySelectorAll('[data-user-id]')) {
+    button.addEventListener('click', () => {
+      selectedUserId = button.dataset.userId;
+      localStorage.setItem(storage.selectedUser, selectedUserId);
+      renderUsers(data);
+    });
+  }
+
+  renderUserDetail(selected);
 }
 
 function renderDownloads(data) {
@@ -287,6 +428,7 @@ function render(data) {
   renderFeatures(data);
   renderFeatureUsers(data);
   renderDailyUserUsage(data);
+  renderUsers(data);
   renderDownloads(data);
   renderReach(data);
   renderEvents(data);

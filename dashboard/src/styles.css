@@ -156,6 +156,11 @@ button {
   padding: 16px;
 }
 
+.users-panel {
+  grid-column: 1 / -1;
+  min-height: 460px;
+}
+
 .panel-header {
   align-items: center;
   display: flex;
@@ -329,6 +334,140 @@ th {
 .recent-meta {
   color: #687076;
   font-size: 11px;
+}
+
+.users-browser {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 300px 1fr;
+  min-height: 380px;
+}
+
+.user-list {
+  border-right: 1px solid #edf0f2;
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 14px;
+}
+
+.user-row {
+  align-items: start;
+  background: #fff;
+  border: 1px solid #e6e8eb;
+  border-radius: 8px;
+  color: #1c2024;
+  display: grid;
+  gap: 4px;
+  height: auto;
+  justify-items: start;
+  padding: 10px;
+  text-align: left;
+  width: 100%;
+}
+
+.user-row.is-active {
+  border-color: #0090ff;
+  box-shadow: 0 0 0 2px rgba(0, 144, 255, 0.12);
+}
+
+.user-row span,
+.user-row small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.user-row span {
+  color: #687076;
+  font-size: 12px;
+}
+
+.user-row strong {
+  font-size: 18px;
+}
+
+.user-row small {
+  color: #8b8d98;
+  font-size: 11px;
+}
+
+.user-detail {
+  min-width: 0;
+}
+
+.user-detail-head {
+  align-items: start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.user-detail h3,
+.user-detail h4 {
+  margin: 0;
+}
+
+.user-detail h3 {
+  font-size: 20px;
+}
+
+.user-detail h4 {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.user-detail-head p,
+.user-seen {
+  color: #687076;
+  font-size: 12px;
+  margin: 5px 0 0;
+}
+
+.user-seen {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  white-space: nowrap;
+}
+
+.user-metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.user-metrics .metric {
+  min-height: 86px;
+  padding: 12px;
+}
+
+.user-metrics .metric .value {
+  font-size: 20px;
+  margin-top: 9px;
+}
+
+.user-detail-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.compact-list {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.user-table {
+  max-height: 260px;
+}
+
+.user-recent {
+  margin-top: 16px;
 }
 
 .empty {
