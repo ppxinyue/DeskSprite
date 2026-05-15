@@ -238,6 +238,61 @@
       </section>
     </main>
 
+    <div class="download-choice" data-download-choice hidden>
+      <div class="download-choice-inner" role="dialog" aria-modal="false" aria-labelledby="downloadChoiceTitle">
+        <div class="download-choice-copy">
+          <p id="downloadChoiceTitle" data-i18n="downloadChoiceTitle">Ready to bring DeskCat home?</p>
+          <span data-i18n="downloadChoiceBody">Pick your download vibe. The cat will not judge. Probably.</span>
+        </div>
+        <div class="download-choice-actions">
+          <button class="choice-button" type="button" data-free-download>
+            <span data-i18n="freeDownloadTitle">Free download</span>
+            <small data-i18n="freeDownloadBody">Zero coins, full cat privileges.</small>
+          </button>
+          <button class="choice-button donate" type="button" data-donate-download>
+            <span data-i18n="donateTitle">Donate</span>
+            <small data-i18n="donateBody">Help Cat Fifteen eat more cans.</small>
+          </button>
+          <button class="choice-close" type="button" data-close-download-choice aria-label="Close download options">×</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="donate-modal" data-donate-modal hidden>
+      <div class="donate-scrim" data-close-donate></div>
+      <div class="donate-panel" role="dialog" aria-modal="true" aria-labelledby="donateTitle">
+        <img class="donate-main-cat" src="assets/cats/idle-1.gif" alt="" aria-hidden="true" />
+        <button class="donate-close" type="button" data-close-donate aria-label="Close donate window">×</button>
+        <div class="donate-copy">
+          <p class="eyebrow" data-i18n="donateModalEyebrow">OPTIONAL CAT TREAT FUND</p>
+          <h2 id="donateTitle" data-i18n="donateModalTitle">Thank you from the very serious snack committee.</h2>
+          <p data-i18n="donateModalBody">
+            Scan either code if you feel like tossing a treat into the bowl. DeskCat downloads either way.
+          </p>
+        </div>
+        <div class="qr-grid">
+          <figure class="qr-card">
+            <div class="qr-placeholder" data-payment-qr="alipay">
+              <img class="qr-image" src="assets/donate-alipay.png" alt="Alipay QR" data-qr-image hidden />
+              <span data-i18n="alipayQrLabel">Alipay QR</span>
+            </div>
+            <figcaption data-i18n="alipayLabel">Alipay</figcaption>
+          </figure>
+          <figure class="qr-card">
+            <div class="qr-placeholder" data-payment-qr="wechat">
+              <img class="qr-image" src="assets/donate-wechat.png" alt="WeChat Pay QR" data-qr-image hidden />
+              <span data-i18n="wechatQrLabel">WeChat QR</span>
+            </div>
+            <figcaption data-i18n="wechatLabel">WeChat Pay</figcaption>
+          </figure>
+        </div>
+        <button class="payment-complete" type="button" data-payment-complete>
+          <span data-i18n="paymentCompleteTitle">Payment done, start download</span>
+          <small data-i18n="paymentCompleteBody">The cat heard the bowl go clink.</small>
+        </button>
+      </div>
+    </div>
+
     <footer class="site-footer color-black">
       <div>
         <img src="assets/icon.png" alt="" />

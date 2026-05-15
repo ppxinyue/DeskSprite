@@ -35,6 +35,21 @@ const copy = {
     downloadTitle: 'Choose your Mac.',
     downloadBody:
       'DeskCat is available for both Apple Silicon and Intel Macs. Current builds are ad-hoc signed for early testing.',
+    downloadChoiceTitle: 'Ready to bring DeskCat home?',
+    downloadChoiceBody: 'Pick your download vibe. The cat will not judge. Probably.',
+    freeDownloadTitle: 'Free download',
+    freeDownloadBody: 'Zero coins, full cat privileges.',
+    donateTitle: 'Donate',
+    donateBody: 'Help Cat Fifteen eat more cans.',
+    donateModalEyebrow: 'OPTIONAL CAT TREAT FUND',
+    donateModalTitle: 'Thank you from the very serious snack committee.',
+    donateModalBody: 'Scan either code if you feel like tossing a treat into the bowl. DeskCat downloads either way.',
+    alipayQrLabel: 'Alipay QR',
+    wechatQrLabel: 'WeChat QR',
+    alipayLabel: 'Alipay',
+    wechatLabel: 'WeChat Pay',
+    paymentCompleteTitle: 'Payment done, start download',
+    paymentCompleteBody: 'The cat heard the bowl go clink.',
     footerLine: 'Desktop companion · AI chat · Focus guard · Smart timeline',
     footerTop: 'Back to top',
   },
@@ -71,6 +86,21 @@ const copy = {
       '自动追踪前台应用、后台活动、终端会话与浏览记录，每天生成完整时间线与工作摘要。',
     downloadTitle: '选择你的 Mac。',
     downloadBody: 'DeskCat 同时支持 Apple Silicon 和 Intel Mac。当前版本为早期测试构建，已做 ad-hoc 签名。',
+    downloadChoiceTitle: '准备把 DeskCat 抱回家了吗？',
+    downloadChoiceBody: '选一个下载姿势。猫猫不挑，真的。',
+    freeDownloadTitle: '免费下载',
+    freeDownloadBody: '今天先白嫖，猫猫也点头。',
+    donateTitle: '投喂一下',
+    donateBody: '助力猫十五多吃罐罐。',
+    donateModalEyebrow: '猫猫罐罐基金',
+    donateModalTitle: '感谢你路过猫碗，还往里叮当放了一下。',
+    donateModalBody: '支付宝或微信都可以。想投喂就扫一下；不投喂也没关系，DeskCat 照样给你下载。',
+    alipayQrLabel: '支付宝二维码',
+    wechatQrLabel: '微信二维码',
+    alipayLabel: '支付宝',
+    wechatLabel: '微信支付',
+    paymentCompleteTitle: '已完成付款，开始下载',
+    paymentCompleteBody: '猫十五听见罐罐开盖声了。',
     footerLine: '桌面宠物 · AI 对话 · 专注守护 · 智能记录',
     footerTop: '回到顶部',
   },
@@ -168,6 +198,12 @@ const publicStatsUrl =
   document.querySelector('meta[name="deskcat-public-stats-url"]')?.content ||
   window.DESKCAT_PUBLIC_STATS_URL ||
   '';
+const downloadChoice = document.querySelector('[data-download-choice]');
+const donateModal = document.querySelector('[data-donate-modal]');
+const freeDownloadButton = document.querySelector('[data-free-download]');
+const donateDownloadButton = document.querySelector('[data-donate-download]');
+const paymentCompleteButton = document.querySelector('[data-payment-complete]');
+let pendingDownloadLink = null;
 
 function formatStatNumber(value) {
   return new Intl.NumberFormat(currentLanguage === 'zh' ? 'zh-CN' : 'en-US').format(Number(value || 0));
@@ -223,6 +259,58 @@ function trackDownload(link) {
     locale: currentLanguage,
     referrer: document.referrer || null,
   });
+}
+
+function animateDownloadButton(link) {
+  link.animate(
+    [
+      { transform: 'translateY(-3px) scale(1)' },
+      { transform: 'translateY(-3px) scale(0.985)' },
+      { transform: 'translateY(-3px) scale(1)' },
+    ],
+    { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' },
+  );
+}
+
+function setPanelHidden(panel, isHidden) {
+  if (!panel) return;
+  panel.hidden = isHidden;
+  document.body.classList.toggle('has-download-ui', !isHidden || !donateModal?.hidden);
+}
+
+function closeDownloadChoice() {
+  setPanelHidden(downloadChoice, true);
+}
+
+function openDownloadChoice(link) {
+  pendingDownloadLink = link;
+  setPanelHidden(downloadChoice, false);
+  freeDownloadButton?.focus();
+}
+
+function openDonateModal() {
+  closeDownloadChoice();
+  setPanelHidden(donateModal, false);
+  paymentCompleteButton?.focus();
+}
+
+function closeDonateModal() {
+  setPanelHidden(donateModal, true);
+}
+
+function startPendingDownload() {
+  if (!pendingDownloadLink) return;
+  const link = pendingDownloadLink;
+  closeDownloadChoice();
+  closeDonateModal();
+  trackDownload(link);
+  animateDownloadButton(link);
+  window.location.href = link.href;
+}
+
+function revealQrImage(image) {
+  if (image.naturalWidth <= 0) return;
+  image.hidden = false;
 }
 
 trackPageView();
@@ -298,15 +386,31 @@ if (new URLSearchParams(window.location.search).has('demoTrail')) {
 }
 
 for (const link of document.querySelectorAll('.download-button')) {
-  link.addEventListener('click', () => {
-    trackDownload(link);
-    link.animate(
-      [
-        { transform: 'translateY(-3px) scale(1)' },
-        { transform: 'translateY(-3px) scale(0.985)' },
-        { transform: 'translateY(-3px) scale(1)' },
-      ],
-      { duration: 260, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' },
-    );
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    openDownloadChoice(link);
   });
 }
+
+freeDownloadButton?.addEventListener('click', startPendingDownload);
+donateDownloadButton?.addEventListener('click', openDonateModal);
+paymentCompleteButton?.addEventListener('click', startPendingDownload);
+
+for (const image of document.querySelectorAll('[data-qr-image]')) {
+  if (image.complete) revealQrImage(image);
+  image.addEventListener('load', () => revealQrImage(image));
+}
+
+for (const node of document.querySelectorAll('[data-close-download-choice]')) {
+  node.addEventListener('click', closeDownloadChoice);
+}
+
+for (const node of document.querySelectorAll('[data-close-donate]')) {
+  node.addEventListener('click', closeDonateModal);
+}
+
+window.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  closeDownloadChoice();
+  closeDonateModal();
+});
