@@ -17,6 +17,8 @@ const downloadSummaryEl = document.querySelector('#download-summary');
 const reachListEl = document.querySelector('#reach-list');
 const reachSummaryEl = document.querySelector('#reach-summary');
 const eventTableEl = document.querySelector('#event-table');
+const worldMapEl = document.querySelector('#world-map');
+const mapSummaryEl = document.querySelector('#map-summary');
 
 const storage = {
   days: 'deskcat-dashboard:days',
@@ -272,6 +274,58 @@ function formatUserMeta(user) {
   return parts.length ? parts.map(escapeHtml).join(' · ') : 'No client metadata yet';
 }
 
+function projectMapPoint(lat, lon) {
+  return {
+    x: ((Number(lon) + 180) / 360) * 1000,
+    y: ((90 - Number(lat)) / 180) * 500,
+  };
+}
+
+function renderWorldMap(data) {
+  const locations = data.userLocations || [];
+  const totalIps = locations.reduce((total, location) => total + (location.ips?.length || 0), 0);
+  mapSummaryEl.textContent = `${formatNumber(locations.length)} locations · ${formatNumber(totalIps)} IPs`;
+  if (locations.length === 0) {
+    worldMapEl.innerHTML = '<div class="empty">No user IP locations yet. New client syncs will populate this map.</div>';
+    return;
+  }
+
+  const markers = locations.map((location) => {
+    const point = projectMapPoint(location.lat, location.lon);
+    const radius = Math.min(18, 6 + Number(location.users || 0) * 3);
+    const title = `${location.label}${location.country ? `, ${location.country}` : ''} · ${formatNumber(location.users)} users${location.ips?.length ? ` · ${location.ips.join(', ')}` : ''}`;
+    return `
+      <g class="map-marker" transform="translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})">
+        <circle r="${radius}" tabindex="0">
+          <title>${escapeHtml(title)}</title>
+        </circle>
+        <text y="${-(radius + 7)}">${escapeHtml(location.country || '')}</text>
+      </g>
+    `;
+  }).join('');
+
+  const list = locations.slice(0, 8).map((location) => `
+    <div class="map-location">
+      <strong>${escapeHtml(location.label)}${location.country ? `, ${escapeHtml(location.country)}` : ''}</strong>
+      <span>${formatNumber(location.users)} users${location.timezone ? ` · ${escapeHtml(location.timezone)}` : ''}${location.ips?.length ? ` · ${location.ips.map(escapeHtml).join(', ')}` : ''}</span>
+    </div>
+  `).join('');
+
+  worldMapEl.innerHTML = `
+    <svg viewBox="0 0 1000 500" role="img" aria-label="World map of user IP locations">
+      <rect class="map-ocean" width="1000" height="500" rx="8"></rect>
+      <path class="map-land" d="M145 130c56-45 147-45 209-8 31 18 37 54 17 81-29 39-85 25-127 46-54 27-120 0-136-48-9-27 10-51 37-71Z"></path>
+      <path class="map-land" d="M275 270c46-8 95 18 105 64 11 48-31 89-58 125-32-28-56-68-70-111-11-34-7-70 23-78Z"></path>
+      <path class="map-land" d="M455 115c60-35 159-29 213 17 36 30 29 78-14 96-53 22-122-2-164 38-33 31-93 14-113-25-23-45 24-101 78-126Z"></path>
+      <path class="map-land" d="M642 140c69-42 180-42 238 10 35 31 24 76-23 91-64 20-141-10-193 29-40 30-91 6-98-40-5-34 28-68 76-90Z"></path>
+      <path class="map-land" d="M505 255c50 0 89 36 93 84 4 45-29 82-68 112-38-35-69-84-68-132 1-39 16-64 43-64Z"></path>
+      <path class="map-land" d="M770 325c47-23 104-10 130 31 22 35 10 76-26 98-46 28-109 12-132-32-18-36-7-78 28-97Z"></path>
+      ${markers}
+    </svg>
+    <div class="map-list">${list}</div>
+  `;
+}
+
 function renderDailyUserUsage(data) {
   const rows = data.dailyUserUsageByDay || [];
   if (rows.length === 0) {
@@ -523,6 +577,7 @@ function render(data) {
   renderDownloads(data);
   renderReach(data);
   renderEvents(data);
+  renderWorldMap(data);
   generatedAtEl.textContent = `Generated ${formatDate(data.generatedAt)}`;
 }
 

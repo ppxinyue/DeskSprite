@@ -14,6 +14,7 @@
 body {
   margin: 0;
   min-width: 1080px;
+  overflow-x: hidden;
 }
 
 button,
@@ -145,6 +146,7 @@ button {
   display: grid;
   gap: 12px;
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.85fr);
+  overflow: hidden;
 }
 
 .span-2 {
@@ -152,9 +154,15 @@ button {
 }
 
 .panel {
+  max-width: 100%;
   min-width: 0;
   min-height: 320px;
   padding: 16px;
+}
+
+.chart-panel {
+  justify-self: start;
+  width: min(100%, calc(66vw - 42px));
 }
 
 .users-panel {
@@ -176,11 +184,13 @@ button {
 
 .chart {
   border-bottom: 1px solid #e6e8eb;
+  max-width: 100%;
   min-height: 236px;
   overflow: hidden;
 }
 
 .chart-scroll {
+  contain: inline-size;
   display: flex;
   gap: 8px;
   height: 100%;
@@ -216,6 +226,7 @@ button {
 .bar-plot {
   align-items: end;
   display: grid;
+  flex: 0 0 auto;
   gap: 8px;
   grid-auto-flow: column;
   grid-auto-columns: minmax(60px, 1fr);
@@ -233,6 +244,64 @@ button {
 .line-chart svg {
   background: linear-gradient(#fff, #fff) padding-box;
   flex: 0 0 auto;
+}
+
+.world-map {
+  display: grid;
+  gap: 14px;
+}
+
+.world-map svg {
+  display: block;
+  height: auto;
+  max-height: 390px;
+  width: 100%;
+}
+
+.map-ocean {
+  fill: #f8fbfd;
+}
+
+.map-land {
+  fill: #dfe5ea;
+  stroke: #cfd6dd;
+  stroke-width: 1;
+}
+
+.map-marker circle {
+  fill: rgba(0, 144, 255, 0.72);
+  stroke: #fff;
+  stroke-width: 3;
+}
+
+.map-marker text {
+  fill: #1c2024;
+  font-size: 22px;
+  font-weight: 750;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.map-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.map-location {
+  border-bottom: 1px solid #edf0f2;
+  display: grid;
+  gap: 3px;
+  padding-bottom: 8px;
+}
+
+.map-location strong {
+  font-size: 12px;
+}
+
+.map-location span {
+  color: #687076;
+  font-size: 11px;
 }
 
 .chart-axis {

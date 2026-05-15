@@ -117,6 +117,23 @@ type UserBuilder = {
   recentEvents: RecentEvent[];
 };
 
+const countryCentroids: Record<string, { lat: number; lon: number; name: string }> = {
+  AU: { lat: -25.3, lon: 133.8, name: 'Australia' },
+  BR: { lat: -14.2, lon: -51.9, name: 'Brazil' },
+  CA: { lat: 56.1, lon: -106.3, name: 'Canada' },
+  CN: { lat: 35.9, lon: 104.2, name: 'China' },
+  DE: { lat: 51.2, lon: 10.5, name: 'Germany' },
+  ES: { lat: 40.5, lon: -3.7, name: 'Spain' },
+  FR: { lat: 46.2, lon: 2.2, name: 'France' },
+  GB: { lat: 55.4, lon: -3.4, name: 'United Kingdom' },
+  HK: { lat: 22.3, lon: 114.2, name: 'Hong Kong' },
+  IN: { lat: 20.6, lon: 78.9, name: 'India' },
+  JP: { lat: 36.2, lon: 138.3, name: 'Japan' },
+  KR: { lat: 36.5, lon: 127.8, name: 'South Korea' },
+  SG: { lat: 1.4, lon: 103.8, name: 'Singapore' },
+  US: { lat: 37.1, lon: -95.7, name: 'United States' },
+};
+
 type DailyDownloadMetric = {
   metric_date: string;
   source: string;
@@ -494,6 +511,88 @@ function aggregateDailyUsageByDay(rows: DailyDeviceUsageMetric[]) {
       };
     })
     .sort((a, b) => String(b.metricDate).localeCompare(String(a.metricDate)));
+}
+
+function readObject(value: unknown) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function readString(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function countryFromTimezone(timezone: string | null) {
+  if (!timezone) return null;
+  if (timezone === 'Asia/Shanghai') return 'CN';
+  if (timezone === 'Asia/Tokyo') return 'JP';
+  if (timezone === 'Asia/Seoul') return 'KR';
+  if (timezone === 'Asia/Singapore') return 'SG';
+  if (timezone.startsWith('America/')) return 'US';
+  if (timezone.startsWith('Europe/London')) return 'GB';
+  if (timezone.startsWith('Europe/Berlin')) return 'DE';
+  if (timezone.startsWith('Europe/Paris')) return 'FR';
+  return null;
+}
+
+function buildUserLocations(devices: DeviceMetric[]) {
+  const byKey = new Map<string, {
+    key: string;
+    label: string;
+    country: string | null;
+    city: string | null;
+    region: string | null;
+    timezone: string | null;
+    lat: number;
+    lon: number;
+    users: Set<string>;
+    ips: Set<string>;
+  }>();
+
+  for (const device of devices) {
+    const metadata = readObject(device.metadata);
+    const geo = readObject(metadata.geo);
+    const deviceInfo = readObject(metadata.deviceInfo);
+    const timezone = readString(geo.timezone) || readString(deviceInfo.timezone);
+    const country = (readString(geo.country) || countryFromTimezone(timezone))?.toUpperCase() ?? null;
+    const centroid = country ? countryCentroids[country] : null;
+    if (!centroid) continue;
+
+    const city = readString(geo.city);
+    const region = readString(geo.region);
+    const ip = readString(metadata.ip);
+    const key = city || region || country;
+    const current = byKey.get(key) ?? {
+      key,
+      label: city || region || centroid.name,
+      country,
+      city,
+      region,
+      timezone,
+      lat: centroid.lat,
+      lon: centroid.lon,
+      users: new Set<string>(),
+      ips: new Set<string>(),
+    };
+    current.users.add(device.device_id);
+    if (ip) current.ips.add(ip);
+    byKey.set(key, current);
+  }
+
+  return Array.from(byKey.values())
+    .map((location) => ({
+      label: location.label,
+      country: location.country,
+      city: location.city,
+      region: location.region,
+      timezone: location.timezone,
+      lat: location.lat,
+      lon: location.lon,
+      users: location.users.size,
+      ips: Array.from(location.ips).slice(0, 8),
+    }))
+    .sort((a, b) => b.users - a.users || String(a.label).localeCompare(String(b.label)));
 }
 
 function buildUsers(
@@ -911,6 +1010,7 @@ Deno.serve(async (req) => {
       featureDailyUsers: aggregateFeatureUsers(featureUserRows).slice(0, 80),
       dailyUserUsage: aggregateDeviceUsage(deviceUsageRows).slice(0, 200),
       dailyUserUsageByDay: aggregateDailyUsageByDay(deviceUsageRows),
+      userLocations: buildUserLocations(deviceRows),
       users: buildUsers(
         deviceRows,
         deviceUsageRows,
