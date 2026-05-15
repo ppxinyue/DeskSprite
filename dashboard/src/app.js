@@ -17,7 +17,6 @@ const downloadSummaryEl = document.querySelector('#download-summary');
 const reachListEl = document.querySelector('#reach-list');
 const reachSummaryEl = document.querySelector('#reach-summary');
 const eventTableEl = document.querySelector('#event-table');
-const recentListEl = document.querySelector('#recent-list');
 
 const storage = {
   days: 'deskcat-dashboard:days',
@@ -100,35 +99,67 @@ function renderDaily(data) {
   const maxDau = Math.max(1, ...rows.map((row) => Number(row.dau || 0)));
   const maxDuration = Math.max(1, ...rows.map((row) => Number(row.total_duration_ms || 0)));
   dailySummaryEl.textContent = `${data.range.days} days`;
-  dailyChartEl.innerHTML = rows.map((row) => {
-    const dauHeight = Math.max(2, (Number(row.dau || 0) / maxDau) * 184);
-    const timeHeight = Math.max(2, (Number(row.total_duration_ms || 0) / maxDuration) * 184);
-    const label = String(row.metric_date).slice(5);
-    return `
-      <div class="bar" title="${row.metric_date} · DAU ${row.dau} · ${formatDuration(row.total_duration_ms)}">
-        <div class="bar-stack">
-          <div class="bar-dau" style="height:${dauHeight}px"></div>
-          <div class="bar-time" style="height:${timeHeight}px"></div>
-        </div>
-        <div class="bar-label">${label}</div>
+  const chartWidth = Math.max(760, rows.length * 92);
+  const yTicks = [maxDuration, maxDuration / 2, 0];
+  dailyChartEl.innerHTML = `
+    <div class="chart-scroll">
+      <div class="chart-y-axis" aria-hidden="true">
+        ${yTicks.map((value) => `<span>${formatDuration(value)}</span>`).join('')}
       </div>
-    `;
+      <div class="bar-plot" style="width:${chartWidth}px">
+        ${rows.map((row) => {
+          const dauHeight = Math.max(2, (Number(row.dau || 0) / maxDau) * 184);
+          const timeHeight = Math.max(2, (Number(row.total_duration_ms || 0) / maxDuration) * 184);
+          const label = String(row.metric_date).slice(5);
+          return `
+            <div class="bar" title="${row.metric_date} · DAU ${row.dau} · ${formatDuration(row.total_duration_ms)}">
+              <div class="bar-stack">
+                <div class="bar-dau" style="height:${dauHeight}px"></div>
+                <div class="bar-time" style="height:${timeHeight}px"></div>
+              </div>
+              <div class="bar-label">${label}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+    <div class="axis-note">
+      <span><i class="views"></i>DAU max ${formatNumber(maxDau)}</span>
+      <span><i class="usage"></i>Usage scale</span>
+    </div>
+  `;
+}
+
+function linePoints(rows, key, width, height, padding, max) {
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+  if (rows.length === 1) {
+    const y = padding.top + innerHeight - (Number(rows[0][key] || 0) / max) * innerHeight;
+    return `${padding.left},${y} ${width - padding.right},${y}`;
+  }
+  return rows.map((row, index) => {
+    const x = padding.left + (index / Math.max(1, rows.length - 1)) * innerWidth;
+    const y = padding.top + innerHeight - (Number(row[key] || 0) / max) * innerHeight;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+}
+
+function renderAxisLabels(max, formatter) {
+  return [max, max / 2, 0].map((value, index) => {
+    const y = 24 + index * 82;
+    return `<text class="axis-label" x="8" y="${y}">${formatter(value)}</text>`;
   }).join('');
 }
 
-function linePoints(rows, key, width, height, padding) {
-  const max = Math.max(1, ...rows.map((row) => Number(row[key] || 0)));
-  const innerWidth = width - padding * 2;
-  const innerHeight = height - padding * 2;
-  if (rows.length === 1) {
-    const y = padding + innerHeight - (Number(rows[0][key] || 0) / max) * innerHeight;
-    return `${padding},${y} ${width - padding},${y}`;
-  }
+function renderDateLabels(rows, width, padding) {
+  const step = Math.max(1, Math.ceil(rows.length / 8));
+  const innerWidth = width - padding.left - padding.right;
   return rows.map((row, index) => {
-    const x = padding + (index / Math.max(1, rows.length - 1)) * innerWidth;
-    const y = padding + innerHeight - (Number(row[key] || 0) / max) * innerHeight;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
+    if (index % step !== 0 && index !== rows.length - 1) return '';
+    const x = padding.left + (index / Math.max(1, rows.length - 1)) * innerWidth;
+    const label = String(row.metricDate || row.metric_date).slice(5);
+    return `<text class="axis-label x-label" x="${x.toFixed(1)}" y="214">${label}</text>`;
+  }).join('');
 }
 
 function renderDailyTrends(data) {
@@ -137,17 +168,29 @@ function renderDailyTrends(data) {
     trendChartEl.innerHTML = '<div class="empty">No daily trend data yet.</div>';
     return;
   }
-  const width = 760;
+  const width = Math.max(760, rows.length * 92);
   const height = 220;
-  const padding = 18;
+  const padding = { top: 18, right: 52, bottom: 30, left: 62 };
+  const maxUsage = Math.max(1, ...rows.map((row) => Number(row.usageMs || 0)));
+  const maxCount = Math.max(1, ...rows.map((row) => Number(row.views || 0)), ...rows.map((row) => Number(row.downloads || 0)));
   const latest = rows.at(-1) || {};
   trendChartEl.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Daily downloads, views, and usage time trends">
-      <line class="chart-axis" x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}"></line>
-      <polyline class="trend-line usage" points="${linePoints(rows, 'usageMs', width, height, padding)}"></polyline>
-      <polyline class="trend-line views" points="${linePoints(rows, 'views', width, height, padding)}"></polyline>
-      <polyline class="trend-line downloads" points="${linePoints(rows, 'downloads', width, height, padding)}"></polyline>
-    </svg>
+    <div class="chart-scroll">
+      <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Daily downloads, views, and usage time trends">
+        <line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
+        <line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}"></line>
+        <line class="chart-axis" x1="${width - padding.right}" y1="${padding.top}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
+        ${renderAxisLabels(maxUsage, formatDuration)}
+        ${[maxCount, maxCount / 2, 0].map((value, index) => {
+          const y = 24 + index * 82;
+          return `<text class="axis-label right-label" x="${width - 6}" y="${y}">${formatNumber(Math.round(value))}</text>`;
+        }).join('')}
+        ${renderDateLabels(rows, width, padding)}
+        <polyline class="trend-line usage" points="${linePoints(rows, 'usageMs', width, height, padding, maxUsage)}"></polyline>
+        <polyline class="trend-line views" points="${linePoints(rows, 'views', width, height, padding, maxCount)}"></polyline>
+        <polyline class="trend-line downloads" points="${linePoints(rows, 'downloads', width, height, padding, maxCount)}"></polyline>
+      </svg>
+    </div>
     <div class="trend-legend">
       <span><i class="usage"></i>Usage ${formatDuration(latest.usageMs)}</span>
       <span><i class="views"></i>Views ${formatNumber(latest.views)}</span>
@@ -201,7 +244,7 @@ function shortDeviceId(value) {
 }
 
 function renderDailyUserUsage(data) {
-  const rows = data.dailyUserUsage || [];
+  const rows = data.dailyUserUsageByDay || [];
   if (rows.length === 0) {
     dailyUserUsageTableEl.innerHTML = '<tr><td colspan="5" class="empty">No user usage yet.</td></tr>';
     return;
@@ -209,10 +252,10 @@ function renderDailyUserUsage(data) {
   dailyUserUsageTableEl.innerHTML = rows.map((row) => `
     <tr>
       <td>${row.metricDate}</td>
-      <td title="${row.deviceId}">${shortDeviceId(row.deviceId)}</td>
-      <td title="Raw ${formatDuration(row.rawDurationMs)}">${formatDuration(row.durationMs)}</td>
-      <td>${formatNumber(row.useCount)}</td>
-      <td>${formatNumber(row.eventCount)}</td>
+      <td>${formatNumber(row.users)}</td>
+      <td title="Total ${formatDuration(row.totalDurationMs)} · Raw ${formatDuration(row.rawDurationMs)}">${formatDuration(row.avgDurationMs)}</td>
+      <td>${Number(row.avgUses || 0).toFixed(1)}</td>
+      <td>${formatNumber(row.events)}</td>
     </tr>
   `).join('');
 }
@@ -225,14 +268,14 @@ function renderUserDetail(user) {
 
   const features = user.features || [];
   const daily = user.daily || [];
-  const recent = user.recentEvents || [];
   const maxFeature = Math.max(1, ...features.map((row) => Number(row.durationMs || row.useCount || 0)));
+  const clientMeta = [user.platform, user.appVersion].filter(Boolean).join(' · ');
 
   userDetailEl.innerHTML = `
     <div class="user-detail-head">
       <div>
         <h3 title="${user.deviceId}">${shortDeviceId(user.deviceId)}</h3>
-        <p>${user.platform || 'unknown platform'} · ${user.appVersion || 'unknown version'}</p>
+        ${clientMeta ? `<p>${clientMeta}</p>` : '<p>No client metadata yet</p>'}
       </div>
       <div class="user-seen">
         <span>First ${formatShortDate(user.firstSeenAt)}</span>
@@ -294,18 +337,6 @@ function renderUserDetail(user) {
         </div>
       </section>
     </div>
-
-    <section class="user-recent">
-      <h4>Recent Events</h4>
-      <div class="recent-list">
-        ${recent.length ? recent.slice(0, 8).map((row) => `
-          <div class="recent-item">
-            <div class="recent-title">${row.feature} · ${row.event_name}</div>
-            <div class="recent-meta">${formatDate(row.received_at || row.client_created_at)} · ${formatDuration(row.duration_ms)}</div>
-          </div>
-        `).join('') : '<div class="empty">No recent events for this user.</div>'}
-      </div>
-    </section>
   `;
 }
 
@@ -361,21 +392,24 @@ function renderDownloads(data) {
       label: `GitHub${github.repo ? ` · ${github.repo}` : ''}`,
       value: github.count,
       sub: github.error || 'release asset downloads',
+      level: 0,
     },
     ...productAssets.slice(0, 4).map((asset) => ({
       label: `Website · ${asset.asset}`,
       value: asset.count,
       sub: 'selected range',
+      level: 0,
     })),
     ...githubAssets.slice(0, 4).map((asset) => ({
-      label: `GitHub · ${asset.asset}`,
+      label: asset.asset,
       value: asset.count,
-      sub: asset.release,
+      sub: `GitHub asset · ${asset.release}`,
+      level: 1,
     })),
   ];
 
   downloadListEl.innerHTML = rows.map((row) => `
-    <div class="download-row">
+    <div class="download-row ${row.level ? 'is-child' : ''}">
       <div>
         <strong>${row.label}</strong>
         <span>${row.sub || ''}</span>
@@ -449,20 +483,6 @@ function renderEvents(data) {
   `).join('');
 }
 
-function renderRecent(data) {
-  const rows = data.recentEvents || [];
-  if (rows.length === 0) {
-    recentListEl.innerHTML = '<div class="empty">No recent events.</div>';
-    return;
-  }
-  recentListEl.innerHTML = rows.slice(0, 12).map((row) => `
-    <div class="recent-item">
-      <div class="recent-title">${row.feature} · ${row.event_name}</div>
-      <div class="recent-meta">${formatDate(row.received_at || row.client_created_at)} · ${row.device_id} · ${formatDuration(row.duration_ms)}</div>
-    </div>
-  `).join('');
-}
-
 function render(data) {
   renderMetrics(data);
   renderDaily(data);
@@ -474,7 +494,6 @@ function render(data) {
   renderDownloads(data);
   renderReach(data);
   renderEvents(data);
-  renderRecent(data);
   generatedAtEl.textContent = `Generated ${formatDate(data.generatedAt)}`;
 }
 

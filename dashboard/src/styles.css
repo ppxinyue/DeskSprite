@@ -174,30 +174,110 @@ button {
 }
 
 .chart {
-  align-items: end;
   border-bottom: 1px solid #e6e8eb;
-  display: grid;
-  gap: 4px;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  min-height: 236px;
+  overflow: hidden;
+}
+
+.chart-scroll {
+  display: flex;
+  gap: 8px;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+}
+
+.chart > .chart-scroll {
   height: 236px;
+}
+
+.line-chart .chart-scroll {
+  height: 220px;
+}
+
+.chart-y-axis {
+  color: #8b8d98;
+  display: flex;
+  flex: 0 0 52px;
+  flex-direction: column;
+  font-size: 10px;
+  justify-content: space-between;
+  padding: 18px 0 24px;
+  position: sticky;
+  left: 0;
+  background: #fff;
+  z-index: 1;
+}
+
+.bar-plot {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(60px, 1fr);
+  height: 100%;
+  min-width: 0;
   padding-top: 18px;
 }
 
 .line-chart {
   display: grid;
   gap: 12px;
+  overflow: hidden;
 }
 
 .line-chart svg {
   background: linear-gradient(#fff, #fff) padding-box;
-  height: 236px;
-  width: 100%;
+  flex: 0 0 auto;
 }
 
 .chart-axis {
   stroke: #d7dbdf;
   stroke-width: 1;
+}
+
+.axis-label {
+  fill: #8b8d98;
+  font-size: 10px;
+}
+
+.right-label {
+  text-anchor: end;
+}
+
+.x-label {
+  text-anchor: middle;
+}
+
+.axis-note {
+  color: #687076;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 11px;
+  gap: 14px;
+  padding-top: 8px;
+}
+
+.axis-note span {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.axis-note i {
+  border-radius: 999px;
+  display: inline-block;
+  height: 8px;
+  width: 18px;
+}
+
+.axis-note i.usage {
+  background: #46a758;
+}
+
+.axis-note i.views {
+  background: #0090ff;
 }
 
 .trend-line {
@@ -333,6 +413,26 @@ button {
   gap: 12px;
   justify-content: space-between;
   padding: 0 0 10px;
+}
+
+.download-row.is-child {
+  margin-left: 18px;
+  padding-left: 14px;
+  position: relative;
+}
+
+.download-row.is-child::before {
+  background: #d7dbdf;
+  content: "";
+  height: 1px;
+  left: 0;
+  position: absolute;
+  top: 18px;
+  width: 8px;
+}
+
+.download-row.is-child strong {
+  font-weight: 650;
 }
 
 .download-row div {
@@ -532,10 +632,6 @@ th {
 
 .user-table {
   max-height: 260px;
-}
-
-.user-recent {
-  margin-top: 16px;
 }
 
 .empty {

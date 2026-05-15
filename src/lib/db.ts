@@ -298,6 +298,15 @@ function getCloudEndpoint(store: Store) {
   return value || null;
 }
 
+function getClientPlatform() {
+  return navigator.platform || navigator.userAgent || null;
+}
+
+function getClientAppVersion() {
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  return env?.VITE_APP_VERSION?.trim() || null;
+}
+
 function getUnsyncedTelemetryEvents(store: Store) {
   return store.telemetryEvents.filter((event) => !event.syncedAt);
 }
@@ -929,6 +938,9 @@ export async function syncCloudBackup(endpointOverride?: string): Promise<CloudS
       },
       body: JSON.stringify({
         deviceId: store.cloudSync.deviceId,
+        platform: getClientPlatform(),
+        appVersion: getClientAppVersion(),
+        userAgent: navigator.userAgent || null,
         backup,
         telemetryEvents,
         sentAt: attemptedAt,

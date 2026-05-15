@@ -20,6 +20,9 @@ type BackupPayload = {
 
 type SyncPayload = {
   deviceId: string;
+  platform?: string | null;
+  appVersion?: string | null;
+  userAgent?: string | null;
   backup?: BackupPayload | null;
   telemetryEvents?: TelemetryEventPayload[];
   sentAt?: string;
@@ -68,6 +71,12 @@ function assertPayload(value: unknown): SyncPayload {
   return payload;
 }
 
+function safeText(value: unknown, maxLength = 200) {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  return text ? text.slice(0, maxLength) : null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -77,15 +86,20 @@ Deno.serve(async (req) => {
     const payload = assertPayload(await req.json());
     const supabase = getSupabaseAdmin();
     const now = new Date().toISOString();
+    const platform = safeText(payload.platform);
+    const appVersion = safeText(payload.appVersion, 80);
 
     const { error: deviceError } = await supabase
       .from('devices')
       .upsert({
         device_id: payload.deviceId,
+        ...(platform ? { platform } : {}),
+        ...(appVersion ? { app_version: appVersion } : {}),
         last_seen_at: now,
         metadata: {
           source: 'deskcat',
           sentAt: payload.sentAt ?? null,
+          userAgent: safeText(payload.userAgent, 500),
           headerDeviceId: req.headers.get('x-deskcat-device-id') || req.headers.get('x-desksprite-device-id'),
         },
       }, { onConflict: 'device_id' });

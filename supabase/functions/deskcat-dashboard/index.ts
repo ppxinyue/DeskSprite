@@ -257,9 +257,14 @@ function buildDailyTrends(
   downloadRows: DailyDownloadMetric[],
   pageViewRows: DailyPageViewMetric[],
   githubStats: GithubRepoStats,
+  githubDownloadCount: number,
 ) {
   const downloadsByDate = aggregateDailyDownloads(downloadRows);
   const viewsByDate = aggregateDailyViews(pageViewRows);
+  const latestDate = dailyRows.at(-1)?.metric_date;
+  if (latestDate) {
+    downloadsByDate.set(latestDate, (downloadsByDate.get(latestDate) ?? 0) + githubDownloadCount);
+  }
   for (const row of githubStats.dailyViews ?? []) {
     viewsByDate.set(row.date, (viewsByDate.get(row.date) ?? 0) + Number(row.views ?? 0));
   }
@@ -446,6 +451,49 @@ function aggregateDeviceUsage(rows: DailyDeviceUsageMetric[]) {
       b.durationMs - a.durationMs ||
       String(a.deviceId).localeCompare(String(b.deviceId))
     );
+}
+
+function aggregateDailyUsageByDay(rows: DailyDeviceUsageMetric[]) {
+  const byDate = new Map<string, {
+    metricDate: string;
+    users: Set<string>;
+    durationMs: number;
+    rawDurationMs: number;
+    useCount: number;
+    eventCount: number;
+  }>();
+
+  for (const row of rows) {
+    const current = byDate.get(row.metric_date) ?? {
+      metricDate: row.metric_date,
+      users: new Set<string>(),
+      durationMs: 0,
+      rawDurationMs: 0,
+      useCount: 0,
+      eventCount: 0,
+    };
+    current.users.add(row.device_id);
+    current.durationMs += Number(row.duration_ms ?? 0);
+    current.rawDurationMs += Number(row.raw_duration_ms ?? row.duration_ms ?? 0);
+    current.useCount += Number(row.use_count ?? 0);
+    current.eventCount += Number(row.event_count ?? 0);
+    byDate.set(row.metric_date, current);
+  }
+
+  return Array.from(byDate.values())
+    .map((row) => {
+      const userCount = row.users.size;
+      return {
+        metricDate: row.metricDate,
+        users: userCount,
+        avgDurationMs: userCount ? Math.round(row.durationMs / userCount) : 0,
+        avgUses: userCount ? row.useCount / userCount : 0,
+        events: row.eventCount,
+        totalDurationMs: row.durationMs,
+        rawDurationMs: row.rawDurationMs,
+      };
+    })
+    .sort((a, b) => String(b.metricDate).localeCompare(String(a.metricDate)));
 }
 
 function buildUsers(
@@ -858,10 +906,11 @@ Deno.serve(async (req) => {
         githubStars,
       },
       daily: dailyRows,
-      dailyTrends: buildDailyTrends(dailyRows, downloadRows, pageViewRows, githubStats),
+      dailyTrends: buildDailyTrends(dailyRows, downloadRows, pageViewRows, githubStats, Number(githubDownloads.count ?? 0)),
       featureUsage: aggregates.features,
       featureDailyUsers: aggregateFeatureUsers(featureUserRows).slice(0, 80),
       dailyUserUsage: aggregateDeviceUsage(deviceUsageRows).slice(0, 200),
+      dailyUserUsageByDay: aggregateDailyUsageByDay(deviceUsageRows),
       users: buildUsers(
         deviceRows,
         deviceUsageRows,
