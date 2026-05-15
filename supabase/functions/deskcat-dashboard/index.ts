@@ -263,6 +263,90 @@ function aggregateFeatures(rows: DailyFeatureMetric[]) {
   };
 }
 
+function aggregateDeviceFeatures(rows: DailyDeviceFeatureMetric[]) {
+  const byFeature = new Map<string, {
+    feature: string;
+    eventCount: number;
+    useCount: number;
+    durationMs: number;
+    rawDurationMs: number;
+    activeDevices: Set<string>;
+  }>();
+  const byEvent = new Map<string, {
+    feature: string;
+    eventName: string;
+    eventCount: number;
+    useCount: number;
+    durationMs: number;
+    rawDurationMs: number;
+    activeDevices: Set<string>;
+  }>();
+
+  for (const row of rows) {
+    const durationMs = Number(row.duration_ms ?? 0);
+    const rawDurationMs = Number(row.raw_duration_ms ?? row.duration_ms ?? 0);
+    const useCount = Number(row.use_count ?? 0);
+    const eventCount = Number(row.event_count ?? 0);
+    const deviceKey = `${row.metric_date}:${row.device_id}`;
+
+    const feature = byFeature.get(row.feature) ?? {
+      feature: row.feature,
+      eventCount: 0,
+      useCount: 0,
+      durationMs: 0,
+      rawDurationMs: 0,
+      activeDevices: new Set<string>(),
+    };
+    feature.eventCount += eventCount;
+    feature.useCount += useCount;
+    feature.durationMs += durationMs;
+    feature.rawDurationMs += rawDurationMs;
+    feature.activeDevices.add(deviceKey);
+    byFeature.set(row.feature, feature);
+
+    const eventKey = `${row.feature}:${row.event_name}`;
+    const event = byEvent.get(eventKey) ?? {
+      feature: row.feature,
+      eventName: row.event_name,
+      eventCount: 0,
+      useCount: 0,
+      durationMs: 0,
+      rawDurationMs: 0,
+      activeDevices: new Set<string>(),
+    };
+    event.eventCount += eventCount;
+    event.useCount += useCount;
+    event.durationMs += durationMs;
+    event.rawDurationMs += rawDurationMs;
+    event.activeDevices.add(deviceKey);
+    byEvent.set(eventKey, event);
+  }
+
+  return {
+    features: Array.from(byFeature.values())
+      .map((item) => ({
+        feature: item.feature,
+        eventCount: item.eventCount,
+        useCount: item.useCount,
+        durationMs: item.durationMs,
+        rawDurationMs: item.rawDurationMs,
+        activeDevices: item.activeDevices.size,
+      }))
+      .sort((a, b) => b.durationMs - a.durationMs || b.useCount - a.useCount),
+    events: Array.from(byEvent.values())
+      .map((item) => ({
+        feature: item.feature,
+        eventName: item.eventName,
+        eventCount: item.eventCount,
+        useCount: item.useCount,
+        durationMs: item.durationMs,
+        rawDurationMs: item.rawDurationMs,
+        activeDevices: item.activeDevices.size,
+      }))
+      .sort((a, b) => b.durationMs - a.durationMs || b.useCount - a.useCount),
+  };
+}
+
 function aggregateFeatureUsers(rows: DailyFeatureUserMetric[]) {
   return rows
     .map((row) => ({
@@ -648,7 +732,7 @@ Deno.serve(async (req) => {
     const deviceBackupRows = (deviceBackups.data ?? []) as DeviceBackupMetric[];
     const downloadRows = (downloads.data ?? []) as DailyDownloadMetric[];
     const pageViewRows = (pageViews.data ?? []) as DailyPageViewMetric[];
-    const aggregates = aggregateFeatures(featureRows);
+    const aggregates = aggregateDeviceFeatures(deviceFeatureRows);
     const productDownloads = aggregateProductDownloads(downloadRows);
     const productViews = aggregateProductViews(pageViewRows);
     const githubDownloads = await getGithubDownloads().catch((error) => ({
