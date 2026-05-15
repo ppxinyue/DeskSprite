@@ -1,10 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-type DownloadPayload = {
+type StatsPayload = {
+  eventType?: string;
   asset?: string;
   href?: string;
   locale?: string;
   referrer?: string;
+  path?: string;
 };
 
 const corsHeaders = {
@@ -69,6 +71,44 @@ async function getGithubDownloads() {
   }, 0);
 }
 
+async function getGithubRepoStats() {
+  const repo = Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat';
+  const token = Deno.env.get('GITHUB_TOKEN');
+  const headers: Record<string, string> = {
+    accept: 'application/vnd.github+json',
+    'user-agent': 'deskcat-public-stats',
+  };
+  if (token) headers.authorization = `Bearer ${token}`;
+
+  const repoResponse = await fetch(`https://api.github.com/repos/${repo}`, { headers });
+  if (!repoResponse.ok) throw new Error(`GitHub repo request failed: ${repoResponse.status}`);
+  const repoData = await repoResponse.json() as { stargazers_count?: number };
+
+  let views = 0;
+  let uniqueViews = 0;
+  let viewsError: string | null = token ? null : 'GITHUB_TOKEN is not configured';
+  if (token) {
+    try {
+      const trafficResponse = await fetch(`https://api.github.com/repos/${repo}/traffic/views`, { headers });
+      if (!trafficResponse.ok) throw new Error(`GitHub traffic request failed: ${trafficResponse.status}`);
+      const trafficData = await trafficResponse.json() as { count?: number; uniques?: number };
+      views = Number(trafficData.count ?? 0);
+      uniqueViews = Number(trafficData.uniques ?? 0);
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  return {
+    repo,
+    stars: Number(repoData.stargazers_count ?? 0),
+    views,
+    uniqueViews,
+    viewsWindowDays: 14,
+    viewsError,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -76,15 +116,27 @@ Deno.serve(async (req) => {
     const supabase = getSupabaseAdmin();
 
     if (req.method === 'GET') {
-      const [devices, downloads, githubDownloads] = await Promise.all([
+      const [devices, downloads, pageViews, githubDownloads, githubStats] = await Promise.all([
         supabase.from('devices').select('device_id', { count: 'exact', head: true }),
         supabase.from('download_events').select('id', { count: 'exact', head: true }),
+        supabase.from('page_view_events').select('id', { count: 'exact', head: true }),
         getGithubDownloads().catch(() => 0),
+        getGithubRepoStats().catch((error) => ({
+          repo: Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat',
+          stars: 0,
+          views: 0,
+          uniqueViews: 0,
+          viewsWindowDays: 14,
+          viewsError: error instanceof Error ? error.message : String(error),
+        })),
       ]);
       if (devices.error) throw devices.error;
       if (downloads.error) throw downloads.error;
+      if (pageViews.error) throw pageViews.error;
 
       const productSiteDownloads = downloads.count ?? 0;
+      const productSiteViews = pageViews.count ?? 0;
+      const githubViews = Number(githubStats.views ?? 0);
       return json({
         ok: true,
         generatedAt: new Date().toISOString(),
@@ -92,11 +144,31 @@ Deno.serve(async (req) => {
         productSiteDownloads,
         githubDownloads,
         totalDownloads: productSiteDownloads + githubDownloads,
+        productSiteViews,
+        githubViews,
+        totalViews: productSiteViews + githubViews,
+        githubStars: Number(githubStats.stars ?? 0),
+        github: githubStats,
       });
     }
 
     if (req.method === 'POST') {
-      const payload = (await req.json().catch(() => ({}))) as DownloadPayload;
+      const payload = (await req.json().catch(() => ({}))) as StatsPayload;
+      const eventType = safeText(payload.eventType, 32) || 'download';
+
+      if (eventType === 'page_view') {
+        const { error } = await supabase.from('page_view_events').insert({
+          source: 'product_site',
+          path: safeText(payload.path, 500) || '/',
+          locale: safeText(payload.locale, 32),
+          referrer: safeText(payload.referrer, 500),
+          user_agent: safeText(req.headers.get('user-agent'), 500),
+        });
+        if (error) throw error;
+
+        return json({ ok: true });
+      }
+
       const asset = safeText(payload.asset, 120);
       if (!asset) return json({ ok: false, error: 'Missing asset' }, 400);
 

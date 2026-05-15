@@ -294,7 +294,7 @@ figcaption,
   right: var(--grid-margin);
   bottom: 22px;
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto 1fr repeat(4, auto);
   align-items: end;
   column-gap: 20px;
   row-gap: 10px;
@@ -311,7 +311,7 @@ figcaption,
 .live-users {
   display: inline-flex;
   align-items: baseline;
-  gap: 10px;
+  gap: 7px;
   white-space: nowrap;
 }
 

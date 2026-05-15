@@ -35,6 +35,13 @@ type DailyDownloadMetric = {
   download_count: number;
 };
 
+type DailyPageViewMetric = {
+  metric_date: string;
+  source: string;
+  path: string;
+  view_count: number;
+};
+
 type RecentEvent = {
   device_id: string;
   event_name: string;
@@ -184,6 +191,20 @@ function aggregateProductDownloads(rows: DailyDownloadMetric[]) {
   };
 }
 
+function aggregateProductViews(rows: DailyPageViewMetric[]) {
+  const byPath = new Map<string, number>();
+  for (const row of rows) {
+    byPath.set(row.path, (byPath.get(row.path) ?? 0) + Number(row.view_count ?? 0));
+  }
+  return {
+    count: Array.from(byPath.values()).reduce((total, value) => total + value, 0),
+    paths: Array.from(byPath.entries())
+      .map(([path, count]) => ({ path, count }))
+      .sort((a, b) => b.count - a.count),
+    daily: rows,
+  };
+}
+
 async function getGithubDownloads() {
   const repo = Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat';
   const token = Deno.env.get('GITHUB_TOKEN');
@@ -217,6 +238,44 @@ async function getGithubDownloads() {
   };
 }
 
+async function getGithubRepoStats() {
+  const repo = Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat';
+  const token = Deno.env.get('GITHUB_TOKEN');
+  const headers: Record<string, string> = {
+    accept: 'application/vnd.github+json',
+    'user-agent': 'deskcat-dashboard',
+  };
+  if (token) headers.authorization = `Bearer ${token}`;
+
+  const response = await fetch(`https://api.github.com/repos/${repo}`, { headers });
+  if (!response.ok) throw new Error(`GitHub repo request failed: ${response.status}`);
+  const repoData = await response.json() as { stargazers_count?: number };
+
+  let views = 0;
+  let uniqueViews = 0;
+  let viewsError: string | null = token ? null : 'GITHUB_TOKEN is not configured';
+  if (token) {
+    try {
+      const trafficResponse = await fetch(`https://api.github.com/repos/${repo}/traffic/views`, { headers });
+      if (!trafficResponse.ok) throw new Error(`GitHub traffic request failed: ${trafficResponse.status}`);
+      const trafficData = await trafficResponse.json() as { count?: number; uniques?: number };
+      views = Number(trafficData.count ?? 0);
+      uniqueViews = Number(trafficData.uniques ?? 0);
+    } catch (error) {
+      viewsError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  return {
+    repo,
+    stars: Number(repoData.stargazers_count ?? 0),
+    views,
+    uniqueViews,
+    viewsWindowDays: 14,
+    viewsError,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
@@ -236,6 +295,8 @@ Deno.serve(async (req) => {
       featureUsersDaily,
       downloads,
       downloadsTotal,
+      pageViews,
+      pageViewsTotal,
       recent,
     ] = await Promise.all([
       supabase.from('devices').select('device_id', { count: 'exact', head: true }),
@@ -246,13 +307,27 @@ Deno.serve(async (req) => {
       supabase.from('daily_feature_user_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
       supabase.from('daily_download_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
       supabase.from('download_events').select('id', { count: 'exact', head: true }),
+      supabase.from('daily_page_view_metrics').select('*').gte('metric_date', startDate).order('metric_date', { ascending: false }),
+      supabase.from('page_view_events').select('id', { count: 'exact', head: true }),
       supabase.from('telemetry_events')
         .select('device_id,event_name,feature,count,duration_ms,client_created_at')
         .order('client_created_at', { ascending: false })
         .limit(50),
     ]);
 
-    for (const result of [devices, backups, telemetry, daily, featureDaily, featureUsersDaily, downloads, downloadsTotal, recent]) {
+    for (const result of [
+      devices,
+      backups,
+      telemetry,
+      daily,
+      featureDaily,
+      featureUsersDaily,
+      downloads,
+      downloadsTotal,
+      pageViews,
+      pageViewsTotal,
+      recent,
+    ]) {
       if (result.error) throw result.error;
     }
 
@@ -260,13 +335,23 @@ Deno.serve(async (req) => {
     const featureRows = (featureDaily.data ?? []) as DailyFeatureMetric[];
     const featureUserRows = (featureUsersDaily.data ?? []) as DailyFeatureUserMetric[];
     const downloadRows = (downloads.data ?? []) as DailyDownloadMetric[];
+    const pageViewRows = (pageViews.data ?? []) as DailyPageViewMetric[];
     const aggregates = aggregateFeatures(featureRows);
     const productDownloads = aggregateProductDownloads(downloadRows);
+    const productViews = aggregateProductViews(pageViewRows);
     const githubDownloads = await getGithubDownloads().catch((error) => ({
       repo: Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat',
       count: 0,
       assets: [],
       error: error instanceof Error ? error.message : String(error),
+    }));
+    const githubStats = await getGithubRepoStats().catch((error) => ({
+      repo: Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat',
+      stars: 0,
+      views: 0,
+      uniqueViews: 0,
+      viewsWindowDays: 14,
+      viewsError: error instanceof Error ? error.message : String(error),
     }));
     const latestDaily = dailyRows.at(-1);
 
@@ -283,6 +368,8 @@ Deno.serve(async (req) => {
         useCount: sum(dailyRows as unknown as Array<Record<string, unknown>>, 'feature_use_count'),
         durationMs: sum(dailyRows as unknown as Array<Record<string, unknown>>, 'total_duration_ms'),
         downloads: Number(downloadsTotal.count ?? 0) + Number(githubDownloads.count ?? 0),
+        views: Number(pageViewsTotal.count ?? 0) + Number(githubStats.views ?? 0),
+        githubStars: Number(githubStats.stars ?? 0),
       },
       daily: dailyRows,
       featureUsage: aggregates.features,
@@ -297,6 +384,16 @@ Deno.serve(async (req) => {
         },
         github: githubDownloads,
         total: Number(downloadsTotal.count ?? 0) + Number(githubDownloads.count ?? 0),
+      },
+      views: {
+        productSite: {
+          total: pageViewsTotal.count ?? 0,
+          range: productViews.count,
+          paths: productViews.paths,
+          daily: productViews.daily,
+        },
+        github: githubStats,
+        total: Number(pageViewsTotal.count ?? 0) + Number(githubStats.views ?? 0),
       },
       recentEvents: (recent.data ?? []) as RecentEvent[],
     });

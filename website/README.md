@@ -35,4 +35,6 @@ Deploy `supabase/functions/deskcat-public-stats`, then set the `deskcat-public-s
 <meta name="deskcat-public-stats-url" content="https://<project-ref>.functions.supabase.co/deskcat-public-stats" />
 ```
 
-The site refreshes the total user count, total downloads, product website downloads, and GitHub release downloads every 30 seconds. Download button clicks are recorded as product website downloads.
+The site refreshes the total user count, total downloads, product website downloads, GitHub release downloads, total views, product website views, GitHub traffic views, and GitHub stars every 30 seconds. Page loads are recorded as product website views, and download button clicks are recorded as product website downloads.
+
+GitHub traffic views come from GitHub's repository traffic API, which reports a rolling 14-day window and requires `GITHUB_TOKEN` in the Edge Function environment.

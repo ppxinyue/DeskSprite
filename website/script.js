@@ -8,7 +8,11 @@ const copy = {
     heroFootnote: 'Move your cursor. The cats follow.',
     liveUsersLabel: 'Total users',
     liveDownloadsLabel: 'Downloads',
+    liveViewsLabel: 'Views',
+    githubStarsLabel: 'Stars',
     siteDownloadsLabel: 'Product site',
+    siteViewsLabel: 'Site views',
+    githubViewsLabel: 'GitHub views',
     motionTitle: 'Lives quietly in the corner. Ready when you are.',
     manifestoLabel: 'WHY IT EXISTS',
     manifestoTitle: 'You have more productivity tools than ever. None of them know what you actually did today.',
@@ -43,7 +47,11 @@ const copy = {
     heroFootnote: '移动鼠标，猫猫会跟上来。',
     liveUsersLabel: '当前总计用户数',
     liveDownloadsLabel: '下载量',
+    liveViewsLabel: '总浏览量',
+    githubStarsLabel: 'GitHub Star',
     siteDownloadsLabel: '产品网站',
+    siteViewsLabel: '网页浏览量',
+    githubViewsLabel: 'GitHub 浏览量',
     motionTitle: '住在屏幕角落里，安静在线，随时可用。',
     manifestoLabel: '为什么需要它',
     manifestoTitle: '效率工具越来越多，但没有一个真正懂你今天做了什么。',
@@ -150,8 +158,12 @@ applyLanguage(currentLanguage);
 
 const totalUsersEl = document.querySelector('[data-total-users]');
 const totalDownloadsEl = document.querySelector('[data-total-downloads]');
+const totalViewsEl = document.querySelector('[data-total-views]');
+const githubStarsEls = document.querySelectorAll('[data-github-stars], [data-github-stars-inline]');
 const productDownloadsEl = document.querySelector('[data-product-downloads]');
 const githubDownloadsEl = document.querySelector('[data-github-downloads]');
+const productSiteViewsEl = document.querySelector('[data-product-site-views]');
+const githubViewsEl = document.querySelector('[data-github-views]');
 const publicStatsUrl =
   document.querySelector('meta[name="deskcat-public-stats-url"]')?.content ||
   window.DESKCAT_PUBLIC_STATS_URL ||
@@ -168,37 +180,61 @@ async function refreshPublicStats() {
   if (!response.ok || !data.ok) throw new Error(data.error || `Stats failed: ${response.status}`);
   totalUsersEl.textContent = formatStatNumber(data.totalUsers);
   if (totalDownloadsEl) totalDownloadsEl.textContent = formatStatNumber(data.totalDownloads);
+  if (totalViewsEl) totalViewsEl.textContent = formatStatNumber(data.totalViews);
+  for (const node of githubStarsEls) node.textContent = formatStatNumber(data.githubStars);
   if (productDownloadsEl) productDownloadsEl.textContent = formatStatNumber(data.productSiteDownloads);
   if (githubDownloadsEl) githubDownloadsEl.textContent = formatStatNumber(data.githubDownloads);
+  if (productSiteViewsEl) productSiteViewsEl.textContent = formatStatNumber(data.productSiteViews);
+  if (githubViewsEl) githubViewsEl.textContent = formatStatNumber(data.githubViews);
 }
 
-function trackDownload(link) {
+function postStatsPayload(payload, options = {}) {
   if (!publicStatsUrl) return;
-  const payload = JSON.stringify({
-    asset: link.dataset.downloadAsset || link.getAttribute('download') || link.href.split('/').pop(),
-    href: link.href,
-    locale: currentLanguage,
-    referrer: document.referrer || null,
-  });
+  const body = JSON.stringify(payload);
+  const preferBeacon = options.preferBeacon ?? true;
 
-  if (navigator.sendBeacon) {
-    navigator.sendBeacon(publicStatsUrl, new Blob([payload], { type: 'application/json' }));
+  if (preferBeacon && navigator.sendBeacon) {
+    navigator.sendBeacon(publicStatsUrl, new Blob([body], { type: 'application/json' }));
     return;
   }
 
   fetch(publicStatsUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: payload,
+    body,
     keepalive: true,
   }).catch(() => {});
 }
 
+function trackPageView() {
+  postStatsPayload({
+    eventType: 'page_view',
+    path: `${window.location.pathname}${window.location.search}`,
+    locale: currentLanguage,
+    referrer: document.referrer || null,
+  }, { preferBeacon: false });
+}
+
+function trackDownload(link) {
+  postStatsPayload({
+    eventType: 'download',
+    asset: link.dataset.downloadAsset || link.getAttribute('download') || link.href.split('/').pop(),
+    href: link.href,
+    locale: currentLanguage,
+    referrer: document.referrer || null,
+  });
+}
+
+trackPageView();
 refreshPublicStats().catch(() => {
   if (totalUsersEl) totalUsersEl.textContent = '--';
   if (totalDownloadsEl) totalDownloadsEl.textContent = '--';
+  if (totalViewsEl) totalViewsEl.textContent = '--';
+  for (const node of githubStarsEls) node.textContent = '--';
   if (productDownloadsEl) productDownloadsEl.textContent = '--';
   if (githubDownloadsEl) githubDownloadsEl.textContent = '--';
+  if (productSiteViewsEl) productSiteViewsEl.textContent = '--';
+  if (githubViewsEl) githubViewsEl.textContent = '--';
 });
 window.setInterval(() => {
   refreshPublicStats().catch(() => {});

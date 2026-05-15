@@ -9,6 +9,8 @@ const featureListEl = document.querySelector('#feature-list');
 const featureUserTableEl = document.querySelector('#feature-user-table');
 const downloadListEl = document.querySelector('#download-list');
 const downloadSummaryEl = document.querySelector('#download-summary');
+const reachListEl = document.querySelector('#reach-list');
+const reachSummaryEl = document.querySelector('#reach-summary');
 const eventTableEl = document.querySelector('#event-table');
 const recentListEl = document.querySelector('#recent-list');
 
@@ -64,6 +66,8 @@ function renderMetrics(data) {
     metric('Usage Time', formatDuration(totals.durationMs), `${data.range.days} day range`),
     metric('Feature Uses', formatNumber(totals.useCount), 'summed event count'),
     metric('Downloads', formatNumber(totals.downloads), 'website + GitHub'),
+    metric('Views', formatNumber(totals.views), 'website + GitHub traffic'),
+    metric('GitHub Stars', formatNumber(totals.githubStars), 'repository stars'),
     metric('Events', formatNumber(totals.telemetryEvents), 'raw telemetry'),
     metric('Backups', formatNumber(totals.backups), 'cloud snapshots'),
   ].join('');
@@ -175,6 +179,52 @@ function renderDownloads(data) {
   `).join('');
 }
 
+function renderReach(data) {
+  const views = data.views || {};
+  const productSite = views.productSite || {};
+  const github = views.github || {};
+  const paths = productSite.paths || [];
+  reachSummaryEl.textContent = `${formatNumber(views.total)} total views`;
+
+  const rows = [
+    {
+      label: 'Product website views',
+      value: productSite.total,
+      sub: `${formatNumber(productSite.range)} in selected range`,
+    },
+    {
+      label: `GitHub views${github.viewsWindowDays ? ` · ${github.viewsWindowDays} days` : ''}`,
+      value: github.views,
+      sub: github.viewsError || 'repository traffic views',
+    },
+    {
+      label: 'GitHub unique views',
+      value: github.uniqueViews,
+      sub: github.viewsError || 'repository traffic uniques',
+    },
+    {
+      label: `GitHub stars${github.repo ? ` · ${github.repo}` : ''}`,
+      value: github.stars,
+      sub: 'repository stargazers',
+    },
+    ...paths.slice(0, 4).map((path) => ({
+      label: `Website · ${path.path}`,
+      value: path.count,
+      sub: 'selected range',
+    })),
+  ];
+
+  reachListEl.innerHTML = rows.map((row) => `
+    <div class="download-row">
+      <div>
+        <strong>${row.label}</strong>
+        <span>${row.sub || ''}</span>
+      </div>
+      <b>${formatNumber(row.value)}</b>
+    </div>
+  `).join('');
+}
+
 function renderEvents(data) {
   const rows = data.eventUsage || [];
   if (rows.length === 0) {
@@ -213,6 +263,7 @@ function render(data) {
   renderFeatures(data);
   renderFeatureUsers(data);
   renderDownloads(data);
+  renderReach(data);
   renderEvents(data);
   renderRecent(data);
   generatedAtEl.textContent = `Generated ${formatDate(data.generatedAt)}`;
