@@ -127,21 +127,33 @@ export function isGifAsset(path: string): boolean {
   return path.split(/[?#]/)[0]?.toLowerCase().endsWith('.gif') ?? false;
 }
 
+const REMOVED_BUILTIN_GIF_ASSETS = new Set([
+  'assets/GIF/',
+  'assets/idle/gif/sleeping_raw_2.GIF',
+  'assets/rest/gif/playing_clean_3.GIF',
+  'assets/rest/gif/rest.GIF',
+  'assets/rest/gif/IMG_3448.GIF',
+  'assets/rest/gif/IMG_3449.GIF',
+  'assets/rest/gif/IMG_3453.GIF',
+  'assets/rest/gif/IMG_3454.GIF',
+  'assets/rest/gif/IMG_3455.GIF',
+  'assets/rest/gif/IMG_3457.GIF',
+]);
+
+function isRemovedBuiltinGifAsset(path: string): boolean {
+  return REMOVED_BUILTIN_GIF_ASSETS.has(path);
+}
+
 export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateMediaConfig> | null): PetStateMediaConfig {
   const defaults = DEFAULT_MEDIA_CONFIG[state];
   if (!raw) return defaults;
   const hasExplicitMode = raw.mediaMode === 'image' || raw.mediaMode === 'gif';
   const defaultGifAssets = raw.defaultGifAssets?.length
-    ? raw.defaultGifAssets.filter((path) => !path.startsWith('assets/GIF/'))
+    ? raw.defaultGifAssets.filter((path) => !isRemovedBuiltinGifAsset(path))
     : defaults.defaultGifAssets;
   const mergedDefaultGifAssets = state === 'rest'
     ? Array.from(new Set([
-      ...defaultGifAssets.filter((path) => ![
-        'assets/rest/gif/playing_clean_3.GIF',
-        'assets/rest/gif/rest.GIF',
-        'assets/rest/gif/IMG_3448.GIF',
-        'assets/rest/gif/IMG_3449.GIF',
-      ].includes(path)),
+      ...defaultGifAssets,
       'assets/rest/gif/idle_raw_1.GIF',
       'assets/rest/gif/drinking_raw.GIF',
       'assets/rest/gif/IMG_3452.GIF',
@@ -163,7 +175,7 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
     userFrames: raw.userFrames ?? defaults.userFrames,
     userGifs: raw.userGifs ?? defaults.userGifs,
     disabledFrames: (raw.disabledFrames ?? defaults.disabledFrames)?.filter((path) => !/^assets\/(idle|thinking|sleeping)\//.test(path)),
-    disabledGifs: (raw.disabledGifs ?? defaults.disabledGifs)?.filter((path) => !path.startsWith('assets/GIF/')),
+    disabledGifs: (raw.disabledGifs ?? defaults.disabledGifs)?.filter((path) => !isRemovedBuiltinGifAsset(path)),
   };
 }
 
