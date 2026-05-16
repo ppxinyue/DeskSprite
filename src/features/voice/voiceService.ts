@@ -1,10 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import { BUILTIN_QUOTA_EXHAUSTED_MESSAGE } from '@/features/ai/defaultModel';
+import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
 import { getSetting, setSetting } from '@/lib/db';
 import type { AppSettings, VoiceProviderMode } from '@/features/settings/settingsStore';
 
 const BUILTIN_VOICE_BASE_URL = 'https://api.openai-proxy.org/v1';
-const BUILTIN_VOICE_API_KEY = 'sk-RUPf8NG93A0bg6Phr3GvHaEXj1z2vFKb2eLIMvgjuaGCLMS7';
 export const BUILTIN_TTS_MODEL = 'tts-1';
 export const BUILTIN_STT_MODEL = 'gpt-4o-mini-transcribe';
 const BUILTIN_STT_USAGE_KEY = 'builtinCloseAiSttSecondsUsage';
@@ -51,9 +51,11 @@ type VoiceSettings = Pick<
   | 'customSttBaseUrl'
   | 'customSttModel'
   | 'customSttApiKey'
+  | 'customSttKeyringRef'
   | 'customTtsBaseUrl'
   | 'customTtsModel'
   | 'customTtsApiKey'
+  | 'customTtsKeyringRef'
 >;
 
 export async function resolveVoiceCloudConfig(
@@ -66,7 +68,10 @@ export async function resolveVoiceCloudConfig(
   if (mode === 'user-cloud') {
     const baseUrl = module === 'stt' ? settings.customSttBaseUrl : settings.customTtsBaseUrl;
     const model = module === 'stt' ? settings.customSttModel : settings.customTtsModel;
-    const apiKey = module === 'stt' ? settings.customSttApiKey : settings.customTtsApiKey;
+    const apiKey = await resolveStoredApiKey(
+      module === 'stt' ? settings.customSttApiKey : settings.customTtsApiKey,
+      module === 'stt' ? settings.customSttKeyringRef : settings.customTtsKeyringRef,
+    );
     if (!baseUrl.trim() || !model.trim() || !apiKey.trim()) return null;
     return {
       baseUrl,
@@ -78,7 +83,7 @@ export async function resolveVoiceCloudConfig(
 
   return {
     baseUrl: BUILTIN_VOICE_BASE_URL,
-    apiKey: BUILTIN_VOICE_API_KEY,
+    apiKey: '',
     model: module === 'stt' ? BUILTIN_STT_MODEL : BUILTIN_TTS_MODEL,
     usingBuiltin: true,
   };
@@ -100,7 +105,8 @@ export async function transcribeWithCloudVoice(
   const { blob, durationMs } = await recordAudioClip(options.maxMs ?? 8_000, options.onLevel, options.onStopReady);
   options.onPhase?.('loading');
   const audioBase64 = await blobToBase64(blob);
-  const text = await invoke<string>('transcribe_audio', {
+  const command = config.usingBuiltin ? 'builtin_transcribe_audio' : 'transcribe_audio';
+  const text = await invoke<string>(command, {
       request: {
         baseUrl: config.baseUrl,
         model: config.model,
@@ -128,7 +134,8 @@ export async function speakWithCloudVoice(text: string, mode: VoiceProviderMode,
   }
 
   try {
-    const response = await invoke<SynthesizeSpeechResponse>('synthesize_speech', {
+    const command = config.usingBuiltin ? 'builtin_synthesize_speech' : 'synthesize_speech';
+    const response = await invoke<SynthesizeSpeechResponse>(command, {
       request: {
         baseUrl: config.baseUrl,
         model: config.model,

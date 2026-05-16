@@ -2032,3 +2032,21 @@
 - 缩放：Timeline pinch zoom 灵敏度从 `0.004` 提升到 `0.008`，同样触控板手势缩放幅度翻倍。
 - 验证：`node --check electron/main.cjs`、`pnpm exec tsc -b --pretty false` 通过；已用 Quick Look 生成弹窗样式预览。
 - 文件：electron/main.cjs, App.tsx, SettingsPanel.tsx, ISSUES.md, PROGRESS.md
+
+### R267. AI 内置额度、默认模型链路与文档上传（2026-05-16）
+- 额度：Chat 内置额度用完时统一显示“内置额度已用完，请配置个人 API。”；额度页在 Chat/STT/TTS 任一内置额度耗尽时显示同一提示；STT 内置额度改为 15 分钟，TTS 内置额度改为 1,000 字符。
+- 回退：STT/TTS 内置额度耗尽后仍 fallback 到系统语音输入/系统朗读，并分别提示“已切换到系统语音输入/系统朗读”。
+- 错误：修复 Electron/Tauri 返回对象错误时前端显示 `[object Object]`，内置模型遇到 monthly spending limit / quota / billing / exceeded 等错误时映射为内置额度耗尽文案。
+- 默认模型：恢复默认模型严格遵守设置语义，`Chat 模型 = 默认` 只走内置模型，`自定义` 才走用户 API；主进程内置模型优先读 `DESKCAT_BUILTIN_*` 环境变量，无环境变量时回退到本机内置 key，修复“内置模型服务未配置”误报。
+- 用户 API：设置页测试按钮支持已迁移到安全存储的 `keyringRef`，不再因 `apiKey` 为 null 误报缺 key。
+- 文档上传：Chat 上传入口支持 PDF/DOCX，本地用 `pdf-parse` / `mammoth` 提取文本，将文档内容作为模型上下文发送；聊天气泡只显示文件名，扫描版或不可提取文本的文档给出明确提示。
+- 验证：多次 `pnpm build` 通过。
+- 文件：electron/main.cjs, package.json, pnpm-lock.yaml, src/features/ai/aiService.ts, src/features/ai/defaultModel.ts, src/features/chat/ChatDialog.tsx, src/features/chat/ChatPrimitives.tsx, src/features/chat/chatStore.ts, src/features/chat/HoverInputBar.tsx, src/features/settings/SettingsPanel.tsx, src/features/voice/voiceService.ts, src/i18n.ts, ISSUES.md, PROGRESS.md
+
+### R268. 拖拽图片到灵宠功能延期（2026-05-16）
+- 决策：图片拖到灵宠自动打开 compact chat 并发送图片的交互本次发版不发布，默认关闭 `ENABLE_PET_IMAGE_DROP`。
+- 原因：真实 Finder 拖拽到透明 always-on-top pet panel 时仍不稳定，拖拽影子可能位于灵宠窗口下方，说明 OS 层 drop target/hit-test 未稳定命中 DeskCat。
+- 版本处理：撤回为该实验加入的 pet window `focusable/acceptFirstMouse` 和临时 drop 置顶 handler，避免影响本次发布的灵宠窗口层级与命中行为；保留拖拽文件识别和 handoff helper 单测作为后续研发素材。
+- 后续：单独开 issue 继续研究 macOS 原生 drop target 或替代交互，不阻塞当前版本。
+- 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:chat`、`pnpm test:startup` 通过。
+- 文件：electron/main.cjs, src/App.tsx, src/features/chat/dragImageFiles.ts, src/features/chat/dropImageHandoff.ts, ISSUES.md, PROGRESS.md

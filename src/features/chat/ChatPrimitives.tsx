@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Check, Copy, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
+import { Check, Copy, FileText, ImagePlus, Loader2, Mic, Speaker, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,10 @@ import type { ChatMessage } from './chatStore';
 export interface SelectedImage {
   path: string;
   name: string;
-  dataUrl: string;
+  kind?: 'image' | 'document';
+  dataUrl?: string;
+  text?: string;
+  truncated?: boolean;
 }
 
 const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp']);
@@ -69,7 +72,13 @@ export function Composer({
     <div className={`${compact ? "p-1.5 pt-1" : "p-2.5"} min-w-0 max-w-full overflow-x-hidden`}>
       {selectedImage && (
         <div className={`mb-1.5 flex items-center gap-1.5 rounded-[7px] border px-2 py-1 text-[12px] leading-[1.5] text-[var(--color-chat-muted)] ${error ? 'animate-input-shake border-destructive/45 bg-destructive/5' : 'border-[var(--color-chat-border)] bg-background'}`}>
-          <img src={selectedImage.dataUrl} alt="" className="h-9 w-9 rounded-[9px] object-cover shadow-sm" />
+          {selectedImage.kind === 'document' ? (
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-secondary text-secondary-foreground shadow-sm">
+              <FileText className="h-4 w-4" />
+            </span>
+          ) : selectedImage.dataUrl ? (
+            <img src={selectedImage.dataUrl} alt="" className="h-9 w-9 rounded-[9px] object-cover shadow-sm" />
+          ) : null}
           <span className="min-w-0 flex-1 truncate">{selectedImage.name}</span>
         </div>
       )}
@@ -81,7 +90,7 @@ export function Composer({
           onSubmit();
         }}
       >
-        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'ml-0.5 h-7 w-7 rounded-[6px]'} p-0 text-[var(--text-secondary)] transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]`} title="上传图片" aria-label="上传图片" onClick={onImagePick}>
+        <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'ml-0.5 h-7 w-7 rounded-[6px]'} p-0 text-[var(--text-secondary)] transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] hover:text-[var(--text-primary)]`} title="上传文件" aria-label="上传文件" onClick={onImagePick}>
           <ImagePlus className={`${compact ? 'h-[14px] w-[14px]' : 'h-3.5 w-3.5'}`} />
         </Button>
         <Button variant="ghost" size="sm" type="button" className={`${compact ? 'h-6 w-6 rounded-[5px]' : 'h-7 w-7 rounded-[6px]'} relative overflow-hidden p-0 transition-transform hover:scale-105 hover:bg-[color-mix(in_srgb,var(--text-primary)_8%,transparent)] ${(isListening || isVoiceLoading) ? 'text-[var(--color-chat-accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="语音输入" onClick={onVoiceInput} disabled={isStreaming || isVoiceLoading}>
@@ -249,6 +258,12 @@ export function MessageBubble({
         {(message.imageDataUrl || message.imageUrl) && (
           <img src={message.imageDataUrl || message.imageUrl} alt="" className="mb-2 max-h-48 rounded-[8px] object-contain" />
         )}
+        {message.documentName && (
+          <div className="mb-2 inline-flex max-w-full items-center gap-1.5 rounded-[7px] border border-[var(--color-chat-border)] bg-background/70 px-2 py-1 text-[12px] leading-5 text-[var(--color-chat-muted)]">
+            <FileText className="h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 truncate">{message.documentName}</span>
+          </div>
+        )}
         {isPending ? (
           <PulseDot className="text-[var(--color-chat-muted)]" />
         ) : isUser ? (
@@ -303,13 +318,14 @@ function clipboardHasImage(event: React.ClipboardEvent) {
     Array.from(event.clipboardData.items ?? []).some((item) => item.kind === 'file' && item.type.startsWith('image/'));
 }
 
-async function fileToSelectedImage(file: File, fallbackName = '图片'): Promise<SelectedImage> {
+export async function fileToSelectedImage(file: File, fallbackName = '图片'): Promise<SelectedImage> {
   if (!isAllowedImageFile(file)) {
     throw new Error('Unsupported image type');
   }
   return {
     path: '',
     name: file.name || `${fallbackName}.${imageExtensionFromType(file.type)}`,
+    kind: 'image',
     dataUrl: await fileToDataUrl(file),
   };
 }

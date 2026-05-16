@@ -1,18 +1,20 @@
 import type { ApiConfig, Message } from './types';
 import type { ApiConfig as StoredApiConfig } from '@/features/settings/apiConfigStore';
+import { invoke } from '@tauri-apps/api/core';
 import { getSetting, setSetting } from '@/lib/db';
 import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
 
 const BUILTIN_USAGE_KEY = 'builtinCloseAiTokenUsage';
 export const BUILTIN_TOKEN_LIMIT = 100_000;
 export const BUILTIN_QUOTA_EXHAUSTED_MESSAGE = '内置额度已用完，请配置个人 API。';
+export const BUILTIN_SERVICE_UNCONFIGURED_MESSAGE = '内置模型服务未配置，请配置个人 API。';
 
 export const BUILTIN_CLOSEAI_CONFIG: ApiConfig = {
   id: -1,
   provider: 'custom',
   baseUrl: 'https://api.openai-proxy.org/v1',
   model: 'gpt-4o-mini',
-  apiKey: 'sk-PByFO1hQJwL32oh0xy3TyAov6bDwJdc91phAdmDDjkU3K6KO',
+  apiKey: '',
   isDefault: true,
 };
 
@@ -22,6 +24,14 @@ export async function resolveChatConfig(defaultConfig: StoredApiConfig | undefin
   error?: string;
 }> {
   if (!defaultConfig) {
+    const available = await isBuiltinChatConfigured();
+    if (!available) {
+      return {
+        config: null,
+        usingBuiltin: true,
+        error: BUILTIN_SERVICE_UNCONFIGURED_MESSAGE,
+      };
+    }
     const usage = await getBuiltinUsage();
     if (usage >= BUILTIN_TOKEN_LIMIT) {
       return {
@@ -34,7 +44,7 @@ export async function resolveChatConfig(defaultConfig: StoredApiConfig | undefin
   }
 
   try {
-    const apiKey = await resolveStoredApiKey(defaultConfig.apiKey);
+    const apiKey = await resolveStoredApiKey(defaultConfig.apiKey, defaultConfig.keyringRef);
     if (!apiKey.trim()) {
       throw new Error('missing api key');
     }
@@ -56,6 +66,12 @@ export async function resolveChatConfig(defaultConfig: StoredApiConfig | undefin
       error: '无法读取 API Key，请重新配置。',
     };
   }
+}
+
+async function isBuiltinChatConfigured() {
+  if (!window.deskCat) return true;
+  const status = await invoke<{ chatConfigured?: boolean }>('get_builtin_service_status').catch(() => null);
+  return status?.chatConfigured !== false;
 }
 
 export async function resolveStoredChatConfig(defaultConfig: StoredApiConfig): Promise<{

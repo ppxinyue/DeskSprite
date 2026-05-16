@@ -28,6 +28,7 @@ import {
   getConversations,
 } from '@/lib/db';
 import { shouldSubmitMessage } from './sendShortcut';
+import { COMPACT_CHAT_PENDING_IMAGE_KEY, isDroppedChatImagePayload, parseDroppedChatImage } from './dropImageHandoff';
 import type { ChatMessage } from './chatStore';
 
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp']);
@@ -86,6 +87,7 @@ export function ChatDialog({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const voiceStopRef = useRef<(() => void) | null>(null);
+  const sendImageRef = useRef<(image: SelectedImage) => void>(() => {});
 
   const {
     messages,
@@ -171,15 +173,16 @@ export function ChatDialog({
     setMode('history');
   }
 
-  async function handleSend() {
-    const text = input.trim();
+  async function handleSend(overrideImage?: SelectedImage) {
+    const text = overrideImage ? '' : input.trim();
     if (isStreaming) return;
-    if (!text && !selectedImage) {
-      setComposerError('先写点内容，或添加一张图片。');
+    const attachmentForMessage = overrideImage ?? selectedImage;
+    if (!text && !attachmentForMessage) {
+      setComposerError('先写点内容，或添加一个文件。');
       setComposerShakeKey((value) => value + 1);
       return;
     }
-    const messageText = text || '请分析这张图片。';
+    const messageText = text || (attachmentForMessage?.kind === 'document' ? '请总结这个文档。' : '请分析这张图片。');
 
     const defaultConfig = settings.chatModelMode === 'custom' ? getDefaultConfig() : undefined;
     const resolved = await resolveChatConfig(defaultConfig);
@@ -189,9 +192,14 @@ export function ChatDialog({
     }
     const apiConfig = resolved.config;
 
-    const imageForMessage = selectedImage;
+    const imageForMessage = attachmentForMessage?.kind === 'document' ? null : attachmentForMessage;
     if (imageForMessage && !supportsImageOrFileInput(apiConfig)) {
       setComposerError(`${apiConfig.model} 暂不支持图片输入，请切换到支持视觉的模型。`);
+      setComposerShakeKey((value) => value + 1);
+      return;
+    }
+    if (attachmentForMessage?.kind === 'document' && !attachmentForMessage.text?.trim()) {
+      setComposerError('未能从文档中提取文本，请换一个可复制文字的 PDF 或 DOCX。');
       setComposerShakeKey((value) => value + 1);
       return;
     }
@@ -199,6 +207,10 @@ export function ChatDialog({
     const userMsg = createMessage('user', messageText, imageForMessage ? {
       imageUrl: imageForMessage.dataUrl,
       imageDataUrl: imageForMessage.dataUrl,
+    } : attachmentForMessage?.kind === 'document' ? {
+      documentName: attachmentForMessage.name,
+      documentText: attachmentForMessage.text,
+      documentTruncated: attachmentForMessage.truncated,
     } : {});
     addMessage(userMsg);
     addMessage(createMessage('assistant', '...'));
@@ -225,8 +237,8 @@ export function ChatDialog({
       const systemPrompt = await getActiveSystemPrompt();
       const baseMessages = [
         { role: 'system' as const, content: systemPrompt },
-        ...messages.map((m) => ({ role: m.role, content: m.content, imageDataUrl: m.imageDataUrl })),
-        { role: 'user' as const, content: messageText, imageDataUrl: imageForMessage?.dataUrl },
+        ...messages.map((m) => ({ role: m.role, content: messageContentForModel(m), imageDataUrl: m.imageDataUrl })),
+        { role: 'user' as const, content: messageContentForModel(userMsg), imageDataUrl: imageForMessage?.dataUrl },
       ];
       if (shouldQuerySystemKnowledge(baseMessages, settings.systemKnowledgeEnabled)) {
         updateLastAssistant('Querying...');
@@ -276,6 +288,31 @@ export function ChatDialog({
       setStreamingContent('');
     }
   }
+
+  sendImageRef.current = (image: SelectedImage) => {
+    void handleSend({ ...image, kind: 'image' });
+  };
+
+  useEffect(() => {
+    if (standalone) return;
+    const consumePendingImage = () => {
+      const raw = localStorage.getItem(COMPACT_CHAT_PENDING_IMAGE_KEY);
+      if (!raw) return;
+      localStorage.removeItem(COMPACT_CHAT_PENDING_IMAGE_KEY);
+      const image = parseDroppedChatImage(raw);
+      if (image) sendImageRef.current(image);
+    };
+    const handleDroppedImage = (event: Event) => {
+      const image = (event as CustomEvent<SelectedImage>).detail;
+      if (isDroppedChatImagePayload(image)) sendImageRef.current(image);
+    };
+    const timer = window.setTimeout(consumePendingImage, 0);
+    window.addEventListener('deskcat:send-image', handleDroppedImage);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('deskcat:send-image', handleDroppedImage);
+    };
+  }, [standalone]);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (shouldSubmitMessage(e, settings.messageSendShortcut)) {
@@ -604,7 +641,7 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
     if (!panel || panel.isStreaming) return;
     const text = panel.input.trim();
     if (!text && !panel.selectedImage) return;
-    const messageText = text || '请分析这张图片。';
+    const messageText = text || (panel.selectedImage?.kind === 'document' ? '请总结这个文档。' : '请分析这张图片。');
 
     const resolved = await resolvePanelConfig(panel.modelId);
     if (!resolved.config) {
@@ -615,7 +652,8 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
       return;
     }
 
-    const imageForMessage = panel.selectedImage;
+    const attachmentForMessage = panel.selectedImage;
+    const imageForMessage = attachmentForMessage?.kind === 'document' ? null : attachmentForMessage;
     if (imageForMessage && !supportsImageOrFileInput(resolved.config)) {
       const modelName = resolved.config.model;
       updatePanel(panelId, (current) => ({
@@ -627,10 +665,24 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
       }));
       return;
     }
+    if (attachmentForMessage?.kind === 'document' && !attachmentForMessage.text?.trim()) {
+      updatePanel(panelId, (current) => ({
+        ...current,
+        messages: [
+          ...current.messages,
+          createMessage('assistant', '未能从文档中提取文本，请换一个可复制文字的 PDF 或 DOCX。', { tone: 'error' }),
+        ],
+      }));
+      return;
+    }
 
     const finalUserMsg = createMessage('user', messageText, imageForMessage ? {
       imageUrl: imageForMessage.dataUrl,
       imageDataUrl: imageForMessage.dataUrl,
+    } : attachmentForMessage?.kind === 'document' ? {
+      documentName: attachmentForMessage.name,
+      documentText: attachmentForMessage.text,
+      documentTruncated: attachmentForMessage.truncated,
     } : {});
     const assistantMsg = createMessage('assistant', '...');
     const previousMessages = panel.messages;
@@ -660,8 +712,8 @@ function StandaloneChatWorkspace({ initialConversationId }: { initialConversatio
       const systemPrompt = await getActiveSystemPrompt();
       const baseMessages = [
         { role: 'system' as const, content: systemPrompt },
-        ...previousMessages.map((m) => ({ role: m.role, content: m.content, imageDataUrl: m.imageDataUrl })),
-        { role: 'user' as const, content: messageText, imageDataUrl: imageForMessage?.dataUrl },
+        ...previousMessages.map((m) => ({ role: m.role, content: messageContentForModel(m), imageDataUrl: m.imageDataUrl })),
+        { role: 'user' as const, content: messageContentForModel(finalUserMsg), imageDataUrl: imageForMessage?.dataUrl },
       ];
       if (shouldQuerySystemKnowledge(baseMessages, settings.systemKnowledgeEnabled)) {
         updatePanel(panelId, (current) => ({
@@ -880,17 +932,36 @@ function messageImageFields(imagePath: string | null | undefined): Partial<Pick<
   return {};
 }
 
+function messageContentForModel(message: Pick<ChatMessage, 'content' | 'documentName' | 'documentText' | 'documentTruncated'>) {
+  if (!message.documentText?.trim()) return message.content;
+  return [
+    message.content,
+    '',
+    `[用户上传文档：${message.documentName || '未命名文档'}]`,
+    message.documentText,
+    message.documentTruncated ? '[注：文档内容较长，已截断到可发送范围。]' : '',
+  ].filter(Boolean).join('\n');
+}
+
 async function pickImage(): Promise<SelectedImage | null> {
-  const picked = await invoke<SelectedImage | null>('pick_chat_image').catch((error) => {
-    console.warn('Native image picker failed:', error);
+  const picked = await invoke<SelectedImage | null>('pick_chat_attachment').catch((error) => {
+    console.warn('Native attachment picker failed:', error);
+    window.alert(error instanceof Error ? error.message : String(error));
     return null;
   });
   if (!picked) return null;
+  if (picked.kind === 'document') {
+    if (!picked.text?.trim()) {
+      window.alert('未能从文档中提取文本，请换一个可复制文字的 PDF 或 DOCX。');
+      return null;
+    }
+    return picked;
+  }
   if (!picked.dataUrl?.startsWith('data:image/') && !isAllowedImageName(picked.name)) {
-    window.alert('只能上传图片，请选择 PNG、JPG、JPEG、WEBP、GIF 或 BMP 格式。');
+    window.alert('只能上传图片或文档，请选择 PNG、JPG、JPEG、WEBP、GIF、BMP、PDF 或 DOCX 格式。');
     return null;
   }
-  return picked;
+  return { ...picked, kind: 'image' };
 }
 
 function isAllowedImageName(name: string) {

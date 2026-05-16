@@ -2883,10 +2883,10 @@ async function loadPetPreviewDataUrl(path: string) {
 }
 
 async function testApiConfig(config: ApiConfig): Promise<{ success: boolean; message: string; latency?: number }> {
-  if (!config.apiKey) {
+  if (!config.keyringRef && !config.apiKey) {
     return { success: false, message: '缺少 API Key，请重新保存配置。' };
   }
-  const apiKey = await resolveStoredApiKey(config.apiKey);
+  const apiKey = await resolveStoredApiKey(config.apiKey, config.keyringRef);
   if (!apiKey.trim()) {
     return { success: false, message: 'API Key 为空。' };
   }
@@ -3032,17 +3032,18 @@ function AISection({
   };
 
   const applyVoiceConfig = async (target: 'stt' | 'tts', config: ApiConfig) => {
-    const apiKey = config.apiKey?.trim();
     const partial: Partial<import('./settingsStore').AppSettings> = target === 'stt'
       ? {
           customSttBaseUrl: config.baseUrl,
           customSttModel: config.model,
-          ...(apiKey ? { customSttApiKey: apiKey } : {}),
+          customSttApiKey: '',
+          customSttKeyringRef: config.keyringRef ?? '',
         }
       : {
           customTtsBaseUrl: config.baseUrl,
           customTtsModel: config.model,
-          ...(apiKey ? { customTtsApiKey: apiKey } : {}),
+          customTtsApiKey: '',
+          customTtsKeyringRef: config.keyringRef ?? '',
         };
     await updateSettings(partial);
   };
@@ -3074,7 +3075,7 @@ function AISection({
                 </div>
                 <div className="mb-1 text-[11px] text-muted-foreground">Model: {c.model}</div>
                 <div className="truncate text-[11px] text-muted-foreground">Base URL: {c.baseUrl}</div>
-                <div className="mt-1 text-[11px] text-muted-foreground">API Key: {describeApiKey(c.apiKey)}</div>
+                <div className="mt-1 text-[11px] text-muted-foreground">API Key: {describeApiKey(c.apiKey, c.keyringRef)}</div>
                 {testResult && (
                   <div className={`mt-1 text-[11px] ${testResult.success ? 'text-green-600' : 'text-red-600'}`}>
                     {testResult.message}
@@ -3893,7 +3894,7 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
             />
             <p className="text-[11px] text-muted-foreground">
               {editingConfig
-                ? `${describeApiKey(editingConfig.apiKey)}。留空保存则不修改，重新粘贴会覆盖。`
+                ? `${describeApiKey(editingConfig.apiKey, editingConfig.keyringRef)}。留空保存则不修改，重新粘贴会覆盖。`
                 : '保存后会显示长度、尾号和指纹，方便确认测试时使用的是同一把 Key。'}
             </p>
           </div>

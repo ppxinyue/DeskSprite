@@ -10,6 +10,7 @@ const {
   nativeImage,
   protocol,
   powerMonitor,
+  safeStorage,
   screen,
   shell,
   systemPreferences,
@@ -34,6 +35,12 @@ const {
   resolveSessionStatus,
 } = require('./codingStatus.cjs');
 const { createDeferredWindowShowController, createPetVisibilityController } = require('./windowLifecycle.cjs');
+const {
+  hasSeenWelcomePermissionPrompt,
+  markWelcomePermissionPromptSeen,
+  readImageDataUrl,
+} = require('./welcomePermissionPrompt.cjs');
+const { createSecureKeyStore } = require('./secureKeyStore.cjs');
 const { autoUpdater } = require('electron-updater');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -60,6 +67,9 @@ let topmostSuppressed = false;
 let compactChatHiddenUntil = 0;
 let petContextMenuOpen = false;
 let currentAppIconPath = path.join(app.getAppPath(), 'public', 'assets', 'idle', 'png', 'idle.png');
+let secureKeyStore = null;
+const scheduleKnowledgeCache = new Map();
+const scheduleKnowledgeInFlight = new Map();
 let tray = null;
 let currentAppIcon = null;
 const floatingConfiguredWindows = new WeakSet();
@@ -70,6 +80,10 @@ const CODEX_STATUS = {
   WORKING: 'working',
   DONE: 'done',
 };
+const BUILTIN_CHAT_API_KEY_FALLBACK = 'sk-PByFO1hQJwL32oh0xy3TyAov6bDwJdc91phAdmDDjkU3K6KO';
+const BUILTIN_VOICE_API_KEY_FALLBACK = 'sk-RUPf8NG93A0bg6Phr3GvHaEXj1z2vFKb2eLIMvgjuaGCLMS7';
+const SCHEDULE_PERMISSION_PROMPT_STATE_FILE = 'schedule-permission-prompts-v1.json';
+const SCHEDULE_KNOWLEDGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_CODEX_HTTP_PROXY = 'http://127.0.0.1:6478';
 const DEFAULT_CODEX_SOCKS_PROXY = 'socks5://127.0.0.1:6478';
 const CURRENT_CODEX_THREAD_ID =
@@ -1387,11 +1401,12 @@ function showChatWindow() {
   showWindowAfterInitialPaint(win, { focus: true });
 }
 
-function showCompactChatWindow({ x, y, w, h }, show = true) {
-  if (Date.now() < compactChatHiddenUntil) {
+function showCompactChatWindow({ x, y, w, h, force = false }, show = true) {
+  if (!force && Date.now() < compactChatHiddenUntil) {
     debugCompactChat('compact chat update ignored after hide', { show, hiddenUntil: compactChatHiddenUntil });
-    return;
+    return false;
   }
+  if (force) compactChatHiddenUntil = 0;
   const existing = windows.get('compact-chat');
   if (!show && existing && !existing.isDestroyed()) {
     debugCompactChat('position compact chat', {
@@ -1403,7 +1418,7 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
     existing.setIgnoreMouseEvents(false);
     applyFloatingFullscreenBehavior(existing);
     debugCompactChat('position compact chat applied', { snapshot: compactChatWindowSnapshot(existing) });
-    return;
+    return true;
   }
   const win = createWindow('compact-chat', {
     width: Math.round(w),
@@ -1433,6 +1448,7 @@ function showCompactChatWindow({ x, y, w, h }, show = true) {
     applyFloatingFullscreenBehavior(win, { force: true });
     win.moveTop();
   }
+  return true;
 }
 
 function focusCompactChatWindowForInput(reason = 'input-start') {
@@ -1474,8 +1490,13 @@ function imageMime(filePath) {
   if (ext === '.webp') return 'image/webp';
   if (ext === '.gif') return 'image/gif';
   if (ext === '.bmp') return 'image/bmp';
+  if (ext === '.svg') return 'image/svg+xml';
   return 'image/png';
 }
+
+const CHAT_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp']);
+const CHAT_DOCUMENT_EXTENSIONS = new Set(['.pdf', '.docx']);
+const CHAT_DOCUMENT_TEXT_LIMIT = 60_000;
 
 function contentType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -1638,6 +1659,39 @@ async function chatCompletion({ request }) {
   return content;
 }
 
+function getBuiltinApiKey(kind = 'chat') {
+  const specific = kind === 'voice'
+    ? process.env.DESKCAT_BUILTIN_VOICE_API_KEY
+    : process.env.DESKCAT_BUILTIN_CHAT_API_KEY;
+  const fallback = kind === 'voice' ? BUILTIN_VOICE_API_KEY_FALLBACK : BUILTIN_CHAT_API_KEY_FALLBACK;
+  return normalizeApiKey(specific || process.env.DESKCAT_BUILTIN_API_KEY || fallback);
+}
+
+function getBuiltinBaseUrl() {
+  return normalizeBaseUrl(process.env.DESKCAT_BUILTIN_BASE_URL || 'https://api.openai-proxy.org/v1');
+}
+
+function getBuiltinServiceStatus() {
+  return {
+    chatConfigured: Boolean(getBuiltinApiKey('chat')),
+    voiceConfigured: Boolean(getBuiltinApiKey('voice')),
+  };
+}
+
+async function builtinChatCompletion({ request }) {
+  const apiKey = getBuiltinApiKey('chat');
+  if (!apiKey) throw new Error('内置模型服务未配置，请切换到个人 API。');
+  return chatCompletion({
+    request: {
+      ...request,
+      provider: 'custom',
+      baseUrl: getBuiltinBaseUrl(),
+      model: 'gpt-4o-mini',
+      apiKey,
+    },
+  });
+}
+
 async function testAiConnection({ request }) {
   const started = Date.now();
   try {
@@ -1775,6 +1829,7 @@ tell ${target}
         set eventLocation to ""
         try
           set eventLocation to location of eventItem
+          if eventLocation is missing value then set eventLocation to ""
         end try
         set output to output & "calendar" & tab & calendarName & tab & eventTitle & tab & (eventStart as string) & tab & (eventEnd as string) & tab & eventLocation & linefeed
       end repeat
@@ -1882,32 +1937,67 @@ async function readSystemKnowledgeScheduleInfo(args = {}) {
   }
   const wantsCalendar = args.calendar !== false;
   const wantsReminders = args.reminders === true;
+  const cacheKey = `calendar:${wantsCalendar ? '1' : '0'};reminders:${wantsReminders ? '1' : '0'}`;
+  const cached = scheduleKnowledgeCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    timelineDebugLog({
+      stage: 'system-knowledge:schedule',
+      message: `cache=hit ${cacheKey}`,
+    });
+    return cached.value;
+  }
+  const inFlight = scheduleKnowledgeInFlight.get(cacheKey);
+  if (inFlight) {
+    timelineDebugLog({
+      stage: 'system-knowledge:schedule',
+      message: `cache=join ${cacheKey}`,
+    });
+    return inFlight;
+  }
+  const readPromise = readSystemKnowledgeScheduleInfoFresh({ wantsCalendar, wantsReminders }).then((result) => {
+    if (!result.calendarError && !result.remindersError) {
+      scheduleKnowledgeCache.set(cacheKey, {
+        expiresAt: Date.now() + SCHEDULE_KNOWLEDGE_CACHE_TTL_MS,
+        value: result,
+      });
+    }
+    return result;
+  }).finally(() => {
+    scheduleKnowledgeInFlight.delete(cacheKey);
+  });
+  scheduleKnowledgeInFlight.set(cacheKey, readPromise);
+  return readPromise;
+}
+
+async function readSystemKnowledgeScheduleInfoFresh({ wantsCalendar, wantsReminders }) {
   const calendarResult = wantsCalendar
-    ? await settlePromise(runFirstSuccessfulAppAppleScript('Calendar', 'com.apple.iCal', calendarKnowledgeScript, 12000))
+    ? settlePromise(runFirstSuccessfulAppAppleScript('Calendar', 'com.apple.iCal', calendarKnowledgeScript, 12000))
     : { status: 'fulfilled', value: '' };
   const remindersResult = wantsReminders
-    ? await settlePromise(runFirstSuccessfulAppAppleScript('Reminders', 'com.apple.reminders', remindersKnowledgeScript))
+    ? settlePromise(runFirstSuccessfulAppAppleScript('Reminders', 'com.apple.reminders', remindersKnowledgeScript))
     : { status: 'fulfilled', value: '' };
-  const calendarError = wantsCalendar && calendarResult.status === 'rejected'
-    ? humanizeAppleScriptAccessError(calendarResult.reason?.message || calendarResult.reason)
+  const [settledCalendarResult, settledRemindersResult] = await Promise.all([calendarResult, remindersResult]);
+  const calendarError = wantsCalendar && settledCalendarResult.status === 'rejected'
+    ? humanizeAppleScriptAccessError(settledCalendarResult.reason?.message || settledCalendarResult.reason)
     : '';
-  const remindersError = wantsReminders && remindersResult.status === 'rejected'
-    ? humanizeAppleScriptAccessError(remindersResult.reason?.message || remindersResult.reason)
+  const remindersError = wantsReminders && settledRemindersResult.status === 'rejected'
+    ? humanizeAppleScriptAccessError(settledRemindersResult.reason?.message || settledRemindersResult.reason)
     : '';
   timelineDebugLog({
     stage: 'system-knowledge:schedule',
     message: [
-      wantsCalendar ? `calendar=${calendarResult.status}` : 'calendar=skipped',
-      wantsReminders ? `reminders=${remindersResult.status}` : 'reminders=skipped',
+      'cache=miss',
+      wantsCalendar ? `calendar=${settledCalendarResult.status}` : 'calendar=skipped',
+      wantsReminders ? `reminders=${settledRemindersResult.status}` : 'reminders=skipped',
       calendarError ? `calendarError=${calendarError}` : '',
       remindersError ? `remindersError=${remindersError}` : '',
     ].filter(Boolean).join(' '),
   });
   return {
-    calendar: wantsCalendar && calendarResult.status === 'fulfilled' ? parseTabRows(calendarResult.value, 'calendar') : [],
-    reminders: wantsReminders && remindersResult.status === 'fulfilled' ? parseTabRows(remindersResult.value, 'reminder') : [],
-    calendarStatus: !wantsCalendar || calendarResult.status === 'fulfilled' ? 'ok' : 'error',
-    remindersStatus: !wantsReminders || remindersResult.status === 'fulfilled' ? 'ok' : 'error',
+    calendar: wantsCalendar && settledCalendarResult.status === 'fulfilled' ? parseTabRows(settledCalendarResult.value, 'calendar') : [],
+    reminders: wantsReminders && settledRemindersResult.status === 'fulfilled' ? parseTabRows(settledRemindersResult.value, 'reminder') : [],
+    calendarStatus: !wantsCalendar || settledCalendarResult.status === 'fulfilled' ? 'ok' : 'error',
+    remindersStatus: !wantsReminders || settledRemindersResult.status === 'fulfilled' ? 'ok' : 'error',
     calendarError,
     remindersError,
     error: [
@@ -1947,6 +2037,7 @@ async function requestSystemKnowledgePermissions(args = {}) {
   }
   const wantsCalendar = args.calendar !== false;
   const wantsReminders = args.reminders === true;
+  const promptKey = schedulePermissionPromptKey({ calendar: wantsCalendar, reminders: wantsReminders });
   const permissionTitle = wantsCalendar && wantsReminders
     ? chooseLocaleText('需要日历和提醒事项权限', 'Calendar and Reminders needed')
     : wantsReminders
@@ -1973,15 +2064,18 @@ async function requestSystemKnowledgePermissions(args = {}) {
         'Only needed data is read for related questions. Local by default; cloud backups are encrypted.',
       ),
     };
-    const consent = permissionParent && !permissionParent.isDestroyed()
-      ? await dialog.showMessageBox(permissionParent, messageBoxOptions)
-      : await dialog.showMessageBox(messageBoxOptions);
-    if (consent.response !== 0) {
-      return {
-        ok: false,
-        calendar: { ok: !wantsCalendar, message: wantsCalendar ? 'User cancelled permission request.' : 'Not requested.' },
-        reminders: { ok: !wantsReminders, message: wantsReminders ? 'User cancelled permission request.' : 'Not requested.' },
-      };
+    if (!hasSeenSchedulePermissionPrompt(promptKey)) {
+      const consent = permissionParent && !permissionParent.isDestroyed()
+        ? await dialog.showMessageBox(permissionParent, messageBoxOptions)
+        : await dialog.showMessageBox(messageBoxOptions);
+      markSchedulePermissionPromptSeen(promptKey);
+      if (consent.response !== 0) {
+        return {
+          ok: false,
+          calendar: { ok: !wantsCalendar, message: wantsCalendar ? 'User cancelled permission request.' : 'Not requested.' },
+          reminders: { ok: !wantsReminders, message: wantsReminders ? 'User cancelled permission request.' : 'Not requested.' },
+        };
+      }
     }
     const calendarResult = wantsCalendar
       ? await settlePromise(runFirstSuccessfulAppAppleScript('Calendar', 'com.apple.iCal', (target) => `tell ${target} to return count of calendars`))
@@ -1991,6 +2085,9 @@ async function requestSystemKnowledgePermissions(args = {}) {
       : { status: 'fulfilled', value: '' };
     const calendar = wantsCalendar ? permissionResultFromSettled(calendarResult) : { ok: true, message: 'Not requested.' };
     const reminders = wantsReminders ? permissionResultFromSettled(remindersResult) : { ok: true, message: 'Not requested.' };
+    if (wantsCalendar && calendar.ok) markSchedulePermissionPromptSeen('calendar');
+    if (wantsReminders && reminders.ok) markSchedulePermissionPromptSeen('reminders');
+    if (wantsCalendar && wantsReminders && calendar.ok && reminders.ok) markSchedulePermissionPromptSeen('calendar+reminders');
     if ((wantsCalendar && !calendar.ok) || (wantsReminders && !reminders.ok)) {
       shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Automation').catch(() => {});
     }
@@ -2000,6 +2097,42 @@ async function requestSystemKnowledgePermissions(args = {}) {
       reminders,
     };
   });
+}
+
+function schedulePermissionPromptStatePath() {
+  return path.join(app.getPath('userData'), SCHEDULE_PERMISSION_PROMPT_STATE_FILE);
+}
+
+function readSchedulePermissionPromptState() {
+  try {
+    return JSON.parse(fs.readFileSync(schedulePermissionPromptStatePath(), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function writeSchedulePermissionPromptState(state) {
+  try {
+    fs.writeFileSync(schedulePermissionPromptStatePath(), JSON.stringify(state, null, 2));
+  } catch {
+    // If persistence fails, permissions still work; the explanatory prompt may reappear.
+  }
+}
+
+function schedulePermissionPromptKey({ calendar, reminders }) {
+  if (calendar && reminders) return 'calendar+reminders';
+  if (reminders) return 'reminders';
+  return 'calendar';
+}
+
+function hasSeenSchedulePermissionPrompt(key) {
+  return Boolean(readSchedulePermissionPromptState()[key]?.seen);
+}
+
+function markSchedulePermissionPromptSeen(key) {
+  const state = readSchedulePermissionPromptState();
+  state[key] = { seen: true, seenAt: new Date().toISOString() };
+  writeSchedulePermissionPromptState(state);
 }
 
 function showPermissionPromptOverlay(args = {}, event) {
@@ -2068,7 +2201,7 @@ function showPermissionPromptOverlay(args = {}, event) {
 
     const requestedIconPath = resolveAppIconPath(args.iconPath);
     const iconPath = fs.existsSync(requestedIconPath) ? requestedIconPath : currentAppIconPath;
-    const iconSrc = fs.existsSync(iconPath) ? `deskcat-file:///${encodeURIComponent(iconPath)}` : '';
+    const iconSrc = fs.existsSync(iconPath) ? readImageDataUrl(iconPath, imageMime) : '';
     const title = escapeHtml(args.title);
     const feature = escapeHtml(args.feature);
     const privacy = escapeHtml(args.privacy);
@@ -2125,6 +2258,10 @@ document.getElementById('ok').focus();
 
 function showWelcomePermissionPrompt(event) {
   return new Promise((resolve) => {
+    if (hasSeenWelcomePermissionPrompt(app.getPath('userData'))) {
+      resolve(true);
+      return;
+    }
     const parent = event?.sender ? BrowserWindow.fromWebContents(event.sender) : windows.get('pet');
     const parentBounds = parent && !parent.isDestroyed() ? parent.getBounds() : screen.getPrimaryDisplay().bounds;
     const display = screen.getDisplayMatching(parentBounds);
@@ -2161,6 +2298,11 @@ function showWelcomePermissionPrompt(event) {
     const finish = (accepted) => {
       if (!permissionPromptResolvers.has(id)) return;
       permissionPromptResolvers.delete(id);
+      try {
+        markWelcomePermissionPromptSeen(app.getPath('userData'));
+      } catch {
+        // Losing this marker only means the explanatory prompt may show again.
+      }
       if (!win.isDestroyed()) win.close();
       resolve(Boolean(accepted));
     };
@@ -2187,7 +2329,7 @@ function showWelcomePermissionPrompt(event) {
       setTimeout(revealPrompt, 360);
     });
 
-    const iconSrc = fs.existsSync(currentAppIconPath) ? `deskcat-file:///${encodeURIComponent(currentAppIconPath)}` : '';
+    const iconSrc = fs.existsSync(currentAppIconPath) ? readImageDataUrl(currentAppIconPath, imageMime) : '';
     const zh = isChineseLocale();
     const eyebrow = zh ? '欢迎使用 DeskCat' : 'Welcome to DeskCat';
     const title = zh ? '咪已成功登陆你的电脑' : 'Mimi has successfully moved into your computer';
@@ -2359,6 +2501,19 @@ async function transcribeAudio({ request }) {
   return JSON.parse(text).text?.trim() || '';
 }
 
+async function builtinTranscribeAudio({ request }) {
+  const apiKey = getBuiltinApiKey('voice');
+  if (!apiKey) throw new Error('内置语音服务未配置，请切换到系统或个人语音服务。');
+  return transcribeAudio({
+    request: {
+      ...request,
+      baseUrl: getBuiltinBaseUrl(),
+      model: 'gpt-4o-mini-transcribe',
+      apiKey,
+    },
+  });
+}
+
 async function synthesizeSpeech({ request }) {
   const apiKey = normalizeApiKey(request.apiKey);
   if (!apiKey) throw new Error('API Key 为空。');
@@ -2380,6 +2535,19 @@ async function synthesizeSpeech({ request }) {
   const bytes = Buffer.from(await response.arrayBuffer());
   const mimeType = format === 'opus' ? 'audio/ogg' : format === 'wav' ? 'audio/wav' : 'audio/mpeg';
   return { dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`, mimeType };
+}
+
+async function builtinSynthesizeSpeech({ request }) {
+  const apiKey = getBuiltinApiKey('voice');
+  if (!apiKey) throw new Error('内置语音服务未配置，请切换到系统或个人语音服务。');
+  return synthesizeSpeech({
+    request: {
+      ...request,
+      baseUrl: getBuiltinBaseUrl(),
+      model: 'tts-1',
+      apiKey,
+    },
+  });
 }
 
 function getCodexBinary() {
@@ -3832,17 +4000,21 @@ async function ackInheritedClaudeCodingSessions({ ackKeys } = {}) {
   return getInheritedClaudeCodingState();
 }
 
-const keyStore = new Map();
-
 const handlers = {
   show_settings_cmd: ({ section }) => showSettingsWindow(section),
   show_chat_window: () => showChatWindow(),
   show_compact_chat_window: (args) => showCompactChatWindow(args, true),
   position_compact_chat_window: (args) => showCompactChatWindow(args, false),
-  hide_compact_chat_window: () => {
-    debugCompactChat('hide compact chat', { snapshot: compactChatWindowSnapshot(windows.get('compact-chat')) });
-    compactChatHiddenUntil = Date.now() + 1500;
+  hide_compact_chat_window: ({ suppressReopenMs = 0, reason = '' } = {}) => {
+    const suppressMs = Math.max(0, Math.min(5000, Number(suppressReopenMs) || 0));
+    debugCompactChat('hide compact chat', {
+      reason,
+      suppressReopenMs: suppressMs,
+      snapshot: compactChatWindowSnapshot(windows.get('compact-chat')),
+    });
+    if (suppressMs > 0) compactChatHiddenUntil = Date.now() + suppressMs;
     windows.get('compact-chat')?.hide();
+    return true;
   },
   is_compact_chat_visible: () => {
     const win = windows.get('compact-chat');
@@ -3896,7 +4068,8 @@ const handlers = {
   },
   import_pet_image: importPetImage,
   list_pet_images: listPetImages,
-  pick_chat_image: (_args, event) => pickChatImage(event),
+  pick_chat_image: (_args, event) => pickChatAttachment(event),
+  pick_chat_attachment: (_args, event) => pickChatAttachment(event),
   renderer_window_ready: (_args, event) => {
     markRendererReady(BrowserWindow.fromWebContents(event.sender));
   },
@@ -3925,16 +4098,29 @@ const handlers = {
   capture_screen_region: captureScreenRegion,
   open_external_url: ({ url }) => shell.openExternal(url),
   chat_completion: chatCompletion,
+  builtin_chat_completion: builtinChatCompletion,
+  get_builtin_service_status: getBuiltinServiceStatus,
   test_ai_connection: testAiConnection,
   read_system_knowledge_device_info: readSystemKnowledgeDeviceInfo,
   read_system_knowledge_weather_info: readSystemKnowledgeWeatherInfo,
   read_system_knowledge_schedule_info: readSystemKnowledgeScheduleInfo,
   request_system_knowledge_permissions: requestSystemKnowledgePermissions,
   show_permission_prompt_overlay: (args, event) => showPermissionPromptOverlay(args, event),
+  get_welcome_permission_prompt_seen: () => hasSeenWelcomePermissionPrompt(app.getPath('userData')),
+  mark_welcome_permission_prompt_seen: () => {
+    try {
+      markWelcomePermissionPromptSeen(app.getPath('userData'));
+      return true;
+    } catch {
+      return false;
+    }
+  },
   show_welcome_permission_prompt: (_args, event) => showWelcomePermissionPrompt(event),
   permission_prompt_result: resolvePermissionPromptResult,
   transcribe_audio: transcribeAudio,
+  builtin_transcribe_audio: builtinTranscribeAudio,
   synthesize_speech: synthesizeSpeech,
+  builtin_synthesize_speech: builtinSynthesizeSpeech,
   can_start_speech_recognition: () => true,
   check_distraction: checkDistraction,
   ensure_accessibility_permission: ensureAccessibilityPermission,
@@ -3996,11 +4182,16 @@ const handlers = {
     return null;
   },
   save_api_key: ({ keyringRef, key }) => {
-    keyStore.set(keyringRef, key);
+    if (!secureKeyStore) secureKeyStore = createSecureKeyStore({ userDataPath: app.getPath('userData'), safeStorage });
+    secureKeyStore.save(keyringRef, key);
   },
-  get_api_key: ({ keyringRef }) => keyStore.get(keyringRef) || '',
+  get_api_key: ({ keyringRef }) => {
+    if (!secureKeyStore) secureKeyStore = createSecureKeyStore({ userDataPath: app.getPath('userData'), safeStorage });
+    return secureKeyStore.get(keyringRef) || '';
+  },
   delete_api_key: ({ keyringRef }) => {
-    keyStore.delete(keyringRef);
+    if (!secureKeyStore) secureKeyStore = createSecureKeyStore({ userDataPath: app.getPath('userData'), safeStorage });
+    secureKeyStore.remove(keyringRef);
   },
 };
 
@@ -4069,28 +4260,76 @@ ipcMain.handle('deskcat:open-dialog', async (event, options) => {
   return options.multiple ? result.filePaths : result.filePaths[0] || null;
 });
 
-async function pickChatImage(event) {
+async function pickChatAttachment(event) {
   const parent = event?.sender ? BrowserWindow.fromWebContents(event.sender) : windows.get('pet');
   if (parent && !parent.isDestroyed()) {
     applyFloatingFullscreenBehavior(parent, { force: true });
   }
   const result = await dialog.showOpenDialog(parent && !parent.isDestroyed() ? parent : undefined, {
     properties: ['openFile'],
-    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
+    filters: [
+      { name: 'Images and Documents', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'pdf', 'docx'] },
+      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] },
+      { name: 'Documents', extensions: ['pdf', 'docx'] },
+    ],
   });
   if (result.canceled || !result.filePaths[0]) return null;
   const filePath = result.filePaths[0];
   const ext = path.extname(filePath).toLowerCase();
-  if (!['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'].includes(ext)) return null;
+  if (!CHAT_IMAGE_EXTENSIONS.has(ext) && !CHAT_DOCUMENT_EXTENSIONS.has(ext)) {
+    throw new Error('请选择 PNG、JPG、JPEG、WEBP、GIF、BMP、PDF 或 DOCX 文件');
+  }
   const bytes = await fsp.readFile(filePath);
+  if (CHAT_DOCUMENT_EXTENSIONS.has(ext)) {
+    const extracted = ext === '.pdf'
+      ? await extractPdfText(bytes)
+      : await extractDocxText(filePath);
+    const normalized = normalizeDocumentText(extracted);
+    if (!normalized) throw new Error('未能从文档中提取文本，请换一个可复制文字的 PDF 或 DOCX。');
+    const truncated = normalized.length > CHAT_DOCUMENT_TEXT_LIMIT;
+    return {
+      path: filePath,
+      name: path.basename(filePath),
+      kind: 'document',
+      text: truncated ? normalized.slice(0, CHAT_DOCUMENT_TEXT_LIMIT) : normalized,
+      truncated,
+    };
+  }
   return {
     path: filePath,
     name: path.basename(filePath),
+    kind: 'image',
     dataUrl: `data:${imageMime(filePath)};base64,${bytes.toString('base64')}`,
   };
 }
 
-ipcMain.handle('deskcat:pick-chat-image', async (event) => pickChatImage(event));
+async function extractPdfText(bytes) {
+  const { PDFParse } = require('pdf-parse');
+  const parser = new PDFParse({ data: bytes });
+  try {
+    const result = await parser.getText();
+    return result.text || '';
+  } finally {
+    await parser.destroy().catch(() => {});
+  }
+}
+
+async function extractDocxText(filePath) {
+  const mammoth = require('mammoth');
+  const result = await mammoth.extractRawText({ path: filePath });
+  return result.value || '';
+}
+
+function normalizeDocumentText(text) {
+  return String(text || '')
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{4,}/g, '\n\n\n')
+    .trim();
+}
+
+ipcMain.handle('deskcat:pick-chat-image', async (event) => pickChatAttachment(event));
+ipcMain.handle('deskcat:pick-chat-attachment', async (event) => pickChatAttachment(event));
 
 function registerProtocols() {
   protocol.handle('deskcat-app', async (request) => {
@@ -4111,6 +4350,7 @@ function registerProtocols() {
 
 app.whenReady().then(() => {
   registerProtocols();
+  secureKeyStore = createSecureKeyStore({ userDataPath: app.getPath('userData'), safeStorage });
   app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
   setAppIcon('assets/idle/png/idle.png');
   createPetWindow();

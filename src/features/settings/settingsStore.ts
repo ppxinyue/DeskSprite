@@ -50,9 +50,11 @@ export interface AppSettings {
   customSttBaseUrl: string;
   customSttModel: string;
   customSttApiKey: string;
+  customSttKeyringRef: string;
   customTtsBaseUrl: string;
   customTtsModel: string;
   customTtsApiKey: string;
+  customTtsKeyringRef: string;
   autoSpeak: boolean;
   speakRate: number;
   launchAtLogin: boolean;
@@ -108,9 +110,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   customSttBaseUrl: 'https://api.openai-proxy.org/v1',
   customSttModel: 'gpt-4o-mini-transcribe',
   customSttApiKey: '',
+  customSttKeyringRef: '',
   customTtsBaseUrl: 'https://api.openai-proxy.org/v1',
   customTtsModel: 'tts-1',
   customTtsApiKey: '',
+  customTtsKeyringRef: '',
   autoSpeak: false,
   speakRate: 1.0,
   launchAtLogin: true,

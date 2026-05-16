@@ -6,8 +6,10 @@ import { Check, MessageCircle, Minus, Maximize2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PetAvatar } from "@/features/pet/PetAvatar";
-import { Composer, MessageBubble } from "@/features/chat/ChatPrimitives";
+import { Composer, MessageBubble, fileToSelectedImage, type SelectedImage } from "@/features/chat/ChatPrimitives";
 import { shouldSubmitMessage } from "@/features/chat/sendShortcut";
+import { COMPACT_CHAT_PENDING_IMAGE_KEY, serializeDroppedChatImage } from "@/features/chat/dropImageHandoff";
+import { firstDraggedImageFile, hasDraggedFileItems, hasDraggedImageItems } from "@/features/chat/dragImageFiles";
 import { usePetStore } from "@/features/pet/petStore";
 import { useSettingsStore, type AppSettings, type CodingProvider } from "@/features/settings/settingsStore";
 import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
@@ -26,6 +28,7 @@ const ChatDialog = lazy(() => import("@/features/chat/ChatDialog").then((mod) =>
 const CHAT_HANDOFF_KEY = "deskcat:chat-handoff-conversation-id";
 const COMPACT_CHAT_KEY = "deskcat:compact-chat";
 const COMPACT_CHAT_DISMISSED_KEY = "deskcat:compact-chat-dismissed";
+const ENABLE_PET_IMAGE_DROP = false;
 const CODING_CONVERSATION_KEY = "deskcat:coding-conversation-id";
 const CODING_SAVED_MESSAGES_KEY = "deskcat:coding-saved-message-ids";
 const CODING_SESSION_ORDER_KEY = "deskcat:coding-session-order";
@@ -75,10 +78,23 @@ function waitForStablePaint() {
 type PetPrompt =
   | { id: 'rest-reminder'; message: string; variant: 'rest' }
   | { id: 'focus-complete'; message: string; variant: 'rest' }
-  | { id: 'focus-warning'; message: string; variant: 'warning'; rule?: string };
+  | { id: 'focus-warning'; message: string; variant: 'warning'; rule?: string }
+  | { id: 'drop-image'; message: string; variant: 'curious' };
 
 function isCompactChatDismissed() {
   return localStorage.getItem(COMPACT_CHAT_DISMISSED_KEY) === "1";
+}
+
+function dragEventHasImage(event: React.DragEvent) {
+  return hasDraggedImageItems(event.dataTransfer?.items) ||
+    hasDraggedFileItems(event.dataTransfer?.items) ||
+    Boolean(firstDraggedImageFile(event.dataTransfer?.files));
+}
+
+function nativeDragEventHasFile(event: DragEvent) {
+  return hasDraggedImageItems(event.dataTransfer?.items) ||
+    hasDraggedFileItems(event.dataTransfer?.items) ||
+    Boolean(firstDraggedImageFile(event.dataTransfer?.files));
 }
 
 const timelineLogLastByKey = new Map<string, number>();
@@ -230,10 +246,19 @@ function App() {
     if (!loaded || windowLabel !== 'pet') return;
     if (localStorage.getItem(WELCOME_PERMISSION_PROMPT_KEY) === '1') return;
     let cancelled = false;
-    invoke('show_welcome_permission_prompt')
-      .catch(() => true)
-      .then(() => {
-        if (!cancelled) localStorage.setItem(WELCOME_PERMISSION_PROMPT_KEY, '1');
+    invoke<boolean>('get_welcome_permission_prompt_seen')
+      .catch(() => false)
+      .then((seen) => {
+        if (cancelled) return;
+        if (seen) {
+          localStorage.setItem(WELCOME_PERMISSION_PROMPT_KEY, '1');
+          return;
+        }
+        invoke('show_welcome_permission_prompt')
+          .catch(() => true)
+          .then(() => {
+            if (!cancelled) localStorage.setItem(WELCOME_PERMISSION_PROMPT_KEY, '1');
+          });
       });
     return () => {
       cancelled = true;
@@ -460,6 +485,9 @@ function CompactChatWindow() {
     const imageListener = listen("compact-chat:image", () => {
       window.dispatchEvent(new CustomEvent("deskcat:chat-image"));
     });
+    const sendImageListener = listen<SelectedImage>("compact-chat:send-image", ({ payload }) => {
+      window.dispatchEvent(new CustomEvent("deskcat:send-image", { detail: payload }));
+    });
     const voiceListener = listen("compact-chat:voice", () => {
       window.dispatchEvent(new CustomEvent("deskcat:chat-voice"));
     });
@@ -469,6 +497,7 @@ function CompactChatWindow() {
     return () => {
       openListener.then((fn) => fn());
       imageListener.then((fn) => fn());
+      sendImageListener.then((fn) => fn());
       voiceListener.then((fn) => fn());
       focusListener.then((fn) => fn());
     };
@@ -494,7 +523,7 @@ function CompactChatWindow() {
 
   const collapseCompactChat = useCallback(async () => {
     localStorage.setItem(COMPACT_CHAT_DISMISSED_KEY, "1");
-    await invoke("hide_compact_chat_window").catch(() => {});
+    await invoke("hide_compact_chat_window", { suppressReopenMs: 1200, reason: "user-collapse" }).catch(() => {});
     await emit("compact-chat:collapsed", {}).catch(() => {});
   }, []);
 
@@ -1367,6 +1396,7 @@ function PetWindow() {
   const [chatBurst, setChatBurst] = useState(false);
   const [petHovering, setPetHovering] = useState(false);
   const [compactVisible, setCompactVisible] = useState(false);
+  const [fileDropActive, setFileDropActive] = useState(false);
   const [codingState, setCodingState] = useState<CodingState>(DEFAULT_CODING_STATE);
   const [petPrompt, setPetPrompt] = useState<PetPrompt | null>(null);
   const [focusEndAt, setFocusEndAt] = useState<number | null>(null);
@@ -1436,6 +1466,8 @@ function PetWindow() {
   const compactConversationIdRef = useRef<number | null>(chatConversationId);
   const compactDismissedRef = useRef(false);
   const compactOpenSeqRef = useRef(0);
+  const petImageDragDepthRef = useRef(0);
+  const petImageDropBubbleTimerRef = useRef<number | null>(null);
   const applyLayoutState = useCallback((nextLayout: PetWindowLayout) => {
     layoutRef.current = nextLayout;
     setLayout(nextLayout);
@@ -1444,6 +1476,10 @@ function PetWindow() {
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => () => {
+    if (petImageDropBubbleTimerRef.current) window.clearTimeout(petImageDropBubbleTimerRef.current);
+  }, []);
 
   useEffect(() => {
     layoutRef.current = layout;
@@ -1551,10 +1587,12 @@ function PetWindow() {
     show,
     windowLeft,
     windowTop,
+    force,
   }: {
     show: boolean;
     windowLeft?: number;
     windowTop?: number;
+    force?: boolean;
   }) => {
     if (show && isCompactChatDismissed()) return;
     const geometry = await getCompactChatGeometry({
@@ -1567,7 +1605,10 @@ function PetWindow() {
       windowTop,
     });
     if (!geometry) return;
-    await invoke(show ? "show_compact_chat_window" : "position_compact_chat_window", geometry);
+    await invoke(show ? "show_compact_chat_window" : "position_compact_chat_window", {
+      ...geometry,
+      force: Boolean(force),
+    });
   }, [settings.dialogWidth, petImageWidth, petImageHeight]);
 
   const forceShowCompactChat = useCallback(async (mode: 'new' | 'history', conversationId: number | null = null) => {
@@ -1581,12 +1622,138 @@ function PetWindow() {
     setCompactVisible(true);
     const payload = { mode, conversationId };
     localStorage.setItem(COMPACT_CHAT_KEY, JSON.stringify(payload));
-    await positionCompactChatWindow({ show: true });
+    await positionCompactChatWindow({ show: true, force: true });
     if (seq !== compactOpenSeqRef.current) return;
     await emit("compact-chat:open", payload);
     setChatBurst(true);
     window.setTimeout(() => setChatBurst(false), 360);
   }, [positionCompactChatWindow]);
+
+  const showDroppedImagePrompt = useCallback(() => {
+    if (!ENABLE_PET_IMAGE_DROP) return;
+    if (petImageDropBubbleTimerRef.current) {
+      window.clearTimeout(petImageDropBubbleTimerRef.current);
+      petImageDropBubbleTimerRef.current = null;
+    }
+    setPetPrompt({
+      id: 'drop-image',
+      message: orbMode ? '我来看看' : '什么东西？给咪看看',
+      variant: 'curious',
+    });
+    setFileDropActive(true);
+  }, [orbMode]);
+
+  const clearDroppedImagePrompt = useCallback(() => {
+    setPetPrompt((current) => (current?.id === 'drop-image' ? null : current));
+    setFileDropActive(false);
+  }, []);
+
+  const handlePetDragEnter = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragEventHasImage(event)) return;
+    event.preventDefault();
+    petImageDragDepthRef.current += 1;
+    showDroppedImagePrompt();
+  }, [showDroppedImagePrompt]);
+
+  const handlePetDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragEventHasImage(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    showDroppedImagePrompt();
+  }, [showDroppedImagePrompt]);
+
+  const handlePetDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragEventHasImage(event)) return;
+    petImageDragDepthRef.current = Math.max(0, petImageDragDepthRef.current - 1);
+    if (petImageDragDepthRef.current === 0) clearDroppedImagePrompt();
+  }, [clearDroppedImagePrompt]);
+
+  const handlePetDrop = useCallback(async (event: React.DragEvent<HTMLDivElement>) => {
+    if (!dragEventHasImage(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    petImageDragDepthRef.current = 0;
+    showDroppedImagePrompt();
+    const file = firstDraggedImageFile(event.dataTransfer.files);
+    if (!file) {
+      clearDroppedImagePrompt();
+      return;
+    }
+    try {
+      const image = await fileToSelectedImage(file, '拖入图片');
+      localStorage.setItem(COMPACT_CHAT_PENDING_IMAGE_KEY, serializeDroppedChatImage(image));
+      openChat('new');
+      await forceShowCompactChat('new', null);
+      await emit('compact-chat:send-image', image).catch(() => {});
+      if (petImageDropBubbleTimerRef.current) window.clearTimeout(petImageDropBubbleTimerRef.current);
+      petImageDropBubbleTimerRef.current = window.setTimeout(clearDroppedImagePrompt, 1800);
+    } catch (error) {
+      console.warn('Failed to send dropped image:', error);
+      clearDroppedImagePrompt();
+    }
+  }, [clearDroppedImagePrompt, forceShowCompactChat, openChat, showDroppedImagePrompt]);
+
+  const sendDroppedImageFile = useCallback(async (file: File | null) => {
+    if (!file) {
+      clearDroppedImagePrompt();
+      return;
+    }
+    try {
+      const image = await fileToSelectedImage(file, '拖入图片');
+      localStorage.setItem(COMPACT_CHAT_PENDING_IMAGE_KEY, serializeDroppedChatImage(image));
+      openChat('new');
+      await forceShowCompactChat('new', null);
+      await emit('compact-chat:send-image', image).catch(() => {});
+      if (petImageDropBubbleTimerRef.current) window.clearTimeout(petImageDropBubbleTimerRef.current);
+      petImageDropBubbleTimerRef.current = window.setTimeout(clearDroppedImagePrompt, 1800);
+    } catch (error) {
+      console.warn('Failed to send dropped image:', error);
+      clearDroppedImagePrompt();
+    }
+  }, [clearDroppedImagePrompt, forceShowCompactChat, openChat]);
+
+  useEffect(() => {
+    if (!ENABLE_PET_IMAGE_DROP) return;
+    const handleDragEnter = (event: DragEvent) => {
+      if (!nativeDragEventHasFile(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      petImageDragDepthRef.current += 1;
+      showDroppedImagePrompt();
+    };
+    const handleDragOver = (event: DragEvent) => {
+      if (!nativeDragEventHasFile(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+      showDroppedImagePrompt();
+    };
+    const handleDragLeave = (event: DragEvent) => {
+      if (!nativeDragEventHasFile(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      petImageDragDepthRef.current = Math.max(0, petImageDragDepthRef.current - 1);
+      if (petImageDragDepthRef.current === 0) clearDroppedImagePrompt();
+    };
+    const handleDrop = (event: DragEvent) => {
+      if (!nativeDragEventHasFile(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      petImageDragDepthRef.current = 0;
+      showDroppedImagePrompt();
+      void sendDroppedImageFile(firstDraggedImageFile(event.dataTransfer?.files));
+    };
+    window.addEventListener('dragenter', handleDragEnter, true);
+    window.addEventListener('dragover', handleDragOver, true);
+    window.addEventListener('dragleave', handleDragLeave, true);
+    window.addEventListener('drop', handleDrop, true);
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter, true);
+      window.removeEventListener('dragover', handleDragOver, true);
+      window.removeEventListener('dragleave', handleDragLeave, true);
+      window.removeEventListener('drop', handleDrop, true);
+    };
+  }, [clearDroppedImagePrompt, sendDroppedImageFile, showDroppedImagePrompt]);
 
   const forceShowCodingChat = useCallback(async () => {
     const seq = ++compactOpenSeqRef.current;
@@ -1599,7 +1766,7 @@ function PetWindow() {
     setCompactVisible(true);
     const payload = { mode: 'new' as const, conversationId: null };
     localStorage.setItem(COMPACT_CHAT_KEY, JSON.stringify(payload));
-    await positionCompactChatWindow({ show: true });
+    await positionCompactChatWindow({ show: true, force: true });
     if (seq !== compactOpenSeqRef.current) return;
     await emit("compact-chat:open", payload);
     setCompactVisible(true);
@@ -2625,13 +2792,23 @@ function PetWindow() {
   return (
     <TooltipProvider>
       <div className="fixed inset-0 overflow-hidden" style={{ background: 'transparent' }}>
+        {ENABLE_PET_IMAGE_DROP && fileDropActive && (
+          <div
+            className="pointer-events-none fixed inset-0 z-10"
+            style={{ background: 'rgba(255,255,255,0.012)' }}
+          />
+        )}
         <div
-          className="group absolute flex flex-col items-start"
+          className="group absolute z-20 flex flex-col items-start"
           onMouseEnter={() => {
             setPetHovering(true);
             refreshCompactVisibility();
           }}
           onMouseLeave={() => setPetHovering(false)}
+          onDragEnter={ENABLE_PET_IMAGE_DROP ? handlePetDragEnter : undefined}
+          onDragOver={ENABLE_PET_IMAGE_DROP ? handlePetDragOver : undefined}
+          onDragLeave={ENABLE_PET_IMAGE_DROP ? handlePetDragLeave : undefined}
+          onDrop={ENABLE_PET_IMAGE_DROP ? handlePetDrop : undefined}
           style={{
             left: 0,
             top: 0,
@@ -2852,13 +3029,14 @@ function PetPromptBubble({
   onEndFocus: () => void;
 }) {
   const isWarning = prompt.id === 'focus-warning';
+  const isDropImage = prompt.id === 'drop-image';
   return (
     <div
       className="absolute top-[-74px] z-50 w-[196px] animate-pet-bubble-in rounded-[10px] border border-border/75 bg-background/96 px-2.5 py-2 text-center shadow-[0_12px_34px_rgba(32,28,22,0.16)] backdrop-blur-md"
       style={{ left }}
     >
       <div className="text-[12px] font-medium leading-snug text-foreground">{prompt.message}</div>
-      <div className="mt-2 flex justify-center gap-1.5">
+      {!isDropImage && <div className="mt-2 flex justify-center gap-1.5">
         {isWarning ? (
           <>
             <MicroActionButton label="继续专注" onClick={onIgnore}>
@@ -2878,7 +3056,7 @@ function PetPromptBubble({
             </MicroActionButton>
           </>
         )}
-      </div>
+      </div>}
       <div
         className="absolute bottom-[-5px] h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-border/75 bg-background/96"
         style={{ left: arrowLeft }}

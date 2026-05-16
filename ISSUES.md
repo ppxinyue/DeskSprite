@@ -3239,3 +3239,40 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/settings/SettingsPanel.tsx`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：权限教育应集中在首次安装的一次性欢迎说明里，避免每个系统权限前都弹自定义确认框；自定义弹窗只负责解释，不应制造额外“同意/拒绝”决策。
 - 是否需更新技术文档：否。
+
+## ISSUE-272
+- 发现时间：2026-05-16
+- 发现者：用户反馈
+- 相关任务：AI 内置额度与默认模型调用链路
+- 严重程度：严重
+- 问题现象：内置 API key 达到月度额度时，命令行输出 `HTTP 403: you have reached the monthly spending limit...`，前端显示“出错了：[object Object]”；随后默认模型又出现“内置模型服务未配置，请配置个人 API。”，导致设置选择默认时无法使用本机内置模型。
+- 原因分析：Tauri/Electron bridge 返回的错误不是标准 `Error` 实例，前端直接 `String(e)` 得到 `[object Object]`；同时内置模型调用迁移到主进程后只读取 `DESKCAT_BUILTIN_*` 环境变量，没有回退到项目原有的本机内置 key。中途还曾错误地让“有用户 API 配置”优先于设置中的默认/自定义选择，违背设置语义。
+- 解决方案：`aiService` 增加错误正规化，从对象中提取 message/error/reason/detail 并抛出标准 `Error`；内置模型 quota/monthly spending/billing/exceeded 错误统一映射为“内置额度已用完，请配置个人 API。”；主进程内置模型 key 读取增加本机 fallback，并恢复 `Chat 模型 = 默认` 只走内置、`自定义` 才走用户 API。
+- 涉及文件：`electron/main.cjs`, `src/features/ai/aiService.ts`, `src/features/ai/defaultModel.ts`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/HoverInputBar.tsx`, `src/features/settings/SettingsPanel.tsx`, `src/i18n.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：默认/自定义模型选择必须作为最高优先级产品语义，不应被“是否存在用户配置”覆盖；跨进程错误必须在 service 层正规化为标准 `Error` 后再交给 UI。
+- 是否需更新技术文档：否。
+
+## ISSUE-273
+- 发现时间：2026-05-16
+- 发现者：用户需求
+- 相关任务：Chat 文档上传
+- 严重程度：中等
+- 问题现象：用户希望内置 chat 能读取 Word/PDF，但原上传入口只允许图片，模型只收到 image data URL 或纯文本输入，不能直接处理 `.pdf` / `.docx`。
+- 原因分析：成熟文档问答通常先通过文件处理管线抽取文本、OCR 或渲染页面，再把模型可消费的内容作为上下文发送；当前 DeskCat 只有图片上传和视觉输入链路，没有文档解析/文本注入链路。
+- 解决方案：上传入口扩展为图片和文档；Electron 侧用 `pdf-parse` 抽取 PDF 文本，用 `mammoth` 抽取 DOCX 文本；前端将文档文本作为隐藏上下文拼入本轮消息，UI 只展示文件名，扫描版或不可提取文本时给出“未能从文档中提取文本，请换一个可复制文字的 PDF 或 DOCX。”。
+- 涉及文件：`electron/main.cjs`, `package.json`, `pnpm-lock.yaml`, `src/features/chat/ChatDialog.tsx`, `src/features/chat/ChatPrimitives.tsx`, `src/features/chat/chatStore.ts`, `src/i18n.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：文档上传应区分“UI 展示的附件”和“模型上下文里的提取文本”；不要把整篇文档刷进聊天气泡，也不要把本地文档路径持久化为可预览图片。
+- 是否需更新技术文档：否。
+
+## ISSUE-274
+- 发现时间：2026-05-16
+- 发现者：用户反馈
+- 相关任务：灵宠拖拽图片到 Compact Chat
+- 严重程度：延期 / 不进入本次发版
+- 问题现象：尝试把图片拖到灵宠身上时没有稳定触发气泡和 drop；用户观察到拖拽影子像是被压在灵宠窗口下方，而不是进入灵宠的交互命中区域。
+- 原因分析：初步判断不是 chat 发送链路问题，而是 macOS 透明 always-on-top panel 的文件拖拽 hit-test / 窗口层级问题。即使前端使用 window capture 监听并在 dragover 阶段接受未知 file item，系统仍可能没有把 Finder 文件拖拽投递给 pet BrowserWindow。尝试过让 pet window focusable、增加极低 alpha 命中层和临时提高窗口 level，但仍未达到可发布稳定性。
+- 当前处理：本次版本禁用该交互入口，撤回为拖拽 drop 做的窗口层级改动；相关 helper 和测试可作为后续实验基础保留，但发布包默认不启用 `ENABLE_PET_IMAGE_DROP`。
+- 后续方向：需要单独验证 Electron BrowserWindow 对 macOS file drag 的窗口级接收条件，必要时改为原生 NSWindow/NSView drop target、全局 drag monitor，或提供“拖到小 chat / 粘贴图片”作为替代入口。
+- 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/chat/dragImageFiles.ts`, `src/features/chat/dropImageHandoff.ts`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：透明悬浮窗的文件拖拽不能只按普通 DOM drag/drop 设计；发布前必须用真实 Finder 拖拽验证 OS 层窗口命中与层级。
+- 是否需更新技术文档：否。

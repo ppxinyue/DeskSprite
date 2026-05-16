@@ -7,6 +7,7 @@ import {
   updateApiConfig,
 } from '@/lib/db';
 import { decodeLocalApiKey, normalizeApiKeyText } from '@/lib/apiKeyStorage';
+import { createApiKeyRef, deleteApiKey, saveApiKey } from '@/lib/keychain';
 import { emit } from '@tauri-apps/api/event';
 
 export interface ApiConfig {
@@ -57,15 +58,36 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
   loadConfigs: async () => {
     try {
       const rows = await getApiConfigs();
+      const migratedRows = await Promise.all(rows.map(async (row) => {
+        if (!row.keyring_ref && row.api_key) {
+          const legacyKey = normalizeApiKeyText(decodeLocalApiKey(row.api_key));
+          if (legacyKey) {
+            const keyringRef = createApiKeyRef();
+            await saveApiKey(keyringRef, legacyKey);
+            await updateApiConfig(
+              row.id,
+              row.provider,
+              row.base_url,
+              row.model,
+              row.name ?? row.provider,
+              row.provider_id ?? row.provider,
+              keyringRef,
+              null,
+            );
+            return { ...row, keyring_ref: keyringRef, api_key: null };
+          }
+        }
+        return row;
+      }));
       set({
-        configs: rows.map((r) => ({
+        configs: migratedRows.map((r) => ({
           id: r.id,
           provider: r.provider,
           providerId: r.provider_id,
           name: r.name,
           baseUrl: r.base_url,
           model: r.model,
-          apiKey: decodeLocalApiKey(r.api_key),
+          apiKey: r.keyring_ref ? null : decodeLocalApiKey(r.api_key),
           keyringRef: r.keyring_ref,
           isDefault: r.is_default === 1,
           lastUsedAt: r.last_used_at,
@@ -82,29 +104,32 @@ export const useApiConfigStore = create<ApiConfigState>((set, get) => ({
 
   addConfig: async (provider, baseUrl, model, apiKey, name, providerId) => {
     const normalizedKey = normalizeApiKey(apiKey);
-    await insertApiConfig(provider, baseUrl, model, null, 0, name, providerId, normalizedKey);
+    const keyringRef = createApiKeyRef();
+    await saveApiKey(keyringRef, normalizedKey);
+    await insertApiConfig(provider, baseUrl, model, keyringRef, 0, name, providerId, null);
     await get().loadConfigs();
     await emit('api-config:changed', {});
   },
 
   updateConfig: async (id, provider, baseUrl, model, name, providerId, apiKey) => {
     const config = get().configs.find((c) => c.id === id);
-    const keyringRef = config?.keyringRef ?? null;
+    const keyringRef = config?.keyringRef ?? createApiKeyRef();
     let nextApiKey: string | undefined;
 
     if (apiKey && apiKey.length > 0) {
       nextApiKey = normalizeApiKey(apiKey);
-    } else if (!config?.apiKey) {
+      await saveApiKey(keyringRef, nextApiKey);
+    } else if (!config?.keyringRef && !config?.apiKey) {
       throw new Error('缺少 API Key，请重新填写并保存。');
     }
 
-    await updateApiConfig(id, provider, baseUrl, model, name, providerId, keyringRef, nextApiKey);
+    await updateApiConfig(id, provider, baseUrl, model, name, providerId, keyringRef, null);
     await get().loadConfigs();
     await emit('api-config:changed', {});
   },
 
   removeConfig: async (id, keyringRef) => {
-    void keyringRef;
+    if (keyringRef) await deleteApiKey(keyringRef).catch(() => {});
     await deleteApiConfig(id);
     await get().loadConfigs();
     await emit('api-config:changed', {});

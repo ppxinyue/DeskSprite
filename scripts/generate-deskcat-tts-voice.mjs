@@ -4,10 +4,10 @@ import { spawnSync } from 'node:child_process';
 
 const root = new URL('..', import.meta.url).pathname;
 const voiceService = readFileSync(join(root, 'src/features/voice/voiceService.ts'), 'utf8');
-const baseUrl = voiceService.match(/BUILTIN_VOICE_BASE_URL = '([^']+)'/)?.[1];
-const apiKey = voiceService.match(/BUILTIN_VOICE_API_KEY = '([^']+)'/)?.[1];
+const baseUrl = process.env.DESKCAT_BUILTIN_BASE_URL || voiceService.match(/BUILTIN_VOICE_BASE_URL = '([^']+)'/)?.[1];
+const apiKey = process.env.DESKCAT_BUILTIN_VOICE_API_KEY || process.env.DESKCAT_BUILTIN_API_KEY;
 const model = voiceService.match(/BUILTIN_TTS_MODEL = '([^']+)'/)?.[1] ?? 'tts-1';
-if (!baseUrl || !apiKey) throw new Error('Missing built-in TTS config');
+if (!baseUrl || !apiKey) throw new Error('Missing DESKCAT_BUILTIN_VOICE_API_KEY or DESKCAT_BUILTIN_API_KEY');
 
 const outDir = join(root, 'public/audio/deskcat-tts-vo');
 mkdirSync(outDir, { recursive: true });

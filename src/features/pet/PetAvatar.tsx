@@ -12,6 +12,11 @@ import {
   isBuiltinAsset,
 } from './animations';
 import { stopPetStateEngine } from './petStateEngine';
+import {
+  shouldActivateContextMenuAction,
+  shouldRunContextMenuAction,
+  type ContextMenuActionStamp,
+} from './contextMenuAction';
 import type { AvatarRenderMode, CodingProvider, CodingSessionMode, PetMotionName, PetMotionSettings } from '@/features/settings/settingsStore';
 import type { PetState } from './animations';
 
@@ -106,6 +111,7 @@ export function PetAvatar({
   const submenuCloseTimer = useRef<number | null>(null);
   const activeSubmenuRef = useRef<'history' | 'coding' | null>(null);
   const lockedSubmenuRef = useRef<'history' | 'coding' | null>(null);
+  const contextMenuActionRef = useRef<ContextMenuActionStamp>(null);
   const orbMode = renderMode === 'orb';
   const w = Math.round((orbMode ? 150 : 120) * scale);
   const h = Math.round(150 * scale);
@@ -312,6 +318,19 @@ export function PetAvatar({
         try { await invoke('quit_app'); } catch (e) { console.error(e); }
         break;
     }
+  };
+
+  const activateContextMenuAction = (
+    action: string,
+    event: React.PointerEvent<HTMLButtonElement> | React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    if (!shouldActivateContextMenuAction(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const now = Date.now();
+    if (!shouldRunContextMenuAction(contextMenuActionRef.current, action, now)) return;
+    contextMenuActionRef.current = { action, at: now };
+    void handleContextMenu(action);
   };
 
   const handleContextMenuOpen = (e: React.MouseEvent) => {
@@ -613,7 +632,13 @@ export function PetAvatar({
         ) : null}
         <div className="my-1 h-px bg-border/60" />
         <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('settings')}>设置</button>
-        <button className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent" onClick={() => handleContextMenu('hide')}>隐藏</button>
+        <button
+          className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-accent"
+          onPointerDown={(event) => activateContextMenuAction('hide', event)}
+          onClick={(event) => activateContextMenuAction('hide', event)}
+        >
+          隐藏
+        </button>
       </div>
     </>
   );

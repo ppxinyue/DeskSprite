@@ -40,11 +40,16 @@ export function decodeLocalApiKey(value: string | null | undefined) {
   }
 }
 
-export async function resolveStoredApiKey(apiKey: string | null | undefined) {
+export async function resolveStoredApiKey(apiKey: string | null | undefined, keyringRef?: string | null) {
+  if (keyringRef) {
+    const { getApiKey } = await import('./keychain.ts');
+    return normalizeApiKeyText(await getApiKey(keyringRef));
+  }
   return normalizeApiKeyText(decodeLocalApiKey(apiKey));
 }
 
-export function describeApiKey(apiKey: string | null | undefined) {
+export function describeApiKey(apiKey: string | null | undefined, keyringRef?: string | null) {
+  if (keyringRef) return 'Key: 已保存于系统安全存储';
   const normalized = normalizeApiKeyText(decodeLocalApiKey(apiKey));
   if (!normalized) return 'Key: 未保存';
   const tail = normalized.slice(-4);

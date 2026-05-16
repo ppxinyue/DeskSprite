@@ -1,5 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
 
+export function createApiKeyRef() {
+  const cryptoObj = globalThis.crypto;
+  const id = cryptoObj && 'randomUUID' in cryptoObj
+    ? cryptoObj.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return `api-key:${id}`;
+}
+
 export async function saveApiKey(keyringRef: string, key: string): Promise<void> {
   await invoke('save_api_key', { keyringRef, key });
 }

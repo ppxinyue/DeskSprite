@@ -6,6 +6,9 @@ export interface ChatMessage extends Message {
   timestamp: number;
   imageUrl?: string;
   imageDataUrl?: string;
+  documentName?: string;
+  documentText?: string;
+  documentTruncated?: boolean;
   tone?: 'default' | 'error';
 }
 
@@ -61,7 +64,11 @@ export const useChatStore = create<ChatState>((set) => ({
     set({ messages: [], currentConversationId: null, streamingContent: '' }),
 }));
 
-export function createMessage(role: Message['role'], content: string, extras: Partial<Pick<ChatMessage, 'imageUrl' | 'imageDataUrl' | 'tone'>> = {}): ChatMessage {
+export function createMessage(
+  role: Message['role'],
+  content: string,
+  extras: Partial<Pick<ChatMessage, 'imageUrl' | 'imageDataUrl' | 'documentName' | 'documentText' | 'documentTruncated' | 'tone'>> = {},
+): ChatMessage {
   return {
     id: `msg-${Date.now()}-${++msgCounter}`,
     role,
