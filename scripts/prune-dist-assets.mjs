@@ -5,9 +5,17 @@ const distDir = path.resolve('dist');
 const removable = [
   'captures',
   'remotion-captures',
+  'audio',
   path.join('assets', 'gif-videos'),
   path.join('assets', 'pet-images'),
   path.join('assets', 'remotion'),
+  path.join('assets', 'idle', 'gif', 'blink.GIF'),
+  path.join('assets', 'idle', 'gif', 'IMG_3517.GIF'),
+  path.join('assets', 'rest', 'gif', 'drinking_raw.GIF'),
+  path.join('assets', 'rest', 'gif', 'IMG_3452.GIF'),
+  path.join('assets', 'rest', 'gif', 'IMG_3456.GIF'),
+  path.join('assets', 'rest', 'gif', 'IMG_3518.GIF'),
+  path.join('assets', 'rest', 'gif', 'IMG_3519.GIF'),
 ];
 
 let removedBytes = 0;
@@ -35,7 +43,23 @@ if (removedBytes > 0) {
   console.log(`[prune-dist-assets] total removed ${formatBytes(removedBytes)}`);
 }
 
+await removeDotStoreFiles(distDir);
+
 function formatBytes(bytes) {
   const mb = bytes / 1024 / 1024;
   return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`;
+}
+
+async function removeDotStoreFiles(dir) {
+  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+  await Promise.all(entries.map(async (entry) => {
+    const target = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      await removeDotStoreFiles(target);
+      return;
+    }
+    if (entry.isFile() && entry.name === '.DS_Store') {
+      await fs.rm(target, { force: true });
+    }
+  }));
 }

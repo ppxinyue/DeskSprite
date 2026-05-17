@@ -2057,5 +2057,6 @@
 - 用量：新增 `builtin_ai_usage_events` 表和 `daily_builtin_ai_usage_metrics` view，记录 action、deviceId、appVersion、估算 input/output units、成功失败、HTTP 状态和 latency；不记录 prompt、回复正文、图片、音频或 key。
 - 防滥用：内置代理请求增加 `x-deskcat-app-version`、`x-deskcat-device-id`、`x-deskcat-action`、timestamp、nonce 和 HMAC 签名；服务端支持 `DESKCAT_BUILTIN_MIN_APP_VERSION` 与 `DESKCAT_BUILTIN_REQUIRE_SIGNATURE`，便于发版后灰度强制新版本和签名校验。
 - 打包：版本号更新为 `1.1.1`；继续使用 `build.files` 白名单，只打包 `dist/**`、`electron/**` 和 `package.json`，排除 website/dashboard/supabase/tests/captures 等无关材料，并依赖 `prune-dist-assets` 清理大型素材。
+- 瘦身：默认灵宠 GIF 精简为轻量 idle/rest/work 动画组合，移除 30-45MB 级 rest GIF、较大的 idle GIF、未引用 `dist/audio` 和 `.DS_Store`，降低 DMG 与 app.asar 体积。
 - 验证：`pnpm exec tsc -b`、`node --check electron/main.cjs`、`pnpm test`、`pnpm build` 已在安全改动阶段通过；发版前会重新执行 mac 双架构构建与产物体积检查。
 - 文件：electron/main.cjs, src/features/ai/aiService.ts, src/features/voice/voiceService.ts, supabase/functions/deskcat-builtin-ai/index.ts, supabase/migrations/202605170001_builtin_ai_usage_events.sql, package.json, ISSUES.md, PROGRESS.md

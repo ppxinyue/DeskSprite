@@ -32,10 +32,8 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
       'assets/idle/png/sleeping1.png',
     ],
     defaultGifAssets: [
-      'assets/idle/gif/blink.GIF',
       'assets/idle/gif/grooming.GIF',
       'assets/idle/gif/idle_clean_1.GIF',
-      'assets/idle/gif/IMG_3517.GIF',
     ],
     userFrames: [],
     userGifs: [],
@@ -48,12 +46,7 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
     defaultAssets: ['assets/idle/png/sleeping.png'],
     defaultGifAssets: [
       'assets/rest/gif/idle_raw_1.GIF',
-      'assets/rest/gif/drinking_raw.GIF',
-      'assets/rest/gif/IMG_3452.GIF',
-      'assets/rest/gif/IMG_3456.GIF',
       'assets/rest/gif/IMG_3458.GIF',
-      'assets/rest/gif/IMG_3518.GIF',
-      'assets/rest/gif/IMG_3519.GIF',
     ],
     userFrames: [],
     userGifs: [],
@@ -74,7 +67,7 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   drinking: {
     mediaMode: 'gif',
     defaultAssets: ['assets/idle/png/idle2.png'],
-    defaultGifAssets: ['assets/rest/gif/drinking_raw.GIF'],
+    defaultGifAssets: ['assets/rest/gif/IMG_3458.GIF'],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -94,7 +87,7 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   sleeping: {
     mediaMode: 'gif',
     defaultAssets: ['assets/idle/png/sleeping.png', 'assets/idle/png/sleeping1.png'],
-    defaultGifAssets: ['assets/idle/gif/IMG_3517.GIF'],
+    defaultGifAssets: ['assets/idle/gif/idle_clean_1.GIF'],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -129,7 +122,14 @@ export function isGifAsset(path: string): boolean {
 
 const REMOVED_BUILTIN_GIF_ASSETS = new Set([
   'assets/GIF/',
+  'assets/idle/gif/blink.GIF',
+  'assets/idle/gif/IMG_3517.GIF',
   'assets/idle/gif/sleeping_raw_2.GIF',
+  'assets/rest/gif/drinking_raw.GIF',
+  'assets/rest/gif/IMG_3452.GIF',
+  'assets/rest/gif/IMG_3456.GIF',
+  'assets/rest/gif/IMG_3518.GIF',
+  'assets/rest/gif/IMG_3519.GIF',
   'assets/rest/gif/playing_clean_3.GIF',
   'assets/rest/gif/rest.GIF',
   'assets/rest/gif/IMG_3448.GIF',
@@ -155,13 +155,8 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
     ? Array.from(new Set([
       ...defaultGifAssets,
       'assets/rest/gif/idle_raw_1.GIF',
-      'assets/rest/gif/drinking_raw.GIF',
-      'assets/rest/gif/IMG_3452.GIF',
-      'assets/rest/gif/IMG_3456.GIF',
       'assets/rest/gif/IMG_3458.GIF',
-      'assets/rest/gif/IMG_3518.GIF',
-      'assets/rest/gif/IMG_3519.GIF',
-    ]))
+    ].filter((path) => !isRemovedBuiltinGifAsset(path))))
     : defaultGifAssets;
   const defaultAssets = raw.defaultAssets?.length
     ? raw.defaultAssets.filter((path) => !/^assets\/(idle|thinking|sleeping)\//.test(path))
