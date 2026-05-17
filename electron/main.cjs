@@ -80,8 +80,7 @@ const CODEX_STATUS = {
   WORKING: 'working',
   DONE: 'done',
 };
-const BUILTIN_CHAT_API_KEY_FALLBACK = 'sk-PByFO1hQJwL32oh0xy3TyAov6bDwJdc91phAdmDDjkU3K6KO';
-const BUILTIN_VOICE_API_KEY_FALLBACK = 'sk-RUPf8NG93A0bg6Phr3GvHaEXj1z2vFKb2eLIMvgjuaGCLMS7';
+const DEFAULT_BUILTIN_PROXY_URL = 'https://vuxzqebeirynkdyonzud.functions.supabase.co/deskcat-builtin-ai';
 const SCHEDULE_PERMISSION_PROMPT_STATE_FILE = 'schedule-permission-prompts-v1.json';
 const SCHEDULE_KNOWLEDGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_CODEX_HTTP_PROXY = 'http://127.0.0.1:6478';
@@ -1663,22 +1662,51 @@ function getBuiltinApiKey(kind = 'chat') {
   const specific = kind === 'voice'
     ? process.env.DESKCAT_BUILTIN_VOICE_API_KEY
     : process.env.DESKCAT_BUILTIN_CHAT_API_KEY;
-  const fallback = kind === 'voice' ? BUILTIN_VOICE_API_KEY_FALLBACK : BUILTIN_CHAT_API_KEY_FALLBACK;
-  return normalizeApiKey(specific || process.env.DESKCAT_BUILTIN_API_KEY || fallback);
+  return normalizeApiKey(specific || process.env.DESKCAT_BUILTIN_API_KEY || '');
 }
 
 function getBuiltinBaseUrl() {
   return normalizeBaseUrl(process.env.DESKCAT_BUILTIN_BASE_URL || 'https://api.openai-proxy.org/v1');
 }
 
+function getBuiltinProxyUrl() {
+  const configured = String(process.env.DESKCAT_BUILTIN_PROXY_URL || DEFAULT_BUILTIN_PROXY_URL).trim();
+  return configured ? normalizeBaseUrl(configured) : '';
+}
+
 function getBuiltinServiceStatus() {
+  const proxyUrl = getBuiltinProxyUrl();
   return {
-    chatConfigured: Boolean(getBuiltinApiKey('chat')),
-    voiceConfigured: Boolean(getBuiltinApiKey('voice')),
+    chatConfigured: Boolean(proxyUrl || getBuiltinApiKey('chat')),
+    voiceConfigured: Boolean(proxyUrl || getBuiltinApiKey('voice')),
   };
 }
 
+async function callBuiltinProxy(action, request = {}) {
+  const proxyUrl = getBuiltinProxyUrl();
+  if (!proxyUrl) return null;
+  const response = await fetch(proxyUrl, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-deskcat-app-version': app.getVersion(),
+    },
+    body: JSON.stringify({ action, request }),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText}`);
+  return JSON.parse(text || '{}');
+}
+
 async function builtinChatCompletion({ request }) {
+  const proxyResult = await callBuiltinProxy('chat', {
+    messages: request?.messages || [],
+  });
+  if (proxyResult) {
+    const content = String(proxyResult.content || '');
+    if (!content) throw new Error('模型返回内容为空。');
+    return content;
+  }
   const apiKey = getBuiltinApiKey('chat');
   if (!apiKey) throw new Error('内置模型服务未配置，请切换到个人 API。');
   return chatCompletion({
@@ -2502,6 +2530,13 @@ async function transcribeAudio({ request }) {
 }
 
 async function builtinTranscribeAudio({ request }) {
+  const proxyResult = await callBuiltinProxy('transcribe', {
+    audioBase64: request?.audioBase64 || '',
+    mimeType: request?.mimeType || 'audio/webm',
+    fileName: request?.fileName || 'recording.webm',
+    language: request?.language || '',
+  });
+  if (proxyResult) return String(proxyResult.text || '').trim();
   const apiKey = getBuiltinApiKey('voice');
   if (!apiKey) throw new Error('内置语音服务未配置，请切换到系统或个人语音服务。');
   return transcribeAudio({
@@ -2538,6 +2573,17 @@ async function synthesizeSpeech({ request }) {
 }
 
 async function builtinSynthesizeSpeech({ request }) {
+  const proxyResult = await callBuiltinProxy('synthesize', {
+    input: request?.input || '',
+    voice: request?.voice || 'alloy',
+    format: request?.format || 'mp3',
+  });
+  if (proxyResult) {
+    return {
+      dataUrl: String(proxyResult.dataUrl || ''),
+      mimeType: String(proxyResult.mimeType || 'audio/mpeg'),
+    };
+  }
   const apiKey = getBuiltinApiKey('voice');
   if (!apiKey) throw new Error('内置语音服务未配置，请切换到系统或个人语音服务。');
   return synthesizeSpeech({
