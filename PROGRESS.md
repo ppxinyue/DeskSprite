@@ -2050,3 +2050,12 @@
 - 后续：单独开 issue 继续研究 macOS 原生 drop target 或替代交互，不阻塞当前版本。
 - 验证：`pnpm exec tsc -b --pretty false`、`pnpm test:chat`、`pnpm test:startup` 通过。
 - 文件：electron/main.cjs, src/App.tsx, src/features/chat/dragImageFiles.ts, src/features/chat/dropImageHandoff.ts, ISSUES.md, PROGRESS.md
+
+### R269. 内置 AI Key 服务端化与 v1.1.1 发布准备（2026-05-17）
+- 安全：删除 Electron 客户端内置 chat/voice API key fallback；内置 chat、STT、TTS 改为优先调用 Supabase Edge Function `deskcat-builtin-ai`，真实 key 只放在 Supabase secrets。
+- 代理：新增 `deskcat-builtin-ai` function，支持 chat、transcribe、synthesize 三类 action；客户端不再发送或保存内置 key，安装包只能看到代理 URL。
+- 用量：新增 `builtin_ai_usage_events` 表和 `daily_builtin_ai_usage_metrics` view，记录 action、deviceId、appVersion、估算 input/output units、成功失败、HTTP 状态和 latency；不记录 prompt、回复正文、图片、音频或 key。
+- 防滥用：内置代理请求增加 `x-deskcat-app-version`、`x-deskcat-device-id`、`x-deskcat-action`、timestamp、nonce 和 HMAC 签名；服务端支持 `DESKCAT_BUILTIN_MIN_APP_VERSION` 与 `DESKCAT_BUILTIN_REQUIRE_SIGNATURE`，便于发版后灰度强制新版本和签名校验。
+- 打包：版本号更新为 `1.1.1`；继续使用 `build.files` 白名单，只打包 `dist/**`、`electron/**` 和 `package.json`，排除 website/dashboard/supabase/tests/captures 等无关材料，并依赖 `prune-dist-assets` 清理大型素材。
+- 验证：`pnpm exec tsc -b`、`node --check electron/main.cjs`、`pnpm test`、`pnpm build` 已在安全改动阶段通过；发版前会重新执行 mac 双架构构建与产物体积检查。
+- 文件：electron/main.cjs, src/features/ai/aiService.ts, src/features/voice/voiceService.ts, supabase/functions/deskcat-builtin-ai/index.ts, supabase/migrations/202605170001_builtin_ai_usage_events.sql, package.json, ISSUES.md, PROGRESS.md

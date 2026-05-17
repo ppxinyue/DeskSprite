@@ -3276,3 +3276,15 @@
 - 涉及文件：`electron/main.cjs`, `src/App.tsx`, `src/features/chat/dragImageFiles.ts`, `src/features/chat/dropImageHandoff.ts`, `PROGRESS.md`, `ISSUES.md`
 - 经验总结：透明悬浮窗的文件拖拽不能只按普通 DOM drag/drop 设计；发布前必须用真实 Finder 拖拽验证 OS 层窗口命中与层级。
 - 是否需更新技术文档：否。
+
+## ISSUE-275
+- 发现时间：2026-05-17
+- 发现者：安全检查 / 用户要求
+- 相关任务：内置 API Key 安全、Supabase 代理与 v1.1.1 发版
+- 严重程度：严重
+- 问题现象：内置 chat/voice API key 不能继续出现在 Electron 客户端源码、安装包或可还原产物中；仅靠本地内置 key 会导致用户拿到安装包后仍可能提取凭据。
+- 原因分析：分发型 Electron 客户端不能安全保存服务端 API key；即使混淆、环境变量或压缩打包，也只能提高提取成本，无法做到密钥不泄露。内置服务应由服务端代理持有 key，客户端只提交请求和有限元数据。
+- 解决方案：移除客户端 hardcoded built-in key fallback，改为调用 Supabase Edge Function `deskcat-builtin-ai`；真实 chat/voice key 只从 Supabase secrets 读取；新增 `builtin_ai_usage_events` 与 `daily_builtin_ai_usage_metrics` 记录 action、deviceId、版本、估算用量、成功失败和耗时，不保存 prompt/回复/图片/音频/key；客户端为内置代理请求附加 app version、deviceId、action、timestamp、nonce 和 HMAC 签名，服务端支持 `DESKCAT_BUILTIN_MIN_APP_VERSION` 与 `DESKCAT_BUILTIN_REQUIRE_SIGNATURE` 灰度拦截旧版本和裸请求。
+- 涉及文件：`electron/main.cjs`, `src/features/ai/aiService.ts`, `src/features/voice/voiceService.ts`, `supabase/functions/deskcat-builtin-ai/index.ts`, `supabase/migrations/202605170001_builtin_ai_usage_events.sql`, `package.json`, `PROGRESS.md`, `ISSUES.md`
+- 经验总结：客户端永远不能被当作密钥边界；内置服务必须服务端化，并把版本控制、签名、用量记录和后续限流作为同一条防滥用链路设计。
+- 是否需更新技术文档：是，Supabase secrets 与 function 部署步骤需要在发布/运维文档中继续补齐。
