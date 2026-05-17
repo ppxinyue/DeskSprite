@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { BUILTIN_QUOTA_EXHAUSTED_MESSAGE } from '@/features/ai/defaultModel';
 import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
-import { getSetting, setSetting } from '@/lib/db';
+import { getCloudSyncStatus, getSetting, setSetting } from '@/lib/db';
 import type { AppSettings, VoiceProviderMode } from '@/features/settings/settingsStore';
 
 const BUILTIN_VOICE_BASE_URL = 'https://api.openai-proxy.org/v1';
@@ -115,6 +115,8 @@ export async function transcribeWithCloudVoice(
       mimeType: blob.type || 'audio/webm',
       fileName: audioFileName(blob.type),
       language: lang,
+      durationMs,
+      deviceId: config.usingBuiltin ? await getBuiltinDeviceId() : '',
     },
   });
   if (config.usingBuiltin) {
@@ -143,6 +145,7 @@ export async function speakWithCloudVoice(text: string, mode: VoiceProviderMode,
         input: cleanText,
         voice: 'alloy',
         format: 'mp3',
+        deviceId: config.usingBuiltin ? await getBuiltinDeviceId() : '',
       },
     });
     await playAudioDataUrl(response.dataUrl);
@@ -153,6 +156,14 @@ export async function speakWithCloudVoice(text: string, mode: VoiceProviderMode,
   } catch (e) {
     console.warn('Cloud TTS failed, falling back to system speech:', e);
     return false;
+  }
+}
+
+async function getBuiltinDeviceId() {
+  try {
+    return (await getCloudSyncStatus()).deviceId;
+  } catch {
+    return '';
   }
 }
 

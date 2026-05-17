@@ -1685,11 +1685,13 @@ function getBuiltinServiceStatus() {
 async function callBuiltinProxy(action, request = {}) {
   const proxyUrl = getBuiltinProxyUrl();
   if (!proxyUrl) return null;
+  const deviceId = String(request?.deviceId || '').trim().slice(0, 160);
   const response = await fetch(proxyUrl, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       'x-deskcat-app-version': app.getVersion(),
+      ...(deviceId ? { 'x-deskcat-device-id': deviceId } : {}),
     },
     body: JSON.stringify({ action, request }),
   });

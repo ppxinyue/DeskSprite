@@ -1,3 +1,5 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 type ChatMessage = {
   role?: string;
   content?: string;
@@ -11,7 +13,7 @@ type BuiltinRequest = {
 
 const corsHeaders = {
   'access-control-allow-origin': '*',
-  'access-control-allow-headers': 'authorization, content-type, x-client-info, x-deskcat-app-version',
+  'access-control-allow-headers': 'authorization, content-type, x-client-info, x-deskcat-app-version, x-deskcat-device-id',
   'access-control-allow-methods': 'POST, OPTIONS',
 };
 
@@ -40,12 +42,137 @@ function getApiKey(kind: 'chat' | 'voice') {
   return key;
 }
 
+function getSupabaseAdmin() {
+  const url = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!url || !serviceRoleKey) return null;
+  return createClient(url, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
 function extractApiErrorMessage(text: string) {
   try {
     const data = JSON.parse(text);
     return data?.error?.message || data?.message || text;
   } catch {
     return text || null;
+  }
+}
+
+function extractHttpStatus(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const match = message.match(/\bHTTP\s+(\d{3})\b/i);
+  const status = match ? Number(match[1]) : NaN;
+  return Number.isFinite(status) ? status : null;
+}
+
+function safeText(value: unknown, maxLength = 200) {
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  return text ? text.slice(0, maxLength) : null;
+}
+
+function sanitizeDeviceId(value: unknown) {
+  const text = safeText(value, 160);
+  return text && /^[a-zA-Z0-9:._-]+$/.test(text) ? text : null;
+}
+
+function getDeviceId(req: Request, request: Record<string, unknown>) {
+  return sanitizeDeviceId(request.deviceId) || sanitizeDeviceId(req.headers.get('x-deskcat-device-id'));
+}
+
+function getAppVersion(req: Request) {
+  return safeText(req.headers.get('x-deskcat-app-version'), 80);
+}
+
+function estimateChatChars(messages: ChatMessage[]) {
+  return messages.reduce((total, message) => (
+    total + String(message.content || '').length + (message.imageDataUrl ? 1000 : 0)
+  ), 0);
+}
+
+function buildUsageMetrics(action: BuiltinRequest['action'], request: Record<string, unknown>, result?: Record<string, unknown>) {
+  if (action === 'chat') {
+    const messages = Array.isArray(request.messages) ? request.messages as ChatMessage[] : [];
+    return {
+      unit: 'chars',
+      inputUnits: estimateChatChars(messages),
+      outputUnits: String(result?.content || '').length,
+      metadata: {
+        messageCount: messages.length,
+        hasImage: messages.some((message) => Boolean(message.imageDataUrl)),
+      },
+    };
+  }
+  if (action === 'transcribe') {
+    const seconds = Math.max(0, Math.ceil(Number(request.durationMs || 0) / 1000));
+    return {
+      unit: 'seconds',
+      inputUnits: seconds,
+      outputUnits: String(result?.text || '').length,
+      metadata: {
+        mimeType: safeText(request.mimeType, 80),
+        language: safeText(request.language, 20),
+      },
+    };
+  }
+  if (action === 'synthesize') {
+    return {
+      unit: 'chars',
+      inputUnits: String(request.input || '').length,
+      outputUnits: 0,
+      metadata: {
+        voice: safeText(request.voice, 80),
+        format: safeText(request.format, 20),
+      },
+    };
+  }
+  return {
+    unit: 'count',
+    inputUnits: 1,
+    outputUnits: 0,
+    metadata: {},
+  };
+}
+
+async function recordUsageEvent(args: {
+  req: Request;
+  action: BuiltinRequest['action'];
+  request: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  startedAt: number;
+  success: boolean;
+  statusCode?: number | null;
+  error?: unknown;
+}) {
+  if (!args.action) return;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
+  const metrics = buildUsageMetrics(args.action, args.request, args.result);
+  await supabase.from('builtin_ai_usage_events').insert({
+    device_id: getDeviceId(args.req, args.request),
+    action: args.action,
+    app_version: getAppVersion(args.req),
+    unit: metrics.unit,
+    input_units: metrics.inputUnits,
+    output_units: metrics.outputUnits,
+    success: args.success,
+    status_code: args.statusCode ?? null,
+    latency_ms: Math.max(0, Date.now() - args.startedAt),
+    error_code: args.error ? safeText(args.error instanceof Error && args.error.name !== 'Error' ? args.error.name : `HTTP_${args.statusCode || 'UNKNOWN'}`, 120) : null,
+    metadata: metrics.metadata,
+  });
+}
+
+async function recordUsageBestEffort(args: Parameters<typeof recordUsageEvent>[0]) {
+  try {
+    await recordUsageEvent(args);
+  } catch (error) {
+    console.warn('Failed to record builtin AI usage', error instanceof Error ? error.message : String(error));
   }
 }
 
@@ -137,13 +264,39 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
+  const startedAt = Date.now();
+  let payload: BuiltinRequest | null = null;
+  let request: Record<string, unknown> = {};
   try {
-    const payload = await req.json() as BuiltinRequest;
-    if (payload.action === 'chat') return json(await chatCompletion(payload.request || {}));
-    if (payload.action === 'transcribe') return json(await transcribeAudio(payload.request || {}));
-    if (payload.action === 'synthesize') return json(await synthesizeSpeech(payload.request || {}));
+    payload = await req.json() as BuiltinRequest;
+    request = payload.request || {};
+    if (payload.action === 'chat') {
+      const result = await chatCompletion(request);
+      await recordUsageBestEffort({ req, action: payload.action, request, result, startedAt, success: true, statusCode: 200 });
+      return json(result);
+    }
+    if (payload.action === 'transcribe') {
+      const result = await transcribeAudio(request);
+      await recordUsageBestEffort({ req, action: payload.action, request, result, startedAt, success: true, statusCode: 200 });
+      return json(result);
+    }
+    if (payload.action === 'synthesize') {
+      const result = await synthesizeSpeech(request);
+      await recordUsageBestEffort({ req, action: payload.action, request, result, startedAt, success: true, statusCode: 200 });
+      return json(result);
+    }
     return json({ error: 'Unknown action' }, 400);
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    const status = extractHttpStatus(error) || 500;
+    await recordUsageBestEffort({
+      req,
+      action: payload?.action,
+      request,
+      startedAt,
+      success: false,
+      statusCode: status,
+      error,
+    });
+    return json({ error: error instanceof Error ? error.message : String(error) }, status);
   }
 });

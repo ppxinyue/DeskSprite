@@ -1,6 +1,7 @@
 import type { ApiConfig, Message, AiError } from './types';
 import { BUILTIN_QUOTA_EXHAUSTED_MESSAGE } from './defaultModel';
 import { resolveStoredApiKey } from '@/lib/apiKeyStorage';
+import { getCloudSyncStatus } from '@/lib/db';
 import { invoke } from '@tauri-apps/api/core';
 
 export async function* streamChat(
@@ -9,7 +10,9 @@ export async function* streamChat(
 ): AsyncGenerator<string, void, undefined> {
   try {
     if (config.id === -1) {
-      const content = await invoke<string>('builtin_chat_completion', { request: { messages } });
+      const content = await invoke<string>('builtin_chat_completion', {
+        request: { messages, deviceId: await getBuiltinDeviceId() },
+      });
       if (content) yield content;
       return;
     }
@@ -45,6 +48,7 @@ export async function vision(
               imageDataUrl: `data:image/png;base64,${imageBase64}`,
             },
           ],
+          deviceId: await getBuiltinDeviceId(),
         },
       });
     }
@@ -66,6 +70,14 @@ export async function vision(
     });
   } catch (e) {
     throw toError(createAiError(e, config.id === -1));
+  }
+}
+
+async function getBuiltinDeviceId() {
+  try {
+    return (await getCloudSyncStatus()).deviceId;
+  } catch {
+    return '';
   }
 }
 
