@@ -1,21 +1,22 @@
 <p align="center">
-  <img src="public/assets/idle/png/idle.png" alt="cat15" width="180" />
+  <img src="public/assets/idle/png/idle.png" alt="DeskCat" width="160" />
 </p>
 
-<h1 align="center">DeskCat 猫十五</h1>
+<h1 align="center">DeskCat</h1>
 
 <p align="center">
-  An AI desktop companion for chat, focus, Timeline tracking, and coding workflows.
+  A personal AI desktop companion for calm work, smarter focus, coding sessions, and your day-in-review Timeline.
 </p>
 
 <p align="center">
-  一只住在桌面上的 AI 灵宠，陪你聊天、专注、记录 Timeline，并在 Coding 时陪你工作。
+  让你的小猫、小狗住进桌面，陪你工作、聊天、提醒专注与休息，并自动整理你的时间线。
 </p>
 
 <p align="center">
   <img alt="Electron" src="https://img.shields.io/badge/Electron-39-47848f?style=flat-square&logo=electron&logoColor=white" />
   <img alt="React" src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=111111" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6-3178c6?style=flat-square&logo=typescript&logoColor=white" />
+  <img alt="Supabase" src="https://img.shields.io/badge/Supabase-cloud-3ecf8e?style=flat-square&logo=supabase&logoColor=white" />
   <img alt="Local first" src="https://img.shields.io/badge/local--first-privacy-2f855a?style=flat-square" />
 </p>
 
@@ -24,190 +25,104 @@
 </p>
 
 <p align="center">
-  <img src="docs/orb-modes.gif" alt="cat15 orb modes" width="620" />
-</p>
-<p align="center">
-  <sub>Orb mode preview: idle, work, and rest states with dark glass styling.</sub>
+  <img src="docs/orb-modes.gif" alt="DeskCat orb modes" width="620" />
 </p>
 
 ## English
 
-DeskCat is an Electron desktop app. It lives on your screen as either a pet or an orb and provides AI chat, focus reminders, Timeline tracking, coding mode, and personal analytics. It is designed to be local-first, low-interruption, customizable, and visually close to a lightweight macOS glass interface.
+DeskCat is an Electron app for people who want a desktop companion that is useful, personal, and a little alive. It can be your cat, dog, or any custom avatar. It stays near your work, talks with you, speaks aloud, reminds you when you drift, connects to coding agents, and turns your day into a readable Timeline.
 
-## Features
+The product is organized around four core features:
 
-### Personal
+1. **Desktop companion**
+2. **AI chat**
+3. **Focus guard**
+4. **Smart timeline**
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">Setting</th>
-      <th align="left">Feature</th>
-      <th align="left">Technical approach</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>Profile</strong></td>
-      <td align="left">Shows Timeline, 14-day focus, top apps, daily activity, and distraction content ranking.</td>
-      <td align="left">Local database aggregation; <code>timelineView.ts</code> handles cross-day clipping, color-block spans, short-use folding, and display stats.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Conversation History</strong></td>
-      <td align="left">Opens previous chat and coding conversations.</td>
-      <td align="left">Messages are persisted locally and restored by conversation id; coding history can open the latest session by default.</td>
-    </tr>
-  </tbody>
-</table>
+## Core Features
 
-### Appearance
+### Desktop Companion
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">Setting</th>
-      <th align="left">Feature</th>
-      <th align="left">Technical approach</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>Display</strong></td>
-      <td align="left">Switches Pet / Orb, theme, opacity, scale, chat width, and always-on-top behavior.</td>
-      <td align="left">Transparent frameless Electron window + React state; startup pre-paints theme classes to avoid dark-mode flashing.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Custom Avatar</strong></td>
-      <td align="left">Configures built-in or user-uploaded cat PNG/GIF assets.</td>
-      <td align="left"><code>DEFAULT_MEDIA_CONFIG</code> maps idle, work, rest, and preset media; GIF mode does not stack extra motion effects.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Pet Motion</strong></td>
-      <td align="left">Controls jump, wobble, and breathing effects.</td>
-      <td align="left"><code>PetAvatar</code> and CSS animations compose motion by state; Orb uses code-rendered glass, letters, and hover motion.</td>
-    </tr>
-  </tbody>
-</table>
+DeskCat lives on your desktop as a pet or an orb. You can use the built-in cat assets or import your own cat, dog, character, PNG frames, GIFs, and state-specific animations.
 
-<p align="center">
-  <img src="docs/avatar-resources.png" alt="cat15 built-in avatar resources" width="760" />
-</p>
-<p align="center">
-  <sub>Built-in cat15 avatar resources, plus a custom slot for user-added avatars.</sub>
-</p>
+- Custom avatars for idle, work, rest, drinking, thinking, and sleeping states.
+- Pet or orb display modes, opacity, size, motion, and always-on-top behavior.
+- Voice output, cloud TTS, and system speech fallback so your companion can actually talk.
+- Rest and water reminders shown directly around the companion, not hidden in a productivity dashboard.
+- macOS-friendly floating window behavior for desktop and fullscreen spaces.
 
-### Focus & Reminders
+**How it works:** the companion is a transparent frameless Electron window rendered by React. Pet state is driven by local settings, focus/rest timers, chat/coding activity, and timeline sampling. Native macOS panel handling keeps the companion visible without behaving like a normal app window.
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">Setting</th>
-      <th align="left">Feature</th>
-      <th align="left">Technical approach</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>Rest Reminder</strong></td>
-      <td align="left">Reminds you to rest and shows a countdown under the pet.</td>
-      <td align="left">Renderer timers drive Pet/Orb UI; the countdown background follows the same opacity parameter as the companion.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Focus Mode</strong></td>
-      <td align="left">Records focus time and warns on distractions.</td>
-      <td align="left">Foreground app, window title, and browser URL are matched against focus rules; hits are sent to the renderer for prompt UI.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Blocked List</strong></td>
-      <td align="left">Manages blocked apps and keywords.</td>
-      <td align="left">App/title/url are normalized before matching; keyword hits are ranked by concrete content such as <code>bilibili</code> or <code>zhihu</code>.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Game Detection</strong></td>
-      <td align="left">Lowers topmost behavior and pauses Timeline refresh while gaming.</td>
-      <td align="left">User-maintained game keywords protect game performance by pausing foreground sampling and reducing window interference.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Music Detection</strong></td>
-      <td align="left">Records background music only when playback is active.</td>
-      <td align="left">Apple Music / Spotify use AppleScript; NeteaseMusic uses local playback state and freshness checks.</td>
-    </tr>
-  </tbody>
-</table>
+### AI Chat
 
-### AI
+DeskCat includes a compact chat next to the companion and a full chat window for longer conversations. It supports text, screenshots/images, document text extraction, voice input, and voice output.
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">Setting</th>
-      <th align="left">Feature</th>
-      <th align="left">Technical approach</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>Built-in Quota</strong></td>
-      <td align="left">Starts quickly with the built-in model quota.</td>
-      <td align="left">Default model config and usage are managed locally; custom providers can override the default path.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Coding Mode</strong></td>
-      <td align="left">Connects to Codex and Claude Code.</td>
-      <td align="left">Codex uses <code>app-server --listen stdio://</code> with newline-delimited JSON; Claude Code uses CLI <code>stream-json</code> output.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Chat Model</strong></td>
-      <td align="left">Configures default or custom chat models.</td>
-      <td align="left">Supports OpenAI-compatible Base URL, Model, and API Key through local/keychain-backed storage.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Voice Model</strong></td>
-      <td align="left">Configures STT/TTS models.</td>
-      <td align="left">Web Audio drives the live recording waveform; STT/TTS calls are sent through Electron IPC.</td>
-    </tr>
-  </tbody>
-</table>
+- Built-in model path for quick start, plus custom OpenAI-compatible chat providers.
+- Image and screenshot analysis through chat messages.
+- PDF/DOCX upload by extracting local text before sending context to the model.
+- STT/TTS for voice input and spoken replies.
+- System Knowledge Base for local time, weather, device info, Calendar, and Reminders when authorized.
+- Coding mode connects to **Codex** and **Claude Code** so the companion can sit beside active agent sessions.
 
-### General
+**How it works:** chat calls go through Electron IPC. User API keys are stored through local/keychain-backed storage. Built-in chat/voice no longer ships API keys in the client: Electron calls a Supabase Edge Function proxy, while server-side secrets stay in Supabase. Requests include app version, device id, action, timestamp, nonce, and HMAC signature so the proxy can enforce rollout and reduce abuse.
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">Setting</th>
-      <th align="left">Feature</th>
-      <th align="left">Technical approach</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>Basics</strong></td>
-      <td align="left">Sets language, launch behavior, and basic preferences.</td>
-      <td align="left">Settings live in the local store; Chinese / English copy is mapped through i18n.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Timeline</strong></td>
-      <td align="left">Tracks foreground windows, browser sites, and background processes after the minimum duration.</td>
-      <td align="left">macOS AppleScript/System Events provide foreground snapshots; <code>timelineRecorder.ts</code> manages active, candidate, paused, and background states.</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Shortcuts</strong></td>
-      <td align="left">Configures global open, screenshot, and send-message shortcuts.</td>
-      <td align="left">Electron main process registers shortcuts; send mode supports Enter or Command/Ctrl+Enter.</td>
-    </tr>
-  </tbody>
-</table>
+### Focus Guard
 
-<p align="center">
-  <img src="docs/timeline-mock-en.png" alt="cat15 English Profile Timeline mock preview" width="760" />
-</p>
-<p align="center">
-  <sub>Profile preview with sample Timeline, activity, and app statistics.</sub>
-</p>
+Focus Guard is the part of DeskCat that notices when you said you wanted to work and then wandered somewhere else.
 
-## Install from source
+- Focus sessions with foreground app, window title, and browser URL matching.
+- Distraction reminders for blocked apps, sites, or keywords.
+- Water and rest reminders during long work blocks.
+- Game/fullscreen detection to reduce interference when another app needs the screen.
+- Coding mode status for Codex and Claude Code, including working/done/needs-input states.
 
-Node.js and pnpm are required.
+**How it works:** the Electron main process samples foreground app/window state through macOS System Events and AppleScript, then the renderer compares normalized app/title/url data against focus rules. Coding mode reads Codex app-server events and Claude Code `stream-json` output, then maps them into compact companion states.
+
+### Smart Timeline
+
+Smart Timeline is DeskCat's memory of your workday. It shows where your attention went, which apps dominated your day, where distractions happened, and what was running in the background.
+
+- Foreground activity timeline with app names, window titles, browser domains, and categories.
+- Short-switch folding so tiny accidental app hops do not destroy the main work block.
+- Idle pause handling so reading, thinking, or stepping away does not become fake activity.
+- Background markers for coding agents, music, terminal, and other tracked context.
+- 14-day focus stats, top apps, distraction ranking, active hours, and profile summaries.
+- Cloud analytics/dashboard support through Supabase when enabled.
+
+**How it works:** the local store keeps timeline entries, focus stats, conversations, settings, and telemetry under `deskcat:electron-db:v1`. `timelineRecorder.ts` manages active/candidate/paused/background states, while `timelineView.ts` clips entries across days and prepares display aggregates. Optional cloud sync sends encrypted backups and telemetry events to Supabase tables such as `devices`, `cloud_backups`, and `telemetry_events`.
+
+## Technical Architecture
+
+DeskCat is local-first, with cloud services used only where they make sense.
+
+| Area | Implementation |
+| --- | --- |
+| Desktop shell | Electron 39, transparent frameless windows, native macOS panel behavior, Electron Builder packaging |
+| UI | React 19, TypeScript, Vite 8, Tailwind CSS 4, Radix UI, lucide-react |
+| Local data | Browser localStorage-backed app store for settings, conversations, Timeline, focus stats, and telemetry queue |
+| Secure keys | Local/keychain-backed API key references; built-in service keys stay server-side |
+| Timeline sensing | macOS System Events, AppleScript, browser/window title sampling, idle/fullscreen/game guards |
+| AI chat | OpenAI-compatible chat/STT/TTS through Electron IPC; built-in calls routed through Supabase Edge Functions |
+| Cloud | Supabase Edge Functions, Postgres tables, migrations, optional cloud backup and analytics dashboard |
+| Coding mode | Codex app-server stdio protocol and Claude Code `stream-json` protocol |
+| Updates | electron-updater with GitHub releases and `latest-mac.yml` |
+
+## Privacy Model
+
+- Personal data is local by default.
+- Timeline and conversations are stored on the user's machine unless cloud sync is enabled.
+- Built-in AI proxy usage records do **not** store prompts, replies, images, audio, or API keys.
+- Supabase is used for cloud backup/analytics, public stats, and the built-in AI proxy.
+- macOS permissions are requested only for features that need them: Accessibility, Automation/System Events, Calendar, Reminders, Location, Microphone, and Screen Recording.
+
+## Install
+
+Download the latest macOS build from [GitHub Releases](https://github.com/ppxinyue/DeskCat/releases/latest).
+
+- Apple Silicon: `DeskCat-*-arm64.dmg`
+- Intel Mac: `DeskCat-*-x64.dmg`
+
+## Run From Source
 
 ```bash
 git clone https://github.com/ppxinyue/DeskCat.git
@@ -216,211 +131,129 @@ pnpm install
 pnpm electron:dev
 ```
 
-On macOS, Timeline tracking, browser URL capture, music state, and screenshots may ask for Accessibility, Automation, or Screen Recording permissions.
-
-## Commands
+Useful commands:
 
 ```bash
-pnpm electron:dev   # Vite + Electron dev mode
-pnpm build          # TypeScript + Vite build
-pnpm electron:build # desktop package build
-pnpm test           # Timeline and startup lifecycle tests
-pnpm lint           # ESLint
+pnpm electron:dev        # Vite + Electron development mode
+pnpm build               # TypeScript + Vite production build
+pnpm electron:build:mac  # macOS x64 + arm64 DMG build
+pnpm test                # Timeline, AI, chat, and startup tests
+pnpm lint                # ESLint
 ```
 
-## Stack
+## Repository Map
 
-- Electron 39 + Electron Builder
-- React 19 + TypeScript + Vite 8
-- Tailwind CSS 4 + Radix UI + lucide-react
-- Zustand for local state
-- Node.js IPC, AppleScript, macOS System Events
-- OpenAI-compatible Chat / STT / TTS configuration
-- Codex app-server stdio protocol, Claude Code stream-json protocol
-
-## Platform status
-
-- **macOS**: primary development platform; Timeline, music state, fullscreen floating, and browser URL detection are the most complete.
-- **Windows**: Electron Builder configuration exists; deep desktop sensing still needs platform-specific adaptation.
+```text
+electron/main.cjs                 Electron main process, windows, native integrations, AI proxy calls
+src/App.tsx                       Desktop orchestration, companion state, Timeline sampling
+src/features/pet/                 Pet/orb rendering, animation config, visual states
+src/features/chat/                Chat UI, compact chat, images, documents, voice handoff
+src/features/ai/                  Chat service, default model, system knowledge
+src/features/voice/               STT/TTS and system speech fallback
+src/lib/timelineRecorder.ts       Timeline state machine
+src/lib/timelineView.ts           Timeline clipping and aggregation
+src/lib/db.ts                     Local store, focus stats, telemetry, cloud sync payloads
+supabase/functions/               Edge Functions for sync, dashboard, public stats, built-in AI proxy
+supabase/migrations/              Supabase schema and analytics views
+dashboard/                        Developer analytics dashboard
+website/                          Marketing/download website
+```
 
 ## 中文
 
-DeskCat 猫十五是一个 Electron 桌面应用。它可以以灵宠或悬浮球的形式停在屏幕上，提供 AI 对话、专注提醒、Timeline 记录、Coding 模式和个人统计。它的设计目标是本地优先、低打扰、可定制，并尽量贴近 macOS 的轻量玻璃质感。
+DeskCat 是一个 Electron 桌面应用。它不是普通聊天窗口，而是一只住在桌面上的 AI 灵宠：可以是小猫、小狗，也可以是你自己的角色。它会陪你工作，会说话，会提醒你专注和休息，还会把一天的工作自动整理成 Timeline。
 
-## 功能
+DeskCat 的核心功能分成四个：
 
-### 个人
+1. **Desktop companion 桌面灵宠**
+2. **AI chat 智能聊天**
+3. **Focus guard 专注守卫**
+4. **Smart timeline 智能时间线**
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">设置项</th>
-      <th align="left">功能</th>
-      <th align="left">技术方案</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>个人档案</strong></td>
-      <td align="left">展示 Timeline、14 天专注、Top 软件、全天活跃度和分心内容排行。</td>
-      <td align="left">本地数据库聚合 Timeline 与专注数据；<code>timelineView.ts</code> 负责跨日裁剪、色块跨度、短暂切换折叠和统计展示。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>对话历史</strong></td>
-      <td align="left">查看历史对话和 Coding 对话记录。</td>
-      <td align="left">对话消息本地持久化；聊天窗口按 conversation id 加载历史上下文，Coding 历史可默认打开最新会话。</td>
-    </tr>
-  </tbody>
-</table>
+## 核心功能
 
-### 外观
+### Desktop Companion 桌面灵宠
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">设置项</th>
-      <th align="left">功能</th>
-      <th align="left">技术方案</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>显示</strong></td>
-      <td align="left">切换 Pet / Orb、主题、透明度、大小、对话框宽度和始终置顶。</td>
-      <td align="left">Electron 透明无边框窗口 + React 状态；主题启动时预置 class，减少深色闪烁。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>自定义形象</strong></td>
-      <td align="left">配置内置或用户上传的猫猫 PNG/GIF 资源。</td>
-      <td align="left"><code>DEFAULT_MEDIA_CONFIG</code> 管理 idle、work、rest 和预设素材；GIF 模式不叠加额外动作效果。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>灵宠动作</strong></td>
-      <td align="left">控制跳跃、摇摆、呼吸等轻量动作。</td>
-      <td align="left"><code>PetAvatar</code> 与 CSS animation 根据状态组合动画；Orb 模式使用代码渲染玻璃球、字母和 hover 动效。</td>
-    </tr>
-  </tbody>
-</table>
+DeskCat 可以作为灵宠或悬浮球停在桌面上。你可以使用内置小猫资源，也可以换成自己的小猫、小狗、角色、PNG 帧、GIF 和不同状态动画。
 
-<p align="center">
-  <img src="docs/avatar-resources.png" alt="cat15 built-in avatar resources" width="760" />
-</p>
-<p align="center">
-  <sub>内置猫十五形象资源，以及用于添加自定义形象的入口。</sub>
-</p>
+- 支持 idle、work、rest、drinking、thinking、sleeping 等状态。
+- 支持灵宠 / Orb 模式、透明度、大小、动效和置顶行为。
+- 支持语音朗读、云端 TTS 和系统朗读兜底，让灵宠真的能说话。
+- 喝水提醒、休息提醒直接显示在灵宠附近。
+- 对 macOS 桌面、全屏 Space、悬浮窗层级做了专门适配。
 
-### 专注与提醒
+**技术方案：** 灵宠是 React 渲染的 Electron 透明无边框窗口。状态来自本地设置、专注/休息计时器、聊天状态、Coding 状态和 Timeline 采样。macOS 下通过 native panel 行为控制全屏和置顶体验。
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">设置项</th>
-      <th align="left">功能</th>
-      <th align="left">技术方案</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>休息提醒</strong></td>
-      <td align="left">定时提醒休息，并在灵宠下方显示倒计时。</td>
-      <td align="left">Renderer 计时状态驱动 Pet/Orb UI；倒计时背景透明度与灵宠透明度同步。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>专注模式</strong></td>
-      <td align="left">记录专注时长并在分心时提醒。</td>
-      <td align="left">前台 app、窗口标题和浏览器 URL 与规则匹配；命中后传给前端弹出提醒并写入分心统计。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>屏蔽列表</strong></td>
-      <td align="left">管理屏蔽软件和屏蔽关键词。</td>
-      <td align="left">app/title/url 统一归一化匹配；关键词命中后按具体内容聚合排行，例如 <code>bilibili</code> 或 <code>zhihu</code>。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>游戏识别</strong></td>
-      <td align="left">游戏运行时取消置顶并暂停 Timeline 刷新。</td>
-      <td align="left">用户维护游戏关键词；命中后暂停前台采样并降低窗口干扰，避免影响游戏性能。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>音乐识别</strong></td>
-      <td align="left">只在音乐真正播放时记录后台音乐。</td>
-      <td align="left">Apple Music / Spotify 用 AppleScript；NeteaseMusic 用本地播放状态和时效判断。</td>
-    </tr>
-  </tbody>
-</table>
+### AI Chat 智能聊天
 
-### AI
+DeskCat 有灵宠旁边的 compact chat，也有完整聊天窗口。它可以处理文本、截图/图片、PDF/DOCX 文档文本、语音输入和语音回复。
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">设置项</th>
-      <th align="left">功能</th>
-      <th align="left">技术方案</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>内置额度</strong></td>
-      <td align="left">使用内置模型额度快速开始。</td>
-      <td align="left">默认模型配置与用量在本地管理；自定义模型可覆盖默认路径。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Coding 模式</strong></td>
-      <td align="left">连接 Codex 和 Claude Code。</td>
-      <td align="left">Codex 使用 <code>app-server --listen stdio://</code> 的换行 JSON 协议；Claude Code 使用 CLI <code>stream-json</code> 输出。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Chat 模型</strong></td>
-      <td align="left">配置默认或自定义聊天模型。</td>
-      <td align="left">支持 OpenAI-compatible Base URL、Model、API Key；API Key 通过本地存储/钥匙串辅助模块管理。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>语音模型</strong></td>
-      <td align="left">配置 STT/TTS 模型。</td>
-      <td align="left">Web Audio 录音驱动实时波形；STT/TTS 请求通过 Electron IPC 发送给配置的模型服务。</td>
-    </tr>
-  </tbody>
-</table>
+- 内置模型快速可用，也支持自定义 OpenAI-compatible provider。
+- 支持图片、截图分析。
+- 支持 PDF/DOCX 上传，本地提取文本后作为模型上下文。
+- 支持 STT 语音输入和 TTS 语音回复。
+- 系统知识库可在授权后读取时间、天气、设备信息、日历和提醒事项。
+- Coding mode 连接 **Codex** 和 **Claude Code**，让灵宠陪着 agent 工作。
 
-### 通用
+**技术方案：** 聊天请求通过 Electron IPC 进入主进程。用户自己的 API Key 使用本地/keychain-backed 存储。内置 chat/voice 不再把 key 打进客户端，而是调用 Supabase Edge Function 代理，真实 key 只在 Supabase secrets 中。客户端请求会带 app version、device id、action、timestamp、nonce 和 HMAC 签名，服务端可以做版本校验和防滥用控制。
 
-<table>
-  <thead>
-    <tr>
-      <th align="left">设置项</th>
-      <th align="left">功能</th>
-      <th align="left">技术方案</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="left" nowrap><strong>基础</strong></td>
-      <td align="left">设置语言、开机启动和基础行为。</td>
-      <td align="left">设置保存在本地 store；中文 / English 文案通过 i18n 映射。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>Timeline</strong></td>
-      <td align="left">记录达到最小时长的前台窗口、浏览器网站和后台进程。</td>
-      <td align="left">macOS AppleScript/System Events 读取前台信息；<code>timelineRecorder.ts</code> 管理 active、candidate、paused 和 background 状态机。</td>
-    </tr>
-    <tr>
-      <td align="left" nowrap><strong>快捷键</strong></td>
-      <td align="left">设置全局呼出、截图和发送消息快捷键。</td>
-      <td align="left">Electron 主进程注册快捷键；发送方式支持 Enter 或 Command/Ctrl+Enter。</td>
-    </tr>
-  </tbody>
-</table>
+### Focus Guard 专注守卫
 
-<p align="center">
-  <img src="docs/timeline-mock.png" alt="cat15 Timeline mock preview" width="760" />
-</p>
-<p align="center">
-  <sub>个人档案预览：示例 Timeline、全天活跃度和软件统计。</sub>
-</p>
+Focus Guard 负责在你进入专注状态后，提醒你有没有分心。
 
-## 安装与运行
+- 专注模式会匹配当前前台 app、窗口标题和浏览器 URL。
+- 可配置分心 app、网站或关键词提醒。
+- 长时间工作时提醒喝水和休息。
+- 检测游戏/全屏场景，减少灵宠窗口对游戏或全屏软件的干扰。
+- Coding mode 会展示 Codex / Claude Code 的 working、done、needs-input 等状态。
 
-目前建议从源码运行，需要 Node.js 与 pnpm。
+**技术方案：** Electron 主进程通过 macOS System Events 和 AppleScript 采样前台窗口、应用、浏览器 URL、音乐和系统状态。前端把标准化后的 app/title/url 与专注规则匹配。Codex 通过 app-server stdio 协议接入，Claude Code 通过 CLI `stream-json` 输出接入。
+
+### Smart Timeline 智能时间线
+
+Timeline 是 DeskCat 对你一天工作状态的记忆。它会告诉你时间花在哪里，哪些 app 占据最多，什么时候分心，背景里还运行着什么。
+
+- 记录前台 app、窗口标题、浏览器域名和分类。
+- 折叠很短的切换，避免 1-2 秒误触破坏主时间块。
+- 处理 idle / 暂停状态，避免把离开电脑当成有效工作。
+- 记录 Coding、音乐、终端等背景 marker。
+- 展示 14 天专注统计、Top apps、分心排行、活跃时段和个人档案。
+- 开启云端能力后，可通过 Supabase 做备份、统计和 dashboard。
+
+**技术方案：** 本地数据存在 `deskcat:electron-db:v1`，包括 settings、conversations、timeline entries、focus stats 和 telemetry queue。`timelineRecorder.ts` 负责 active/candidate/paused/background 状态机，`timelineView.ts` 负责跨日裁剪、色块展示和统计聚合。可选云同步会把加密备份与 telemetry 发送到 Supabase 的 `devices`、`cloud_backups`、`telemetry_events` 等表。
+
+## 技术架构
+
+DeskCat 是 local-first 应用，云端只用于需要云端能力的地方。
+
+| 模块 | 技术方案 |
+| --- | --- |
+| 桌面壳 | Electron 39、透明无边框窗口、macOS native panel、Electron Builder |
+| 前端 | React 19、TypeScript、Vite 8、Tailwind CSS 4、Radix UI、lucide-react |
+| 本地数据 | localStorage-backed store，保存设置、聊天、Timeline、专注统计和 telemetry 队列 |
+| 密钥安全 | 用户 API key 使用本地/keychain-backed 引用；内置服务 key 只在服务端 |
+| Timeline 感知 | macOS System Events、AppleScript、窗口标题/浏览器 URL 采样、idle/fullscreen/game 保护 |
+| AI 能力 | OpenAI-compatible chat/STT/TTS，经 Electron IPC 调用；内置服务经 Supabase Edge Function 代理 |
+| 云端 | Supabase Edge Functions、Postgres migrations、可选云备份、统计 dashboard |
+| Coding mode | Codex app-server stdio 协议、Claude Code `stream-json` 协议 |
+| 自动更新 | electron-updater、GitHub Releases、`latest-mac.yml` |
+
+## 隐私模型
+
+- 默认本地优先，个人数据先留在用户机器上。
+- Timeline 和聊天记录不会自动上传，除非用户开启云同步。
+- 内置 AI 代理的用量记录不保存 prompt、回复正文、图片、音频或 API key。
+- Supabase 用于云备份/统计、公开下载统计和内置 AI 代理。
+- macOS 权限按功能触发：辅助功能、Automation/System Events、日历、提醒事项、位置、麦克风、屏幕录制。
+
+## 安装
+
+从 [GitHub Releases](https://github.com/ppxinyue/DeskCat/releases/latest) 下载最新版。
+
+- Apple Silicon：`DeskCat-*-arm64.dmg`
+- Intel Mac：`DeskCat-*-x64.dmg`
+
+## 本地运行
 
 ```bash
 git clone https://github.com/ppxinyue/DeskCat.git
@@ -429,51 +262,30 @@ pnpm install
 pnpm electron:dev
 ```
 
-macOS 首次使用 Timeline、浏览器 URL、音乐状态或截图功能时，系统可能请求 Accessibility、Automation 或 Screen Recording 权限。
-
-## 常用命令
+常用命令：
 
 ```bash
-pnpm electron:dev   # Vite + Electron 开发模式
-pnpm build          # TypeScript + Vite 构建
-pnpm electron:build # 构建桌面安装包
-pnpm test           # Timeline 与启动生命周期测试
-pnpm lint           # ESLint
+pnpm electron:dev        # Vite + Electron 开发模式
+pnpm build               # TypeScript + Vite 生产构建
+pnpm electron:build:mac  # macOS x64 + arm64 DMG 构建
+pnpm test                # Timeline、AI、Chat、启动生命周期测试
+pnpm lint                # ESLint
 ```
 
-## 技术栈
-
-- Electron 39 + Electron Builder
-- React 19 + TypeScript + Vite 8
-- Tailwind CSS 4 + Radix UI + lucide-react
-- Zustand 本地状态管理
-- Node.js IPC、AppleScript、macOS System Events
-- OpenAI-compatible Chat / STT / TTS 配置
-- Codex app-server stdio 协议、Claude Code stream-json 协议
-
-## 项目结构
+## 目录结构
 
 ```text
-electron/
-  main.cjs              主进程：窗口、Timeline、音乐/游戏识别、Coding IPC
-  preload.cjs           Renderer 安全桥接层
-src/
-  App.tsx               桌面交互编排、Timeline 采样、窗口状态
-  features/chat/        聊天 UI、图片/截图/语音输入
-  features/pet/         Pet / Orb 渲染、动画和悬浮状态
-  features/settings/    设置 UI、模型配置、语言与主题
-  lib/timelineRecorder.ts Timeline 记录状态机
-  lib/timelineView.ts     Timeline 展示、裁剪与聚合
-  lib/db.ts               本地持久化
-public/assets/          灵宠图片、GIF 与静态资源
-docs/                   README 截图与开发文档
+electron/main.cjs                 Electron 主进程、窗口、原生集成、AI proxy 调用
+src/App.tsx                       桌面交互编排、灵宠状态、Timeline 采样
+src/features/pet/                 灵宠/Orb 渲染、动画配置、视觉状态
+src/features/chat/                Chat UI、compact chat、图片、文档、语音交接
+src/features/ai/                  Chat service、默认模型、系统知识库
+src/features/voice/               STT/TTS、系统语音兜底
+src/lib/timelineRecorder.ts       Timeline 状态机
+src/lib/timelineView.ts           Timeline 裁剪和聚合
+src/lib/db.ts                     本地 store、专注统计、telemetry、云同步 payload
+supabase/functions/               同步、dashboard、公开统计、内置 AI proxy 的 Edge Functions
+supabase/migrations/              Supabase schema 和 analytics views
+dashboard/                        开发者数据 dashboard
+website/                          官网/下载页
 ```
-
-## 平台状态
-
-- **macOS**：主要开发平台，Timeline、音乐状态、全屏悬浮和浏览器 URL 检测最完整。
-- **Windows**：已有 Electron Builder 配置，深度桌面感知能力仍需要平台适配。
-
-## License
-
-License not specified yet.
