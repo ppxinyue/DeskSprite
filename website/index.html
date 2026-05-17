@@ -20,9 +20,9 @@
         <span>DeskCat</span>
       </a>
       <nav class="nav-links" aria-label="Primary navigation">
+        <a href="#download" data-i18n="navDownload">Download</a>
         <a href="#motion" data-i18n="navMotion">Motion</a>
         <a href="#features" data-i18n="navFeatures">Features</a>
-        <a href="#download" data-i18n="navDownload">Download</a>
         <a href="https://github.com/ppxinyue/DeskCat" target="_blank" rel="noreferrer">GitHub</a>
       </nav>
       <button class="lang-toggle" type="button" data-lang-toggle aria-label="Switch language">中文</button>
@@ -34,7 +34,6 @@
         <div class="cat-trail" data-cat-trail aria-hidden="true"></div>
 
         <div class="hero-center">
-          <p class="eyebrow reveal" data-i18n="heroEyebrow">PRODUCT / MACOS / AI COMPANION</p>
           <h1 class="wordmark reveal" aria-label="DeskCat">
             <span>D</span><span>e</span><span>s</span><span>k</span><span class="logo-letter">C<img src="assets/icon.png" alt="" /></span><span>a</span><span>t</span>
           </h1>
@@ -44,8 +43,6 @@
         </div>
 
         <div class="hero-footnote">
-          <span>@deskcat</span>
-          <span data-i18n="heroFootnote">Move your cursor. The cats follow.</span>
           <span class="live-users" aria-live="polite">
             <span data-i18n="liveUsersLabel">Total users</span>
             <strong data-total-users>--</strong>
@@ -65,14 +62,78 @@
         </div>
       </section>
 
+      <section id="download" class="download color-offwhite">
+        <div class="download-copy reveal">
+          <p class="eyebrow">DOWNLOAD / V1.1.1</p>
+          <h2 data-i18n="downloadTitle">Download DeskCat.</h2>
+          <p data-i18n="downloadBody">
+            DeskCat is available for macOS today. Windows support is in development, with a download spot already saved.
+          </p>
+        </div>
+        <div class="download-actions reveal">
+          <div class="download-platform">
+            <span data-i18n="downloadPlatformMac">macOS</span>
+            <small data-i18n="downloadPlatformMacBody">Latest GitHub release</small>
+          </div>
+          <a class="download-button primary" href="https://github.com/ppxinyue/DeskCat/releases/download/v1.1.1/DeskCat-1.1.1-arm64.dmg" data-download-asset="DeskCat-1.1.1-arm64.dmg">
+            <span>Apple Silicon</span>
+            <small>M1 / M2 / M3 / M4 · arm64 · 170M</small>
+          </a>
+          <a class="download-button" href="https://github.com/ppxinyue/DeskCat/releases/download/v1.1.1/DeskCat-1.1.1-x64.dmg" data-download-asset="DeskCat-1.1.1-x64.dmg">
+            <span>Intel Mac</span>
+            <small>x64 · 177M</small>
+          </a>
+          <div class="download-platform windows">
+            <span data-i18n="downloadPlatformWindows">Windows</span>
+            <small data-i18n="downloadPlatformWindowsBody">In development</small>
+          </div>
+          <div class="download-button disabled" aria-disabled="true">
+            <span data-i18n="windowsDownloadTitle">Windows build</span>
+            <small data-i18n="windowsDownloadBody">Coming soon · the cat is learning new windowsills</small>
+          </div>
+        </div>
+      </section>
+
       <section id="motion" class="motion-section color-black">
         <div class="motion-copy reveal">
           <p class="eyebrow">01 / PRODUCT MOTION</p>
           <h2 data-i18n="motionTitle">Lives quietly in the corner. Ready when you are.</h2>
         </div>
         <div class="video-frame reveal">
-          <video controls playsinline poster="assets/hero-desktop.png">
+          <video controls playsinline>
             <source src="assets/product-video.mp4" type="video/mp4" />
+          </video>
+        </div>
+      </section>
+
+      <section class="motion-gallery color-black">
+        <div class="desk-video-grid reveal" aria-label="DeskCat feature videos">
+          <video autoplay muted loop playsinline preload="metadata">
+            <source src="assets/0-desk-web/0.1.mp4" type="video/mp4" />
+          </video>
+          <video autoplay muted loop playsinline preload="metadata">
+            <source src="assets/0-desk-web/0.2.mp4" type="video/mp4" />
+          </video>
+          <video autoplay muted loop playsinline preload="metadata">
+            <source src="assets/0-desk-web/0.3.mp4" type="video/mp4" />
+          </video>
+          <video autoplay muted loop playsinline preload="metadata">
+            <source src="assets/0-desk-web/0.4.mp4" type="video/mp4" />
+          </video>
+          <video autoplay muted loop playsinline preload="metadata">
+            <source src="assets/0-desk-web/0.5.mp4" type="video/mp4" />
+          </video>
+          <video autoplay muted loop playsinline preload="metadata">
+            <source src="assets/0-desk-web/0.6.mp4" type="video/mp4" />
+          </video>
+          <video autoplay muted loop playsinline preload="metadata">
+            <source src="assets/0-desk-web/0.7.mp4" type="video/mp4" />
+          </video>
+          <video autoplay muted loop playsinline preload="metadata">
+            <source src="assets/0-desk-web/0.8.mp4" type="video/mp4" />
+          </video>
+          <video autoplay muted loop playsinline preload="metadata">
+            <source src="assets/0-desk-web/0.9.mp4" type="video/mp4" />
           </video>
         </div>
       </section>
@@ -91,7 +152,7 @@
         </p>
       </section>
 
-      <section id="features" class="features color-offwhite">
+      <section id="features" class="feature-overview color-offwhite">
         <div class="section-kicker reveal">
           <span>03</span>
           <span data-i18n="featuresLabel">FOUR IN ONE</span>
@@ -99,7 +160,9 @@
         <h2 class="section-title reveal" data-i18n="featuresTitle">
           Desktop companion · AI chat · Focus guard · Smart timeline.
         </h2>
+      </section>
 
+      <section class="features color-offwhite">
         <article class="feature-story reveal">
           <div class="feature-copy progressive-copy">
             <p class="eyebrow">COMPANION</p>
@@ -110,18 +173,10 @@
             </p>
           </div>
           <div class="feature-media-flow">
-            <figure class="media-panel single">
-              <img src="assets/hero-desktop.png" alt="DeskCat living on the desktop" />
-            </figure>
-            <figure class="media-panel split">
-              <img src="assets/desktop-2.png" alt="DeskCat desktop companion mode" />
-              <img src="assets/custom-avatar.png" alt="DeskCat custom avatar settings" />
-            </figure>
-            <figure class="media-panel mosaic companion-mosaic">
-              <img src="assets/cats/idle-1.gif" alt="DeskCat idle animation" />
-              <img src="assets/cats/drinking.gif" alt="DeskCat rest reminder animation" />
-              <img src="assets/cats/playing.gif" alt="DeskCat playing animation" />
-              <img src="assets/desktop-4.png" alt="DeskCat desktop preview" />
+            <figure class="media-panel single video-panel">
+              <video autoplay muted loop playsinline preload="metadata">
+                <source src="assets/1-desktop-companion-web/1.mp4" type="video/mp4" />
+              </video>
             </figure>
           </div>
         </article>
@@ -136,17 +191,11 @@
             </p>
           </div>
           <div class="feature-media-flow">
-            <figure class="media-panel single">
-              <img src="assets/ai-chat.png" alt="DeskCat AI chat preview" />
+            <figure class="media-panel single ai-chat-panel">
+              <img src="assets/2-chat/图片7.png" alt="DeskCat AI chat preview" />
             </figure>
-            <figure class="media-panel split asymmetric">
-              <img src="assets/chat-window.png" alt="DeskCat compact chat window" />
-              <img src="assets/ai-2.png" alt="DeskCat AI model configuration" />
-            </figure>
-            <figure class="media-panel mosaic ai-mosaic">
-              <img src="assets/ai-3.png" alt="DeskCat AI provider settings" />
-              <img src="assets/ai-4.png" alt="DeskCat AI workflow preview" />
-              <img src="assets/chat-window.png" alt="DeskCat compact chat window" />
+            <figure class="media-panel single ai-chat-panel">
+              <img src="assets/2-chat/图片8.png" alt="DeskCat AI model and chat settings preview" />
             </figure>
           </div>
         </article>
@@ -161,19 +210,20 @@
             </p>
           </div>
           <div class="feature-media-flow">
-            <figure class="media-panel portrait">
-              <img src="assets/focus-mode.png" alt="DeskCat focus mode reminder" />
+            <figure class="media-panel single video-panel focus-video-panel">
+              <video autoplay muted loop playsinline preload="metadata" aria-label="DeskCat focus mode reminder">
+                <source src="assets/3-focus-web/3.1.mp4" type="video/mp4" />
+              </video>
             </figure>
-            <figure class="media-panel mosaic focus-mosaic">
-              <img src="assets/focus-1.png" alt="DeskCat focus and reminder settings" />
-              <img src="assets/focus-2.png" alt="DeskCat focus rule settings" />
-              <img src="assets/focus-3.png" alt="DeskCat distraction reminder settings" />
-              <img src="assets/focus-4.png" alt="DeskCat rest reminder settings" />
-              <img src="assets/focus-5.png" alt="DeskCat focus summary settings" />
+            <figure class="media-panel single video-panel focus-video-panel">
+              <video autoplay muted loop playsinline preload="metadata" aria-label="DeskCat focus rule settings">
+                <source src="assets/3-focus-web/3.2.mp4" type="video/mp4" />
+              </video>
             </figure>
-            <figure class="media-panel split">
-              <img src="assets/coding-green.png" alt="DeskCat coding mode green state" />
-              <img src="assets/coding-yellow.png" alt="DeskCat coding mode need input state" />
+            <figure class="media-panel single video-panel focus-video-panel">
+              <video autoplay muted loop playsinline preload="metadata" aria-label="DeskCat coding mode focus states">
+                <source src="assets/3-focus-web/3.3.mp4" type="video/mp4" />
+              </video>
             </figure>
           </div>
         </article>
@@ -188,59 +238,25 @@
             </p>
           </div>
           <div class="feature-media-flow">
-            <figure class="media-panel single">
-              <img src="assets/timeline-en.png" alt="DeskCat timeline dashboard preview" />
+            <figure class="media-panel single timeline-media-panel">
+              <img src="assets/4-timeline/图片5.png" alt="DeskCat timeline dashboard preview" />
             </figure>
-            <figure class="media-panel split">
-              <img src="assets/timeline-zh.png" alt="DeskCat Chinese timeline dashboard preview" />
-              <img src="assets/github.png" alt="DeskCat coding activity integration preview" />
-            </figure>
-            <figure class="media-panel single">
-              <img src="assets/desktop-4.png" alt="DeskCat daily activity desktop preview" />
+            <figure class="media-panel single timeline-media-panel">
+              <img src="assets/4-timeline/图片6.png" alt="DeskCat daily activity timeline preview" />
             </figure>
           </div>
         </article>
       </section>
 
-      <section id="download" class="download color-offwhite">
-        <div class="download-copy reveal">
-          <p class="eyebrow">DOWNLOAD / V1.0.0</p>
-          <h2 data-i18n="downloadTitle">Choose your Mac.</h2>
-          <p data-i18n="downloadBody">
-            DeskCat is available for both Apple Silicon and Intel Macs. Current builds are ad-hoc signed for
-            early testing.
-          </p>
-        </div>
-        <div class="download-actions reveal">
-          <a class="download-button primary" href="https://github.com/ppxinyue/DeskCat/releases/download/v1.0.0/DeskCat-1.0.0-arm64.dmg" data-download-asset="DeskCat-1.0.0-arm64.dmg">
-            <span>Apple Silicon</span>
-            <small>M1 / M2 / M3 / M4 · arm64 · 662M</small>
-          </a>
-          <a class="download-button" href="https://github.com/ppxinyue/DeskCat/releases/download/v1.0.0/DeskCat-1.0.0-x64.dmg" data-download-asset="DeskCat-1.0.0-x64.dmg">
-            <span>Intel Mac</span>
-            <small>x64 · 669M</small>
-          </a>
-          <p class="download-live" aria-live="polite">
-            <span data-i18n="siteDownloadsLabel">Product site</span>
-            <strong data-product-downloads>--</strong>
-            <span>GitHub</span>
-            <strong data-github-downloads>--</strong>
-          </p>
-          <p class="download-live" aria-live="polite">
-            <span data-i18n="siteViewsLabel">Site views</span>
-            <strong data-product-site-views>--</strong>
-            <span data-i18n="githubViewsLabel">GitHub views</span>
-            <strong data-github-views>--</strong>
-            <span data-i18n="githubStarsLabel">Stars</span>
-            <strong data-github-stars-inline>--</strong>
-          </p>
-        </div>
-      </section>
     </main>
 
     <div class="download-choice" data-download-choice hidden>
-      <div class="download-choice-inner" role="dialog" aria-modal="false" aria-labelledby="downloadChoiceTitle">
+      <div class="donate-scrim" data-close-download-choice></div>
+      <div class="download-choice-inner" role="dialog" aria-modal="true" aria-labelledby="downloadChoiceTitle">
+        <img class="donate-main-cat" src="assets/cats/happy.png" alt="" aria-hidden="true" />
+        <button class="donate-close" type="button" data-close-download-choice aria-label="Close download options">×</button>
         <div class="download-choice-copy">
+          <p class="eyebrow" data-i18n="downloadChoiceEyebrow">CHOOSE YOUR CAT DOOR</p>
           <p id="downloadChoiceTitle" data-i18n="downloadChoiceTitle">Ready to bring DeskCat home?</p>
           <span data-i18n="downloadChoiceBody">Pick your download vibe. The cat will not judge. Probably.</span>
         </div>
@@ -253,7 +269,6 @@
             <span data-i18n="donateTitle">Donate</span>
             <small data-i18n="donateBody">Help Cat Fifteen eat more cans.</small>
           </button>
-          <button class="choice-close" type="button" data-close-download-choice aria-label="Close download options">×</button>
         </div>
       </div>
     </div>
@@ -273,14 +288,14 @@
         <div class="qr-grid">
           <figure class="qr-card">
             <div class="qr-placeholder" data-payment-qr="alipay">
-              <img class="qr-image" src="assets/donate-alipay.png" alt="Alipay QR" data-qr-image hidden />
+              <img class="qr-image" src="assets/donate/ali.jpg" alt="Alipay QR" data-qr-image hidden />
               <span data-i18n="alipayQrLabel">Alipay QR</span>
             </div>
             <figcaption data-i18n="alipayLabel">Alipay</figcaption>
           </figure>
           <figure class="qr-card">
             <div class="qr-placeholder" data-payment-qr="wechat">
-              <img class="qr-image" src="assets/donate-wechat.png" alt="WeChat Pay QR" data-qr-image hidden />
+              <img class="qr-image" src="assets/donate/wechat.jpg" alt="WeChat Pay QR" data-qr-image hidden />
               <span data-i18n="wechatQrLabel">WeChat QR</span>
             </div>
             <figcaption data-i18n="wechatLabel">WeChat Pay</figcaption>
@@ -294,13 +309,13 @@
     </div>
 
     <footer class="site-footer color-black">
-      <div>
+      <a class="footer-brand" href="#top" aria-label="DeskCat home">
         <img src="assets/icon.png" alt="" />
-        <p>DeskCat</p>
-      </div>
-      <p data-i18n="footerLine">Desktop companion · AI chat · Focus guard · Smart timeline</p>
-      <a href="#top" data-i18n="footerTop">Back to top</a>
+        <span>DeskCat</span>
+      </a>
       <a href="https://github.com/ppxinyue/DeskCat" target="_blank" rel="noreferrer">GitHub</a>
+      <a href="mailto:deskcat15@163.com">deskcat15@163.com</a>
+      <p data-i18n="footerContact">For partnerships, please contact us.</p>
     </footer>
 
     <script src="script.js"></script>

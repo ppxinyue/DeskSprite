@@ -3,7 +3,6 @@ const copy = {
     navMotion: 'Motion',
     navFeatures: 'Features',
     navDownload: 'Download',
-    heroEyebrow: 'PRODUCT / MACOS / AI COMPANION',
     heroSubtitle: 'Not just a desktop companion — a reflection of how you work.',
     heroFootnote: 'Move your cursor. The cats follow.',
     liveUsersLabel: 'Total users',
@@ -32,9 +31,16 @@ const copy = {
     timelineTitle: 'A timeline you did not have to write',
     timelineBody:
       'DeskCat tracks foreground apps, background activity, terminal sessions, and browser tabs, then hands you a daily summary.',
-    downloadTitle: 'Choose your Mac.',
+    downloadTitle: 'Download DeskCat.',
     downloadBody:
-      'DeskCat is available for both Apple Silicon and Intel Macs. Current builds are ad-hoc signed for early testing.',
+      'DeskCat is available for macOS today. Windows support is in development, with a download spot already saved.',
+    downloadPlatformMac: 'macOS',
+    downloadPlatformMacBody: 'Latest GitHub release',
+    downloadPlatformWindows: 'Windows',
+    downloadPlatformWindowsBody: 'In development',
+    windowsDownloadTitle: 'Windows build',
+    windowsDownloadBody: 'Coming soon · the cat is learning new windowsills',
+    downloadChoiceEyebrow: 'CHOOSE YOUR CAT DOOR',
     downloadChoiceTitle: 'Ready to bring DeskCat home?',
     downloadChoiceBody: 'Pick your download vibe. The cat will not judge. Probably.',
     freeDownloadTitle: 'Free download',
@@ -50,14 +56,12 @@ const copy = {
     wechatLabel: 'WeChat Pay',
     paymentCompleteTitle: 'Payment done, start download',
     paymentCompleteBody: 'The cat heard the bowl go clink.',
-    footerLine: 'Desktop companion · AI chat · Focus guard · Smart timeline',
-    footerTop: 'Back to top',
+    footerContact: 'For partnerships, please contact us.',
   },
   zh: {
     navMotion: '动态',
     navFeatures: '功能',
     navDownload: '下载',
-    heroEyebrow: '产品 / MACOS / AI 灵宠',
     heroSubtitle: '不只是桌面宠物，是你工作状态的镜子。',
     heroFootnote: '移动鼠标，猫猫会跟上来。',
     liveUsersLabel: '当前总计用户数',
@@ -84,8 +88,15 @@ const copy = {
     timelineTitle: '智能记录，读懂你的一天',
     timelineBody:
       '自动追踪前台应用、后台活动、终端会话与浏览记录，每天生成完整时间线与工作摘要。',
-    downloadTitle: '选择你的 Mac。',
-    downloadBody: 'DeskCat 同时支持 Apple Silicon 和 Intel Mac。当前版本为早期测试构建，已做 ad-hoc 签名。',
+    downloadTitle: '下载 DeskCat。',
+    downloadBody: 'DeskCat 现在支持 macOS，Windows 版本正在开发中。下载位已经留好，等猫猫学会开窗。',
+    downloadPlatformMac: 'macOS',
+    downloadPlatformMacBody: 'GitHub 最新版本',
+    downloadPlatformWindows: 'Windows',
+    downloadPlatformWindowsBody: '开发中',
+    windowsDownloadTitle: 'Windows 版本',
+    windowsDownloadBody: '即将到来 · 猫猫正在学习开窗',
+    downloadChoiceEyebrow: '选择一扇猫门',
     downloadChoiceTitle: '准备把 DeskCat 抱回家了吗？',
     downloadChoiceBody: '选一个下载姿势。猫猫不挑，真的。',
     freeDownloadTitle: '免费下载',
@@ -101,8 +112,7 @@ const copy = {
     wechatLabel: '微信支付',
     paymentCompleteTitle: '已完成付款，开始下载',
     paymentCompleteBody: '猫十五听见罐罐开盖声了。',
-    footerLine: '桌面宠物 · AI 对话 · 专注守护 · 智能记录',
-    footerTop: '回到顶部',
+    footerContact: '合作请联系',
   },
 };
 
@@ -164,6 +174,11 @@ const mediaObserver = new IntersectionObserver(
 );
 
 for (const panel of document.querySelectorAll('.media-panel')) mediaObserver.observe(panel);
+
+for (const video of document.querySelectorAll('.desk-video-grid video, .video-panel video')) {
+  video.muted = true;
+  video.play().catch(() => {});
+}
 
 const languageButton = document.querySelector('[data-lang-toggle]');
 let currentLanguage = localStorage.getItem('deskcat-site-lang') || 'en';
@@ -385,7 +400,7 @@ if (new URLSearchParams(window.location.search).has('demoTrail')) {
   });
 }
 
-for (const link of document.querySelectorAll('.download-button')) {
+for (const link of document.querySelectorAll('a.download-button')) {
   link.addEventListener('click', (event) => {
     event.preventDefault();
     openDownloadChoice(link);
