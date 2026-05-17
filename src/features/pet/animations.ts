@@ -158,9 +158,7 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
       'assets/rest/gif/IMG_3458.GIF',
     ].filter((path) => !isRemovedBuiltinGifAsset(path))))
     : defaultGifAssets;
-  const defaultAssets = raw.defaultAssets?.length
-    ? raw.defaultAssets.filter((path) => !/^assets\/(idle|thinking|sleeping)\//.test(path))
-    : defaults.defaultAssets;
+  const defaultAssets = raw.defaultAssets?.length ? raw.defaultAssets : defaults.defaultAssets;
   return {
     ...defaults,
     ...raw,
@@ -169,7 +167,7 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
     defaultGifAssets: mergedDefaultGifAssets.length ? mergedDefaultGifAssets : defaults.defaultGifAssets,
     userFrames: raw.userFrames ?? defaults.userFrames,
     userGifs: raw.userGifs ?? defaults.userGifs,
-    disabledFrames: (raw.disabledFrames ?? defaults.disabledFrames)?.filter((path) => !/^assets\/(idle|thinking|sleeping)\//.test(path)),
+    disabledFrames: raw.disabledFrames ?? defaults.disabledFrames,
     disabledGifs: (raw.disabledGifs ?? defaults.disabledGifs)?.filter((path) => !isRemovedBuiltinGifAsset(path)),
   };
 }

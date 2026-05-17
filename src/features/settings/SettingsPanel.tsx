@@ -3897,6 +3897,9 @@ function ApiConfigModal({ isOpen, onClose, editingConfig }: { isOpen: boolean; o
                 ? `${describeApiKey(editingConfig.apiKey, editingConfig.keyringRef)}。留空保存则不修改，重新粘贴会覆盖。`
                 : '保存后会显示长度、尾号和指纹，方便确认测试时使用的是同一把 Key。'}
             </p>
+            <p className="text-[11px] leading-4 text-red-600">
+              保存时 macOS 可能弹出系统安全存储确认，用于加密保存你的 API Key。
+            </p>
           </div>
 
           {selectedProvider.docsUrl && (

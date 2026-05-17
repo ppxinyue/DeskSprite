@@ -103,6 +103,9 @@ function createAiError(e: unknown, usingBuiltin = false): AiError {
   }
   const message = normalizeErrorMessage(e);
   const status = extractHttpStatus(message);
+  if (usingBuiltin && isBuiltinNetworkError(message)) {
+    return { code: 'network', status, message: normalizeBuiltinNetworkMessage(message) };
+  }
   if (usingBuiltin && isQuotaLimitError(message, status)) {
     return { code: 'rate_limit', status, message: BUILTIN_QUOTA_EXHAUSTED_MESSAGE };
   }
@@ -152,4 +155,13 @@ function isQuotaLimitError(message: string, status?: number) {
     status === 429 ||
     /quota|spending limit|monthly limit|usage limit|rate limit|insufficient_quota|billing|exceeded/.test(text)
   );
+}
+
+function isBuiltinNetworkError(message: string) {
+  return /fetch failed|network|timeout|aborted|连接失败|连接超时|无法解析的数据|内置模型服务连接/i.test(message);
+}
+
+function normalizeBuiltinNetworkMessage(message: string) {
+  const match = message.match(/内置模型服务[^。]*(?:。|$)/);
+  return match?.[0] || '内置模型服务连接失败，请检查网络后重试，或切换到个人 API。';
 }

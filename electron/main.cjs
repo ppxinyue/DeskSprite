@@ -21,7 +21,7 @@ const fsp = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const { createHash, createHmac, randomUUID } = require('node:crypto');
+const { createDecipheriv, createHash, createHmac, pbkdf2Sync, randomUUID } = require('node:crypto');
 const { execFile, spawn } = require('node:child_process');
 const {
   compactMessage: compactCodingStatusMessage,
@@ -80,8 +80,28 @@ const CODEX_STATUS = {
   WORKING: 'working',
   DONE: 'done',
 };
-const DEFAULT_BUILTIN_PROXY_URL = 'https://vuxzqebeirynkdyonzud.functions.supabase.co/deskcat-builtin-ai';
+const DEFAULT_BUILTIN_PROXY_URL = '';
 const BUILTIN_PROXY_CLIENT_TOKEN = process.env.DESKCAT_BUILTIN_PROXY_CLIENT_TOKEN || 'deskcat-builtin-ai-client-v1:2026-05-17';
+const BUILTIN_PROXY_CHAT_TIMEOUT_MS = 15_000;
+const BUILTIN_PROXY_VOICE_TIMEOUT_MS = 25_000;
+const BUILTIN_PROXY_RACE_DELAY_MS = 1800;
+const BUILTIN_KEY_CIPHER = 'aes-256-gcm';
+const BUILTIN_KEY_DERIVE_ITERATIONS = 210_000;
+const BUILTIN_KEY_MATERIAL = ['DeskCat', 'builtin', 'model', 'stable', 'local', '2026-05'];
+const BUILTIN_ENCRYPTED_KEYS = {
+  chat: {
+    salt: '254Bp3avOABMRQKRS6Ucbw==',
+    iv: 'sp3OLRyeudIRdY6r',
+    tag: 'W44e96//umYMxBSToJ/QRQ==',
+    value: 'AqpEDIDUdQhhTQYxc4jKLvl3fphCwNkl/62/HkCLiYE4HDzgAvOMvOyfVebyy4AXB0kf',
+  },
+  voice: {
+    salt: 'PTQRvCCSqfkb0ofIL3A2EQ==',
+    iv: 'G655TkDGBAi2wfiN',
+    tag: 'jBYuV24P+DzOAK0J6RSmdw==',
+    value: '4QdnEZjsFJGiN60v9kaG03Er3Hav6z2bJPMfWX22m7zemIxp6RlVqOwaruv6hkMgAB8s',
+  },
+};
 const SCHEDULE_PERMISSION_PROMPT_STATE_FILE = 'schedule-permission-prompts-v1.json';
 const SCHEDULE_KNOWLEDGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_CODEX_HTTP_PROXY = 'http://127.0.0.1:6478';
@@ -586,10 +606,12 @@ function resolveAppIconPath(iconPath) {
 
 function resolveBundledAppIconPath() {
   const candidates = [
-    path.join(app.getAppPath(), 'dist', 'favicon.svg'),
-    path.join(app.getAppPath(), 'public', 'favicon.svg'),
+    path.join(app.getAppPath(), 'public', 'assets', 'idle', 'png', 'idle.png'),
+    path.join(app.getAppPath(), 'src-tauri', 'icons', '32x32.png'),
     path.join(app.getAppPath(), 'src-tauri', 'icons', 'icon.png'),
     currentAppIconPath,
+    path.join(app.getAppPath(), 'dist', 'favicon.svg'),
+    path.join(app.getAppPath(), 'public', 'favicon.svg'),
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) || currentAppIconPath;
 }
@@ -1647,10 +1669,12 @@ async function chatCompletion({ request }) {
   } else {
     headers.authorization = `Bearer ${apiKey}`;
   }
+  const timeoutMs = Number(request.timeoutMs || 0);
   const response = await fetch(endpoint, {
     method: 'POST',
     headers,
     body: JSON.stringify(buildChatBody(provider, request.model, request.messages || [])),
+    ...(timeoutMs > 0 ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText}`);
@@ -1663,7 +1687,30 @@ function getBuiltinApiKey(kind = 'chat') {
   const specific = kind === 'voice'
     ? process.env.DESKCAT_BUILTIN_VOICE_API_KEY
     : process.env.DESKCAT_BUILTIN_CHAT_API_KEY;
-  return normalizeApiKey(specific || process.env.DESKCAT_BUILTIN_API_KEY || '');
+  return normalizeApiKey(specific || process.env.DESKCAT_BUILTIN_API_KEY || decryptBuiltinApiKey(kind));
+}
+
+function decryptBuiltinApiKey(kind = 'chat') {
+  const record = BUILTIN_ENCRYPTED_KEYS[kind === 'voice' ? 'voice' : 'chat'];
+  try {
+    const salt = Buffer.from(record.salt, 'base64');
+    const key = pbkdf2Sync(
+      BUILTIN_KEY_MATERIAL.join(':'),
+      salt,
+      BUILTIN_KEY_DERIVE_ITERATIONS,
+      32,
+      'sha256',
+    );
+    const decipher = createDecipheriv(BUILTIN_KEY_CIPHER, key, Buffer.from(record.iv, 'base64'));
+    decipher.setAuthTag(Buffer.from(record.tag, 'base64'));
+    return Buffer.concat([
+      decipher.update(Buffer.from(record.value, 'base64')),
+      decipher.final(),
+    ]).toString('utf8');
+  } catch (error) {
+    console.warn('Failed to decrypt builtin API key', kind, error instanceof Error ? error.message : String(error));
+    return '';
+  }
 }
 
 function getBuiltinBaseUrl() {
@@ -1671,8 +1718,19 @@ function getBuiltinBaseUrl() {
 }
 
 function getBuiltinProxyUrl() {
-  const configured = String(process.env.DESKCAT_BUILTIN_PROXY_URL || DEFAULT_BUILTIN_PROXY_URL).trim();
-  return configured ? normalizeBaseUrl(configured) : '';
+  return getBuiltinProxyUrls()[0] || '';
+}
+
+function getBuiltinProxyUrls() {
+  const configured = String(
+    process.env.DESKCAT_BUILTIN_PROXY_URLS ||
+    process.env.DESKCAT_BUILTIN_PROXY_URL ||
+    DEFAULT_BUILTIN_PROXY_URL,
+  ).trim();
+  return Array.from(new Set(configured
+    .split(',')
+    .map((url) => normalizeBaseUrl(url))
+    .filter(Boolean)));
 }
 
 function getBuiltinServiceStatus() {
@@ -1684,8 +1742,39 @@ function getBuiltinServiceStatus() {
 }
 
 async function callBuiltinProxy(action, request = {}) {
-  const proxyUrl = getBuiltinProxyUrl();
-  if (!proxyUrl) return null;
+  const proxyUrls = getBuiltinProxyUrls();
+  if (proxyUrls.length === 0) return null;
+  return await callBuiltinProxyWithFallback(proxyUrls, action, request);
+}
+
+async function callBuiltinProxyWithFallback(proxyUrls, action, request) {
+  if (proxyUrls.length === 1) return await callBuiltinProxyEndpoint(proxyUrls[0], action, request);
+  const timers = [];
+  let settled = false;
+  const attempts = proxyUrls.map((proxyUrl, index) => new Promise((resolve, reject) => {
+    const start = () => {
+      if (settled) return;
+      callBuiltinProxyEndpoint(proxyUrl, action, request).then(resolve, reject);
+    };
+    if (index === 0) {
+      start();
+    } else {
+      timers.push(setTimeout(start, BUILTIN_PROXY_RACE_DELAY_MS * index));
+    }
+  }));
+  try {
+    const result = await Promise.any(attempts);
+    settled = true;
+    for (const timer of timers) clearTimeout(timer);
+    return result;
+  } catch (error) {
+    settled = true;
+    for (const timer of timers) clearTimeout(timer);
+    throw new Error(formatBuiltinProxyAggregateError(error));
+  }
+}
+
+async function callBuiltinProxyEndpoint(proxyUrl, action, request = {}) {
   const deviceId = String(request?.deviceId || '').trim().slice(0, 160);
   const appVersion = app.getVersion();
   const body = JSON.stringify({ action, request });
@@ -1694,22 +1783,54 @@ async function callBuiltinProxy(action, request = {}) {
   const bodyHash = createHash('sha256').update(body).digest('hex');
   const signaturePayload = `${timestamp}.${nonce}.${appVersion}.${deviceId}.${action}.${bodyHash}`;
   const signature = createHmac('sha256', BUILTIN_PROXY_CLIENT_TOKEN).update(signaturePayload).digest('hex');
-  const response = await fetch(proxyUrl, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-deskcat-app-version': appVersion,
-      ...(deviceId ? { 'x-deskcat-device-id': deviceId } : {}),
-      'x-deskcat-action': action,
-      'x-deskcat-signature-timestamp': timestamp,
-      'x-deskcat-signature-nonce': nonce,
-      'x-deskcat-signature': signature,
-    },
-    body,
-  });
+  const timeoutMs = action === 'chat' ? BUILTIN_PROXY_CHAT_TIMEOUT_MS : BUILTIN_PROXY_VOICE_TIMEOUT_MS;
+  let response;
+  try {
+    response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-deskcat-app-version': appVersion,
+        ...(deviceId ? { 'x-deskcat-device-id': deviceId } : {}),
+        'x-deskcat-action': action,
+        'x-deskcat-signature-timestamp': timestamp,
+        'x-deskcat-signature-nonce': nonce,
+        'x-deskcat-signature': signature,
+      },
+      body,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    throw new Error(formatBuiltinProxyNetworkError(error, timeoutMs));
+  }
   const text = await response.text();
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText}`);
-  return JSON.parse(text || '{}');
+  try {
+    return JSON.parse(text || '{}');
+  } catch {
+    throw new Error('内置模型服务返回了无法解析的数据，请稍后重试或切换到个人 API。');
+  }
+}
+
+function formatBuiltinProxyAggregateError(error) {
+  if (error instanceof AggregateError) {
+    const messages = error.errors
+      .map((item) => item instanceof Error ? item.message : String(item || ''))
+      .filter(Boolean);
+    const timeoutMessage = messages.find((message) => /超时/.test(message));
+    const failedMessage = messages.find((message) => /连接失败/.test(message));
+    return timeoutMessage || failedMessage || messages[0] || '内置模型服务暂时不可用，请稍后重试或切换到个人 API。';
+  }
+  return error instanceof Error ? error.message : String(error || '内置模型服务暂时不可用，请稍后重试或切换到个人 API。');
+}
+
+function formatBuiltinProxyNetworkError(error, timeoutMs) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const name = error instanceof Error ? error.name : '';
+  if (name === 'TimeoutError' || name === 'AbortError' || /timeout|aborted/i.test(message)) {
+    return `内置模型服务连接超时（${Math.round(timeoutMs / 1000)} 秒），请稍后重试或切换到个人 API。`;
+  }
+  return '内置模型服务连接失败，请检查网络后重试，或切换到个人 API。';
 }
 
 async function builtinChatCompletion({ request }) {
@@ -1731,6 +1852,7 @@ async function builtinChatCompletion({ request }) {
       baseUrl: getBuiltinBaseUrl(),
       model: 'gpt-4o-mini',
       apiKey,
+      timeoutMs: BUILTIN_PROXY_CHAT_TIMEOUT_MS,
     },
   });
 }
@@ -2538,6 +2660,7 @@ async function transcribeAudio({ request }) {
     method: 'POST',
     headers: { authorization: `Bearer ${apiKey}` },
     body: form,
+    ...(Number(request.timeoutMs || 0) > 0 ? { signal: AbortSignal.timeout(Number(request.timeoutMs || 0)) } : {}),
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText}`);
@@ -2562,6 +2685,7 @@ async function builtinTranscribeAudio({ request }) {
       baseUrl: getBuiltinBaseUrl(),
       model: 'gpt-4o-mini-transcribe',
       apiKey,
+      timeoutMs: BUILTIN_PROXY_VOICE_TIMEOUT_MS,
     },
   });
 }
@@ -2579,6 +2703,7 @@ async function synthesizeSpeech({ request }) {
       voice: request.voice || 'alloy',
       response_format: format,
     }),
+    ...(Number(request.timeoutMs || 0) > 0 ? { signal: AbortSignal.timeout(Number(request.timeoutMs || 0)) } : {}),
   });
   if (!response.ok) {
     const text = await response.text();
@@ -2610,6 +2735,7 @@ async function builtinSynthesizeSpeech({ request }) {
       baseUrl: getBuiltinBaseUrl(),
       model: 'tts-1',
       apiKey,
+      timeoutMs: BUILTIN_PROXY_VOICE_TIMEOUT_MS,
     },
   });
 }
@@ -4416,7 +4542,7 @@ app.whenReady().then(() => {
   registerProtocols();
   secureKeyStore = createSecureKeyStore({ userDataPath: app.getPath('userData'), safeStorage });
   app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
-  setAppIcon('assets/idle/png/idle.png');
+  setAppIcon(resolveBundledAppIconPath());
   createPetWindow();
   ensureTopmostGuard();
   setTimeout(() => {
