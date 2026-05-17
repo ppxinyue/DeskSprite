@@ -13,7 +13,7 @@ type BuiltinRequest = {
 
 const corsHeaders = {
   'access-control-allow-origin': '*',
-  'access-control-allow-headers': 'authorization, content-type, x-client-info, x-deskcat-app-version, x-deskcat-device-id',
+  'access-control-allow-headers': 'authorization, content-type, x-client-info, x-deskcat-action, x-deskcat-app-version, x-deskcat-device-id, x-deskcat-signature, x-deskcat-signature-nonce, x-deskcat-signature-timestamp',
   'access-control-allow-methods': 'POST, OPTIONS',
 };
 
@@ -40,6 +40,18 @@ function getApiKey(kind: 'chat' | 'voice') {
   const key = (specific || shared || '').trim().replace(/^Bearer\s+/i, '').replace(/\s+/g, '');
   if (!key) throw new Error(kind === 'voice' ? 'Voice service is not configured' : 'Chat service is not configured');
   return key;
+}
+
+function getProxyClientToken() {
+  return (Deno.env.get('DESKCAT_BUILTIN_PROXY_CLIENT_TOKEN') || '').trim();
+}
+
+function requiresProxySignature() {
+  return Deno.env.get('DESKCAT_BUILTIN_REQUIRE_SIGNATURE') === '1';
+}
+
+function getMinimumAppVersion() {
+  return (Deno.env.get('DESKCAT_BUILTIN_MIN_APP_VERSION') || '').trim();
 }
 
 function getSupabaseAdmin() {
@@ -87,6 +99,81 @@ function getDeviceId(req: Request, request: Record<string, unknown>) {
 
 function getAppVersion(req: Request) {
   return safeText(req.headers.get('x-deskcat-app-version'), 80);
+}
+
+function compareVersions(left: string, right: string) {
+  const leftParts = left.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
+  const rightParts = right.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
+  const length = Math.max(leftParts.length, rightParts.length, 3);
+  for (let index = 0; index < length; index += 1) {
+    const delta = (leftParts[index] || 0) - (rightParts[index] || 0);
+    if (delta !== 0) return delta;
+  }
+  return 0;
+}
+
+function assertAppVersion(req: Request) {
+  const minimum = getMinimumAppVersion();
+  if (!minimum) return;
+  const version = getAppVersion(req);
+  if (!version || compareVersions(version, minimum) < 0) {
+    throw new Error(`HTTP 426: DeskCat ${minimum} or newer is required`);
+  }
+}
+
+function toHex(bytes: ArrayBuffer) {
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function sha256Hex(value: string) {
+  return toHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+}
+
+async function hmacSha256Hex(secret: string, value: string) {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  return toHex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(value)));
+}
+
+function constantTimeEqual(left: string, right: string) {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    diff |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return diff === 0;
+}
+
+async function assertProxySignature(req: Request, bodyText: string) {
+  const token = getProxyClientToken();
+  if (!token && !requiresProxySignature()) return;
+  if (!token) throw new Error('HTTP 500: Proxy signature token is not configured');
+
+  const signature = safeText(req.headers.get('x-deskcat-signature'), 128);
+  const timestamp = safeText(req.headers.get('x-deskcat-signature-timestamp'), 32);
+  const nonce = safeText(req.headers.get('x-deskcat-signature-nonce'), 80);
+  const appVersion = getAppVersion(req) || '';
+  const deviceId = sanitizeDeviceId(req.headers.get('x-deskcat-device-id')) || '';
+  const action = safeText(req.headers.get('x-deskcat-action'), 32) || '';
+  if (!signature || !timestamp || !nonce || !appVersion || !action) {
+    throw new Error('HTTP 401: Missing request signature');
+  }
+
+  const timestampMs = Number(timestamp);
+  if (!Number.isFinite(timestampMs) || Math.abs(Date.now() - timestampMs) > 5 * 60 * 1000) {
+    throw new Error('HTTP 401: Expired request signature');
+  }
+
+  const bodyHash = await sha256Hex(bodyText);
+  const expected = await hmacSha256Hex(token, `${timestamp}.${nonce}.${appVersion}.${deviceId}.${action}.${bodyHash}`);
+  if (!constantTimeEqual(signature.toLowerCase(), expected)) {
+    throw new Error('HTTP 401: Invalid request signature');
+  }
 }
 
 function estimateChatChars(messages: ChatMessage[]) {
@@ -268,7 +355,14 @@ Deno.serve(async (req) => {
   let payload: BuiltinRequest | null = null;
   let request: Record<string, unknown> = {};
   try {
-    payload = await req.json() as BuiltinRequest;
+    assertAppVersion(req);
+    const bodyText = await req.text();
+    await assertProxySignature(req, bodyText);
+    payload = JSON.parse(bodyText) as BuiltinRequest;
+    const signedAction = safeText(req.headers.get('x-deskcat-action'), 32);
+    if (signedAction && signedAction !== payload.action) {
+      throw new Error('HTTP 401: Signed action does not match request body');
+    }
     request = payload.request || {};
     if (payload.action === 'chat') {
       const result = await chatCompletion(request);

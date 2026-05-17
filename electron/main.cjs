@@ -21,7 +21,7 @@ const fsp = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const { randomUUID } = require('node:crypto');
+const { createHash, createHmac, randomUUID } = require('node:crypto');
 const { execFile, spawn } = require('node:child_process');
 const {
   compactMessage: compactCodingStatusMessage,
@@ -81,6 +81,7 @@ const CODEX_STATUS = {
   DONE: 'done',
 };
 const DEFAULT_BUILTIN_PROXY_URL = 'https://vuxzqebeirynkdyonzud.functions.supabase.co/deskcat-builtin-ai';
+const BUILTIN_PROXY_CLIENT_TOKEN = process.env.DESKCAT_BUILTIN_PROXY_CLIENT_TOKEN || 'deskcat-builtin-ai-client-v1:2026-05-17';
 const SCHEDULE_PERMISSION_PROMPT_STATE_FILE = 'schedule-permission-prompts-v1.json';
 const SCHEDULE_KNOWLEDGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_CODEX_HTTP_PROXY = 'http://127.0.0.1:6478';
@@ -1686,14 +1687,25 @@ async function callBuiltinProxy(action, request = {}) {
   const proxyUrl = getBuiltinProxyUrl();
   if (!proxyUrl) return null;
   const deviceId = String(request?.deviceId || '').trim().slice(0, 160);
+  const appVersion = app.getVersion();
+  const body = JSON.stringify({ action, request });
+  const timestamp = String(Date.now());
+  const nonce = randomUUID();
+  const bodyHash = createHash('sha256').update(body).digest('hex');
+  const signaturePayload = `${timestamp}.${nonce}.${appVersion}.${deviceId}.${action}.${bodyHash}`;
+  const signature = createHmac('sha256', BUILTIN_PROXY_CLIENT_TOKEN).update(signaturePayload).digest('hex');
   const response = await fetch(proxyUrl, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'x-deskcat-app-version': app.getVersion(),
+      'x-deskcat-app-version': appVersion,
       ...(deviceId ? { 'x-deskcat-device-id': deviceId } : {}),
+      'x-deskcat-action': action,
+      'x-deskcat-signature-timestamp': timestamp,
+      'x-deskcat-signature-nonce': nonce,
+      'x-deskcat-signature': signature,
     },
-    body: JSON.stringify({ action, request }),
+    body,
   });
   const text = await response.text();
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${extractApiErrorMessage(text) || response.statusText}`);
@@ -1703,6 +1715,7 @@ async function callBuiltinProxy(action, request = {}) {
 async function builtinChatCompletion({ request }) {
   const proxyResult = await callBuiltinProxy('chat', {
     messages: request?.messages || [],
+    deviceId: request?.deviceId || '',
   });
   if (proxyResult) {
     const content = String(proxyResult.content || '');
@@ -2537,6 +2550,8 @@ async function builtinTranscribeAudio({ request }) {
     mimeType: request?.mimeType || 'audio/webm',
     fileName: request?.fileName || 'recording.webm',
     language: request?.language || '',
+    durationMs: request?.durationMs || 0,
+    deviceId: request?.deviceId || '',
   });
   if (proxyResult) return String(proxyResult.text || '').trim();
   const apiKey = getBuiltinApiKey('voice');
@@ -2579,6 +2594,7 @@ async function builtinSynthesizeSpeech({ request }) {
     input: request?.input || '',
     voice: request?.voice || 'alloy',
     format: request?.format || 'mp3',
+    deviceId: request?.deviceId || '',
   });
   if (proxyResult) {
     return {
