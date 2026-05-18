@@ -256,12 +256,11 @@ function DonateSection() {
               DeskCat is built by one human and one emotionally unstable cat.
               If it made your day a little softer or more productive, you can help support its future. Your support helps fund new features, bug fixes, and the cat&apos;s ongoing snack requirements.
             </p>
-            <a
-              href="#donate-qrcodes"
-              className="inline-flex h-9 items-center justify-center rounded-[10px] bg-[#ff8a3d] px-4 text-[13px] font-semibold text-white shadow-[0_10px_22px_rgba(255,138,61,0.24)] transition hover:bg-[#f27625] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff8a3d]/35"
-            >
-              投喂一下 / Feed the Cat
-            </a>
+            <p className="rounded-[10px] border border-[#ff8a3d]/22 bg-[#fff4eb]/70 px-3 py-2 text-[12px] font-medium leading-5 text-[#b6531b] dark:border-[#ffb06a]/18 dark:bg-[#3a2418]/34 dark:text-[#ffbc82]">
+              扫描下方二维码就可以投喂小猫。
+              <br />
+              Scan a QR code to send the cat a snack.
+            </p>
             <p className="text-[12px] leading-5 text-muted-foreground">
               不支持也没关系，小猫还是会陪你上班摸鱼。
               <br />

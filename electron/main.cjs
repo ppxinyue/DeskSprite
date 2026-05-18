@@ -1729,6 +1729,8 @@ function getBuiltinProxyUrls() {
   ).trim();
   return Array.from(new Set(configured
     .split(',')
+    .map((url) => url.trim())
+    .filter(Boolean)
     .map((url) => normalizeBaseUrl(url))
     .filter(Boolean)));
 }
