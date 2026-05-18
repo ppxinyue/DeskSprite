@@ -179,6 +179,8 @@ button {
 
 .chart {
   border-bottom: 1px solid #e6e8eb;
+  display: grid;
+  gap: 10px;
   max-width: 100%;
   min-height: 236px;
   overflow: hidden;
@@ -418,6 +420,14 @@ button {
 
 .trend-line.downloads {
   stroke: #f76808;
+}
+
+.daily-bar.views {
+  fill: #0090ff;
+}
+
+.daily-bar.usage {
+  fill: #46a758;
 }
 
 .trend-legend {

@@ -101,34 +101,9 @@ function renderDaily(data) {
   const maxDau = Math.max(1, ...rows.map((row) => Number(row.dau || 0)));
   const maxDuration = Math.max(1, ...rows.map((row) => Number(row.total_duration_ms || 0)));
   dailySummaryEl.textContent = `${data.range.days} days`;
-  const chartWidth = Math.max(760, rows.length * 92);
-  const yTicks = [maxDuration, maxDuration / 2, 0];
   dailyChartEl.innerHTML = `
-    <div class="chart-scroll">
-      <div class="chart-y-axis" aria-hidden="true">
-        ${yTicks.map((value) => `<span>${formatDuration(value)}</span>`).join('')}
-      </div>
-      <div class="bar-plot" style="width:${chartWidth}px">
-        ${rows.map((row) => {
-          const dauHeight = Math.max(2, (Number(row.dau || 0) / maxDau) * 184);
-          const timeHeight = Math.max(2, (Number(row.total_duration_ms || 0) / maxDuration) * 184);
-          const label = String(row.metric_date).slice(5);
-          return `
-            <div class="bar" title="${row.metric_date} · DAU ${row.dau} · ${formatDuration(row.total_duration_ms)}">
-              <div class="bar-stack">
-                <div class="bar-dau" style="height:${dauHeight}px"></div>
-                <div class="bar-time" style="height:${timeHeight}px"></div>
-              </div>
-              <div class="bar-label">${label}</div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-    <div class="axis-note">
-      <span><i class="views"></i>DAU max ${formatNumber(maxDau)}</span>
-      <span><i class="usage"></i>Usage scale</span>
-    </div>
+    ${renderDailySeries(rows, { key: 'dau', label: 'DAU', className: 'views', max: maxDau, format: (value) => formatNumber(Math.round(value)) })}
+    ${renderDailySeries(rows, { key: 'total_duration_ms', label: 'Usage Time', className: 'usage', max: maxDuration, format: formatDuration })}
   `;
 }
 
@@ -144,6 +119,43 @@ function linePoints(rows, key, width, height, padding, max) {
     const y = padding.top + innerHeight - (Number(row[key] || 0) / max) * innerHeight;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
+}
+
+function renderDailySeries(rows, config) {
+  const width = Math.max(520, rows.length * 72);
+  const height = 150;
+  const padding = { top: 14, right: 22, bottom: 26, left: 62 };
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+  const barWidth = Math.min(42, Math.max(12, innerWidth / Math.max(1, rows.length) * 0.58));
+  const latest = rows.at(-1) || {};
+  const latestValue = Number(latest[config.key] || 0);
+  const bars = rows.map((row, index) => {
+    const value = Number(row[config.key] || 0);
+    const x = padding.left + (index / Math.max(1, rows.length - 1)) * innerWidth - barWidth / 2;
+    const barHeight = Math.max(value > 0 ? 2 : 1, (value / config.max) * innerHeight);
+    const y = padding.top + innerHeight - barHeight;
+    const date = row.metricDate || row.metric_date;
+    return `<rect class="daily-bar ${config.className}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}" rx="5"><title>${date} · ${config.label} ${config.format(value)}</title></rect>`;
+  }).join('');
+
+  return `
+    <section class="trend-card">
+      <div class="trend-card-head">
+        <strong><i class="${config.className}"></i>${config.label}</strong>
+        <span>${config.format(latestValue)}</span>
+      </div>
+      <div class="chart-scroll">
+        <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.label} daily chart">
+          <line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
+          <line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}"></line>
+          ${renderAxisLabels(config.max, config.format, height, padding)}
+          ${renderDateLabels(rows, width, height, padding)}
+          ${bars}
+        </svg>
+      </div>
+    </section>
+  `;
 }
 
 function renderAxisLabels(max, formatter, height = 220, padding = { top: 18, bottom: 30 }) {
