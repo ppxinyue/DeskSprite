@@ -232,13 +232,67 @@ button {
 
 .line-chart {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   overflow: hidden;
 }
 
 .line-chart svg {
   background: linear-gradient(#fff, #fff) padding-box;
   flex: 0 0 auto;
+}
+
+.trend-card {
+  border-bottom: 1px solid #edf0f2;
+  display: grid;
+  gap: 6px;
+  padding-bottom: 10px;
+}
+
+.trend-card:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.trend-card .chart-scroll {
+  height: 150px;
+}
+
+.trend-card-head {
+  align-items: center;
+  display: flex;
+  font-size: 12px;
+  justify-content: space-between;
+}
+
+.trend-card-head strong,
+.trend-card-head span {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.trend-card-head span {
+  color: #687076;
+  font-weight: 700;
+}
+
+.trend-card-head i {
+  border-radius: 999px;
+  display: inline-block;
+  height: 8px;
+  width: 18px;
+}
+
+.trend-card-head i.usage {
+  background: #46a758;
+}
+
+.trend-card-head i.views {
+  background: #0090ff;
+}
+
+.trend-card-head i.downloads {
+  background: #f76808;
 }
 
 .world-map {

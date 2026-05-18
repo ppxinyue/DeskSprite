@@ -146,22 +146,49 @@ function linePoints(rows, key, width, height, padding, max) {
   }).join(' ');
 }
 
-function renderAxisLabels(max, formatter) {
+function renderAxisLabels(max, formatter, height = 220, padding = { top: 18, bottom: 30 }) {
+  const innerHeight = height - padding.top - padding.bottom;
   return [max, max / 2, 0].map((value, index) => {
-    const y = 24 + index * 82;
+    const y = padding.top + 6 + index * (innerHeight / 2);
     return `<text class="axis-label" x="8" y="${y}">${formatter(value)}</text>`;
   }).join('');
 }
 
-function renderDateLabels(rows, width, padding) {
+function renderDateLabels(rows, width, height, padding) {
   const step = Math.max(1, Math.ceil(rows.length / 8));
   const innerWidth = width - padding.left - padding.right;
   return rows.map((row, index) => {
     if (index % step !== 0 && index !== rows.length - 1) return '';
     const x = padding.left + (index / Math.max(1, rows.length - 1)) * innerWidth;
     const label = String(row.metricDate || row.metric_date).slice(5);
-    return `<text class="axis-label x-label" x="${x.toFixed(1)}" y="214">${label}</text>`;
+    return `<text class="axis-label x-label" x="${x.toFixed(1)}" y="${height - 7}">${label}</text>`;
   }).join('');
+}
+
+function renderTrendSeries(rows, config) {
+  const width = Math.max(520, rows.length * 72);
+  const height = 150;
+  const padding = { top: 14, right: 22, bottom: 26, left: 62 };
+  const max = Math.max(1, ...rows.map((row) => Number(row[config.key] || 0)));
+  const latest = rows.at(-1) || {};
+  const latestValue = Number(latest[config.key] || 0);
+  return `
+    <section class="trend-card">
+      <div class="trend-card-head">
+        <strong><i class="${config.className}"></i>${config.label}</strong>
+        <span>${config.format(latestValue)}</span>
+      </div>
+      <div class="chart-scroll">
+        <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${config.label} daily trend">
+          <line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
+          <line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}"></line>
+          ${renderAxisLabels(max, config.format, height, padding)}
+          ${renderDateLabels(rows, width, height, padding)}
+          <polyline class="trend-line ${config.className}" points="${linePoints(rows, config.key, width, height, padding, max)}"></polyline>
+        </svg>
+      </div>
+    </section>
+  `;
 }
 
 function renderDailyTrends(data) {
@@ -170,34 +197,10 @@ function renderDailyTrends(data) {
     trendChartEl.innerHTML = '<div class="empty">No daily trend data yet.</div>';
     return;
   }
-  const width = Math.max(760, rows.length * 92);
-  const height = 220;
-  const padding = { top: 18, right: 52, bottom: 30, left: 62 };
-  const maxUsage = Math.max(1, ...rows.map((row) => Number(row.usageMs || 0)));
-  const maxCount = Math.max(1, ...rows.map((row) => Number(row.views || 0)), ...rows.map((row) => Number(row.downloads || 0)));
-  const latest = rows.at(-1) || {};
   trendChartEl.innerHTML = `
-    <div class="chart-scroll">
-      <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Daily downloads, views, and usage time trends">
-        <line class="chart-axis" x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
-        <line class="chart-axis" x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}"></line>
-        <line class="chart-axis" x1="${width - padding.right}" y1="${padding.top}" x2="${width - padding.right}" y2="${height - padding.bottom}"></line>
-        ${renderAxisLabels(maxUsage, formatDuration)}
-        ${[maxCount, maxCount / 2, 0].map((value, index) => {
-          const y = 24 + index * 82;
-          return `<text class="axis-label right-label" x="${width - 6}" y="${y}">${formatNumber(Math.round(value))}</text>`;
-        }).join('')}
-        ${renderDateLabels(rows, width, padding)}
-        <polyline class="trend-line usage" points="${linePoints(rows, 'usageMs', width, height, padding, maxUsage)}"></polyline>
-        <polyline class="trend-line views" points="${linePoints(rows, 'views', width, height, padding, maxCount)}"></polyline>
-        <polyline class="trend-line downloads" points="${linePoints(rows, 'downloads', width, height, padding, maxCount)}"></polyline>
-      </svg>
-    </div>
-    <div class="trend-legend">
-      <span><i class="usage"></i>Usage ${formatDuration(latest.usageMs)}</span>
-      <span><i class="views"></i>Views ${formatNumber(latest.views)}</span>
-      <span><i class="downloads"></i>Downloads ${formatNumber(latest.downloads)}</span>
-    </div>
+    ${renderTrendSeries(rows, { key: 'downloads', label: 'Downloads', className: 'downloads', format: (value) => formatNumber(Math.round(value)) })}
+    ${renderTrendSeries(rows, { key: 'views', label: 'Views', className: 'views', format: (value) => formatNumber(Math.round(value)) })}
+    ${renderTrendSeries(rows, { key: 'usageMs', label: 'Usage Time', className: 'usage', format: formatDuration })}
   `;
 }
 
