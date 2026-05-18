@@ -274,13 +274,19 @@ function buildDailyTrends(
   downloadRows: DailyDownloadMetric[],
   pageViewRows: DailyPageViewMetric[],
   githubStats: GithubRepoStats,
-  githubDownloadCount: number,
+  githubDownloads: {
+    releaseAssetCount?: number;
+    dailyClones?: Array<{ date: string; count: number }>;
+  },
 ) {
   const downloadsByDate = aggregateDailyDownloads(downloadRows);
   const viewsByDate = aggregateDailyViews(pageViewRows);
   const latestDate = dailyRows.at(-1)?.metric_date;
   if (latestDate) {
-    downloadsByDate.set(latestDate, (downloadsByDate.get(latestDate) ?? 0) + githubDownloadCount);
+    downloadsByDate.set(latestDate, (downloadsByDate.get(latestDate) ?? 0) + Number(githubDownloads.releaseAssetCount ?? 0));
+  }
+  for (const row of githubDownloads.dailyClones ?? []) {
+    downloadsByDate.set(row.date, (downloadsByDate.get(row.date) ?? 0) + Number(row.count ?? 0));
   }
   for (const row of githubStats.dailyViews ?? []) {
     viewsByDate.set(row.date, (viewsByDate.get(row.date) ?? 0) + Number(row.views ?? 0));
@@ -806,10 +812,46 @@ async function getGithubDownloads() {
         count: Number(asset.download_count ?? 0),
       }))
   );
+  const releaseAssetCount = assets.reduce((total, asset) => total + asset.count, 0);
+  let cloneCount = 0;
+  let cloneUniqueCount = 0;
+  let cloneWindowDays = 14;
+  let cloneError: string | null = token ? null : 'GITHUB_TOKEN is not configured';
+  let dailyClones: Array<{ date: string; count: number; uniques: number }> = [];
+
+  if (token) {
+    try {
+      const clonesResponse = await fetch(`https://api.github.com/repos/${repo}/traffic/clones`, { headers });
+      if (!clonesResponse.ok) throw new Error(`GitHub clones request failed: ${clonesResponse.status}`);
+      const clonesData = await clonesResponse.json() as {
+        count?: number;
+        uniques?: number;
+        clones?: Array<{ timestamp?: string; count?: number; uniques?: number }>;
+      };
+      cloneCount = Number(clonesData.count ?? 0);
+      cloneUniqueCount = Number(clonesData.uniques ?? 0);
+      dailyClones = (clonesData.clones ?? []).map((row) => ({
+        date: String(row.timestamp ?? '').slice(0, 10),
+        count: Number(row.count ?? 0),
+        uniques: Number(row.uniques ?? 0),
+      })).filter((row) => row.date);
+      cloneWindowDays = dailyClones.length || 14;
+    } catch (error) {
+      cloneError = error instanceof Error ? error.message : String(error);
+    }
+  }
 
   return {
     repo,
-    count: assets.reduce((total, asset) => total + asset.count, 0),
+    count: releaseAssetCount + cloneCount,
+    releaseAssetCount,
+    cloneCount,
+    cloneUniqueCount,
+    cloneWindowDays,
+    cloneError,
+    sourceZipCount: null,
+    sourceZipError: 'GitHub API does not expose source ZIP download counts.',
+    dailyClones,
     assets: assets.sort((a, b) => b.count - a.count).slice(0, 20),
   };
 }
@@ -972,7 +1014,12 @@ Deno.serve(async (req) => {
     const githubDownloads = await getGithubDownloads().catch((error) => ({
       repo: Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat',
       count: 0,
+      releaseAssetCount: 0,
+      cloneCount: 0,
+      cloneUniqueCount: 0,
+      cloneWindowDays: 14,
       assets: [],
+      dailyClones: [],
       error: error instanceof Error ? error.message : String(error),
     }));
     const githubStats = await getGithubRepoStats().catch((error) => ({
@@ -1005,7 +1052,7 @@ Deno.serve(async (req) => {
         githubStars,
       },
       daily: dailyRows,
-      dailyTrends: buildDailyTrends(dailyRows, downloadRows, pageViewRows, githubStats, Number(githubDownloads.count ?? 0)),
+      dailyTrends: buildDailyTrends(dailyRows, downloadRows, pageViewRows, githubStats, githubDownloads),
       featureUsage: aggregates.features,
       featureDailyUsers: aggregateFeatureUsers(featureUserRows).slice(0, 80),
       dailyUserUsage: aggregateDeviceUsage(deviceUsageRows).slice(0, 200),

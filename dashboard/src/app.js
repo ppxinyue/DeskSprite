@@ -488,8 +488,27 @@ function renderDownloads(data) {
     {
       label: `GitHub${github.repo ? ` · ${github.repo}` : ''}`,
       value: github.count,
-      sub: github.error || 'release asset downloads',
+      sub: github.error || 'release assets + repository clones',
       level: 0,
+    },
+    {
+      label: 'GitHub release assets',
+      value: github.releaseAssetCount,
+      sub: 'release asset downloads',
+      level: 1,
+    },
+    {
+      label: 'GitHub repository clones',
+      value: github.cloneCount,
+      sub: github.cloneError || `${formatNumber(github.cloneUniqueCount)} unique · ${formatNumber(github.cloneWindowDays || 14)} day traffic window`,
+      level: 1,
+    },
+    {
+      label: 'GitHub source ZIP',
+      value: null,
+      sub: github.sourceZipError || 'not available from GitHub API',
+      level: 1,
+      unavailable: true,
     },
     ...productAssets.slice(0, 4).map((asset) => ({
       label: `Website · ${asset.asset}`,
@@ -511,7 +530,7 @@ function renderDownloads(data) {
         <strong>${row.label}</strong>
         <span>${row.sub || ''}</span>
       </div>
-      <b>${formatNumber(row.value)}</b>
+      <b>${row.unavailable ? '—' : formatNumber(row.value)}</b>
     </div>
   `).join('');
 }

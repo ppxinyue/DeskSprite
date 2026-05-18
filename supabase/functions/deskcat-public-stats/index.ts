@@ -60,7 +60,7 @@ async function getGithubDownloads() {
     assets?: Array<{ name?: string; download_count?: number }>;
   }>;
 
-  return releases.reduce((releaseTotal, release) => {
+  const releaseAssetCount = releases.reduce((releaseTotal, release) => {
     const assetTotal = (release.assets ?? [])
       .filter((asset) => String(asset.name ?? '').endsWith('.dmg'))
       .reduce(
@@ -69,6 +69,39 @@ async function getGithubDownloads() {
       );
     return releaseTotal + assetTotal;
   }, 0);
+
+  let cloneCount = 0;
+  let cloneUniqueCount = 0;
+  let cloneWindowDays = 14;
+  let cloneError: string | null = token ? null : 'GITHUB_TOKEN is not configured';
+
+  if (token) {
+    try {
+      const clonesResponse = await fetch(`https://api.github.com/repos/${repo}/traffic/clones`, { headers });
+      if (!clonesResponse.ok) throw new Error(`GitHub clones request failed: ${clonesResponse.status}`);
+      const clonesData = await clonesResponse.json() as {
+        count?: number;
+        uniques?: number;
+        clones?: Array<{ timestamp?: string }>;
+      };
+      cloneCount = Number(clonesData.count ?? 0);
+      cloneUniqueCount = Number(clonesData.uniques ?? 0);
+      cloneWindowDays = clonesData.clones?.length || 14;
+    } catch (error) {
+      cloneError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  return {
+    count: releaseAssetCount + cloneCount,
+    releaseAssetCount,
+    cloneCount,
+    cloneUniqueCount,
+    cloneWindowDays,
+    cloneError,
+    sourceZipCount: null,
+    sourceZipError: 'GitHub API does not expose source ZIP download counts.',
+  };
 }
 
 async function getGithubRepoStats() {
@@ -120,7 +153,14 @@ Deno.serve(async (req) => {
         supabase.from('devices').select('device_id', { count: 'exact', head: true }),
         supabase.from('download_events').select('id', { count: 'exact', head: true }),
         supabase.from('page_view_events').select('id', { count: 'exact', head: true }),
-        getGithubDownloads().catch(() => 0),
+        getGithubDownloads().catch(() => ({
+          count: 0,
+          releaseAssetCount: 0,
+          cloneCount: 0,
+          cloneUniqueCount: 0,
+          cloneWindowDays: 14,
+          sourceZipCount: null,
+        })),
         getGithubRepoStats().catch((error) => ({
           repo: Deno.env.get('DESKCAT_GITHUB_REPO') || Deno.env.get('GITHUB_REPO') || 'ppxinyue/DeskCat',
           stars: 0,
@@ -136,14 +176,16 @@ Deno.serve(async (req) => {
 
       const productSiteDownloads = downloads.count ?? 0;
       const productSiteViews = pageViews.count ?? 0;
+      const githubDownloadCount = Number(githubDownloads.count ?? 0);
       const githubViews = Number(githubStats.views ?? 0);
       return json({
         ok: true,
         generatedAt: new Date().toISOString(),
         totalUsers: devices.count ?? 0,
         productSiteDownloads,
-        githubDownloads,
-        totalDownloads: productSiteDownloads + githubDownloads,
+        githubDownloads: githubDownloadCount,
+        githubDownloadBreakdown: githubDownloads,
+        totalDownloads: productSiteDownloads + githubDownloadCount,
         productSiteViews,
         githubViews,
         totalViews: productSiteViews + githubViews,
