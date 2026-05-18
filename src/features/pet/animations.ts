@@ -26,8 +26,8 @@ declare const __OPTIMIZED_PET_ASSETS__: boolean | undefined;
 const USE_OPTIMIZED_BUILTIN_GIF_ASSETS =
   typeof __OPTIMIZED_PET_ASSETS__ !== 'undefined' && Boolean(__OPTIMIZED_PET_ASSETS__);
 
-function getRuntimeBuiltinGifAssetPath(path: string): string {
-  if (!USE_OPTIMIZED_BUILTIN_GIF_ASSETS || !path.startsWith('assets/')) return path;
+export function getRuntimeBuiltinGifAssetPath(path: string, optimized = USE_OPTIMIZED_BUILTIN_GIF_ASSETS): string {
+  if (!optimized || !path.startsWith('assets/')) return path;
   return path.replace(/\.gif$/i, '.webp');
 }
 
@@ -135,6 +135,16 @@ export function getBuiltinAssetUrl(path: string): string {
 
 export function isGifAsset(path: string): boolean {
   return /\.(gif|webp)$/i.test(path.split(/[?#]/)[0] ?? '');
+}
+
+export function getFallbackBuiltinGifAssetSource(source: string): string | null {
+  const normalized = source.replace(/\\/g, '/');
+  const isBuiltinRuntimeSource =
+    normalized.startsWith('assets/') ||
+    /(?:^|[/])assets\/(?:idle|rest|work)\//i.test(normalized);
+  if (!isBuiltinRuntimeSource || !/\.webp(?:[?#]|$)/i.test(source)) return null;
+  const fallback = source.replace(/\.webp(?=([?#]|$))/i, '.GIF');
+  return fallback === source ? null : fallback;
 }
 
 function normalizeBuiltinGifAssetPaths(paths?: string[]): string[] {

@@ -39,44 +39,61 @@ function createDeferredWindowShowController({ setTimeoutFn = setTimeout, clearTi
   return { requestShow, markReady, isReady };
 }
 
-function createPetVisibilityController() {
+function createPetVisibilityController({ setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout } = {}) {
   let layoutReady = false;
   let pendingShow = true;
+  let fallbackTimer = null;
+
+  const clearFallbackTimer = () => {
+    if (!fallbackTimer) return;
+    clearTimeoutFn(fallbackTimer);
+    fallbackTimer = null;
+  };
+
+  const showInactive = (win, applyTopmost) => {
+    if (!win || win.isDestroyed?.() || win.isVisible?.() || !pendingShow) return false;
+    pendingShow = false;
+    clearFallbackTimer();
+    applyTopmost?.(win);
+    win.showInactive();
+    applyTopmost?.(win);
+    win.moveTop?.();
+    return true;
+  };
 
   const reset = () => {
+    clearFallbackTimer();
     layoutReady = false;
     pendingShow = true;
   };
 
   const hide = (win) => {
+    clearFallbackTimer();
     pendingShow = false;
     win?.hide?.();
   };
 
-  const requestShow = (win, { requestLayout, applyTopmost } = {}) => {
+  const requestShow = (win, { requestLayout, applyTopmost, fallbackShowMs = 0 } = {}) => {
     if (!win || win.isDestroyed?.()) return false;
     applyTopmost?.(win);
     pendingShow = true;
     if (!layoutReady) {
       requestLayout?.(win);
+      clearFallbackTimer();
+      if (fallbackShowMs > 0) {
+        fallbackTimer = setTimeoutFn(() => {
+          fallbackTimer = null;
+          showInactive(win, applyTopmost);
+        }, fallbackShowMs);
+      }
       return false;
     }
-    pendingShow = false;
-    win.showInactive();
-    applyTopmost?.(win);
-    win.moveTop?.();
-    return true;
+    return showInactive(win, applyTopmost);
   };
 
   const markLayoutReady = (win, { applyTopmost } = {}) => {
     layoutReady = true;
-    if (!win || win.isDestroyed?.() || win.isVisible?.() || !pendingShow) return false;
-    pendingShow = false;
-    applyTopmost?.(win);
-    win.showInactive();
-    applyTopmost?.(win);
-    win.moveTop?.();
-    return true;
+    return showInactive(win, applyTopmost);
   };
 
   const getState = () => ({ layoutReady, pendingShow });

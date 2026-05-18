@@ -41,6 +41,8 @@ const {
   readImageDataUrl,
 } = require('./welcomePermissionPrompt.cjs');
 const { createSecureKeyStore } = require('./secureKeyStore.cjs');
+const { readActiveWindowWindows } = require('./platform/windowsActivity.cjs');
+const { createWindowsBackgroundMarkers, readWindowsProcesses } = require('./platform/windowsProcesses.cjs');
 const { autoUpdater } = require('electron-updater');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -525,6 +527,17 @@ function createWindow(label, options) {
     webPreferences: preload(label),
   });
   windows.set(label, win);
+  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error(`[${label}] failed to load ${validatedURL}: ${errorCode} ${errorDescription}`);
+  });
+  win.webContents.on('render-process-gone', (_event, details) => {
+    console.error(`[${label}] renderer process gone: ${details?.reason || 'unknown'}`);
+  });
+  win.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const severity = level >= 2 ? 'error' : level === 1 ? 'warn' : 'log';
+    if (severity === 'log') return;
+    console[severity](`[${label}] ${message} (${sourceId}:${line})`);
+  });
   win.loadURL(rendererUrl(label));
   win.setTitle('');
   win.on('move', () => send(win, 'window:moved', null));
@@ -734,8 +747,11 @@ return frontApp & linefeed & frontWindow & linefeed & isFullscreen & linefeed & 
 }
 
 function readActiveWindow() {
+  if (process.platform === 'win32') {
+    return readActiveWindowWindows({ log: timelineDebugLog });
+  }
   if (process.platform !== 'darwin') {
-    return Promise.resolve({ supported: false, appName: '', windowTitle: '', error: 'unsupported' });
+    return Promise.resolve({ supported: false, appName: '', windowTitle: '', url: '', error: 'unsupported' });
   }
   return new Promise((resolve) => {
     execFile('/usr/bin/osascript', ['-e', activeWindowScript()], { timeout: 2500 }, (error, stdout, stderr) => {
@@ -754,6 +770,7 @@ function readActiveWindow() {
         supported: true,
         appName: appName.trim(),
         windowTitle: titleParts.join('\n').trim(),
+        url: '',
         error: null,
       });
     });
@@ -966,6 +983,10 @@ async function readNeteaseNowPlaying(appName, minSegmentMs = 60_000) {
 }
 
 function readRunningProcessNames() {
+  if (process.platform === 'win32') {
+    return readWindowsProcesses({ log: timelineDebugLog })
+      .then((rows) => rows.map((row) => row.name).filter(Boolean));
+  }
   if (process.platform !== 'darwin') {
     return Promise.resolve([]);
   }
@@ -983,6 +1004,11 @@ function readRunningProcessNames() {
 }
 
 function readShellProcessMarkers() {
+  if (process.platform === 'win32') {
+    return readWindowsProcesses({ log: timelineDebugLog })
+      .then((rows) => createWindowsBackgroundMarkers(rows, { ownPid: process.pid })
+        .filter((marker) => marker.type === 'terminal'));
+  }
   if (process.platform !== 'darwin') return Promise.resolve([]);
   return new Promise((resolve) => {
     execFile('/bin/ps', ['-axo', 'pid=', '-o', 'command='], { timeout: 1800 }, (error, stdout) => {
@@ -1057,6 +1083,18 @@ function compactTerminalCommands(commands) {
 }
 
 async function readTimelineBackgroundMarkers({ musicAppKeywords, minSegmentMs } = {}) {
+  if (process.platform === 'win32') {
+    const processes = await readWindowsProcesses({ log: timelineDebugLog });
+    const markers = createWindowsBackgroundMarkers(processes, { musicAppKeywords, ownPid: process.pid });
+    timelineDebugLog({
+      stage: 'background:markers',
+      message: markers.length > 0
+        ? markers.map((marker) => `${marker.type}:${marker.name}:${marker.detail}`).join(' | ')
+        : 'none',
+    });
+    return markers;
+  }
+
   const processes = await readRunningProcessNames();
 
   const markers = [];
@@ -1106,7 +1144,7 @@ async function readTimelineBackgroundMarkers({ musicAppKeywords, minSegmentMs } 
 }
 
 async function readTimelineBackgroundOnly({ musicAppKeywords, minSegmentMs } = {}) {
-  if (process.platform !== 'darwin') return { supported: false, background: [], error: 'unsupported', checkedAt: Date.now() };
+  if (process.platform !== 'darwin' && process.platform !== 'win32') return { supported: false, background: [], error: 'unsupported', checkedAt: Date.now() };
   const background = await readTimelineBackgroundMarkers({ musicAppKeywords, minSegmentMs });
   return { supported: true, background, error: null, checkedAt: Date.now() };
 }
@@ -1126,7 +1164,7 @@ function readSystemActivityState({ idleThresholdSeconds } = {}) {
 }
 
 async function readTimelineActiveWindow({ musicAppKeywords, minSegmentMs } = {}) {
-  if (process.platform !== 'darwin') {
+  if (process.platform !== 'darwin' && process.platform !== 'win32') {
     return { supported: false, appName: '', windowTitle: '', url: '', background: [], error: 'unsupported' };
   }
   const active = await readActiveWindow();
@@ -1135,8 +1173,10 @@ async function readTimelineActiveWindow({ musicAppKeywords, minSegmentMs } = {})
   }
 
   const [url, background] = await Promise.all([
-    readBrowserUrl(active.appName),
-    readTimelineBackgroundMarkers({ musicAppKeywords, minSegmentMs }),
+    process.platform === 'darwin' ? readBrowserUrl(active.appName) : Promise.resolve(''),
+    (process.platform === 'darwin' || process.platform === 'win32')
+      ? readTimelineBackgroundMarkers({ musicAppKeywords, minSegmentMs })
+      : Promise.resolve([]),
   ]);
   return {
     supported: true,
@@ -1310,6 +1350,7 @@ function showPetWindow() {
   petVisibilityController.requestShow(win, {
     requestLayout: (target) => send(target, 'pet:request-initial-layout', {}),
     applyTopmost: (target) => applyFloatingFullscreenBehavior(target, { force: true }),
+    fallbackShowMs: process.platform === 'win32' ? 2500 : 0,
   });
 }
 
@@ -4545,7 +4586,7 @@ app.whenReady().then(() => {
   secureKeyStore = createSecureKeyStore({ userDataPath: app.getPath('userData'), safeStorage });
   app.setLoginItemSettings({ openAtLogin: true, openAsHidden: false });
   setAppIcon(resolveBundledAppIconPath());
-  createPetWindow();
+  showPetWindow();
   ensureTopmostGuard();
   setTimeout(() => {
     checkForAppUpdates().catch((error) => {

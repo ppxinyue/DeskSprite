@@ -145,6 +145,26 @@ test('after pet layout is ready, manual show is immediate and stable', () => {
   });
 
   assert.equal(shown, true);
-  assert.deepEqual(calls, ['topmost', 'topmost']);
+  assert.deepEqual(calls, ['topmost', 'topmost', 'topmost']);
   assert.deepEqual(win.calls, ['showInactive', 'moveTop']);
+});
+
+test('pet window can use an explicit fallback show timer when layout is delayed', () => {
+  const timers = fakeTimers();
+  const controller = createPetVisibilityController(timers);
+  const win = fakeWindow();
+  const calls = [];
+
+  controller.requestShow(win, {
+    requestLayout: () => calls.push('requestLayout'),
+    applyTopmost: () => calls.push('topmost'),
+    fallbackShowMs: 2500,
+  });
+
+  assert.deepEqual(win.calls, []);
+  timers.flushOne();
+
+  assert.deepEqual(win.calls, ['showInactive', 'moveTop']);
+  assert.deepEqual(calls, ['topmost', 'requestLayout', 'topmost', 'topmost']);
+  assert.deepEqual(controller.getState(), { layoutReady: false, pendingShow: false });
 });

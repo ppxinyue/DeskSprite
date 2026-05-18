@@ -72,11 +72,29 @@ function formatBytes(bytes) {
 }
 
 async function resolveGif2WebpPath() {
-  const candidates = ['/opt/homebrew/bin/gif2webp', '/usr/local/bin/gif2webp'];
+  const pathEntries = (process.env.PATH || '')
+    .split(path.delimiter)
+    .filter(Boolean);
+  const executableNames = process.platform === 'win32'
+    ? ['gif2webp.exe', 'gif2webp.cmd', 'gif2webp']
+    : ['gif2webp'];
+  const pathCandidates = pathEntries.flatMap((entry) => (
+    executableNames.map((name) => path.join(entry, name))
+  ));
+  const userProfile = process.env.USERPROFILE || process.env.HOME || '';
+  const scoopCandidates = process.platform === 'win32' && userProfile
+    ? executableNames.map((name) => path.join(userProfile, 'scoop', 'shims', name))
+    : [];
+  const candidates = [
+    '/opt/homebrew/bin/gif2webp',
+    '/usr/local/bin/gif2webp',
+    ...scoopCandidates,
+    ...pathCandidates,
+  ];
   for (const candidate of candidates) {
     if (await isExecutable(candidate)) return candidate;
   }
-  throw new Error('gif2webp is required to optimize pet GIF assets. Install it with `brew install webp`.');
+  throw new Error('gif2webp is required to optimize pet GIF assets. Install it with `brew install webp` or `scoop install libwebp`.');
 }
 
 async function isExecutable(filePath) {

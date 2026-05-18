@@ -8,6 +8,7 @@ import {
   getPetFrameSources,
   getRandomFrameSwitchDelay,
   getBuiltinAssetUrl,
+  getFallbackBuiltinGifAssetSource,
   isGifAsset,
   isBuiltinAsset,
 } from './animations';
@@ -416,6 +417,15 @@ export function PetAvatar({
     setImgError(false);
   }, [resolvedSrc]);
 
+  const handleMediaLoadError = useCallback(() => {
+    const fallbackSrc = getFallbackBuiltinGifAssetSource(resolvedSrc);
+    if (fallbackSrc && fallbackSrc !== resolvedSrc) {
+      setResolvedSrc(fallbackSrc);
+      return;
+    }
+    setImgError(true);
+  }, [resolvedSrc]);
+
   useEffect(() => {
     if (kind !== 'video') return;
     const video = videoRef.current;
@@ -485,7 +495,7 @@ export function PetAvatar({
       ctx.restore();
     };
     image.onerror = () => {
-      if (!cancelled) setImgError(true);
+      if (!cancelled) handleMediaLoadError();
     };
     image.src = resolvedSrc;
 
@@ -493,7 +503,7 @@ export function PetAvatar({
       cancelled = true;
       clearCanvas();
     };
-  }, [h, kind, opacity, resolvedSrc, w]);
+  }, [h, handleMediaLoadError, kind, opacity, resolvedSrc, w]);
 
   const interactiveProps = {
     onPointerDown: handlePointerDown,
@@ -718,7 +728,7 @@ export function PetAvatar({
         {kind === 'video' ? (
           <video ref={videoRef} key={resolvedSrc} src={resolvedSrc} autoPlay={!animationsPaused} loop={!animationsPaused} muted playsInline draggable={false} width={w} height={h}
             style={{ width: w, height: h, objectFit: 'contain', opacity, display: 'block', pointerEvents: 'none', ...motionStyle }}
-            onError={() => setImgError(true)} />
+            onError={handleMediaLoadError} />
         ) : kind === 'gif' ? (
           <img
             key={resolvedSrc}
@@ -736,7 +746,7 @@ export function PetAvatar({
               pointerEvents: 'none',
               ...motionStyle,
             }}
-            onError={() => setImgError(true)}
+            onError={handleMediaLoadError}
           />
         ) : (
           <canvas

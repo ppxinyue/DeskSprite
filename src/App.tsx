@@ -15,6 +15,7 @@ import { useSettingsStore, type AppSettings, type CodingProvider } from "@/featu
 import { createConversation, getConversations, getMessages, getSetting, insertMessage, recordCodingModeTime, recordDistraction, recordFocusSession, upsertTimelineEntry } from "@/lib/db";
 import { flushCloudSync, startCloudSyncScheduler } from "@/lib/cloudSyncScheduler";
 import { getThemeClassAction, shouldDeferWindowContent } from "@/lib/startupTheme";
+import { shouldRequestAccessibilityPermission, shouldWaitForExistingAccessibilityPermission, supportsForegroundActivityPlatform } from "@/lib/platformSupport";
 import { createFeatureTimer, trackFeatureUse } from "@/lib/telemetry";
 import { TimelineRecorder, type TimelineRecorderState, type TimelineSnapshot } from "@/lib/timelineRecorder";
 import { installDocumentTranslator } from "@/i18n";
@@ -356,8 +357,6 @@ function App() {
       </TooltipProvider>
     );
   }
-
-  if (windowLabel === "pet" && !loaded) return null;
 
   return <PetWindow />;
 }
@@ -2187,7 +2186,7 @@ function PetWindow() {
 
   useEffect(() => {
     if (!focusEndAt || !settings.distractionDetectionEnabled) return;
-    if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
+    if (!supportsForegroundActivityPlatform(navigator.platform, navigator.userAgent)) return;
     let disposed = false;
     const runCheck = async () => {
       if (disposed || !focusEndAtRef.current) return;
@@ -2245,7 +2244,7 @@ function PetWindow() {
       timelineDebugLog({ stage: 'disabled', message: 'Timeline recording is off' });
       return;
     }
-    if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) {
+    if (!supportsForegroundActivityPlatform(navigator.platform, navigator.userAgent)) {
       timelineDebugLog({ stage: 'unsupported', message: `platform=${navigator.platform}` });
       return;
     }
@@ -2310,12 +2309,11 @@ function PetWindow() {
           accessibilityChecked = true;
           const existingPermission = await invoke<{ supported: boolean; trusted: boolean }>('check_accessibility_permission').catch(() => null);
           let permission = existingPermission;
-          if (!existingPermission?.trusted) {
-            const requestedBefore = localStorage.getItem(ACCESSIBILITY_PERMISSION_REQUESTED_KEY) === '1';
-            if (requestedBefore) {
-              timelineDebugLog({ stage: 'accessibility:pending', message: 'Accessibility permission not granted; skipping repeated prompt' });
-              return;
-            }
+          if (shouldWaitForExistingAccessibilityPermission(existingPermission, localStorage.getItem(ACCESSIBILITY_PERMISSION_REQUESTED_KEY) === '1')) {
+            timelineDebugLog({ stage: 'accessibility:pending', message: 'Accessibility permission not granted; skipping repeated prompt' });
+            return;
+          }
+          if (shouldRequestAccessibilityPermission(existingPermission, localStorage.getItem(ACCESSIBILITY_PERMISSION_REQUESTED_KEY) === '1')) {
             localStorage.setItem(ACCESSIBILITY_PERMISSION_REQUESTED_KEY, '1');
             permission = await invoke<{ supported: boolean; trusted: boolean }>('ensure_accessibility_permission').catch((error) => {
               timelineDebugLog({ stage: 'accessibility:error', error: error instanceof Error ? error.message : String(error) });
@@ -2395,7 +2393,7 @@ function PetWindow() {
   }, [settings.timelineRecordingEnabled, settings.timelineMinSegmentMinutes, settings.musicAppKeywords, triggerDistractionWarning]);
 
   useEffect(() => {
-    if (typeof navigator !== 'undefined' && navigator.platform && !navigator.platform.toLowerCase().includes('mac')) return;
+    if (!supportsForegroundActivityPlatform(navigator.platform, navigator.userAgent)) return;
     let disposed = false;
 
     const runPresenceCheck = async () => {
