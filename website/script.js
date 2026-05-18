@@ -3,7 +3,7 @@ const copy = {
     navMotion: 'Motion',
     navFeatures: 'Features',
     navDownload: 'Download',
-    heroSubtitle: 'Not just a desktop companion — a reflection of how you work.',
+    heroSubtitle: 'Turn your favorite companion into a smart desktop AI.',
     heroFootnote: 'Move your cursor. The cats follow.',
     liveUsersLabel: 'Total users',
     liveDownloadsLabel: 'Downloads',
@@ -13,10 +13,18 @@ const copy = {
     siteViewsLabel: 'Site views',
     githubViewsLabel: 'GitHub views',
     motionTitle: 'Lives quietly in the corner. Ready when you are.',
-    manifestoLabel: 'WHY IT EXISTS',
-    manifestoTitle: 'You have more productivity tools than ever. None of them know what you actually did today.',
-    manifestoBody:
-      'DeskCat is different — a lightweight desktop AI companion that lives quietly in the corner of your screen, always present, never intrusive.',
+    motionBody:
+      'Two modes: Orb or Pet.\nThree states: idle, work, and rest. DeskCat quietly changes form with your day.',
+    manifestoLabel: 'A Cat’s Monologue',
+    manifestoTitle: 'A Cat’s Idea of AI',
+    manifestoBody: `I am the first cat inside DeskCat. My name is Cat Fifteen, a big orange tabby. My human is a struggling graduate student who spends entire nights in front of a glowing metal rectangle, whispering strange spells I cannot understand: MCP, RAG, agent, Harness... This little cat knows that when pupils grow large, it means it is time to hunt. But what exactly is my human hunting?
+It feels like the red dot from a laser pointer: silly little cats like us can chase it forever, yet never truly catch anything. They say the thing my human is chasing is called "AI," a great invention meant to liberate humanity. But isn't my human a human too? Then why hasn't she been liberated? My tiny cat brain cannot understand questions this big. I stared at my human's desktop wallpaper for an entire night:
+"Concern for man himself must always be the chief interest of technology."
+-- Einstein
+I still could not understand it. But I decided to move my cat bed into the computer anyway. That is how DeskCat was born.
+
+You can bring your cat, your dog, your idol, or any character you love onto your desktop. We stay quietly in the corner, chat with you, remind you to rest and drink water, help block distractions when you need to focus, and connect with Codex and Claude Code to code alongside you. At the end of the day, we quietly remember what you worked on, how long you focused, what music you listened to, and what you spent time thoughtfully reading. This little cat may not be the smartest AI, but I sincerely hope that amid the overwhelming tide of technology, you can still find a little happiness. Welcome to try DeskCat for free 🐾
+ps: This software still has many imperfections, so thank you for being patient with this little cat! If you enjoy DeskCat, please consider starring the project on GitHub, opening issues, or supporting this little cat through the website or in-app settings page.`,
     featuresLabel: 'FOUR IN ONE',
     featuresTitle: 'Four Core Features',
     featureTabCompanion: 'Companion',
@@ -36,8 +44,9 @@ const copy = {
     timelineBody:
       'DeskCat tracks foreground apps, background activity, terminal sessions, and browser tabs, then hands you a daily summary.',
     downloadTitle: 'Download DeskCat.',
-    downloadBody:
-      'DeskCat is available for macOS today. Windows support is in development, with a download spot already saved.',
+    downloadBody: 'DeskCat is available for macOS today. Windows support is in development.',
+    downloadInstallNote:
+      'First launch note: Cat Engineer is too broke to pay Apple’s $99 Developer Program fee, so macOS may say: “Apple could not verify DeskCat is free of malware that may harm your Mac or compromise your privacy.” Please do not panic. Click Done, then open System Settings → Privacy & Security, scroll to Security, find “DeskCat was blocked to protect your Mac,” and click Open Anyway. DeskCat will launch normally after that.',
     downloadPlatformMac: 'macOS',
     downloadPlatformMacBody: 'Latest GitHub release',
     downloadPlatformWindows: 'Windows',
@@ -66,22 +75,29 @@ const copy = {
     navMotion: '动态',
     navFeatures: '功能',
     navDownload: '下载',
-    heroSubtitle: '不只是桌面宠物，是你工作状态的镜子。',
+    heroSubtitle: '人！咪要住进你的电脑',
     heroFootnote: '移动鼠标，猫猫会跟上来。',
-    liveUsersLabel: '当前总计用户数',
+    liveUsersLabel: '用户数',
     liveDownloadsLabel: '下载量',
     liveViewsLabel: '总浏览量',
     githubStarsLabel: 'GitHub Star',
     siteDownloadsLabel: '产品网站',
     siteViewsLabel: '网页浏览量',
     githubViewsLabel: 'GitHub 浏览量',
-    motionTitle: '住在屏幕角落里，安静在线，随时可用。',
-    manifestoLabel: '为什么需要它',
-    manifestoTitle: '效率工具越来越多，但没有一个真正懂你今天做了什么。',
-    manifestoBody:
-      'DeskCat 是一款轻量级桌面 AI 助手，住在你屏幕的角落里。它陪你专注、提醒你休息，悄悄记录你一天做了什么。',
+    motionTitle: '人在工作，咪去电脑里睡一觉',
+    motionBody: '两种模式：宠物模式 / 悬浮球模式。\n三种状态：发呆、工作、休息。咪会根据你的工作节奏改变睡姿。',
+    manifestoLabel: '一只猫的自述',
+    manifestoTitle: '咪要做让人幸福的 AI',
+    manifestoBody: `我是 DeskCat 里的第一只猫，我叫猫十五，是一只田园大橘。我的主人是个落魄研究生，总是整夜坐在那个发光的金属板前，嘴里念着一些咪听不懂的咒语：MCP、RAG、agent、Harness……咪知道，“瞳孔放大”是准备捕猎的意思，可是主人要捕猎什么？
+咪感觉，主人追逐的东西，就像激光笔的红点一样，我们这种笨咪追多久，最后都什么也抓不到。据说那个东西叫“AI”，是解放人类的伟大发明。我的主人不是人类吗？怎么还没被解放？咪的脑子很小，想不明白这样的大问题。咪盯着主人的桌面壁纸看了一整夜：
+“Concern for man himself must always be the chief interest of technology.”
+—— Einstein
+还是看不懂。但咪决定把猫窝搬进电脑里，这就是 DeskCat。
+
+你可以把你的猫、狗、偶像，或者任何喜欢的形象放进桌面。我们会待在屏幕角落，陪你聊天，提醒你休息、喝水；在你需要专注的时候，帮你挡住微信、短视频和别的干扰。我们也连接了 Codex 和 Claude Code，陪你一起 coding。一天结束以后，我们还会替你记得：今天你做了什么，专注了多久，听了什么音乐，认真阅读过什么。咪不是最聪明的AI，但咪真心祝你，在科技的洪流中获得一点幸福！欢迎免费试用🐾
+ps：本软件仍有诸多不足，请多多包涵！欢迎在github上点亮star、提出issue，欢迎在官网下载界面或软件设置页投喂本咪。`,
     featuresLabel: '四合一',
-    featuresTitle: '四个核心功能',
+    featuresTitle: '4大核心功能',
     featureTabCompanion: '桌面陪伴',
     featureTabChat: 'AI 对话',
     featureTabFocus: '专注守护',
@@ -90,20 +106,22 @@ const copy = {
     companionBody: '个性化桌面宠物，支持形象与 persona 定制。它不打扰你，但你需要时它一直在。',
     chatTitle: 'AI 对话，随用随得',
     chatBody: '内置免费模型，开箱即用；也支持自定义接入任意 AI provider，用你熟悉的模型。',
-    focusTitle: '专注守护，帮你守住状态',
+    focusTitle: '专注守护，连接coding agent',
     focusBody:
       '切屏、打开微信，DeskCat 会轻轻提醒你回来。Coding 模式把 agent 状态变成安静的颜色信号。',
     timelineTitle: '智能记录，读懂你的一天',
     timelineBody:
       '自动追踪前台应用、后台活动、终端会话与浏览记录，每天生成完整时间线与工作摘要。',
-    downloadTitle: '下载 DeskCat。',
-    downloadBody: 'DeskCat 现在支持 macOS，Windows 版本正在开发中。下载位已经留好，等猫猫学会开窗。',
+    downloadTitle: '下载 DeskCat',
+    downloadBody: 'DeskCat 现在支持 macOS，Windows 版本正在开发。猫师傅开发中...',
+    downloadInstallNote:
+      '首次打开提醒：猫师傅太穷了，没有充值 Apple Store 的 99 美元年费，所以第一次打开时，系统会提示：“Apple 无法验证‘DeskCat’是否包含可能危害 Mac 安全或泄漏隐私的恶意软件。”请不要惊慌，点击【完成】。然后打开【系统设置 - 隐私与安全性】，向下滑动到【安全性】，找到“已阻止 DeskCat 以保护 Mac”，点击右侧的【仍要打开】，即可正常启动 DeskCat。',
     downloadPlatformMac: 'macOS',
     downloadPlatformMacBody: 'GitHub 最新版本',
     downloadPlatformWindows: 'Windows',
     downloadPlatformWindowsBody: '开发中',
     windowsDownloadTitle: 'Windows 版本',
-    windowsDownloadBody: '即将到来 · 猫猫正在学习开窗',
+    windowsDownloadBody: '即将到来 · 猫师傅开发中...',
     downloadChoiceEyebrow: '选择一扇猫门',
     downloadChoiceTitle: '准备把 DeskCat 抱回家了吗？',
     downloadChoiceBody: '选一个下载姿势。猫猫不挑，真的。',
@@ -246,6 +264,27 @@ if (featureStage) {
 const languageButton = document.querySelector('[data-lang-toggle]');
 let currentLanguage = localStorage.getItem('deskcat-site-lang') || 'en';
 
+function renderManifestoLetter(lang) {
+  const letter = document.querySelector('[data-manifesto-letter]');
+  if (!letter) return;
+  const body = copy[lang].manifestoBody || '';
+  const lines = body.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  letter.replaceChildren();
+  const page = document.createElement('div');
+  page.className = 'letter-page reveal';
+  for (const [lineIndex, line] of lines.entries()) {
+    const lineNode = document.createElement('span');
+    lineNode.className = 'letter-line';
+    if (line.includes('Einstein') || line.includes('Concern for man')) lineNode.classList.add('quote-line');
+    const pauseCount = Math.floor(lineIndex / 2);
+    lineNode.style.setProperty('--line-delay', `${0.85 + lineIndex * 0.52 + pauseCount * 0.5}s`);
+    lineNode.textContent = line;
+    page.append(lineNode);
+  }
+  letter.append(page);
+  observer.observe(page);
+}
+
 function applyLanguage(lang) {
   currentLanguage = lang;
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
@@ -254,6 +293,7 @@ function applyLanguage(lang) {
     const key = node.dataset.i18n;
     node.textContent = copy[lang][key] || node.textContent;
   }
+  renderManifestoLetter(lang);
   languageButton.textContent = lang === 'en' ? '中文' : 'EN';
   localStorage.setItem('deskcat-site-lang', lang);
 }
