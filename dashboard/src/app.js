@@ -498,9 +498,9 @@ function renderDownloads(data) {
       level: 1,
     },
     {
-      label: 'GitHub repository clones',
-      value: github.cloneCount,
-      sub: github.cloneError || `${formatNumber(github.cloneUniqueCount)} unique · ${formatNumber(github.cloneWindowDays || 14)} day traffic window`,
+      label: 'GitHub unique repository clones',
+      value: github.countedCloneCount ?? github.cloneUniqueCount,
+      sub: github.cloneError || `${formatNumber(github.cloneCount)} raw clone operations · ${formatNumber(github.cloneWindowDays || 14)} day traffic window`,
       level: 1,
     },
     {

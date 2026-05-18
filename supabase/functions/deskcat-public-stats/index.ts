@@ -57,12 +57,13 @@ async function getGithubDownloads() {
   const response = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, { headers });
   if (!response.ok) throw new Error(`GitHub releases request failed: ${response.status}`);
   const releases = await response.json() as Array<{
-    assets?: Array<{ name?: string; download_count?: number }>;
+    draft?: boolean;
+    assets?: Array<{ name?: string; download_count?: number; state?: string }>;
   }>;
 
-  const releaseAssetCount = releases.reduce((releaseTotal, release) => {
+  const releaseAssetCount = releases.filter((release) => !release.draft).reduce((releaseTotal, release) => {
     const assetTotal = (release.assets ?? [])
-      .filter((asset) => String(asset.name ?? '').endsWith('.dmg'))
+      .filter((asset) => String(asset.name ?? '').endsWith('.dmg') && (asset.state ?? 'uploaded') === 'uploaded')
       .reduce(
         (total, asset) => total + Number(asset.download_count ?? 0),
         0,
@@ -93,10 +94,12 @@ async function getGithubDownloads() {
   }
 
   return {
-    count: releaseAssetCount + cloneCount,
+    count: releaseAssetCount + cloneUniqueCount,
     releaseAssetCount,
     cloneCount,
     cloneUniqueCount,
+    countedCloneCount: cloneUniqueCount,
+    cloneCountBasis: 'unique_clones',
     cloneWindowDays,
     cloneError,
     sourceZipCount: null,
@@ -158,6 +161,8 @@ Deno.serve(async (req) => {
           releaseAssetCount: 0,
           cloneCount: 0,
           cloneUniqueCount: 0,
+          countedCloneCount: 0,
+          cloneCountBasis: 'unique_clones',
           cloneWindowDays: 14,
           sourceZipCount: null,
         })),

@@ -276,7 +276,7 @@ function buildDailyTrends(
   githubStats: GithubRepoStats,
   githubDownloads: {
     releaseAssetCount?: number;
-    dailyClones?: Array<{ date: string; count: number }>;
+    dailyClones?: Array<{ date: string; count: number; uniques?: number }>;
   },
 ) {
   const downloadsByDate = aggregateDailyDownloads(downloadRows);
@@ -286,7 +286,7 @@ function buildDailyTrends(
     downloadsByDate.set(latestDate, (downloadsByDate.get(latestDate) ?? 0) + Number(githubDownloads.releaseAssetCount ?? 0));
   }
   for (const row of githubDownloads.dailyClones ?? []) {
-    downloadsByDate.set(row.date, (downloadsByDate.get(row.date) ?? 0) + Number(row.count ?? 0));
+    downloadsByDate.set(row.date, (downloadsByDate.get(row.date) ?? 0) + Number(row.uniques ?? row.count ?? 0));
   }
   for (const row of githubStats.dailyViews ?? []) {
     viewsByDate.set(row.date, (viewsByDate.get(row.date) ?? 0) + Number(row.views ?? 0));
@@ -800,18 +800,21 @@ async function getGithubDownloads() {
   if (!response.ok) throw new Error(`GitHub releases request failed: ${response.status}`);
   const releases = await response.json() as Array<{
     tag_name?: string;
-    assets?: Array<{ name?: string; download_count?: number }>;
+    draft?: boolean;
+    assets?: Array<{ name?: string; download_count?: number; state?: string }>;
   }>;
 
-  const assets = releases.flatMap((release) =>
-    (release.assets ?? [])
-      .filter((asset) => String(asset.name ?? '').endsWith('.dmg'))
-      .map((asset) => ({
-        release: release.tag_name ?? '',
-        asset: asset.name ?? '',
-        count: Number(asset.download_count ?? 0),
-      }))
-  );
+  const assets = releases
+    .filter((release) => !release.draft)
+    .flatMap((release) =>
+      (release.assets ?? [])
+        .filter((asset) => String(asset.name ?? '').endsWith('.dmg') && (asset.state ?? 'uploaded') === 'uploaded')
+        .map((asset) => ({
+          release: release.tag_name ?? '',
+          asset: asset.name ?? '',
+          count: Number(asset.download_count ?? 0),
+        }))
+    );
   const releaseAssetCount = assets.reduce((total, asset) => total + asset.count, 0);
   let cloneCount = 0;
   let cloneUniqueCount = 0;
@@ -843,10 +846,12 @@ async function getGithubDownloads() {
 
   return {
     repo,
-    count: releaseAssetCount + cloneCount,
+    count: releaseAssetCount + cloneUniqueCount,
     releaseAssetCount,
     cloneCount,
     cloneUniqueCount,
+    countedCloneCount: cloneUniqueCount,
+    cloneCountBasis: 'unique_clones',
     cloneWindowDays,
     cloneError,
     sourceZipCount: null,
@@ -1017,6 +1022,8 @@ Deno.serve(async (req) => {
       releaseAssetCount: 0,
       cloneCount: 0,
       cloneUniqueCount: 0,
+      countedCloneCount: 0,
+      cloneCountBasis: 'unique_clones',
       cloneWindowDays: 14,
       assets: [],
       dailyClones: [],
