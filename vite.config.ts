@@ -8,10 +8,11 @@ const packageJson = JSON.parse(
   fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
 ) as { version?: string }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss()],
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version ?? '0.0.0'),
+    __OPTIMIZED_PET_ASSETS__: JSON.stringify(command === 'build'),
   },
   build: {
     rollupOptions: {
@@ -46,4 +47,4 @@ export default defineConfig({
       '@tauri-apps/plugin-dialog': path.resolve(__dirname, './src/electron-shims/dialog.ts'),
     },
   },
-})
+}))

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DEFAULT_MEDIA_CONFIG, getPetFrameSources, normalizePetMediaConfig } from './animations.ts';
+import { DEFAULT_MEDIA_CONFIG, getPetFrameSources, isGifAsset, normalizePetMediaConfig } from './animations.ts';
 
 test('preserves disabled built-in image assets after normalization', () => {
   const disabledPath = DEFAULT_MEDIA_CONFIG.idle.defaultAssets[0];
@@ -30,4 +30,9 @@ test('preserves disabled built-in gif assets after normalization', () => {
 
   assert.equal(config.disabledGifs?.includes(disabledPath), true);
   assert.equal(getPetFrameSources(config, [], [customPath]).includes(disabledPath), false);
+});
+
+test('treats built-in animated webp assets like gif assets', () => {
+  assert.equal(isGifAsset('assets/idle/gif/grooming.webp'), true);
+  assert.equal(isGifAsset('/Users/test/static.png'), false);
 });

@@ -9,13 +9,6 @@ const removable = [
   path.join('assets', 'gif-videos'),
   path.join('assets', 'pet-images'),
   path.join('assets', 'remotion'),
-  path.join('assets', 'idle', 'gif', 'blink.GIF'),
-  path.join('assets', 'idle', 'gif', 'IMG_3517.GIF'),
-  path.join('assets', 'rest', 'gif', 'drinking_raw.GIF'),
-  path.join('assets', 'rest', 'gif', 'IMG_3452.GIF'),
-  path.join('assets', 'rest', 'gif', 'IMG_3456.GIF'),
-  path.join('assets', 'rest', 'gif', 'IMG_3518.GIF'),
-  path.join('assets', 'rest', 'gif', 'IMG_3519.GIF'),
 ];
 
 let removedBytes = 0;

@@ -47,7 +47,7 @@ export type SettingsSection =
   | 'chatModel'
   | 'voiceModel';
 const ALLOWED_STATIC_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'bmp']);
-const ALLOWED_GIF_EXTENSIONS = new Set(['gif']);
+const ALLOWED_GIF_EXTENSIONS = new Set(['gif', 'webp']);
 const MASKED_API_KEY = '••••••••';
 const PROFILE_EXAMPLE_KEY = 'example';
 
@@ -2585,7 +2585,7 @@ function ImageSection() {
       multiple: true,
       filters: [
         scheme === 'gif'
-          ? { name: 'GIF 动图', extensions: ['gif'] }
+          ? { name: '动图', extensions: ['gif', 'webp'] }
           : { name: '常见图片格式', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }
       ],
     });
@@ -2594,7 +2594,7 @@ function ImageSection() {
     const acceptedFiles = files.filter((path) => scheme === 'gif' ? isAllowedPetGifPath(path) : isAllowedStaticPetImagePath(path));
     const rejectedCount = files.length - acceptedFiles.length;
     if (rejectedCount > 0) {
-      alert(scheme === 'gif' ? 'GIF 方案只能上传 .gif 动图。' : '图片方案只能上传 PNG、JPG、JPEG、WEBP 或 BMP。');
+      alert(scheme === 'gif' ? 'GIF 方案只能上传 .gif 或 .webp 动图。' : '图片方案只能上传 PNG、JPG、JPEG、WEBP 或 BMP。');
     }
     if (acceptedFiles.length === 0) return;
     for (const file of acceptedFiles) {

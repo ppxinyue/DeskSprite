@@ -21,6 +21,16 @@ export interface PetStateMediaConfig {
 
 export type PetMediaConfig = Record<PetState, PetStateMediaConfig>;
 
+declare const __OPTIMIZED_PET_ASSETS__: boolean | undefined;
+
+const USE_OPTIMIZED_BUILTIN_GIF_ASSETS =
+  typeof __OPTIMIZED_PET_ASSETS__ !== 'undefined' && Boolean(__OPTIMIZED_PET_ASSETS__);
+
+function getRuntimeBuiltinGifAssetPath(path: string): string {
+  if (!USE_OPTIMIZED_BUILTIN_GIF_ASSETS || !path.startsWith('assets/')) return path;
+  return path.replace(/\.gif$/i, '.webp');
+}
+
 export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   idle: {
     mediaMode: 'gif',
@@ -32,8 +42,10 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
       'assets/idle/png/sleeping1.png',
     ],
     defaultGifAssets: [
-      'assets/idle/gif/grooming.GIF',
-      'assets/idle/gif/idle_clean_1.GIF',
+      getRuntimeBuiltinGifAssetPath('assets/idle/gif/blink.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/idle/gif/grooming.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/idle/gif/IMG_3517.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/idle/gif/idle_clean_1.GIF'),
     ],
     userFrames: [],
     userGifs: [],
@@ -45,8 +57,13 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
     mediaMode: 'gif',
     defaultAssets: ['assets/idle/png/sleeping.png'],
     defaultGifAssets: [
-      'assets/rest/gif/idle_raw_1.GIF',
-      'assets/rest/gif/IMG_3458.GIF',
+      getRuntimeBuiltinGifAssetPath('assets/rest/gif/drinking_raw.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/rest/gif/IMG_3452.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/rest/gif/IMG_3456.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/rest/gif/IMG_3458.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/rest/gif/IMG_3518.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/rest/gif/IMG_3519.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/rest/gif/idle_raw_1.GIF'),
     ],
     userFrames: [],
     userGifs: [],
@@ -57,7 +74,7 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   work: {
     mediaMode: 'gif',
     defaultAssets: ['assets/idle/png/idle.png'],
-    defaultGifAssets: ['assets/work/gif/working_clean.GIF'],
+    defaultGifAssets: [getRuntimeBuiltinGifAssetPath('assets/work/gif/working_clean.GIF')],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -67,7 +84,7 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   drinking: {
     mediaMode: 'gif',
     defaultAssets: ['assets/idle/png/idle2.png'],
-    defaultGifAssets: ['assets/rest/gif/IMG_3458.GIF'],
+    defaultGifAssets: [getRuntimeBuiltinGifAssetPath('assets/rest/gif/IMG_3458.GIF')],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -77,7 +94,7 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   thinking: {
     mediaMode: 'gif',
     defaultAssets: ['assets/idle/png/idle.png'],
-    defaultGifAssets: ['assets/idle/gif/grooming.GIF'],
+    defaultGifAssets: [getRuntimeBuiltinGifAssetPath('assets/idle/gif/grooming.GIF')],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -87,7 +104,7 @@ export const DEFAULT_MEDIA_CONFIG: PetMediaConfig = {
   sleeping: {
     mediaMode: 'gif',
     defaultAssets: ['assets/idle/png/sleeping.png', 'assets/idle/png/sleeping1.png'],
-    defaultGifAssets: ['assets/idle/gif/idle_clean_1.GIF'],
+    defaultGifAssets: [getRuntimeBuiltinGifAssetPath('assets/idle/gif/idle_clean_1.GIF')],
     userFrames: [],
     userGifs: [],
     frameInterval: 150,
@@ -117,46 +134,31 @@ export function getBuiltinAssetUrl(path: string): string {
 }
 
 export function isGifAsset(path: string): boolean {
-  return path.split(/[?#]/)[0]?.toLowerCase().endsWith('.gif') ?? false;
+  return /\.(gif|webp)$/i.test(path.split(/[?#]/)[0] ?? '');
 }
 
-const REMOVED_BUILTIN_GIF_ASSETS = new Set([
-  'assets/GIF/',
-  'assets/idle/gif/blink.GIF',
-  'assets/idle/gif/IMG_3517.GIF',
-  'assets/idle/gif/sleeping_raw_2.GIF',
-  'assets/rest/gif/drinking_raw.GIF',
-  'assets/rest/gif/IMG_3452.GIF',
-  'assets/rest/gif/IMG_3456.GIF',
-  'assets/rest/gif/IMG_3518.GIF',
-  'assets/rest/gif/IMG_3519.GIF',
-  'assets/rest/gif/playing_clean_3.GIF',
-  'assets/rest/gif/rest.GIF',
-  'assets/rest/gif/IMG_3448.GIF',
-  'assets/rest/gif/IMG_3449.GIF',
-  'assets/rest/gif/IMG_3453.GIF',
-  'assets/rest/gif/IMG_3454.GIF',
-  'assets/rest/gif/IMG_3455.GIF',
-  'assets/rest/gif/IMG_3457.GIF',
-]);
-
-function isRemovedBuiltinGifAsset(path: string): boolean {
-  return REMOVED_BUILTIN_GIF_ASSETS.has(path);
+function normalizeBuiltinGifAssetPaths(paths?: string[]): string[] {
+  return (paths ?? []).map((path) => getRuntimeBuiltinGifAssetPath(path));
 }
 
 export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateMediaConfig> | null): PetStateMediaConfig {
   const defaults = DEFAULT_MEDIA_CONFIG[state];
-  if (!raw) return defaults;
+  if (!raw) {
+    return {
+      ...defaults,
+      defaultGifAssets: normalizeBuiltinGifAssetPaths(defaults.defaultGifAssets),
+    };
+  }
   const hasExplicitMode = raw.mediaMode === 'image' || raw.mediaMode === 'gif';
   const defaultGifAssets = raw.defaultGifAssets?.length
-    ? raw.defaultGifAssets.filter((path) => !isRemovedBuiltinGifAsset(path))
-    : defaults.defaultGifAssets;
+    ? normalizeBuiltinGifAssetPaths(raw.defaultGifAssets)
+    : normalizeBuiltinGifAssetPaths(defaults.defaultGifAssets);
   const mergedDefaultGifAssets = state === 'rest'
     ? Array.from(new Set([
       ...defaultGifAssets,
-      'assets/rest/gif/idle_raw_1.GIF',
-      'assets/rest/gif/IMG_3458.GIF',
-    ].filter((path) => !isRemovedBuiltinGifAsset(path))))
+      getRuntimeBuiltinGifAssetPath('assets/rest/gif/idle_raw_1.GIF'),
+      getRuntimeBuiltinGifAssetPath('assets/rest/gif/IMG_3458.GIF'),
+    ]))
     : defaultGifAssets;
   const defaultAssets = raw.defaultAssets?.length ? raw.defaultAssets : defaults.defaultAssets;
   return {
@@ -168,7 +170,7 @@ export function normalizePetMediaConfig(state: PetState, raw?: Partial<PetStateM
     userFrames: raw.userFrames ?? defaults.userFrames,
     userGifs: raw.userGifs ?? defaults.userGifs,
     disabledFrames: raw.disabledFrames ?? defaults.disabledFrames,
-    disabledGifs: (raw.disabledGifs ?? defaults.disabledGifs)?.filter((path) => !isRemovedBuiltinGifAsset(path)),
+    disabledGifs: normalizeBuiltinGifAssetPaths(raw.disabledGifs ?? defaults.disabledGifs),
   };
 }
 
