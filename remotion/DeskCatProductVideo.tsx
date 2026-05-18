@@ -48,6 +48,7 @@ import {
   type PetState,
   type ThemeMode,
 } from './DeskCatPresentationFixtures';
+import exampleAvatar from './example.png';
 
 type Scene = { from: number; duration: number };
 
@@ -586,7 +587,7 @@ function DogCompanion({ progress = 1, scale = 1 }: { progress?: number; scale?: 
   );
 }
 
-function TomJerryPhoto({ size = 138, rounded = 22 }: { size?: number; rounded?: number }) {
+function ExampleAvatarPhoto({ size = 138, rounded = 22 }: { size?: number; rounded?: number }) {
   return (
     <div
       style={{
@@ -601,15 +602,15 @@ function TomJerryPhoto({ size = 138, rounded = 22 }: { size?: number; rounded?: 
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.42)',
       }}
     >
-      <Img src={staticFile('assets/remotion/tom-jerry-upload.svg')} style={{ width: size, height: size, objectFit: 'cover' }} />
+      <Img src={exampleAvatar} style={{ width: size, height: size, objectFit: 'contain' }} />
     </div>
   );
 }
 
-function TomJerryCompanion({ progress = 1, scale = 1 }: { progress?: number; scale?: number }) {
+function ExampleAvatarCompanion({ progress = 1, scale = 1 }: { progress?: number; scale?: number }) {
   return (
-    <div style={{ width: 230 * scale, height: 250 * scale, opacity: progress, transform: `scale(${0.76 + progress * 0.24})`, filter: 'drop-shadow(0 28px 28px rgba(0,0,0,0.32))' }}>
-      <TomJerryPhoto size={210 * scale} rounded={36 * scale} />
+    <div style={{ width: 230 * scale, height: 250 * scale, opacity: progress, transform: `scale(${0.76 + progress * 0.24})`, filter: 'drop-shadow(0 28px 28px rgba(0,0,0,0.32))', display: 'grid', placeItems: 'center' }}>
+      <ExampleAvatarPhoto size={210 * scale} rounded={36 * scale} />
     </div>
   );
 }
@@ -629,9 +630,11 @@ function AvatarAssetTile({
 }) {
   const isDark = mode === 'dark';
   return (
-    <div style={{ position: 'relative', width: 154, height: 154, borderRadius: 13, background: active ? (isDark ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.44)') : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.24)'), border: `1px solid ${isDark ? 'rgba(255,255,255,0.095)' : 'rgba(255,255,255,0.50)'}`, boxShadow: isDark ? '0 16px 30px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)' : '0 8px 20px rgba(52,64,84,0.045), inset 0 1px 0 rgba(255,255,255,0.62)', display: 'grid', placeItems: 'center', opacity: progress }}>
+    <div style={{ position: 'relative', width: 154, height: 154, borderRadius: 13, overflow: 'hidden', background: active ? (isDark ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.44)') : (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.24)'), border: `1px solid ${isDark ? 'rgba(255,255,255,0.095)' : 'rgba(255,255,255,0.50)'}`, boxShadow: isDark ? '0 16px 30px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.04)' : '0 8px 20px rgba(52,64,84,0.045), inset 0 1px 0 rgba(255,255,255,0.62)', display: 'grid', placeItems: 'center', opacity: progress }}>
+      <div style={{ position: 'absolute', inset: 9, display: 'grid', placeItems: 'center', overflow: 'hidden', borderRadius: 10 }}>
+        {children}
+      </div>
       {label ? <span style={{ position: 'absolute', left: 8, top: 8, borderRadius: 7, background: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.82)', padding: '3px 8px', color: isDark ? 'rgba(255,255,255,0.62)' : '#747b86', fontSize: 12, boxShadow: isDark ? 'none' : '0 2px 8px rgba(0,0,0,0.07)' }}>{label}</span> : null}
-      {children}
     </div>
   );
 }
@@ -653,12 +656,12 @@ function CustomAvatarPanel({ uploadProgress }: { uploadProgress: number }) {
           <div style={{ height: 42, borderRadius: 9, display: 'grid', placeItems: 'center', color: dark.muted, fontSize: 15, fontWeight: 650 }}>图片（5 张）</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 154px)', gap: 16 }}>
-          <AvatarAssetTile mode="dark"><CatSprite state="idle" size={126} /></AvatarAssetTile>
-          <AvatarAssetTile mode="dark"><CatSprite state="rest" size={126} index={1} /></AvatarAssetTile>
-          <AvatarAssetTile mode="dark"><CatSprite state="work" size={126} /></AvatarAssetTile>
+          <AvatarAssetTile mode="dark"><CatSprite state="idle" size={112} /></AvatarAssetTile>
+          <AvatarAssetTile mode="dark"><CatSprite state="rest" size={112} index={1} /></AvatarAssetTile>
+          <AvatarAssetTile mode="dark"><CatSprite state="work" size={112} /></AvatarAssetTile>
           <div style={{ position: 'relative' }}>
             <AvatarAssetTile mode="dark" label="上传" progress={characterInTile}>
-              <TomJerryCompanion progress={characterInTile} scale={0.62} />
+              <ExampleAvatarCompanion progress={characterInTile} scale={0.62} />
             </AvatarAssetTile>
             <div style={{ position: 'absolute', inset: 0, opacity: 1 - characterInTile }}>
               <AvatarAssetTile mode="dark" label="">
@@ -702,11 +705,13 @@ function AppearanceScene() {
       <div style={{ position: 'absolute', left: 430, top: 150, transform: 'scale(0.92)', transformOrigin: 'top left' }}>
         <CustomAvatarPanel uploadProgress={uploadProgress} />
       </div>
-      <div style={{ position: 'absolute', right: 150, bottom: 104, opacity: 1 - characterReveal, transform: `translateY(${-16 * characterReveal}px) scale(${1 - characterReveal * 0.08})` }}>
-        <CatSprite state="idle" size={178} />
-      </div>
-      <div style={{ position: 'absolute', right: 190, bottom: 128, opacity: characterReveal, transform: `translateY(${(1 - characterReveal) * 34}px)` }}>
-        <TomJerryCompanion progress={characterReveal} scale={1.08} />
+      <div style={{ position: 'absolute', right: 170, bottom: 118, width: 270, height: 278, display: 'grid', placeItems: 'center', overflow: 'visible' }}>
+        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: 1 - characterReveal, transform: `translateY(${-10 * characterReveal}px) scale(${1 - characterReveal * 0.06})` }}>
+          <CatSprite state="idle" size={178} />
+        </div>
+        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', opacity: characterReveal, transform: `translateY(${(1 - characterReveal) * 28}px)` }}>
+          <ExampleAvatarCompanion progress={characterReveal} scale={1.08} />
+        </div>
       </div>
       {picker > 0 ? (
         <Glass mode="dark" strong style={{ position: 'absolute', left: 760, top: 384, width: 380, height: 310, borderRadius: 22, padding: 18, opacity: picker, transform: `translateY(${(1 - picker) * 20}px) scale(${0.96 + picker * 0.04})`, background: 'rgba(38,38,38,0.94)', borderColor: 'rgba(255,255,255,0.12)' }}>
@@ -715,9 +720,9 @@ function AppearanceScene() {
             <X size={18} color="rgba(255,255,255,0.46)" />
           </div>
           <div style={{ height: 158, borderRadius: 16, border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '92px 1fr', alignItems: 'center', gap: 15, padding: 14, boxShadow: clickChoose ? '0 0 0 4px rgba(255,255,255,0.12)' : 'none' }}>
-            <TomJerryPhoto size={92} rounded={16} />
+            <ExampleAvatarPhoto size={92} rounded={16} />
             <div>
-              <div style={{ color: dark.text, fontSize: 16, fontWeight: 760 }}>tom-jerry.png</div>
+              <div style={{ color: dark.text, fontSize: 16, fontWeight: 760 }}>example.png</div>
               <div style={{ color: dark.muted, fontSize: 12, marginTop: 7 }}>PNG · transparent artwork</div>
               <div style={{ marginTop: 18, width: 150, height: 8, borderRadius: 999, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
                 <div style={{ width: `${Math.min(100, uploadProgress * 100)}%`, height: '100%', borderRadius: 999, background: '#d8d8d8' }} />
@@ -732,7 +737,7 @@ function AppearanceScene() {
       ) : null}
       {uploadToast > 0 ? (
         <Glass mode="dark" strong style={{ position: 'absolute', left: 1104, top: 430, width: 250, height: 88, borderRadius: 18, padding: 14, display: 'flex', gap: 12, alignItems: 'center', opacity: uploadToast, transform: `translateY(${(1 - uploadToast) * 18}px)`, background: 'rgba(38,38,38,0.92)' }}>
-          <TomJerryPhoto size={56} rounded={12} />
+          <ExampleAvatarPhoto size={56} rounded={12} />
           <div>
             <div style={{ color: dark.text, fontSize: 14, fontWeight: 760 }}>上传完成</div>
             <div style={{ color: dark.muted, fontSize: 12, marginTop: 5 }}>正在渲染新形象</div>
@@ -1184,6 +1189,7 @@ function StatesScene() {
   const local = frame - scenes.states.from;
   const stateIndex = Math.floor(interpolate(local, [10, 168], [0, 2.99], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }));
   const state: PetState = stateIndex === 0 ? 'idle' : stateIndex === 1 ? 'work' : 'rest';
+  const petVisualOffsetX = state === 'idle' ? 34 : state === 'work' ? 24 : 16;
   const progress = interpolate(local, [50, 166], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: ease });
   const orbProgress = interpolate(local, [22, 142], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: ease });
 
@@ -1194,9 +1200,11 @@ function StatesScene() {
         DeskCat can appear as a pet sprite or as a live Orb, with every state reacting on hover.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '430px 660px', gap: 64, alignItems: 'center', marginTop: 84 }}>
-        <Glass mode="dark" strong style={{ width: 430, height: 430, borderRadius: 30, display: 'grid', placeItems: 'center' }}>
+        <Glass mode="dark" strong style={{ width: 430, height: 430, borderRadius: 30, display: 'grid', placeItems: 'center', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', left: 28, top: 24, color: dark.muted, fontSize: 16, fontWeight: 700 }}>Pet mode · {state}</div>
-          <CatSprite state={state} index={state === 'rest' ? 1 : stateIndex} size={236} />
+          <div style={{ position: 'absolute', left: 46, right: 46, top: 78, bottom: 38, display: 'grid', placeItems: 'center', overflow: 'hidden', borderRadius: 22 }}>
+            <CatSprite state={state} index={state === 'rest' ? 1 : stateIndex} size={206} style={{ marginLeft: petVisualOffsetX }} />
+          </div>
         </Glass>
         <Glass mode="dark" strong style={{ width: 660, height: 430, borderRadius: 30, padding: '72px 34px 34px' }}>
           <div style={{ position: 'absolute', left: 28, top: 24, color: dark.muted, fontSize: 16, fontWeight: 700 }}>Orb mode · hover states</div>
