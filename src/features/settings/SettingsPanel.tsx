@@ -29,6 +29,7 @@ import type { ComponentProps, MouseEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 export type SettingsSection =
+  | 'donate'
   | 'profile'
   | 'history'
   | 'general'
@@ -58,6 +59,7 @@ const SECTION_GROUPS: Array<{
   {
     label: '个人',
     items: [
+      { id: 'donate', label: '投喂小猫', icon: PawPrint },
       { id: 'profile', label: '个人档案', icon: UserRound },
       { id: 'history', label: '对话历史', icon: Clock3 },
     ],
@@ -172,6 +174,7 @@ export function SettingsPanel({
 
   return (
     <SettingsLayout sidebar={sidebar}>
+      {activeSection === 'donate' && <DonateSection />}
       {activeSection === 'profile' && <ProfileSection />}
       {(['appearance', 'avatar', 'motion'] as SettingsSection[]).includes(activeSection) && (
         <AppearanceSection settings={settings} updateSettings={updateSettings} view={activeSection as 'appearance' | 'avatar' | 'motion'} />
@@ -223,6 +226,67 @@ export function SettingsPanel({
         <GeneralSection settings={settings} updateSetting={updateSetting} view={activeSection as 'general' | 'timeline' | 'games' | 'music' | 'shortcuts'} />
       )}
     </SettingsLayout>
+  );
+}
+
+function DonateSection() {
+  return (
+    <div className="mx-auto w-full max-w-[760px] px-1 pb-8">
+      <div className="mb-5">
+        <div className="inline-flex items-center gap-2 rounded-full border border-[#ff8a3d]/24 bg-[#fff4eb]/72 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#c85b1c] shadow-[0_8px_18px_rgba(255,138,61,0.10)] dark:border-[#ffb06a]/20 dark:bg-[#3a2418]/42 dark:text-[#ffbc82]">
+          <PawPrint className="h-3.5 w-3.5" />
+          Donate
+        </div>
+        <h1 className="mt-3 text-[28px] font-semibold leading-tight text-foreground">
+          猫咪投喂站
+        </h1>
+        <p className="mt-1 text-[15px] font-medium leading-6 text-muted-foreground">
+          Buy DeskCat a Snack
+        </p>
+      </div>
+
+      <SettingsGroup className="p-5">
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="space-y-4 text-[13px] leading-6 text-foreground/82">
+            <p>
+              这个项目目前由一个人和一只猫共同维护。
+              如果 DeskCat 让你的工作日变得稍微轻松一点，欢迎支持它继续成长。你的支持可能会：提升开发速度、修复神秘bug、以及维持基本猫粮供应。
+            </p>
+            <p className="text-muted-foreground">
+              DeskCat is built by one human and one emotionally unstable cat.
+              If it made your day a little softer or more productive, you can help support its future. Your support helps fund new features, bug fixes, and the cat&apos;s ongoing snack requirements.
+            </p>
+            <a
+              href="#donate-qrcodes"
+              className="inline-flex h-9 items-center justify-center rounded-[10px] bg-[#ff8a3d] px-4 text-[13px] font-semibold text-white shadow-[0_10px_22px_rgba(255,138,61,0.24)] transition hover:bg-[#f27625] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff8a3d]/35"
+            >
+              投喂一下 / Feed the Cat
+            </a>
+            <p className="text-[12px] leading-5 text-muted-foreground">
+              不支持也没关系，小猫还是会陪你上班摸鱼。
+              <br />
+              No pressure — the cat will still hang around your desktop anyway.
+            </p>
+          </div>
+
+          <div id="donate-qrcodes" className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+            <DonateQrCard label="微信 / WeChat" src="/assets/donate/wechat.jpg" />
+            <DonateQrCard label="支付宝 / Alipay" src="/assets/donate/ali.jpg" />
+          </div>
+        </div>
+      </SettingsGroup>
+    </div>
+  );
+}
+
+function DonateQrCard({ label, src }: { label: string; src: string }) {
+  return (
+    <div className="rounded-[12px] border border-border/60 bg-white/62 p-3 shadow-[0_10px_24px_rgba(52,64,84,0.06)] dark:bg-white/[0.055]">
+      <div className="aspect-square overflow-hidden rounded-[8px] bg-white">
+        <img src={src} alt={label} className="h-full w-full object-contain" draggable={false} />
+      </div>
+      <div className="mt-2 text-center text-[12px] font-medium text-muted-foreground">{label}</div>
+    </div>
   );
 }
 
