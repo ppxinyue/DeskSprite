@@ -18,7 +18,11 @@ const copy = {
     manifestoBody:
       'DeskCat is different — a lightweight desktop AI companion that lives quietly in the corner of your screen, always present, never intrusive.',
     featuresLabel: 'FOUR IN ONE',
-    featuresTitle: 'Desktop companion · AI chat · Focus guard · Smart timeline.',
+    featuresTitle: 'Four Core Features',
+    featureTabCompanion: 'Companion',
+    featureTabChat: 'AI Chat',
+    featureTabFocus: 'Focus',
+    featureTabTimeline: 'Timeline',
     companionTitle: 'Companion, not clutter',
     companionBody:
       'A customizable desktop pet with its own look and persona. It stays out of your way until you need it.',
@@ -77,7 +81,11 @@ const copy = {
     manifestoBody:
       'DeskCat 是一款轻量级桌面 AI 助手，住在你屏幕的角落里。它陪你专注、提醒你休息，悄悄记录你一天做了什么。',
     featuresLabel: '四合一',
-    featuresTitle: '桌面宠物 · AI 对话 · 专注守护 · 智能记录。',
+    featuresTitle: '四个核心功能',
+    featureTabCompanion: '桌面陪伴',
+    featureTabChat: 'AI 对话',
+    featureTabFocus: '专注守护',
+    featureTabTimeline: '智能记录',
     companionTitle: '情感陪伴，有温度的存在',
     companionBody: '个性化桌面宠物，支持形象与 persona 定制。它不打扰你，但你需要时它一直在。',
     chatTitle: 'AI 对话，随用随得',
@@ -178,6 +186,61 @@ for (const panel of document.querySelectorAll('.media-panel')) mediaObserver.obs
 for (const video of document.querySelectorAll('.desk-video-grid video, .video-panel video')) {
   video.muted = true;
   video.play().catch(() => {});
+}
+
+const featureStage = document.querySelector('[data-feature-stage]');
+const featureTabs = Array.from(document.querySelectorAll('[data-feature-tab]'));
+const featureSlides = Array.from(document.querySelectorAll('.feature-slide'));
+let featureScrollFrame = null;
+
+function setActiveFeature(index) {
+  featureTabs.forEach((tab, tabIndex) => {
+    tab.classList.toggle('is-active', tabIndex === index);
+  });
+}
+
+function updateFeatureTabFromScroll() {
+  if (!featureStage || featureSlides.length === 0) return;
+  let activeIndex = 0;
+  let closestDistance = Infinity;
+  for (const [index, slide] of featureSlides.entries()) {
+    const distance = Math.abs(slide.offsetLeft - featureStage.scrollLeft);
+    if (distance < closestDistance) {
+      activeIndex = index;
+      closestDistance = distance;
+    }
+  }
+  setActiveFeature(activeIndex);
+}
+
+for (const tab of featureTabs) {
+  tab.addEventListener('click', () => {
+    const targetIndex = Number(tab.dataset.featureTab || 0);
+    const slide = featureSlides[targetIndex];
+    if (!featureStage || !slide) return;
+    featureStage.scrollTo({ left: slide.offsetLeft, behavior: 'smooth' });
+    setActiveFeature(targetIndex);
+  });
+}
+
+if (featureStage) {
+  featureStage.addEventListener('scroll', () => {
+    if (featureScrollFrame) cancelAnimationFrame(featureScrollFrame);
+    featureScrollFrame = requestAnimationFrame(updateFeatureTabFromScroll);
+  });
+
+  featureStage.addEventListener(
+    'wheel',
+    (event) => {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      const maxScroll = featureStage.scrollWidth - featureStage.clientWidth;
+      const nextScroll = Math.min(maxScroll, Math.max(0, featureStage.scrollLeft + event.deltaY));
+      if (nextScroll === featureStage.scrollLeft) return;
+      event.preventDefault();
+      featureStage.scrollLeft = nextScroll;
+    },
+    { passive: false },
+  );
 }
 
 const languageButton = document.querySelector('[data-lang-toggle]');

@@ -62,7 +62,7 @@
         </div>
       </section>
 
-      <section id="download" class="download color-offwhite">
+      <section id="download" class="download color-lilac">
         <div class="download-copy reveal">
           <p class="eyebrow">DOWNLOAD / V1.1.1</p>
           <h2 data-i18n="downloadTitle">Download DeskCat.</h2>
@@ -94,51 +94,50 @@
         </div>
       </section>
 
-      <section id="motion" class="motion-section color-black">
+      <section id="motion" class="motion-section color-green">
         <div class="motion-copy reveal">
           <p class="eyebrow">01 / PRODUCT MOTION</p>
           <h2 data-i18n="motionTitle">Lives quietly in the corner. Ready when you are.</h2>
         </div>
-        <div class="video-frame reveal">
-          <video controls playsinline>
-            <source src="assets/product-video.mp4" type="video/mp4" />
-          </video>
+        <div class="motion-media-stack">
+          <div class="video-frame reveal">
+            <video controls playsinline poster="assets/remotion-head.png">
+              <source src="assets/product-video.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <div class="desk-video-grid reveal" aria-label="DeskCat feature videos">
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="assets/0-desk-web/0.1.mp4" type="video/mp4" />
+            </video>
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="assets/0-desk-web/0.2.mp4" type="video/mp4" />
+            </video>
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="assets/0-desk-web/0.3.mp4" type="video/mp4" />
+            </video>
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="assets/0-desk-web/0.4.mp4" type="video/mp4" />
+            </video>
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="assets/0-desk-web/0.5.mp4" type="video/mp4" />
+            </video>
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="assets/0-desk-web/0.6.mp4" type="video/mp4" />
+            </video>
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="assets/0-desk-web/0.7.mp4" type="video/mp4" />
+            </video>
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="assets/0-desk-web/0.8.mp4" type="video/mp4" />
+            </video>
+            <video autoplay muted loop playsinline preload="metadata">
+              <source src="assets/0-desk-web/0.9.mp4" type="video/mp4" />
+            </video>
+          </div>
         </div>
       </section>
 
-      <section class="motion-gallery color-black">
-        <div class="desk-video-grid reveal" aria-label="DeskCat feature videos">
-          <video autoplay muted loop playsinline preload="metadata">
-            <source src="assets/0-desk-web/0.1.mp4" type="video/mp4" />
-          </video>
-          <video autoplay muted loop playsinline preload="metadata">
-            <source src="assets/0-desk-web/0.2.mp4" type="video/mp4" />
-          </video>
-          <video autoplay muted loop playsinline preload="metadata">
-            <source src="assets/0-desk-web/0.3.mp4" type="video/mp4" />
-          </video>
-          <video autoplay muted loop playsinline preload="metadata">
-            <source src="assets/0-desk-web/0.4.mp4" type="video/mp4" />
-          </video>
-          <video autoplay muted loop playsinline preload="metadata">
-            <source src="assets/0-desk-web/0.5.mp4" type="video/mp4" />
-          </video>
-          <video autoplay muted loop playsinline preload="metadata">
-            <source src="assets/0-desk-web/0.6.mp4" type="video/mp4" />
-          </video>
-          <video autoplay muted loop playsinline preload="metadata">
-            <source src="assets/0-desk-web/0.7.mp4" type="video/mp4" />
-          </video>
-          <video autoplay muted loop playsinline preload="metadata">
-            <source src="assets/0-desk-web/0.8.mp4" type="video/mp4" />
-          </video>
-          <video autoplay muted loop playsinline preload="metadata">
-            <source src="assets/0-desk-web/0.9.mp4" type="video/mp4" />
-          </video>
-        </div>
-      </section>
-
-      <section class="manifesto color-offwhite">
+      <section class="manifesto color-lilac">
         <div class="split-label reveal">
           <span>02</span>
           <span data-i18n="manifestoLabel">WHY IT EXISTS</span>
@@ -152,100 +151,103 @@
         </p>
       </section>
 
-      <section id="features" class="feature-overview color-offwhite">
-        <div class="section-kicker reveal">
-          <span>03</span>
-          <span data-i18n="featuresLabel">FOUR IN ONE</span>
+      <section id="features" class="features-horizontal color-yellow">
+        <div class="features-header reveal">
+          <div class="section-kicker">
+            <span>03</span>
+            <span data-i18n="featuresLabel">FOUR IN ONE</span>
+          </div>
+          <h2 class="section-title" data-i18n="featuresTitle">Four Core Features</h2>
+          <div class="feature-tabs" aria-label="DeskCat feature navigation">
+            <button class="feature-tab is-active" type="button" data-feature-tab="0" data-i18n="featureTabCompanion">Companion</button>
+            <button class="feature-tab" type="button" data-feature-tab="1" data-i18n="featureTabChat">AI Chat</button>
+            <button class="feature-tab" type="button" data-feature-tab="2" data-i18n="featureTabFocus">Focus</button>
+            <button class="feature-tab" type="button" data-feature-tab="3" data-i18n="featureTabTimeline">Timeline</button>
+          </div>
         </div>
-        <h2 class="section-title reveal" data-i18n="featuresTitle">
-          Desktop companion · AI chat · Focus guard · Smart timeline.
-        </h2>
-      </section>
 
-      <section class="features color-offwhite">
-        <article class="feature-story reveal">
-          <div class="feature-copy progressive-copy">
-            <p class="eyebrow">COMPANION</p>
+        <div class="feature-stage reveal" data-feature-stage>
+          <div class="feature-track" data-feature-track>
+            <article class="feature-story feature-slide">
+              <div class="feature-copy progressive-copy">
+                <p class="eyebrow">COMPANION</p>
             <h3 data-i18n="companionTitle">Companion, not clutter</h3>
             <p data-i18n="companionBody">
               A customizable desktop pet with its own look and persona. It stays out of your way until you
               need it.
             </p>
-          </div>
-          <div class="feature-media-flow">
-            <figure class="media-panel single video-panel">
-              <video autoplay muted loop playsinline preload="metadata">
-                <source src="assets/1-desktop-companion-web/1.mp4" type="video/mp4" />
-              </video>
-            </figure>
-          </div>
-        </article>
+              </div>
+              <div class="feature-media-flow">
+                <figure class="media-panel single video-panel">
+                  <video autoplay muted loop playsinline preload="metadata">
+                    <source src="assets/1-desktop-companion-web/1.mp4" type="video/mp4" />
+                  </video>
+                </figure>
+              </div>
+            </article>
 
-        <article class="feature-story reveal">
-          <div class="feature-copy progressive-copy">
-            <p class="eyebrow">AI CHAT</p>
+            <article class="feature-story feature-slide">
+              <div class="feature-copy progressive-copy">
+                <p class="eyebrow">AI CHAT</p>
             <h3 data-i18n="chatTitle">AI chat, your way</h3>
             <p data-i18n="chatBody">
               Ships with a free built-in model. Plug in any provider you prefer — OpenAI, Claude, or whatever
               fits your stack.
             </p>
-          </div>
-          <div class="feature-media-flow">
-            <figure class="media-panel single ai-chat-panel">
-              <img src="assets/2-chat/图片7.png" alt="DeskCat AI chat preview" />
-            </figure>
-            <figure class="media-panel single ai-chat-panel">
-              <img src="assets/2-chat/图片8.png" alt="DeskCat AI model and chat settings preview" />
-            </figure>
-          </div>
-        </article>
+              </div>
+              <div class="feature-media-flow">
+                <figure class="media-panel single ai-chat-panel">
+                  <img src="assets/2-chat/图片7.png" alt="DeskCat AI chat preview" />
+                </figure>
+                <figure class="media-panel single ai-chat-panel">
+                  <img src="assets/2-chat/图片8.png" alt="DeskCat AI model and chat settings preview" />
+                </figure>
+              </div>
+            </article>
 
-        <article class="feature-story reveal">
-          <div class="feature-copy progressive-copy">
-            <p class="eyebrow">FOCUS</p>
+            <article class="feature-story feature-slide">
+              <div class="feature-copy progressive-copy">
+                <p class="eyebrow">FOCUS</p>
             <h3 data-i18n="focusTitle">Focus mode that actually works</h3>
             <p data-i18n="focusBody">
               Switch windows, open a chat app — DeskCat notices and nudges you back. Coding mode turns agent
               state into quiet color signals.
             </p>
-          </div>
-          <div class="feature-media-flow">
-            <figure class="media-panel single video-panel focus-video-panel">
-              <video autoplay muted loop playsinline preload="metadata" aria-label="DeskCat focus mode reminder">
-                <source src="assets/3-focus-web/3.1.mp4" type="video/mp4" />
-              </video>
-            </figure>
-            <figure class="media-panel single video-panel focus-video-panel">
-              <video autoplay muted loop playsinline preload="metadata" aria-label="DeskCat focus rule settings">
-                <source src="assets/3-focus-web/3.2.mp4" type="video/mp4" />
-              </video>
-            </figure>
-            <figure class="media-panel single video-panel focus-video-panel">
-              <video autoplay muted loop playsinline preload="metadata" aria-label="DeskCat coding mode focus states">
-                <source src="assets/3-focus-web/3.3.mp4" type="video/mp4" />
-              </video>
-            </figure>
-          </div>
-        </article>
+              </div>
+              <div class="feature-media-flow">
+                <figure class="media-panel single video-panel focus-video-panel">
+                  <video autoplay muted loop playsinline preload="metadata" aria-label="DeskCat focus mode reminder">
+                    <source src="assets/3-focus-web/3.1.mp4" type="video/mp4" />
+                  </video>
+                </figure>
+                <figure class="media-panel single video-panel focus-video-panel">
+                  <video autoplay muted loop playsinline preload="metadata" aria-label="DeskCat coding mode focus states">
+                    <source src="assets/3-focus-web/3.3.mp4" type="video/mp4" />
+                  </video>
+                </figure>
+              </div>
+            </article>
 
-        <article class="feature-story reveal">
-          <div class="feature-copy progressive-copy">
-            <p class="eyebrow">TIMELINE</p>
+            <article class="feature-story feature-slide">
+              <div class="feature-copy progressive-copy">
+                <p class="eyebrow">TIMELINE</p>
             <h3 data-i18n="timelineTitle">A timeline you did not have to write</h3>
             <p data-i18n="timelineBody">
               DeskCat tracks foreground apps, background activity, terminal sessions, and browser tabs, then
               hands you a daily summary.
             </p>
+              </div>
+              <div class="feature-media-flow">
+                <figure class="media-panel single timeline-media-panel">
+                  <img src="assets/4-timeline/图片5.png" alt="DeskCat timeline dashboard preview" />
+                </figure>
+                <figure class="media-panel single timeline-media-panel">
+                  <img src="assets/4-timeline/图片6.png" alt="DeskCat daily activity timeline preview" />
+                </figure>
+              </div>
+            </article>
           </div>
-          <div class="feature-media-flow">
-            <figure class="media-panel single timeline-media-panel">
-              <img src="assets/4-timeline/图片5.png" alt="DeskCat timeline dashboard preview" />
-            </figure>
-            <figure class="media-panel single timeline-media-panel">
-              <img src="assets/4-timeline/图片6.png" alt="DeskCat daily activity timeline preview" />
-            </figure>
-          </div>
-        </article>
+        </div>
       </section>
 
     </main>
@@ -308,7 +310,7 @@
       </div>
     </div>
 
-    <footer class="site-footer color-black">
+    <footer class="site-footer color-lilac">
       <a class="footer-brand" href="#top" aria-label="DeskCat home">
         <img src="assets/icon.png" alt="" />
         <span>DeskCat</span>
