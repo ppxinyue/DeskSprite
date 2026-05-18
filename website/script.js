@@ -327,6 +327,16 @@ function formatStatNumber(value) {
   return new Intl.NumberFormat(currentLanguage === 'zh' ? 'zh-CN' : 'en-US').format(Number(value || 0));
 }
 
+function parseFormattedStat(node) {
+  if (!node) return 0;
+  return Number(node.textContent.replace(/[^\d]/g, '')) || 0;
+}
+
+function bumpDownloadStats() {
+  if (totalDownloadsEl) totalDownloadsEl.textContent = formatStatNumber(parseFormattedStat(totalDownloadsEl) + 1);
+  if (productDownloadsEl) productDownloadsEl.textContent = formatStatNumber(parseFormattedStat(productDownloadsEl) + 1);
+}
+
 async function refreshPublicStats() {
   if (!publicStatsUrl || !totalUsersEl) return;
   const response = await fetch(publicStatsUrl, { cache: 'no-store' });
@@ -343,25 +353,27 @@ async function refreshPublicStats() {
 }
 
 function postStatsPayload(payload, options = {}) {
-  if (!publicStatsUrl) return;
+  if (!publicStatsUrl) return Promise.resolve(false);
   const body = JSON.stringify(payload);
   const preferBeacon = options.preferBeacon ?? true;
 
   if (preferBeacon && navigator.sendBeacon) {
-    navigator.sendBeacon(publicStatsUrl, new Blob([body], { type: 'application/json' }));
-    return;
+    const queued = navigator.sendBeacon(publicStatsUrl, new Blob([body], { type: 'application/json' }));
+    if (queued) return Promise.resolve(true);
   }
 
-  fetch(publicStatsUrl, {
+  return fetch(publicStatsUrl, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body,
     keepalive: true,
-  }).catch(() => {});
+  })
+    .then((response) => response.ok)
+    .catch(() => false);
 }
 
 function trackPageView() {
-  postStatsPayload({
+  void postStatsPayload({
     eventType: 'page_view',
     path: `${window.location.pathname}${window.location.search}`,
     locale: currentLanguage,
@@ -370,13 +382,13 @@ function trackPageView() {
 }
 
 function trackDownload(link) {
-  postStatsPayload({
+  return postStatsPayload({
     eventType: 'download',
     asset: link.dataset.downloadAsset || link.getAttribute('download') || link.href.split('/').pop(),
     href: link.href,
     locale: currentLanguage,
     referrer: document.referrer || null,
-  });
+  }, { preferBeacon: false });
 }
 
 function animateDownloadButton(link) {
@@ -421,12 +433,18 @@ function closeDonateModal() {
   setPanelHidden(donateModal, true);
 }
 
-function startPendingDownload() {
+async function startPendingDownload() {
   if (!pendingDownloadLink) return;
   const link = pendingDownloadLink;
   closeDownloadChoice();
   closeDonateModal();
-  trackDownload(link);
+  const tracked = await Promise.race([
+    trackDownload(link),
+    new Promise((resolve) => {
+      window.setTimeout(() => resolve(false), 900);
+    }),
+  ]);
+  if (tracked) bumpDownloadStats();
   animateDownloadButton(link);
   window.location.href = link.href;
 }
