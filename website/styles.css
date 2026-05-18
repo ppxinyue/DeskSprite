@@ -1252,7 +1252,7 @@ body[data-lang="zh"] .donate-copy h2 {
 .download-choice,
 .donate-modal {
   position: fixed;
-  z-index: 80;
+  z-index: 120;
 }
 
 .download-choice[hidden],
@@ -1401,7 +1401,7 @@ body[data-lang="zh"] .donate-copy h2 {
   position: absolute;
   top: 18px;
   right: 18px;
-  z-index: 3;
+  z-index: 6;
   background: rgba(255, 253, 244, 0.76);
 }
 

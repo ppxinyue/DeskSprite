@@ -390,10 +390,15 @@ function animateDownloadButton(link) {
   );
 }
 
+function syncDownloadUiState() {
+  const hasOpenDownloadPanel = Boolean(downloadChoice && !downloadChoice.hidden) || Boolean(donateModal && !donateModal.hidden);
+  document.body.classList.toggle('has-download-ui', hasOpenDownloadPanel);
+}
+
 function setPanelHidden(panel, isHidden) {
   if (!panel) return;
   panel.hidden = isHidden;
-  document.body.classList.toggle('has-download-ui', !isHidden || !donateModal?.hidden);
+  syncDownloadUiState();
 }
 
 function closeDownloadChoice() {
@@ -520,11 +525,19 @@ for (const image of document.querySelectorAll('[data-qr-image]')) {
 }
 
 for (const node of document.querySelectorAll('[data-close-download-choice]')) {
-  node.addEventListener('click', closeDownloadChoice);
+  node.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeDownloadChoice();
+  });
 }
 
 for (const node of document.querySelectorAll('[data-close-donate]')) {
-  node.addEventListener('click', closeDonateModal);
+  node.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeDonateModal();
+  });
 }
 
 window.addEventListener('keydown', (event) => {
