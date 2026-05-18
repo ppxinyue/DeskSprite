@@ -212,7 +212,6 @@ function renderDailyTrends(data) {
   trendChartEl.innerHTML = `
     ${renderTrendSeries(rows, { key: 'downloads', label: 'Downloads', className: 'downloads', format: (value) => formatNumber(Math.round(value)) })}
     ${renderTrendSeries(rows, { key: 'views', label: 'Views', className: 'views', format: (value) => formatNumber(Math.round(value)) })}
-    ${renderTrendSeries(rows, { key: 'usageMs', label: 'Usage Time', className: 'usage', format: formatDuration })}
   `;
 }
 
