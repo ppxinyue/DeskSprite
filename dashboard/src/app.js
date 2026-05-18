@@ -488,7 +488,7 @@ function renderDownloads(data) {
     {
       label: `GitHub${github.repo ? ` · ${github.repo}` : ''}`,
       value: github.count,
-      sub: github.error || 'release assets + repository clones',
+      sub: github.error || 'current release asset downloads',
       level: 0,
     },
     {
@@ -500,15 +500,8 @@ function renderDownloads(data) {
     {
       label: 'GitHub unique repository clones',
       value: github.countedCloneCount ?? github.cloneUniqueCount,
-      sub: github.cloneError || `${formatNumber(github.cloneCount)} raw clone operations · ${formatNumber(github.cloneWindowDays || 14)} day traffic window`,
+      sub: github.cloneError || `${formatNumber(github.cloneWindowDays || 14)} day GitHub traffic`,
       level: 1,
-    },
-    {
-      label: 'GitHub source ZIP',
-      value: null,
-      sub: github.sourceZipError || 'not available from GitHub API',
-      level: 1,
-      unavailable: true,
     },
     ...productAssets.slice(0, 4).map((asset) => ({
       label: `Website · ${asset.asset}`,

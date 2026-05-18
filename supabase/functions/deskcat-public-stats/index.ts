@@ -57,19 +57,21 @@ async function getGithubDownloads() {
   const response = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=100`, { headers });
   if (!response.ok) throw new Error(`GitHub releases request failed: ${response.status}`);
   const releases = await response.json() as Array<{
+    tag_name?: string;
+    published_at?: string;
     draft?: boolean;
     assets?: Array<{ name?: string; download_count?: number; state?: string }>;
   }>;
 
-  const releaseAssetCount = releases.filter((release) => !release.draft).reduce((releaseTotal, release) => {
-    const assetTotal = (release.assets ?? [])
-      .filter((asset) => String(asset.name ?? '').endsWith('.dmg') && (asset.state ?? 'uploaded') === 'uploaded')
-      .reduce(
-        (total, asset) => total + Number(asset.download_count ?? 0),
-        0,
-      );
-    return releaseTotal + assetTotal;
-  }, 0);
+  const latestRelease = releases
+    .filter((release) => !release.draft)
+    .sort((a, b) => String(b.published_at ?? '').localeCompare(String(a.published_at ?? '')))[0];
+  const releaseAssetCount = (latestRelease?.assets ?? [])
+    .filter((asset) => String(asset.name ?? '').endsWith('.dmg') && (asset.state ?? 'uploaded') === 'uploaded')
+    .reduce(
+      (total, asset) => total + Number(asset.download_count ?? 0),
+      0,
+    );
 
   let cloneCount = 0;
   let cloneUniqueCount = 0;
@@ -94,7 +96,7 @@ async function getGithubDownloads() {
   }
 
   return {
-    count: releaseAssetCount + cloneUniqueCount,
+    count: releaseAssetCount,
     releaseAssetCount,
     cloneCount,
     cloneUniqueCount,
